@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ViewTube</title>
+<title>ViewTube OS</title>
 <style>
 :root {
   --bg: rgba(0,0,0,0.75);
@@ -18,7 +18,7 @@ body {
   color: var(--text);
 }
 
-/* Top bar + tabs */
+/* Top bar */
 
 .topbar {
   display: flex;
@@ -32,7 +32,7 @@ body {
   border: 1px solid rgba(255,255,255,0.12);
   box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
   margin: 8px;
-  z-index: 10;
+  z-index: 20;
 }
 
 .app-title-wrap {
@@ -75,51 +75,66 @@ body {
   cursor: pointer;
 }
 
-.tabs {
+/* Glassy search bar (full width, below topbar) */
+
+.search-tab {
+  margin: 0 8px 8px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.18);
+  backdrop-filter: blur(26px) saturate(1.3);
+  -webkit-backdrop-filter: blur(26px) saturate(1.3);
   display: flex;
-  gap: 6px;
-  padding: 6px 8px;
-  margin: 8px;
-  background: var(--bg);
-  border-radius: 22px;
-  backdrop-filter: blur(var(--blur)) saturate(1.2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
-  border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
-  z-index: 9;
-}
-
-.tab-btn {
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: none;
-  background: transparent;
-  color: var(--text);
+  align-items: center;
+  gap: 10px;
   cursor: pointer;
-  opacity: 0.7;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
+  z-index: 19;
 }
 
-.tab-btn.active {
-  background: rgba(255,255,255,0.12);
-  opacity: 1;
+.search-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,0.8);
+  position: relative;
 }
 
-/* Search bar + suggestions + keyboard */
+.search-icon::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 2px;
+  background: rgba(255,255,255,0.8);
+  border-radius: 999px;
+  transform: rotate(45deg);
+  right: -6px;
+  bottom: -1px;
+}
 
-.search-wrapper {
+.search-label {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+/* Hidden search input + keyboard container */
+
+.search-panel {
   position: relative;
   margin: 0 8px 8px;
+  display: none;
 }
 
-.search-bar {
+.search-input-bar {
   display: flex;
   gap: 6px;
   padding: 6px 8px;
-  background: var(--bg);
+  background: rgba(255,255,255,0.04);
   border-radius: 18px;
-  backdrop-filter: blur(var(--blur)) saturate(1.2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
-  border: 1px solid rgba(255,255,255,0.12);
+  backdrop-filter: blur(26px) saturate(1.3);
+  -webkit-backdrop-filter: blur(26px) saturate(1.3);
+  border: 1px solid rgba(255,255,255,0.18);
 }
 
 .search-input {
@@ -140,33 +155,11 @@ body {
   cursor: pointer;
 }
 
-.suggestions {
-  position: absolute;
-  top: 40px;
-  left: 0;
-  right: 0;
-  background: rgba(10,10,10,0.95);
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.15);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.7);
-  padding: 4px 0;
-  display: none;
-  z-index: 15;
-}
-
-.suggestion-item {
-  padding: 6px 10px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.suggestion-item:hover {
-  background: rgba(255,255,255,0.08);
-}
+/* Keyboard under search bar */
 
 .keyboard {
   position: absolute;
-  top: 70px;
+  top: 40px;
   left: 0;
   right: 0;
   background: rgba(10,10,10,0.95);
@@ -174,7 +167,7 @@ body {
   -webkit-backdrop-filter: blur(18px);
   padding: 8px;
   display: none;
-  z-index: 14;
+  z-index: 18;
   border-radius: 16px;
   border: 1px solid rgba(255,255,255,0.15);
 }
@@ -197,7 +190,38 @@ body {
   cursor: pointer;
 }
 
-/* Player */
+/* Tabs */
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  margin: 8px;
+  background: var(--bg);
+  border-radius: 22px;
+  backdrop-filter: blur(var(--blur)) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
+  z-index: 17;
+}
+
+.tab-btn {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.tab-btn.active {
+  background: rgba(255,255,255,0.12);
+  opacity: 1;
+}
+
+/* Player (auto-scaled square) */
 
 .player {
   margin: 8px;
@@ -210,52 +234,53 @@ body {
   box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
   transform-style: preserve-3d;
   transition: transform 0.12s ease-out, width 0.25s ease-out, height 0.25s ease-out, top 0.25s ease-out, left 0.25s ease-out;
-  z-index: 20;
+  z-index: 30;
   position: relative;
   display: none;
+  width: min(600px, 90vw);
+  height: min(600px, 90vw);
 }
 
 .player iframe {
   width: 100%;
-  height: 220px;
+  height: 100%;
   border-radius: 18px;
   border: none;
 }
 
 .player-controls {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
   display: flex;
   justify-content: space-between;
   gap: 6px;
-  margin-top: 6px;
 }
 
 .ctrl-btn {
   padding: 4px 8px;
   border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.25);
-  background: transparent;
+  background: rgba(0,0,0,0.5);
   color: var(--text);
   cursor: pointer;
+  font-size: 11px;
 }
 
 /* Fullscreen */
 
 .player-fullscreen {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(600px, 90vw);
+  height: min(600px, 90vw);
   margin: 0;
-  border-radius: 0;
+  border-radius: 22px;
   z-index: 50;
   display: block;
-}
-
-.player-fullscreen iframe {
-  width: 100%;
-  height: calc(100vh - 40px);
-  border-radius: 0;
 }
 
 /* Mini-player */
@@ -264,11 +289,11 @@ body {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 260px;
-  height: 150px;
+  width: 220px;
+  height: 220px;
   border-radius: 18px;
   overflow: hidden;
-  z-index: 30;
+  z-index: 40;
   box-shadow: 0 8px 24px rgba(0,0,0,0.8), 0 2px 6px rgba(0,0,0,0.6);
   backdrop-filter: blur(var(--blur));
   -webkit-backdrop-filter: blur(var(--blur));
@@ -460,21 +485,16 @@ body {
   <button id="themeToggle" class="btn">Mode</button>
 </div>
 
-<div id="tabs" class="tabs parallax">
-  <button id="homeTab" class="tab-btn active">Home</button>
-  <button id="shortsTab" class="tab-btn">Shorts</button>
-  <button id="relatedTab" class="tab-btn">Related</button>
-  <button id="historyTab" class="tab-btn">History</button>
-  <button id="trendingTab" class="tab-btn">Trending</button>
-  <button id="channelTab" class="tab-btn">Channel</button>
+<div id="searchTab" class="search-tab parallax">
+  <div class="search-icon"></div>
+  <div class="search-label">Search YouTube</div>
 </div>
 
-<div class="search-wrapper parallax" id="searchWrapper">
-  <div class="search-bar">
-    <input id="searchInput" class="search-input" placeholder="Search YouTube..." />
+<div id="searchPanel" class="search-panel parallax">
+  <div class="search-input-bar">
+    <input id="searchInput" class="search-input" placeholder="Search..." />
     <button id="searchGo" class="search-btn">Go</button>
   </div>
-  <div id="suggestions" class="suggestions"></div>
   <div id="keyboard" class="keyboard">
     <div class="keyboard-row">
       <button class="key-btn">A</button>
@@ -518,6 +538,15 @@ body {
   </div>
 </div>
 
+<div id="tabs" class="tabs parallax">
+  <button id="homeTab" class="tab-btn active">Home</button>
+  <button id="shortsTab" class="tab-btn">Shorts</button>
+  <button id="relatedTab" class="tab-btn">Related</button>
+  <button id="historyTab" class="tab-btn">History</button>
+  <button id="trendingTab" class="tab-btn">Trending</button>
+  <button id="channelTab" class="tab-btn">Channel</button>
+</div>
+
 <div class="player parallax" id="playerSection">
   <iframe id="playerFrame" src="" allowfullscreen></iframe>
   <div class="player-controls">
@@ -526,6 +555,7 @@ body {
       <button id="rewindBtn" class="ctrl-btn">⏪ 10s</button>
       <button id="playPauseBtn" class="ctrl-btn">Pause</button>
       <button id="forwardBtn" class="ctrl-btn">⏩ 10s</button>
+      <button id="fullBtn" class="ctrl-btn">Full</button>
     </div>
   </div>
 </div>
@@ -537,41 +567,42 @@ body {
 <div id="hud" class="hud"></div>
 
 <script>
-// API keys (replace with your real keys locally)
+// API keys (replace with your real keys)
 const API_KEYS = [
   "AIzaSyAYMawk2KDutvl77rHRUW7Ke6sVsQLbv4k",
-  "AIzaSyDF7DasyCt4U2nle8U6fPZm7QnOwbg_VKg",
+  "AIzaSyDvEbhT-7Pze6cD8FMjYVfJ04SENWoWeAU",
+  "AIzaSyDw6IUNvuDz100eGn-vObZ0tAa8a1jSu9U",
+  "AIzaSyB8MwIt7xiBXFpyj2AUjPE7VRB0MqqY8G8",
+  "AIzaSyCTBtxW_yAJod-az7pGyWEvjLOBEZoyKTk",
+  "AIzaSyDtbk2O00EOh3wcZL3zI-2xHw_B4cz4kU0",
+  "AIzaSyDwC5M_sI5GFU28amUzoMH6LADOczhjtnU",
+  "AIzaSyAzClMaJKl0IYwmI6gcAA9JU82T9CKpkIY",
+  "AIzaSyD-l8BkA618b_s-gdA7PdGicX4_7m381Nw",
+  "AIzaSyAnonwBzHe_B1ZQENw_h_tTe1mc8028lN0",
+  "AIzaSyC8iihsKNeQbeCm_IMJzc7nu1RyhZeRLC8",
+  "AIzaSyDTbRmYLb0BZ95XSexmvviM9movGqQdnpM",
+  "AIzaSyDJk296nOcAkhbcTDAaj1AcfkJLrADXO8A",
+  "AIzaSyDNz0FwRrW1aJyNsJCuyDBtHABf5PJB4NA",
+  "AIzaSyAFbQeij52ZNdw71_3YM29JbVBzdA6j2bk",
+  "AIzaSyD-fHmIX5xWWBhimAAppT0MjpSj7kZeL3k",
+  "AIzaSyCn1W60JG2bBLhfcmdf_4IO4DwbPcSUamw",
+  "AIzaSyAo-sasBmE6POcUWeLG_LJZHC1AIn0ptCQ",
   "AIzaSyBkaog-TrCWGhT2pe9cVQ3aVNwyxvO-vpc",
+  "AIzaSyDF7DasyCt4U2nle8U6fPZm7QnOwbg_VKg",
   "AIzaSyA2aSVuBFCbNdraBsX07qMGmEzmLLrgKD0",
+  "AIzaSyBOBfqmbQ7TEZLBKoYBbFMHiLrsQwTHs-Q",
+  "AIzaSyAFBJRSmLYveDga_kMdWLSBUWmVAQUsim4",
+  "AIzaSyDPTNRYM0ePk3y17ZgePY0RP0OIBOCxE28",
   "AIzaSyA_lsaX7dRjRsaYb2cwxD2mB7U5t6iYdM0",
-  "AIzaSyDjluVd8lCtMlCUKxD4J6YLs1n86jZdA-8",
-  "AIzaSyA72atzyYdbE7bMVGkKW3TVYJkOxo4zqGY",
-  "AIzaSyDqKaX9dypHZOky60_wNba3sLO0Gm6rs5Q",
-  "AIzaSyAb1msw18FjkWQ9eTC1FLBCOCshTT2biY0",
+  "AIzaSyD0OpYzLo49Bzwj5lLg8JPiBLD8te7xjNQ",
+  "AIzaSyBO717pJHi6l3x1fMxvjoV9Qi1yNYTqJ5M",
+  "AIzaSyDRA6Tij7ZdMAOGbK8bn6X3JEtTTKgO2ik",
   "AIzaSyDBH0yil9RS4rLg3H2gVUOoxnojdEy9NYk",
   "AIzaSyDRA6Tij7ZdMAOGbK8bn6X3JEtTTKgO2ik",
-  "AIzaSyBO717pJHi6l3x1fMxvjoV9Qi1yNYTqJ5M",
-  "AIzaSyD0OpYzLo49Bzwj5lLg8JPiBLD8te7xjNQ",
-  "AIzaSyDPTNRYM0ePk3y17ZgePY0RP0OIBOCxE28",
-  "AIzaSyAFBJRSmLYveDga_kMdWLSBUWmVAQUsim4",
-  "AIzaSyBOBfqmbQ7TEZLBKoYBbFMHiLrsQwTHs-Q",
-  "AIzaSyAo-sasBmE6POcUWeLG_LJZHC1AIn0ptCQ",
-  "AIzaSyCn1W60JG2bBLhfcmdf_4IO4DwbPcSUamw",
-  "AIzaSyD-fHmIX5xWWBhimAAppT0MjpSj7kZeL3k",
-  "AIzaSyAFbQeij52ZNdw71_3YM29JbVBzdA6j2bk",
-  "AIzaSyDNz0FwRrW1aJyNsJCuyDBtHABf5PJB4NA",
-  "AIzaSyDJk296nOcAkhbcTDAaj1AcfkJLrADXO8A",
-  "AIzaSyDTbRmYLb0BZ95XSexmvviM9movGqQdnpM",
-  "AIzaSyC8iihsKNeQbeCm_IMJzc7nu1RyhZeRLC8",
-  "AIzaSyAnonwBzHe_B1ZQENw_h_tTe1mc8028lN0",
-  "AIzaSyD-l8BkA618b_s-gdA7PdGicX4_7m381Nw",
-  "AIzaSyAzClMaJKl0IYwmI6gcAA9JU82T9CKpkIY",
-  "AIzaSyDwC5M_sI5GFU28amUzoMH6LADOczhjtnU",
-  "AIzaSyDtbk2O00EOh3wcZL3zI-2xHw_B4cz4kU0",
-  "AIzaSyCTBtxW_yAJod-az7pGyWEvjLOBEZoyKTk",
-  "AIzaSyB8MwIt7xiBXFpyj2AUjPE7VRB0MqqY8G8",
-  "AIzaSyDw6IUNvuDz100eGn-vObZ0tAa8a1jSu9U",
-  "AIzaSyDvEbhT-7Pze6cD8FMjYVfJ04SENWoWeAU"
+  "AIzaSyDBH0yil9RS4rLg3H2gVUOoxnojdEy9NYk",
+  "AIzaSyAb1msw18FjkWQ9eTC1FLBCOCshTT2biY0",
+  "AIzaSyA72atzyYdbE7bMVGkKW3TVYJkOxo4zqGY",
+  "AIzaSyDjluVd8lCtMlCUKxD4J6YLs1n86jZdA-8"
 ];
 
 let keyIndex = 0;
@@ -610,8 +641,6 @@ let isLight = false;
 let currentChannelId = "UCoLDGQ7a81ep9SJqPlDs2sg";
 let channelNextPageToken = null;
 let historyList = [];
-let playerReady = false;
-let player;
 
 // Elements
 const feedEl = document.getElementById("feed");
@@ -622,7 +651,9 @@ const channelPageEl = document.getElementById("channelPage");
 
 const topbarEl = document.getElementById("topbar");
 const tabsEl = document.getElementById("tabs");
-const searchWrapperEl = document.getElementById("searchWrapper");
+const searchTabEl = document.getElementById("searchTab");
+const searchPanelEl = document.getElementById("searchPanel");
+const keyboardEl = document.getElementById("keyboard");
 
 const homeTab = document.getElementById("homeTab");
 const shortsTab = document.getElementById("shortsTab");
@@ -635,49 +666,9 @@ const backBtn = document.getElementById("backBtn");
 const playPauseBtn = document.getElementById("playPauseBtn");
 const forwardBtn = document.getElementById("forwardBtn");
 const rewindBtn = document.getElementById("rewindBtn");
+const fullBtn = document.getElementById("fullBtn");
 const searchInput = document.getElementById("searchInput");
 const searchGo = document.getElementById("searchGo");
-const keyboardEl = document.getElementById("keyboard");
-const suggestionsEl = document.getElementById("suggestions");
-
-// Suggestions
-const suggestionPool = [
-  "music",
-  "gaming",
-  "news",
-  "sports",
-  "movies",
-  "trailers",
-  "technology",
-  "podcasts",
-  "shorts",
-  "funny videos",
-  "tutorials",
-  "live streams"
-];
-
-function updateSuggestions(query) {
-  const q = query.toLowerCase();
-  const matches = suggestionPool.filter(s => s.toLowerCase().includes(q)).slice(0, 6);
-  if (!q || matches.length === 0) {
-    suggestionsEl.style.display = "none";
-    suggestionsEl.innerHTML = "";
-    return;
-  }
-  suggestionsEl.innerHTML = "";
-  matches.forEach(m => {
-    const item = document.createElement("div");
-    item.className = "suggestion-item";
-    item.textContent = m;
-    item.onclick = () => {
-      searchInput.value = m;
-      suggestionsEl.style.display = "none";
-      triggerSearch(m);
-    };
-    suggestionsEl.appendChild(item);
-  });
-  suggestionsEl.style.display = "block";
-}
 
 // HUD
 function showHUD(text) {
@@ -688,27 +679,24 @@ function showHUD(text) {
   }, 1200);
 }
 
-// Player setup (YouTube IFrame API)
-function loadPlayer(videoId) {
-  const src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
-  playerFrame.src = src;
-}
-
 // UI hide/show
 function hideUIForVideo() {
   topbarEl.style.display = "none";
+  searchTabEl.style.display = "none";
+  searchPanelEl.style.display = "none";
   tabsEl.style.display = "none";
-  searchWrapperEl.style.display = "none";
   feedEl.style.display = "none";
   channelPageEl.style.display = "none";
   keyboardEl.style.display = "none";
-  suggestionsEl.style.display = "none";
 }
 
 function showUIWithMiniPlayer() {
   topbarEl.style.display = "flex";
+  searchTabEl.style.display = "flex";
   tabsEl.style.display = "flex";
-  searchWrapperEl.style.display = "block";
+  searchPanelEl.style.display = "none";
+  keyboardEl.style.display = "none";
+
   if (currentTab === "channel") {
     channelPageEl.style.display = "block";
     feedEl.style.display = "none";
@@ -723,10 +711,11 @@ function setPlayerVideo(videoId, snippet) {
   currentVideoId = videoId;
   playerSection.style.display = "block";
   playerSection.classList.remove("player-mini", "player-fullscreen");
-  loadPlayer(videoId);
+  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
   historyList.unshift({ id: videoId, snippet });
   if (historyList.length > 50) historyList.pop();
   hideUIForVideo();
+  playPauseBtn.textContent = "Pause";
 }
 
 // Tabs
@@ -748,6 +737,10 @@ function setActiveTab(tab) {
     feedEl.style.display = "block";
     channelPageEl.style.display = "none";
   }
+
+  // keyboard must disappear when switching tabs
+  keyboardEl.style.display = "none";
+  searchPanelEl.style.display = "none";
 }
 
 // Feed renderer
@@ -868,18 +861,26 @@ backBtn.addEventListener("click", () => {
   miniActive = true;
   showUIWithMiniPlayer();
   keyboardEl.style.display = "none";
-  suggestionsEl.style.display = "none";
+  searchPanelEl.style.display = "none";
   showHUD("Mini-player");
 });
 
-// Simple play/pause/seek using postMessage (best-effort)
+// Fullscreen toggle (resume from mini)
+fullBtn.addEventListener("click", () => {
+  if (!playerSection.style.display || playerSection.style.display === "none") return;
+  playerSection.classList.remove("player-mini");
+  playerSection.classList.add("player-fullscreen");
+  hideUIForVideo();
+  showHUD("Fullscreen");
+});
+
+// Simple play/pause/seek using postMessage
 function postToPlayer(command) {
   if (!playerFrame.contentWindow) return;
   playerFrame.contentWindow.postMessage(JSON.stringify(command), "*");
 }
 
 playPauseBtn.addEventListener("click", () => {
-  // Toggle text only; actual pause/play requires YouTube JS API
   if (playPauseBtn.textContent === "Pause") {
     playPauseBtn.textContent = "Play";
     postToPlayer({ event: "command", func: "pauseVideo", args: [] });
@@ -1029,6 +1030,8 @@ shortsTab.addEventListener("click", async () => {
     order: "date"
   });
   renderFeed(data.items || []);
+  keyboardEl.style.display = "none";
+  searchPanelEl.style.display = "none";
   showHUD("Shorts");
 });
 
@@ -1045,6 +1048,8 @@ relatedTab.addEventListener("click", async () => {
     maxResults: 25
   });
   renderFeed(data.items || []);
+  keyboardEl.style.display = "none";
+  searchPanelEl.style.display = "none";
   showHUD("Related");
 });
 
@@ -1056,33 +1061,31 @@ historyTab.addEventListener("click", async () => {
     statistics: { viewCount: "watched" }
   }));
   renderFeed(items);
+  keyboardEl.style.display = "none";
+  searchPanelEl.style.display = "none";
   showHUD("History");
 });
 
 channelTab.addEventListener("click", async () => {
+  keyboardEl.style.display = "none";
+  searchPanelEl.style.display = "none";
   loadChannelPage(currentChannelId);
 });
 
-// Search + keyboard
+// Search tab + keyboard
 
 function openKeyboard() {
+  searchPanelEl.style.display = "block";
   keyboardEl.style.display = "block";
 }
 
 function closeKeyboard() {
   keyboardEl.style.display = "none";
+  searchPanelEl.style.display = "none";
 }
 
-searchInput.addEventListener("focus", () => {
+searchTabEl.addEventListener("click", () => {
   openKeyboard();
-});
-
-searchInput.addEventListener("click", () => {
-  openKeyboard();
-});
-
-searchInput.addEventListener("input", (e) => {
-  updateSuggestions(e.target.value);
 });
 
 searchGo.addEventListener("click", () => {
@@ -1105,7 +1108,6 @@ keyboardEl.addEventListener("click", (e) => {
   } else {
     searchInput.value += key;
   }
-  updateSuggestions(searchInput.value);
 });
 
 function triggerSearch(q) {
@@ -1120,7 +1122,6 @@ function triggerSearch(q) {
     renderFeed(data.items || []);
     showHUD("Search: " + q);
     closeKeyboard();
-    suggestionsEl.style.display = "none";
   })();
 }
 
