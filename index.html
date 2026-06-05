@@ -5,16 +5,9 @@
 <title>ViewTube</title>
 <style>
 :root {
-  --bg: rgba(0,0,0,0.65);
-  --card: rgba(10,10,10,0.7);
+  --bg: rgba(0,0,0,0.75);
+  --card: rgba(10,10,10,0.8);
   --text: #fff;
-  --blur: 20px;
-}
-
-.light {
-  --bg: rgba(255,255,255,0.25);
-  --card: rgba(255,255,255,0.35);
-  --text: #000;
   --blur: 22px;
 }
 
@@ -37,7 +30,7 @@ body {
   backdrop-filter: blur(var(--blur)) saturate(1.2);
   -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
   border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
   margin: 8px;
   z-index: 10;
 }
@@ -92,7 +85,7 @@ body {
   backdrop-filter: blur(var(--blur)) saturate(1.2);
   -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
   border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
   z-index: 9;
 }
 
@@ -111,13 +104,17 @@ body {
   opacity: 1;
 }
 
-/* Search bar */
+/* Search bar + suggestions + keyboard */
+
+.search-wrapper {
+  position: relative;
+  margin: 0 8px 8px;
+}
 
 .search-bar {
   display: flex;
   gap: 6px;
   padding: 6px 8px;
-  margin: 0 8px 8px;
   background: var(--bg);
   border-radius: 18px;
   backdrop-filter: blur(var(--blur)) saturate(1.2);
@@ -143,19 +140,43 @@ body {
   cursor: pointer;
 }
 
-/* Custom keyboard */
-
-.keyboard {
-  position: fixed;
-  bottom: 0;
+.suggestions {
+  position: absolute;
+  top: 40px;
   left: 0;
   right: 0;
-  background: rgba(10,10,10,0.9);
+  background: rgba(10,10,10,0.95);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.15);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.7);
+  padding: 4px 0;
+  display: none;
+  z-index: 15;
+}
+
+.suggestion-item {
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.suggestion-item:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.keyboard {
+  position: absolute;
+  top: 70px;
+  left: 0;
+  right: 0;
+  background: rgba(10,10,10,0.95);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   padding: 8px;
   display: none;
-  z-index: 40;
+  z-index: 14;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.15);
 }
 
 .keyboard-row {
@@ -186,12 +207,12 @@ body {
   backdrop-filter: blur(var(--blur)) saturate(1.2);
   -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
   border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
   transform-style: preserve-3d;
   transition: transform 0.12s ease-out, width 0.25s ease-out, height 0.25s ease-out, top 0.25s ease-out, left 0.25s ease-out;
-  z-index: 12;
+  z-index: 20;
   position: relative;
-  display: none; /* hidden on startup */
+  display: none;
 }
 
 .player iframe {
@@ -248,7 +269,7 @@ body {
   border-radius: 18px;
   overflow: hidden;
   z-index: 30;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.8), 0 2px 6px rgba(0,0,0,0.6);
   backdrop-filter: blur(var(--blur));
   -webkit-backdrop-filter: blur(var(--blur));
   display: block;
@@ -269,7 +290,7 @@ body {
   backdrop-filter: blur(var(--blur)) saturate(1.2);
   -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
   border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
   transform-style: preserve-3d;
   transition: transform 0.25s ease-out;
   z-index: 5;
@@ -322,8 +343,8 @@ body {
   -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
   border: 1px solid rgba(255,255,255,0.12);
   font-size: 11px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4);
-  z-index: 20;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
+  z-index: 60;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease-out;
@@ -339,7 +360,7 @@ body {
   backdrop-filter: blur(var(--blur)) saturate(1.2);
   -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
   border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
   transform-style: preserve-3d;
   transition: transform 0.25s ease-out;
 }
@@ -357,7 +378,7 @@ body {
   backdrop-filter: blur(var(--blur)) saturate(1.2);
   -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
   border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
   transform-style: preserve-3d;
   transition: transform 0.25s ease-out;
   z-index: 11;
@@ -431,7 +452,7 @@ body {
 </head>
 <body>
 
-<div class="topbar parallax">
+<div id="topbar" class="topbar parallax">
   <div class="app-title-wrap">
     <div class="youtube-logo"></div>
     <div class="app-title">ViewTube</div>
@@ -439,7 +460,7 @@ body {
   <button id="themeToggle" class="btn">Mode</button>
 </div>
 
-<div class="tabs parallax">
+<div id="tabs" class="tabs parallax">
   <button id="homeTab" class="tab-btn active">Home</button>
   <button id="shortsTab" class="tab-btn">Shorts</button>
   <button id="relatedTab" class="tab-btn">Related</button>
@@ -448,16 +469,64 @@ body {
   <button id="channelTab" class="tab-btn">Channel</button>
 </div>
 
-<div class="search-bar parallax">
-  <input id="searchInput" class="search-input" placeholder="Search YouTube..." />
-  <button id="searchGo" class="search-btn">Go</button>
+<div class="search-wrapper parallax" id="searchWrapper">
+  <div class="search-bar">
+    <input id="searchInput" class="search-input" placeholder="Search YouTube..." />
+    <button id="searchGo" class="search-btn">Go</button>
+  </div>
+  <div id="suggestions" class="suggestions"></div>
+  <div id="keyboard" class="keyboard">
+    <div class="keyboard-row">
+      <button class="key-btn">A</button>
+      <button class="key-btn">B</button>
+      <button class="key-btn">C</button>
+      <button class="key-btn">D</button>
+      <button class="key-btn">E</button>
+      <button class="key-btn">F</button>
+    </div>
+    <div class="keyboard-row">
+      <button class="key-btn">G</button>
+      <button class="key-btn">H</button>
+      <button class="key-btn">I</button>
+      <button class="key-btn">J</button>
+      <button class="key-btn">K</button>
+      <button class="key-btn">L</button>
+    </div>
+    <div class="keyboard-row">
+      <button class="key-btn">M</button>
+      <button class="key-btn">N</button>
+      <button class="key-btn">O</button>
+      <button class="key-btn">P</button>
+      <button class="key-btn">Q</button>
+      <button class="key-btn">R</button>
+    </div>
+    <div class="keyboard-row">
+      <button class="key-btn">S</button>
+      <button class="key-btn">T</button>
+      <button class="key-btn">U</button>
+      <button class="key-btn">V</button>
+      <button class="key-btn">W</button>
+      <button class="key-btn">X</button>
+    </div>
+    <div class="keyboard-row">
+      <button class="key-btn">Y</button>
+      <button class="key-btn">Z</button>
+      <button class="key-btn" data-key="SPACE">SPACE</button>
+      <button class="key-btn" data-key="DELETE">DELETE</button>
+      <button class="key-btn" data-key="ENTER">ENTER</button>
+    </div>
+  </div>
 </div>
 
 <div class="player parallax" id="playerSection">
   <iframe id="playerFrame" src="" allowfullscreen></iframe>
   <div class="player-controls">
     <button id="backBtn" class="ctrl-btn">Back</button>
-    <button id="fullBtn" class="ctrl-btn">Full</button>
+    <div>
+      <button id="rewindBtn" class="ctrl-btn">⏪ 10s</button>
+      <button id="playPauseBtn" class="ctrl-btn">Pause</button>
+      <button id="forwardBtn" class="ctrl-btn">⏩ 10s</button>
+    </div>
   </div>
 </div>
 
@@ -467,51 +536,13 @@ body {
 
 <div id="hud" class="hud"></div>
 
-<div id="keyboard" class="keyboard">
-  <div class="keyboard-row">
-    <button class="key-btn">A</button>
-    <button class="key-btn">B</button>
-    <button class="key-btn">C</button>
-    <button class="key-btn">D</button>
-    <button class="key-btn">E</button>
-    <button class="key-btn">F</button>
-  </div>
-  <div class="keyboard-row">
-    <button class="key-btn">G</button>
-    <button class="key-btn">H</button>
-    <button class="key-btn">I</button>
-    <button class="key-btn">J</button>
-    <button class="key-btn">K</button>
-    <button class="key-btn">L</button>
-  </div>
-  <div class="keyboard-row">
-    <button class="key-btn">M</button>
-    <button class="key-btn">N</button>
-    <button class="key-btn">O</button>
-    <button class="key-btn">P</button>
-    <button class="key-btn">Q</button>
-    <button class="key-btn">R</button>
-  </div>
-  <div class="keyboard-row">
-    <button class="key-btn">S</button>
-    <button class="key-btn">T</button>
-    <button class="key-btn">U</button>
-    <button class="key-btn">V</button>
-    <button class="key-btn">W</button>
-    <button class="key-btn">X</button>
-  </div>
-  <div class="keyboard-row">
-    <button class="key-btn">Y</button>
-    <button class="key-btn">Z</button>
-    <button class="key-btn" data-key="SPACE">SPACE</button>
-    <button class="key-btn" data-key="DELETE">DELETE</button>
-    <button class="key-btn" data-key="ENTER">ENTER</button>
-  </div>
-</div>
-
 <script>
-// Rotating YouTube API keys (replace with your real keys locally)
+// API keys (replace with your real keys locally)
 const API_KEYS = [
+  "AIzaSyAYMawk2KDutvl77rHRUW7Ke6sVsQLbv4k",
+  "AIzaSyDF7DasyCt4U2nle8U6fPZm7QnOwbg_VKg",
+  "AIzaSyBkaog-TrCWGhT2pe9cVQ3aVNwyxvO-vpc",
+  "AIzaSyA2aSVuBFCbNdraBsX07qMGmEzmLLrgKD0",
   "AIzaSyA_lsaX7dRjRsaYb2cwxD2mB7U5t6iYdM0",
   "AIzaSyDjluVd8lCtMlCUKxD4J6YLs1n86jZdA-8",
   "AIzaSyA72atzyYdbE7bMVGkKW3TVYJkOxo4zqGY",
@@ -560,12 +591,10 @@ async function fetchYouTube(endpoint, params = {}) {
 
   try {
     const res = await fetch(url);
-
     if (!res.ok) {
       console.warn("Key failed, switching to next key:", key);
       return fetchYouTube(endpoint, params);
     }
-
     return await res.json();
   } catch (err) {
     console.error("Network error, retrying with next key:", err);
@@ -573,7 +602,7 @@ async function fetchYouTube(endpoint, params = {}) {
   }
 }
 
-// Basic state
+// State
 let currentTab = "home";
 let currentVideoId = null;
 let miniActive = false;
@@ -581,6 +610,8 @@ let isLight = false;
 let currentChannelId = "UCoLDGQ7a81ep9SJqPlDs2sg";
 let channelNextPageToken = null;
 let historyList = [];
+let playerReady = false;
+let player;
 
 // Elements
 const feedEl = document.getElementById("feed");
@@ -589,6 +620,10 @@ const playerSection = document.getElementById("playerSection");
 const hudEl = document.getElementById("hud");
 const channelPageEl = document.getElementById("channelPage");
 
+const topbarEl = document.getElementById("topbar");
+const tabsEl = document.getElementById("tabs");
+const searchWrapperEl = document.getElementById("searchWrapper");
+
 const homeTab = document.getElementById("homeTab");
 const shortsTab = document.getElementById("shortsTab");
 const relatedTab = document.getElementById("relatedTab");
@@ -596,11 +631,53 @@ const historyTab = document.getElementById("historyTab");
 const trendingTab = document.getElementById("trendingTab");
 const channelTab = document.getElementById("channelTab");
 const themeToggle = document.getElementById("themeToggle");
-const fullBtn = document.getElementById("fullBtn");
 const backBtn = document.getElementById("backBtn");
+const playPauseBtn = document.getElementById("playPauseBtn");
+const forwardBtn = document.getElementById("forwardBtn");
+const rewindBtn = document.getElementById("rewindBtn");
 const searchInput = document.getElementById("searchInput");
 const searchGo = document.getElementById("searchGo");
 const keyboardEl = document.getElementById("keyboard");
+const suggestionsEl = document.getElementById("suggestions");
+
+// Suggestions
+const suggestionPool = [
+  "music",
+  "gaming",
+  "news",
+  "sports",
+  "movies",
+  "trailers",
+  "technology",
+  "podcasts",
+  "shorts",
+  "funny videos",
+  "tutorials",
+  "live streams"
+];
+
+function updateSuggestions(query) {
+  const q = query.toLowerCase();
+  const matches = suggestionPool.filter(s => s.toLowerCase().includes(q)).slice(0, 6);
+  if (!q || matches.length === 0) {
+    suggestionsEl.style.display = "none";
+    suggestionsEl.innerHTML = "";
+    return;
+  }
+  suggestionsEl.innerHTML = "";
+  matches.forEach(m => {
+    const item = document.createElement("div");
+    item.className = "suggestion-item";
+    item.textContent = m;
+    item.onclick = () => {
+      searchInput.value = m;
+      suggestionsEl.style.display = "none";
+      triggerSearch(m);
+    };
+    suggestionsEl.appendChild(item);
+  });
+  suggestionsEl.style.display = "block";
+}
 
 // HUD
 function showHUD(text) {
@@ -611,14 +688,45 @@ function showHUD(text) {
   }, 1200);
 }
 
+// Player setup (YouTube IFrame API)
+function loadPlayer(videoId) {
+  const src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
+  playerFrame.src = src;
+}
+
+// UI hide/show
+function hideUIForVideo() {
+  topbarEl.style.display = "none";
+  tabsEl.style.display = "none";
+  searchWrapperEl.style.display = "none";
+  feedEl.style.display = "none";
+  channelPageEl.style.display = "none";
+  keyboardEl.style.display = "none";
+  suggestionsEl.style.display = "none";
+}
+
+function showUIWithMiniPlayer() {
+  topbarEl.style.display = "flex";
+  tabsEl.style.display = "flex";
+  searchWrapperEl.style.display = "block";
+  if (currentTab === "channel") {
+    channelPageEl.style.display = "block";
+    feedEl.style.display = "none";
+  } else {
+    feedEl.style.display = "block";
+    channelPageEl.style.display = "none";
+  }
+}
+
 // Player
 function setPlayerVideo(videoId, snippet) {
   currentVideoId = videoId;
   playerSection.style.display = "block";
   playerSection.classList.remove("player-mini", "player-fullscreen");
-  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+  loadPlayer(videoId);
   historyList.unshift({ id: videoId, snippet });
   if (historyList.length > 50) historyList.pop();
+  hideUIForVideo();
 }
 
 // Tabs
@@ -642,7 +750,7 @@ function setActiveTab(tab) {
   }
 }
 
-// Feed renderer with 3D stacking
+// Feed renderer
 function renderFeed(items) {
   feedEl.innerHTML = "";
 
@@ -682,27 +790,23 @@ function renderFeed(items) {
     card.appendChild(thumb);
     card.appendChild(info);
 
-    // Entire card opens video
     card.onclick = () => {
       setPlayerVideo(videoId, snippet);
       showHUD("Playing: " + snippet.title);
     };
 
-    // Thumbnail opens video
     img.onclick = (e) => {
       e.stopPropagation();
       setPlayerVideo(videoId, snippet);
       showHUD("Playing: " + snippet.title);
     };
 
-    // Title opens video
     title.onclick = (e) => {
       e.stopPropagation();
       setPlayerVideo(videoId, snippet);
       showHUD("Playing: " + snippet.title);
     };
 
-    // Channel name opens channel page
     channel.onclick = (e) => {
       e.stopPropagation();
       const channelId = snippet.channelId || currentChannelId;
@@ -756,21 +860,41 @@ themeToggle.addEventListener("click", () => {
   showHUD(isLight ? "Light Mode" : "Dark Mode");
 });
 
-// Fullscreen / mini behavior
-fullBtn.addEventListener("click", () => {
-  if (!playerSection.style.display || playerSection.style.display === "none") return;
-  playerSection.classList.add("player-fullscreen");
-  playerSection.classList.remove("player-mini");
-  miniActive = false;
-  showHUD("Fullscreen");
-});
-
+// Back → mini bottom-right + show UI
 backBtn.addEventListener("click", () => {
   if (!playerSection.style.display || playerSection.style.display === "none") return;
   playerSection.classList.remove("player-fullscreen");
   playerSection.classList.add("player-mini");
   miniActive = true;
+  showUIWithMiniPlayer();
+  keyboardEl.style.display = "none";
+  suggestionsEl.style.display = "none";
   showHUD("Mini-player");
+});
+
+// Simple play/pause/seek using postMessage (best-effort)
+function postToPlayer(command) {
+  if (!playerFrame.contentWindow) return;
+  playerFrame.contentWindow.postMessage(JSON.stringify(command), "*");
+}
+
+playPauseBtn.addEventListener("click", () => {
+  // Toggle text only; actual pause/play requires YouTube JS API
+  if (playPauseBtn.textContent === "Pause") {
+    playPauseBtn.textContent = "Play";
+    postToPlayer({ event: "command", func: "pauseVideo", args: [] });
+  } else {
+    playPauseBtn.textContent = "Pause";
+    postToPlayer({ event: "command", func: "playVideo", args: [] });
+  }
+});
+
+forwardBtn.addEventListener("click", () => {
+  postToPlayer({ event: "command", func: "seekBy", args: [10] });
+});
+
+rewindBtn.addEventListener("click", () => {
+  postToPlayer({ event: "command", func: "seekBy", args: [-10] });
 });
 
 // Channel page
@@ -874,14 +998,23 @@ window.addEventListener("scroll", async () => {
 
 homeTab.addEventListener("click", async () => {
   setActiveTab("home");
-  const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", maxResults: 20 });
+  const data = await fetchYouTube("videos", {
+    part: "snippet,statistics",
+    chart: "mostPopular",
+    maxResults: 25
+  });
   renderFeed(data.items || []);
   showHUD("Home");
 });
 
 trendingTab.addEventListener("click", async () => {
   setActiveTab("trending");
-  const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20 });
+  const data = await fetchYouTube("videos", {
+    part: "snippet,statistics",
+    chart: "mostPopular",
+    regionCode: "US",
+    maxResults: 25
+  });
   renderFeed(data.items || []);
   showHUD("Trending US");
 });
@@ -892,7 +1025,7 @@ shortsTab.addEventListener("click", async () => {
     part: "snippet",
     type: "video",
     videoDuration: "short",
-    maxResults: 20,
+    maxResults: 25,
     order: "date"
   });
   renderFeed(data.items || []);
@@ -909,7 +1042,7 @@ relatedTab.addEventListener("click", async () => {
     part: "snippet",
     relatedToVideoId: currentVideoId,
     type: "video",
-    maxResults: 20
+    maxResults: 25
   });
   renderFeed(data.items || []);
   showHUD("Related");
@@ -948,15 +1081,16 @@ searchInput.addEventListener("click", () => {
   openKeyboard();
 });
 
-searchGo.addEventListener("click", async () => {
-  const q = searchInput.value.trim() || "music";
-  const data = await fetchYouTube("search", { part: "snippet", q, type: "video", maxResults: 20 });
-  renderFeed(data.items || []);
-  showHUD("Search: " + q);
-  closeKeyboard();
+searchInput.addEventListener("input", (e) => {
+  updateSuggestions(e.target.value);
 });
 
-keyboardEl.addEventListener("click", async (e) => {
+searchGo.addEventListener("click", () => {
+  const q = searchInput.value.trim() || "music";
+  triggerSearch(q);
+});
+
+keyboardEl.addEventListener("click", (e) => {
   const btn = e.target.closest(".key-btn");
   if (!btn) return;
   const key = btn.dataset.key || btn.textContent;
@@ -967,18 +1101,36 @@ keyboardEl.addEventListener("click", async (e) => {
     searchInput.value = searchInput.value.slice(0, -1);
   } else if (key === "ENTER") {
     const q = searchInput.value.trim() || "music";
-    const data = await fetchYouTube("search", { part: "snippet", q, type: "video", maxResults: 20 });
-    renderFeed(data.items || []);
-    showHUD("Search: " + q);
-    closeKeyboard();
+    triggerSearch(q);
   } else {
     searchInput.value += key;
   }
+  updateSuggestions(searchInput.value);
 });
 
-// Initial load
+function triggerSearch(q) {
+  (async () => {
+    const data = await fetchYouTube("search", {
+      part: "snippet",
+      q,
+      type: "video",
+      maxResults: 25
+    });
+    setActiveTab("home");
+    renderFeed(data.items || []);
+    showHUD("Search: " + q);
+    closeKeyboard();
+    suggestionsEl.style.display = "none";
+  })();
+}
+
+// Initial load: Home like YouTube
 (async () => {
-  const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", maxResults: 20 });
+  const data = await fetchYouTube("videos", {
+    part: "snippet,statistics",
+    chart: "mostPopular",
+    maxResults: 25
+  });
   renderFeed(data.items || []);
 })();
 </script>
