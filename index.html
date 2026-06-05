@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MyTube Minimal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="logo">MyTube</div>
+    <input id="searchInput" type="text" class="search" placeholder="Search">
+    <button id="searchBtn" class="btn">Search</button>
+    <button id="shortsBtn" class="btn btn-accent">Shorts</button>
+  </header>
+
+  <!-- Main Feed -->
+  <main id="feed" class="feed"></main>
+
+  <!-- Shorts Overlay -->
+  <div id="shortsFeed" class="shorts hidden">
+    <div id="shortsContainer"></div>
+    <button id="closeShortsBtn" class="shorts-close">×</button>
+  </div>
+
+  <!-- HUD -->
+  <div class="hud" id="hud"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  background: #050505;
+  color: #fff;
+}
+
+/* Top Bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #111;
+  border-bottom: 1px solid #222;
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.search {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #333;
+  background: #000;
+  color: #fff;
+}
+
+.btn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: none;
+  background: #333;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn-accent {
+  background: #ff4b4b;
+}
+
+/* Feed */
+.feed {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Video Card */
+.video-card {
+  display: flex;
+  gap: 10px;
+  background: #111;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #222;
+  cursor: pointer;
+}
+
+.video-thumb {
+  width: 40%;
+  min-width: 40%;
+  background: #000;
+}
+
+.video-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.video-info {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.video-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.video-channel {
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 2px;
+}
+
+.video-meta {
+  font-size: 11px;
+  color: #777;
+}
+
+/* Shorts Overlay */
+.shorts {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.shorts.hidden {
+  display: none;
+}
+
+#shortsContainer {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.shortsVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  object-fit: cover;
+}
+
+.shorts-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: none;
+  background: #222;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* HUD */
+.hud {
+  position: fixed;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #222;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.hud.show {
+  opacity: 1;
+}
+// ---------- API ENGINE ----------
+const API_KEYS = [
+  "AIzaSyAiG74ZYcjR4K78NPfUe3sQGeJLnoBIXYU",
+  "AIzaSyDVDUackHINzULJ6qasLLKDZUIBBxTORTI",
+  "AIzaSyApAIjVvwL8DQMe5-B5z815hdJtpj3YLDg",
+  "AIzaSyAUKic3SobVT3S60-H9fWmdHZJVgdOzRPg",
+  "AIzaSyB7FKzBZCxfl4nwi6elI6wj-JCVXXtmA40",
+  "AIzaSyBTUdLTpyYG0-fuOUP1OkeX9tf06S-rVkY",
+  "AIzaSyAJbkJYrguKWmBl7Vyd6ObPXZf0zu8-p3E",
+  "AIzaSyCz8qs_I_hbgfLZXZj9QMX1sO74hF5k84Q",
+  "AIzaSyCAM-BEIynJUz3dkhRWOCrs3cdh5KJbbro",
+  "AIzaSyCQsQnRJB6KgGKnSpGD66v6HNwikLUdFQ8",
+  "AIzaSyCb6lnHEoOXWd0TWfJK71T_mOiM8O2kfrI",
+  "AIzaSyC6qu4BiEbQJ1uoy49GcvAy9_QxHKUE6Go",
+  "AIzaSyAtk1KIeZ9kFLNfhrqgNhmPzU4VJqTPeR8",
+  "AIzaSyCkq9rnLzqpfnr-LHUg-1AuIDb-GkWukPM",
+  "AIzaSyCzjoJptOBNzhkaxnNrkDZRP4SzsmTgTKQ",
+  "AIzaSyBt2YQ-X408_Ep3EYV4B70SgXeeADe_L08",
+  "AIzaSyCiEMfafGEgqpZ94b9ENjAg0UaIku0NRE8",
+  "AIzaSyA0prh1a0eN4fZ6MA_eB4MPJ0UH4LPsIAc",
+  "AIzaSyDiisGuMjbilWyxKAFpTPu4am8d5yQagJI",
+  "AIzaSyDI3sl7QYBrXOgAwCyjwJ23pV1nbjUMVL0",
+  "AIzaSyD_Jfk_5wuEdVhDEsQX9uy3BW2Fio7xe0s",
+  "AIzaSyCpAzwCaG2I8gEusAsDKnkoxVMdkPg1Vpk",
+  "AIzaSyCJ2cLDhXE-e_KYbnfS7DmrT-gtbL9yxCY",
+  "AIzaSyA2DSf373Pmv26YLpcv2gnUMeZd0bGgNug",
+  "AIzaSyC-66qDbGqKdEfQyGFeQPgYpRCjg802eLQ",
+  "AIzaSyBE_TgXpbeBMrkZhEGeEI3nZ5xC_BbbSd0"
+];
+
+function getRandomKey() {
+  return API_KEYS[Math.floor(Math.random() * API_KEYS.length)];
+}
+
+async function fetchYouTube(endpoint, params, retries = 4) {
+  const url = new URL("https://www.googleapis.com/youtube/v3/" + endpoint);
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) url.searchParams.set(k, v);
+  });
+
+  for (let i = 0; i < retries; i++) {
+    url.searchParams.set("key", getRandomKey());
+    try {
+      const res = await fetch(url.toString());
+      if (!res.ok) continue;
+      return res.json();
+    } catch {
+      continue;
+    }
+  }
+  return { items: [] };
+}
+
+// ---------- HISTORY + PERSONALIZATION ----------
+const userHistory = {
+  channels: {},
+  videos: {},
+  categories: {},
+  watchTime: {},
+  lastWatched: [],
+  timeOfDay: { morning: 0, afternoon: 0, evening: 0, night: 0 }
+};
+
+const trendingHistory = {
+  global: 0,
+  categories: {},
+  channels: {}
+};
+
+function getTimeBucket() {
+  const h = new Date().getHours();
+  if (h < 12) return "morning";
+  if (h < 17) return "afternoon";
+  if (h < 21) return "evening";
+  return "night";
+}
+
+function updateHistory(snippet, videoId, watchSeconds = 0) {
+  const ch = snippet.channelId;
+  const cat = snippet.categoryId;
+
+  if (ch) userHistory.channels[ch] = (userHistory.channels[ch] || 0) + 1;
+  if (videoId) userHistory.videos[videoId] = (userHistory.videos[videoId] || 0) + 1;
+  if (cat) userHistory.categories[cat] = (userHistory.categories[cat] || 0) + 1;
+  if (videoId) userHistory.watchTime[videoId] = (userHistory.watchTime[videoId] || 0) + watchSeconds;
+
+  if (videoId) {
+    userHistory.lastWatched.unshift(videoId);
+    if (userHistory.lastWatched.length > 50) userHistory.lastWatched.pop();
+  }
+
+  const bucket = getTimeBucket();
+  userHistory.timeOfDay[bucket]++;
+
+  if (snippet.isTrending) {
+    trendingHistory.global++;
+    if (cat) trendingHistory.categories[cat] = (trendingHistory.categories[cat] || 0) + 1;
+    if (ch) trendingHistory.channels[ch] = (trendingHistory.channels[ch] || 0) + 1;
+  }
+}
+
+// ---------- RANKING + RANDOMIZATION ----------
+function scoreVideo(item) {
+  const stats = item.statistics || {};
+  const snippet = item.snippet || {};
+
+  const views = Number(stats.viewCount || 0);
+  const likes = Number(stats.likeCount || 0);
+  const published = snippet.publishedAt ? new Date(snippet.publishedAt) : new Date();
+  const ageHours = (Date.now() - published.getTime()) / 3600000;
+
+  const freshnessBoost = 1 / Math.max(1, ageHours / 12);
+  const engagement = (likes + 1) / (views + 50);
+
+  const id = item.id?.videoId || item.id;
+  const channelBoost = userHistory.channels[snippet.channelId] || 1;
+  const videoBoost = userHistory.videos[id] || 1;
+  const categoryBoost = userHistory.categories[snippet.categoryId] || 1;
+
+  const bucket = getTimeBucket();
+  const timeBoost = userHistory.timeOfDay[bucket] || 1;
+  const watchBoost = userHistory.watchTime[id] || 0;
+
+  const trendingBoost =
+    (snippet.isTrending ? 1.5 : 1) *
+    (trendingHistory.global * 0.02 +
+     (trendingHistory.categories[snippet.categoryId] || 0) * 0.03 +
+     (trendingHistory.channels[snippet.channelId] || 0) * 0.04);
+
+  return (
+    freshnessBoost * 0.20 +
+    engagement * 0.20 +
+    channelBoost * 0.15 +
+    categoryBoost * 0.10 +
+    videoBoost * 0.10 +
+    timeBoost * 0.05 +
+    watchBoost * 0.05 +
+    trendingBoost * 0.15
+  );
+}
+
+function weightedShuffle(videos) {
+  const maxScore = Math.max(...videos.map(v => v._score || 0)) || 1;
+  return videos
+    .map(v => {
+      const normalized = (v._score || 0) / maxScore;
+      const weight = Math.pow(normalized, 0.7);
+      return { item: v, weight: weight + Math.random() * 0.3 };
+    })
+    .sort((a, b) => b.weight - a.weight)
+    .map(v => v.item);
+}
+
+// ---------- FEED ENGINE ----------
+let currentTab = "home";
+let nextPageToken = null;
+
+async function loadHomeFeed(pageToken = null) {
+  const [personal, trending] = await Promise.all([
+    fetchYouTube("videos", {
+      part: "snippet,statistics",
+      chart: "mostPopular",
+      maxResults: 20,
+      regionCode: "US",
+      pageToken: pageToken || undefined
+    }),
+    fetchYouTube("videos", {
+      part: "snippet,statistics",
+      chart: "mostPopular",
+      maxResults: 20,
+      regionCode: "US"
+    })
+  ]);
+
+  (trending.items || []).forEach(v => v.snippet.isTrending = true);
+
+  let combined = (personal.items || []).concat(trending.items || []);
+  combined = combined.map(v => {
+    v._score = scoreVideo(v);
+    return v;
+  });
+  combined = weightedShuffle(combined);
+
+  return { items: combined, nextPageToken: personal.nextPageToken || null };
+}
+
+async function loadSearch(query, pageToken = null) {
+  const data = await fetchYouTube("search", {
+    part: "snippet",
+    q: query,
+    type: "video",
+    maxResults: 20,
+    pageToken: pageToken || undefined
+  });
+
+  let items = data.items || [];
+  items = items.map(v => {
+    v._score = scoreVideo(v);
+    return v;
+  });
+  items = weightedShuffle(items);
+
+  return { items, nextPageToken: data.nextPageToken || null };
+}
+
+// ---------- SHORTS ENGINE ----------
+let shortsList = [];
+let shortsIndex = 0;
+let shortsActive = false;
+let shortsNextPageToken = null;
+
+async function loadShorts(pageToken = null) {
+  const data = await fetchYouTube("videos", {
+    part: "snippet,statistics",
+    chart: "mostPopular",
+    maxResults: 20,
+    regionCode: "US",
+    videoCategoryId: "24",
+    pageToken: pageToken || undefined
+  });
+  (data.items || []).forEach(v => v.snippet.isTrending = true);
+  let items = data.items || [];
+  items = items.map(v => {
+    v._score = scoreVideo(v);
+    return v;
+  });
+  items = weightedShuffle(items);
+  return { items, nextPageToken: data.nextPageToken || null };
+}
+
+async function openShortsFeed() {
+  const data = await loadShorts();
+  shortsList = data.items;
+  shortsNextPageToken = data.nextPageToken || null;
+  shortsIndex = 0;
+  shortsActive = true;
+  document.getElementById("shortsFeed").classList.remove("hidden");
+  renderShortsVideo();
+}
+
+function closeShortsFeed() {
+  shortsActive = false;
+  document.getElementById("shortsFeed").classList.add("hidden");
+  document.getElementById("shortsContainer").innerHTML = "";
+}
+
+function renderShortsVideo() {
+  const container = document.getElementById("shortsContainer");
+  container.innerHTML = "";
+  const item = shortsList[shortsIndex];
+  if (!item) return;
+  const videoId = item.id?.videoId || item.id;
+  const iframe = document.createElement("iframe");
+  iframe.className = "shortsVideo";
+  iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=0&loop=1&playlist=${videoId}`;
+  iframe.allow = "autoplay; encrypted-media";
+  container.appendChild(iframe);
+}
+
+async function loadMoreShorts() {
+  if (!shortsNextPageToken) return;
+  const data = await loadShorts(shortsNextPageToken);
+  shortsNextPageToken = data.nextPageToken || null;
+  shortsList = shortsList.concat(data.items);
+}
+
+// ---------- AUTO REFRESH ----------
+async function refreshFeed() {
+  if (currentTab !== "home") return;
+  const data = await loadHomeFeed();
+  nextPageToken = data.nextPageToken || null;
+  renderMainFeed(data.items);
+}
+
+async function refreshShortsFeed() {
+  if (!shortsActive) return;
+  const data = await loadShorts();
+  shortsList = data.items;
+  shortsNextPageToken = data.nextPageToken || null;
+  shortsIndex = 0;
+  renderShortsVideo();
+}
+
+setInterval(refreshFeed, 1000 * 60 * 5);
+setInterval(refreshShortsFeed, 1000 * 60 * 3);
+
+// ---------- UI RENDER + EVENTS ----------
+const feedEl = document.getElementById("feed");
+const searchInput = document.getElementById("searchInput");
+const searchBtn = document.getElementById("searchBtn");
+const shortsBtn = document.getElementById("shortsBtn");
+const closeShortsBtn = document.getElementById("closeShortsBtn");
+const hudEl = document.getElementById("hud");
+
+function renderMainFeed(items) {
+  feedEl.innerHTML = "";
+  items.forEach(item => {
+    const snippet = item.snippet || {};
+    const stats = item.statistics || {};
+    const videoId = item.id?.videoId || item.id;
+
+    const card = document.createElement("div");
+    card.className = "video-card";
+
+    const thumb = document.createElement("div");
+    thumb.className = "video-thumb";
+    const img = document.createElement("img");
+    img.src = snippet.thumbnails?.medium?.url || "";
+    thumb.appendChild(img);
+
+    const info = document.createElement("div");
+    info.className = "video-info";
+
+    const title = document.createElement("div");
+    title.className = "video-title";
+    title.textContent = snippet.title || "Untitled";
+
+    const channel = document.createElement("div");
+    channel.className = "video-channel";
+    channel.textContent = snippet.channelTitle || "Unknown channel";
+
+    const meta = document.createElement("div");
+    meta.className = "video-meta";
+    meta.textContent = `${stats.viewCount || 0} views`;
+
+    info.appendChild(title);
+    info.appendChild(channel);
+    info.appendChild(meta);
+
+    card.appendChild(thumb);
+    card.appendChild(info);
+
+    card.onclick = () => {
+      updateHistory(snippet, videoId, 0);
+      showHUD("Video clicked");
+    };
+
+    feedEl.appendChild(card);
+  });
+}
+
+function showHUD(msg) {
+  hudEl.textContent = msg;
+  hudEl.classList.add("show");
+  setTimeout(() => hudEl.classList.remove("show"), 1500);
+}
+
+// Events
+searchBtn.addEventListener("click", async () => {
+  const q = searchInput.value.trim();
+  if (!q) return;
+  currentTab = "search";
+  const data = await loadSearch(q);
+  nextPageToken = data.nextPageToken || null;
+  renderMainFeed(data.items);
+});
+
+shortsBtn.addEventListener("click", () => {
+  openShortsFeed();
+});
+
+closeShortsBtn.addEventListener("click", () => {
+  closeShortsFeed();
+});
+
+// Simple Shorts swipe
+let touchStartY = 0;
+document.addEventListener("touchstart", e => {
+  touchStartY = e.touches[0].clientY;
+});
+document.addEventListener("touchend", async e => {
+  if (!shortsActive) return;
+  const endY = e.changedTouches[0].clientY;
+  const diff = endY - touchStartY;
+  if (diff < -80) {
+    shortsIndex++;
+    if (shortsIndex >= shortsList.length - 3) {
+      await loadMoreShorts();
+    }
+    shortsIndex = Math.min(shortsList.length - 1, shortsIndex);
+    renderShortsVideo();
+  } else if (diff > 80) {
+    shortsIndex = Math.max(0, shortsIndex - 1);
+    renderShortsVideo();
+  }
+});
+
+// Init
+async function initApp() {
+  currentTab = "home";
+  const data = await loadHomeFeed();
+  nextPageToken = data.nextPageToken || null;
+  renderMainFeed(data.items);
+}
+
+window.onload = initApp;
