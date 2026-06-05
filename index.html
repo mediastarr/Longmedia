@@ -1,42 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>MyTube Minimal</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <!-- Top Bar -->
-  <header class="topbar">
-    <div class="logo">MyTube</div>
-    <input id="searchInput" type="text" class="search" placeholder="Search">
-    <button id="searchBtn" class="btn">Search</button>
-    <button id="shortsBtn" class="btn btn-accent">Shorts</button>
-  </header>
+<meta charset="UTF-8">
+<title>MyTube Longmedia</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Main Feed -->
-  <main id="feed" class="feed"></main>
-
-  <!-- Shorts Overlay -->
-  <div id="shortsFeed" class="shorts hidden">
-    <div id="shortsContainer"></div>
-    <button id="closeShortsBtn" class="shorts-close">×</button>
-  </div>
-
-  <!-- HUD -->
-  <div class="hud" id="hud"></div>
-
-  <script src="app.js"></script>
-</body>
-</html>
+<style>
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
-
 body {
   background: #050505;
   color: #fff;
@@ -51,12 +26,10 @@ body {
   background: #111;
   border-bottom: 1px solid #222;
 }
-
 .logo {
   font-weight: 700;
   font-size: 18px;
 }
-
 .search {
   flex: 1;
   padding: 6px 10px;
@@ -65,7 +38,6 @@ body {
   background: #000;
   color: #fff;
 }
-
 .btn {
   padding: 6px 12px;
   border-radius: 999px;
@@ -75,7 +47,6 @@ body {
   cursor: pointer;
   font-size: 13px;
 }
-
 .btn-accent {
   background: #ff4b4b;
 }
@@ -96,41 +67,34 @@ body {
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid #222;
-  cursor: pointer;
 }
-
 .video-thumb {
   width: 40%;
   min-width: 40%;
   background: #000;
 }
-
 .video-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
-
 .video-info {
   padding: 8px;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
-
 .video-title {
   font-size: 14px;
   font-weight: 600;
   margin-bottom: 4px;
 }
-
 .video-channel {
   font-size: 12px;
   color: #aaa;
   margin-bottom: 2px;
 }
-
 .video-meta {
   font-size: 11px;
   color: #777;
@@ -141,22 +105,19 @@ body {
   position: fixed;
   inset: 0;
   background: #000;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   z-index: 9999;
 }
-
-.shorts.hidden {
-  display: none;
+.shorts.active {
+  display: flex;
 }
-
 #shortsContainer {
   width: 100%;
   height: 100%;
   position: relative;
 }
-
 .shortsVideo {
   position: absolute;
   inset: 0;
@@ -165,7 +126,6 @@ body {
   border: none;
   object-fit: cover;
 }
-
 .shorts-close {
   position: absolute;
   top: 10px;
@@ -192,38 +152,35 @@ body {
   opacity: 0;
   transition: opacity 0.2s;
 }
-
 .hud.show {
   opacity: 1;
 }
-// ---------- API ENGINE ----------
+</style>
+</head>
+
+<body>
+<header class="topbar">
+  <div class="logo">MyTube</div>
+  <input id="searchInput" type="text" class="search" placeholder="Search">
+  <button id="searchBtn" class="btn">Search</button>
+  <button id="shortsBtn" class="btn btn-accent">Shorts</button>
+</header>
+
+<main id="feed" class="feed"></main>
+
+<div id="shortsFeed" class="shorts">
+  <div id="shortsContainer"></div>
+  <button id="closeShortsBtn" class="shorts-close">×</button>
+</div>
+
+<div class="hud" id="hud"></div>
+
+<script>
+/* ---------- API KEYS (ADD YOURS HERE) ---------- */
 const API_KEYS = [
-  "AIzaSyAiG74ZYcjR4K78NPfUe3sQGeJLnoBIXYU",
-  "AIzaSyDVDUackHINzULJ6qasLLKDZUIBBxTORTI",
-  "AIzaSyApAIjVvwL8DQMe5-B5z815hdJtpj3YLDg",
-  "AIzaSyAUKic3SobVT3S60-H9fWmdHZJVgdOzRPg",
-  "AIzaSyB7FKzBZCxfl4nwi6elI6wj-JCVXXtmA40",
-  "AIzaSyBTUdLTpyYG0-fuOUP1OkeX9tf06S-rVkY",
-  "AIzaSyAJbkJYrguKWmBl7Vyd6ObPXZf0zu8-p3E",
-  "AIzaSyCz8qs_I_hbgfLZXZj9QMX1sO74hF5k84Q",
-  "AIzaSyCAM-BEIynJUz3dkhRWOCrs3cdh5KJbbro",
-  "AIzaSyCQsQnRJB6KgGKnSpGD66v6HNwikLUdFQ8",
-  "AIzaSyCb6lnHEoOXWd0TWfJK71T_mOiM8O2kfrI",
-  "AIzaSyC6qu4BiEbQJ1uoy49GcvAy9_QxHKUE6Go",
-  "AIzaSyAtk1KIeZ9kFLNfhrqgNhmPzU4VJqTPeR8",
-  "AIzaSyCkq9rnLzqpfnr-LHUg-1AuIDb-GkWukPM",
-  "AIzaSyCzjoJptOBNzhkaxnNrkDZRP4SzsmTgTKQ",
-  "AIzaSyBt2YQ-X408_Ep3EYV4B70SgXeeADe_L08",
-  "AIzaSyCiEMfafGEgqpZ94b9ENjAg0UaIku0NRE8",
-  "AIzaSyA0prh1a0eN4fZ6MA_eB4MPJ0UH4LPsIAc",
-  "AIzaSyDiisGuMjbilWyxKAFpTPu4am8d5yQagJI",
-  "AIzaSyDI3sl7QYBrXOgAwCyjwJ23pV1nbjUMVL0",
-  "AIzaSyD_Jfk_5wuEdVhDEsQX9uy3BW2Fio7xe0s",
-  "AIzaSyCpAzwCaG2I8gEusAsDKnkoxVMdkPg1Vpk",
-  "AIzaSyCJ2cLDhXE-e_KYbnfS7DmrT-gtbL9yxCY",
-  "AIzaSyA2DSf373Pmv26YLpcv2gnUMeZd0bGgNug",
-  "AIzaSyC-66qDbGqKdEfQyGFeQPgYpRCjg802eLQ",
-  "AIzaSyBE_TgXpbeBMrkZhEGeEI3nZ5xC_BbbSd0"
+  // "AIzaSyXXXX...",
+  // "AIzaSyYYYY...",
+  // ...
 ];
 
 function getRandomKey() {
@@ -249,7 +206,7 @@ async function fetchYouTube(endpoint, params, retries = 4) {
   return { items: [] };
 }
 
-// ---------- HISTORY + PERSONALIZATION ----------
+/* ---------- SIMPLE PERSONALIZATION ---------- */
 const userHistory = {
   channels: {},
   videos: {},
@@ -257,12 +214,6 @@ const userHistory = {
   watchTime: {},
   lastWatched: [],
   timeOfDay: { morning: 0, afternoon: 0, evening: 0, night: 0 }
-};
-
-const trendingHistory = {
-  global: 0,
-  categories: {},
-  channels: {}
 };
 
 function getTimeBucket() {
@@ -289,15 +240,9 @@ function updateHistory(snippet, videoId, watchSeconds = 0) {
 
   const bucket = getTimeBucket();
   userHistory.timeOfDay[bucket]++;
-
-  if (snippet.isTrending) {
-    trendingHistory.global++;
-    if (cat) trendingHistory.categories[cat] = (trendingHistory.categories[cat] || 0) + 1;
-    if (ch) trendingHistory.channels[ch] = (trendingHistory.channels[ch] || 0) + 1;
-  }
 }
 
-// ---------- RANKING + RANDOMIZATION ----------
+/* ---------- RANKING + SHUFFLE ---------- */
 function scoreVideo(item) {
   const stats = item.statistics || {};
   const snippet = item.snippet || {};
@@ -319,21 +264,14 @@ function scoreVideo(item) {
   const timeBoost = userHistory.timeOfDay[bucket] || 1;
   const watchBoost = userHistory.watchTime[id] || 0;
 
-  const trendingBoost =
-    (snippet.isTrending ? 1.5 : 1) *
-    (trendingHistory.global * 0.02 +
-     (trendingHistory.categories[snippet.categoryId] || 0) * 0.03 +
-     (trendingHistory.channels[snippet.channelId] || 0) * 0.04);
-
   return (
-    freshnessBoost * 0.20 +
-    engagement * 0.20 +
+    freshnessBoost * 0.25 +
+    engagement * 0.25 +
     channelBoost * 0.15 +
     categoryBoost * 0.10 +
     videoBoost * 0.10 +
-    timeBoost * 0.05 +
-    watchBoost * 0.05 +
-    trendingBoost * 0.15
+    timeBoost * 0.10 +
+    watchBoost * 0.05
   );
 }
 
@@ -349,37 +287,27 @@ function weightedShuffle(videos) {
     .map(v => v.item);
 }
 
-// ---------- FEED ENGINE ----------
+/* ---------- FEED ENGINE ---------- */
 let currentTab = "home";
 let nextPageToken = null;
 
 async function loadHomeFeed(pageToken = null) {
-  const [personal, trending] = await Promise.all([
-    fetchYouTube("videos", {
-      part: "snippet,statistics",
-      chart: "mostPopular",
-      maxResults: 20,
-      regionCode: "US",
-      pageToken: pageToken || undefined
-    }),
-    fetchYouTube("videos", {
-      part: "snippet,statistics",
-      chart: "mostPopular",
-      maxResults: 20,
-      regionCode: "US"
-    })
-  ]);
+  const data = await fetchYouTube("videos", {
+    part: "snippet,statistics",
+    chart: "mostPopular",
+    maxResults: 20,
+    regionCode: "US",
+    pageToken: pageToken || undefined
+  });
 
-  (trending.items || []).forEach(v => v.snippet.isTrending = true);
-
-  let combined = (personal.items || []).concat(trending.items || []);
-  combined = combined.map(v => {
+  let items = data.items || [];
+  items = items.map(v => {
     v._score = scoreVideo(v);
     return v;
   });
-  combined = weightedShuffle(combined);
+  items = weightedShuffle(items);
 
-  return { items: combined, nextPageToken: personal.nextPageToken || null };
+  return { items, nextPageToken: data.nextPageToken || null };
 }
 
 async function loadSearch(query, pageToken = null) {
@@ -401,7 +329,7 @@ async function loadSearch(query, pageToken = null) {
   return { items, nextPageToken: data.nextPageToken || null };
 }
 
-// ---------- SHORTS ENGINE ----------
+/* ---------- SHORTS ENGINE ---------- */
 let shortsList = [];
 let shortsIndex = 0;
 let shortsActive = false;
@@ -416,7 +344,6 @@ async function loadShorts(pageToken = null) {
     videoCategoryId: "24",
     pageToken: pageToken || undefined
   });
-  (data.items || []).forEach(v => v.snippet.isTrending = true);
   let items = data.items || [];
   items = items.map(v => {
     v._score = scoreVideo(v);
@@ -432,13 +359,13 @@ async function openShortsFeed() {
   shortsNextPageToken = data.nextPageToken || null;
   shortsIndex = 0;
   shortsActive = true;
-  document.getElementById("shortsFeed").classList.remove("hidden");
+  document.getElementById("shortsFeed").classList.add("active");
   renderShortsVideo();
 }
 
 function closeShortsFeed() {
   shortsActive = false;
-  document.getElementById("shortsFeed").classList.add("hidden");
+  document.getElementById("shortsFeed").classList.remove("active");
   document.getElementById("shortsContainer").innerHTML = "";
 }
 
@@ -462,7 +389,7 @@ async function loadMoreShorts() {
   shortsList = shortsList.concat(data.items);
 }
 
-// ---------- AUTO REFRESH ----------
+/* ---------- AUTO REFRESH ---------- */
 async function refreshFeed() {
   if (currentTab !== "home") return;
   const data = await loadHomeFeed();
@@ -482,7 +409,7 @@ async function refreshShortsFeed() {
 setInterval(refreshFeed, 1000 * 60 * 5);
 setInterval(refreshShortsFeed, 1000 * 60 * 3);
 
-// ---------- UI RENDER + EVENTS ----------
+/* ---------- UI RENDER + EVENTS ---------- */
 const feedEl = document.getElementById("feed");
 const searchInput = document.getElementById("searchInput");
 const searchBtn = document.getElementById("searchBtn");
@@ -530,7 +457,7 @@ function renderMainFeed(items) {
 
     card.onclick = () => {
       updateHistory(snippet, videoId, 0);
-      showHUD("Video clicked");
+      showHUD("Video tapped");
     };
 
     feedEl.appendChild(card);
@@ -543,7 +470,7 @@ function showHUD(msg) {
   setTimeout(() => hudEl.classList.remove("show"), 1500);
 }
 
-// Events
+/* Events */
 searchBtn.addEventListener("click", async () => {
   const q = searchInput.value.trim();
   if (!q) return;
@@ -561,7 +488,7 @@ closeShortsBtn.addEventListener("click", () => {
   closeShortsFeed();
 });
 
-// Simple Shorts swipe
+/* Shorts swipe */
 let touchStartY = 0;
 document.addEventListener("touchstart", e => {
   touchStartY = e.touches[0].clientY;
@@ -583,7 +510,7 @@ document.addEventListener("touchend", async e => {
   }
 });
 
-// Init
+/* Init */
 async function initApp() {
   currentTab = "home";
   const data = await loadHomeFeed();
@@ -592,3 +519,6 @@ async function initApp() {
 }
 
 window.onload = initApp;
+</script>
+</body>
+</html>
