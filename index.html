@@ -549,6 +549,7 @@ body {
 
 <div class="player parallax" id="playerSection">
   <iframe id="playerFrame" src="" allowfullscreen></iframe>
+  <button id="closeMini" class="ctrl-btn" style="position:absolute; top:6px; left:6px;">X</button>
   <div class="player-controls">
     <button id="backBtn" class="ctrl-btn">Back</button>
     <div>
@@ -587,22 +588,21 @@ const API_KEYS = [
   "AIzaSyD-fHmIX5xWWBhimAAppT0MjpSj7kZeL3k",
   "AIzaSyCn1W60JG2bBLhfcmdf_4IO4DwbPcSUamw",
   "AIzaSyAo-sasBmE6POcUWeLG_LJZHC1AIn0ptCQ",
-  "AIzaSyBkaog-TrCWGhT2pe9cVQ3aVNwyxvO-vpc",
-  "AIzaSyDF7DasyCt4U2nle8U6fPZm7QnOwbg_VKg",
-  "AIzaSyA2aSVuBFCbNdraBsX07qMGmEzmLLrgKD0",
   "AIzaSyBOBfqmbQ7TEZLBKoYBbFMHiLrsQwTHs-Q",
   "AIzaSyAFBJRSmLYveDga_kMdWLSBUWmVAQUsim4",
   "AIzaSyDPTNRYM0ePk3y17ZgePY0RP0OIBOCxE28",
-  "AIzaSyA_lsaX7dRjRsaYb2cwxD2mB7U5t6iYdM0",
   "AIzaSyD0OpYzLo49Bzwj5lLg8JPiBLD8te7xjNQ",
   "AIzaSyBO717pJHi6l3x1fMxvjoV9Qi1yNYTqJ5M",
   "AIzaSyDRA6Tij7ZdMAOGbK8bn6X3JEtTTKgO2ik",
   "AIzaSyDBH0yil9RS4rLg3H2gVUOoxnojdEy9NYk",
-  "AIzaSyDRA6Tij7ZdMAOGbK8bn6X3JEtTTKgO2ik",
-  "AIzaSyDBH0yil9RS4rLg3H2gVUOoxnojdEy9NYk",
   "AIzaSyAb1msw18FjkWQ9eTC1FLBCOCshTT2biY0",
+  "AIzaSyDqKaX9dypHZOky60_wNba3sLO0Gm6rs5Q",
   "AIzaSyA72atzyYdbE7bMVGkKW3TVYJkOxo4zqGY",
-  "AIzaSyDjluVd8lCtMlCUKxD4J6YLs1n86jZdA-8"
+  "AIzaSyDjluVd8lCtMlCUKxD4J6YLs1n86jZdA-8",
+  "AIzaSyA_lsaX7dRjRsaYb2cwxD2mB7U5t6iYdM0",
+  "AIzaSyA2aSVuBFCbNdraBsX07qMGmEzmLLrgKD0",
+  "AIzaSyBkaog-TrCWGhT2pe9cVQ3aVNwyxvO-vpc",
+  "AIzaSyDF7DasyCt4U2nle8U6fPZm7QnOwbg_VKg"
 ];
 
 let keyIndex = 0;
@@ -619,6 +619,10 @@ async function fetchYouTube(endpoint, params = {}) {
       url.searchParams.append(k, v);
     }
   });
+
+  // force fresh results each call
+  const timestamp = Date.now();
+  url.searchParams.append("_", timestamp);
 
   try {
     const res = await fetch(url);
@@ -667,6 +671,7 @@ const playPauseBtn = document.getElementById("playPauseBtn");
 const forwardBtn = document.getElementById("forwardBtn");
 const rewindBtn = document.getElementById("rewindBtn");
 const fullBtn = document.getElementById("fullBtn");
+const closeMini = document.getElementById("closeMini");
 const searchInput = document.getElementById("searchInput");
 const searchGo = document.getElementById("searchGo");
 
@@ -874,6 +879,15 @@ fullBtn.addEventListener("click", () => {
   showHUD("Fullscreen");
 });
 
+// Close mini-player
+closeMini.addEventListener("click", () => {
+  if (playerSection.classList.contains("player-mini")) {
+    playerSection.style.display = "none";
+    playerFrame.src = "";
+    showHUD("Player closed");
+  }
+});
+
 // Simple play/pause/seek using postMessage
 function postToPlayer(command) {
   if (!playerFrame.contentWindow) return;
@@ -1027,7 +1041,10 @@ shortsTab.addEventListener("click", async () => {
     type: "video",
     videoDuration: "short",
     maxResults: 25,
-    order: "date"
+    order: "date",
+    safeSearch: "none",
+    relevanceLanguage: "en",
+    topicId: "/m/0jgv"
   });
   renderFeed(data.items || []);
   keyboardEl.style.display = "none";
@@ -1045,7 +1062,8 @@ relatedTab.addEventListener("click", async () => {
     part: "snippet",
     relatedToVideoId: currentVideoId,
     type: "video",
-    maxResults: 25
+    maxResults: 25,
+    safeSearch: "none"
   });
   renderFeed(data.items || []);
   keyboardEl.style.display = "none";
@@ -1077,6 +1095,7 @@ channelTab.addEventListener("click", async () => {
 function openKeyboard() {
   searchPanelEl.style.display = "block";
   keyboardEl.style.display = "block";
+  document.querySelector(".search-input-bar").style.display = "none";
 }
 
 function closeKeyboard() {
@@ -1096,6 +1115,10 @@ searchGo.addEventListener("click", () => {
 keyboardEl.addEventListener("click", (e) => {
   const btn = e.target.closest(".key-btn");
   if (!btn) return;
+
+  // reveal search bar when typing begins
+  document.querySelector(".search-input-bar").style.display = "flex";
+
   const key = btn.dataset.key || btn.textContent;
 
   if (key === "SPACE") {
