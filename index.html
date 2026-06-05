@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ViewTube AR OS</title>
+<title>ViewTube</title>
 <style>
 :root {
   --bg: rgba(0,0,0,0.35);
@@ -40,6 +40,32 @@ body {
   box-shadow: 0 8px 24px rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.15);
   margin: 8px;
   z-index: 10;
+}
+
+.app-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.youtube-logo {
+  width: 28px;
+  height: 20px;
+  background: #FF0000;
+  border-radius: 6px;
+  position: relative;
+}
+
+.youtube-logo::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-style: solid;
+  border-width: 6px 0 6px 12px;
+  border-color: transparent transparent transparent white;
 }
 
 .app-title {
@@ -85,6 +111,38 @@ body {
   opacity: 1;
 }
 
+/* Search bar */
+
+.search-bar {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  margin: 0 8px 8px;
+  background: var(--bg);
+  border-radius: 18px;
+  backdrop-filter: blur(var(--blur)) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  outline: none;
+  font-size: 13px;
+}
+
+.search-btn {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
 /* Player */
 
 .player {
@@ -97,8 +155,9 @@ body {
   border: 1px solid rgba(255,255,255,0.12);
   box-shadow: 0 8px 24px rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.15);
   transform-style: preserve-3d;
-  transition: transform 0.12s ease-out;
+  transition: transform 0.12s ease-out, width 0.25s ease-out, height 0.25s ease-out, top 0.25s ease-out, left 0.25s ease-out;
   z-index: 12;
+  position: relative;
 }
 
 .player iframe {
@@ -110,7 +169,7 @@ body {
 
 .player-controls {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 6px;
   margin-top: 6px;
 }
@@ -124,9 +183,28 @@ body {
   cursor: pointer;
 }
 
+/* Fullscreen */
+
+.player-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  border-radius: 0;
+  z-index: 50;
+}
+
+.player-fullscreen iframe {
+  width: 100%;
+  height: calc(100vh - 40px);
+  border-radius: 0;
+}
+
 /* Mini-player */
 
-.mini-player {
+.player-mini {
   position: fixed;
   bottom: 20px;
   right: 20px;
@@ -138,7 +216,6 @@ body {
   box-shadow: 0 8px 24px rgba(0,0,0,0.25), 0 2px 6px rgba(0,0,0,0.18);
   backdrop-filter: blur(var(--blur));
   -webkit-backdrop-filter: blur(var(--blur));
-  transition: all 0.25s ease-out;
 }
 
 /* Feed */
@@ -319,7 +396,10 @@ body {
 <body>
 
 <div class="topbar parallax">
-  <div class="app-title">ViewTube AR</div>
+  <div class="app-title-wrap">
+    <div class="youtube-logo"></div>
+    <div class="app-title">ViewTube</div>
+  </div>
   <button id="themeToggle" class="btn">Mode</button>
 </div>
 
@@ -333,10 +413,16 @@ body {
   <button id="channelTab" class="tab-btn">Channel</button>
 </div>
 
+<div class="search-bar parallax">
+  <input id="searchInput" class="search-input" placeholder="Search YouTube..." />
+  <button id="searchGo" class="search-btn">Go</button>
+</div>
+
 <div class="player parallax" id="playerSection">
   <iframe id="playerFrame" src="" allowfullscreen></iframe>
   <div class="player-controls">
-    <button id="miniBtn" class="ctrl-btn">⬇ Mini</button>
+    <button id="backBtn" class="ctrl-btn">Back</button>
+    <button id="fullBtn" class="ctrl-btn">Full</button>
   </div>
 </div>
 
@@ -347,9 +433,8 @@ body {
 <div id="hud" class="hud"></div>
 
 <script>
-// Rotating YouTube API keys (masked)
+// Rotating YouTube API keys (replace with your real keys locally)
 const API_KEYS = [
-  "AIzaSyDF7DasyCt4U2nle8U6fPZm7QnOwbg_VKg",
   "AIzaSyBkaog-TrCWGhT2pe9cVQ3aVNwyxvO-vpc",
   "AIzaSyA2aSVuBFCbNdraBsX07qMGmEzmLLrgKD0",
   "AIzaSyA_lsaX7dRjRsaYb2cwxD2mB7U5t6iYdM0",
@@ -377,7 +462,8 @@ const API_KEYS = [
   "AIzaSyAzClMaJKl0IYwmI6gcAA9JU82T9CKpkIY",
   "AIzaSyDwC5M_sI5GFU28amUzoMH6LADOczhjtnU",
   "AIzaSyDtbk2O00EOh3wcZL3zI-2xHw_B4cz4kU0",
-  "AIzaSyCTBtxW_yAJod-az7pGyWEvjLOBEZoyKTk"
+  "AIzaSyCTBtxW_yAJod-az7pGyWEvjLOBEZoyKTk",
+  "AIzaSyB8MwIt7xiBXFpyj2AUjPE7VRB0MqqY8G8"
 ];
 
 let keyIndex = 0;
@@ -415,8 +501,9 @@ let currentTab = "home";
 let currentVideoId = null;
 let miniActive = false;
 let isLight = false;
-let currentChannelId = "UC123456";
+let currentChannelId = "UC123456"; // replace with a real channel ID if you want
 let channelNextPageToken = null;
+let historyList = [];
 
 // Elements
 const feedEl = document.getElementById("feed");
@@ -433,7 +520,10 @@ const historyTab = document.getElementById("historyTab");
 const trendingTab = document.getElementById("trendingTab");
 const channelTab = document.getElementById("channelTab");
 const themeToggle = document.getElementById("themeToggle");
-const miniBtn = document.getElementById("miniBtn");
+const fullBtn = document.getElementById("fullBtn");
+const backBtn = document.getElementById("backBtn");
+const searchInput = document.getElementById("searchInput");
+const searchGo = document.getElementById("searchGo");
 
 // HUD
 function showHUD(text) {
@@ -448,6 +538,9 @@ function showHUD(text) {
 function setPlayerVideo(videoId, snippet) {
   currentVideoId = videoId;
   playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+  // add to local history
+  historyList.unshift({ id: videoId, snippet });
+  if (historyList.length > 50) historyList.pop();
 }
 
 // Tabs
@@ -570,26 +663,20 @@ themeToggle.addEventListener("click", () => {
   showHUD(isLight ? "Light Mode" : "Dark Mode");
 });
 
-// Mini-player
-miniBtn.addEventListener("click", () => {
-  miniActive = !miniActive;
-  if (miniActive) {
-    playerSection.classList.add("mini-player");
-    showHUD("Mini-player enabled");
-  } else {
-    playerSection.classList.remove("mini-player");
-    showHUD("Mini-player disabled");
-  }
+// Fullscreen / mini behavior
+fullBtn.addEventListener("click", () => {
+  playerSection.classList.add("player-fullscreen");
+  playerSection.classList.remove("player-mini");
+  miniActive = false;
+  showHUD("Fullscreen");
 });
 
-window.addEventListener("scroll", () => {
-  if (!miniActive && window.scrollY > 120) {
-    playerSection.classList.add("mini-player");
-    miniActive = true;
-  } else if (miniActive && window.scrollY < 40) {
-    playerSection.classList.remove("mini-player");
-    miniActive = false;
-  }
+backBtn.addEventListener("click", () => {
+  // exit fullscreen and go mini bottom-right
+  playerSection.classList.remove("player-fullscreen");
+  playerSection.classList.add("player-mini");
+  miniActive = true;
+  showHUD("Mini-player");
 });
 
 // Channel page
@@ -707,16 +794,31 @@ trendingTab.addEventListener("click", async () => {
 
 shortsTab.addEventListener("click", async () => {
   setActiveTab("shorts");
-  const data = await fetchYouTube("search", { part: "snippet", type: "video", videoDuration: "short", maxResults: 20 });
+  const data = await fetchYouTube("search", {
+    part: "snippet",
+    type: "video",
+    videoDuration: "short",
+    maxResults: 20,
+    order: "date"
+  });
   renderFeed(data.items || []);
   showHUD("Shorts");
 });
 
 searchTab.addEventListener("click", async () => {
   setActiveTab("search");
-  const data = await fetchYouTube("search", { part: "snippet", q: "music", type: "video", maxResults: 20 });
+  const q = searchInput.value.trim() || "music";
+  const data = await fetchYouTube("search", { part: "snippet", q, type: "video", maxResults: 20 });
   renderFeed(data.items || []);
-  showHUD("Search: music");
+  showHUD("Search: " + q);
+});
+
+searchGo.addEventListener("click", async () => {
+  setActiveTab("search");
+  const q = searchInput.value.trim() || "music";
+  const data = await fetchYouTube("search", { part: "snippet", q, type: "video", maxResults: 20 });
+  renderFeed(data.items || []);
+  showHUD("Search: " + q);
 });
 
 relatedTab.addEventListener("click", async () => {
@@ -725,16 +827,26 @@ relatedTab.addEventListener("click", async () => {
     showHUD("Play a video first");
     return;
   }
-  const data = await fetchYouTube("search", { part: "snippet", relatedToVideoId: currentVideoId, type: "video", maxResults: 20 });
+  const data = await fetchYouTube("search", {
+    part: "snippet",
+    relatedToVideoId: currentVideoId,
+    type: "video",
+    maxResults: 20
+  });
   renderFeed(data.items || []);
   showHUD("Related");
 });
 
 historyTab.addEventListener("click", async () => {
   setActiveTab("history");
-  const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", maxResults: 20 });
-  renderFeed(data.items || []);
-  showHUD("History (demo)");
+  // render local history
+  const items = historyList.map(h => ({
+    id: h.id,
+    snippet: h.snippet,
+    statistics: { viewCount: "watched" }
+  }));
+  renderFeed(items);
+  showHUD("History");
 });
 
 channelTab.addEventListener("click", async () => {
