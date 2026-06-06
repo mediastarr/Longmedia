@@ -1385,27 +1385,35 @@ window.addEventListener("scroll", async () => {
 homeTab.addEventListener("click", async () => {
   clearFeed();
   setActiveTab("home");
+
   const data = await fetchYouTube("videos", {
     part: "snippet,statistics",
     chart: "mostPopular",
-    maxResults: 25
+    maxResults: 25,
+    random: randomSeed()   // forces refresh
   });
+
   renderFeed(data.items || []);
   showHUD("Home");
 });
 
+
 trendingTab.addEventListener("click", async () => {
   clearFeed();
   setActiveTab("trending");
+
   const data = await fetchYouTube("videos", {
     part: "snippet,statistics",
     chart: "mostPopular",
     regionCode: "US",
-    maxResults: 25
+    maxResults: 25,
+    random: randomSeed()   // forces refresh
   });
+
   renderFeed(data.items || []);
   showHUD("Trending US");
 });
+
 
 // Shorts: real Shorts via videoDuration=short
 shortsTab.addEventListener("click", async () => {
@@ -1414,7 +1422,7 @@ shortsTab.addEventListener("click", async () => {
 
   const data = await fetchYouTube("search", {
     part: "snippet",
-    q: "youtube shorts",
+    q: "youtube shorts " + randomSeed(),
     type: "video",
     videoEmbeddable: "true",
     regionCode: "US",
@@ -1439,7 +1447,7 @@ moviesTab.addEventListener("click", async () => {
 
   const data = await fetchYouTube("search", {
     part: "snippet",
-    q: "short film award winning",
+    q: "short film award winning " + randomSeed(),
     type: "video",
     videoEmbeddable: "true",
     regionCode: "US",
@@ -1457,6 +1465,7 @@ moviesTab.addEventListener("click", async () => {
 });
 
 
+
 historyTab.addEventListener("click", async () => {
   clearFeed();
   setActiveTab("history");
@@ -1471,8 +1480,9 @@ historyTab.addEventListener("click", async () => {
 
 channelTab.addEventListener("click", async () => {
   clearFeed();
-  loadChannelPage(currentChannelId);
+  loadChannelPage(currentChannelId + "?seed=" + randomSeed());
 });
+
 
 // Search tab + keyboard
 
