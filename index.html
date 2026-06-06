@@ -1203,10 +1203,16 @@ function exitSearchDepthMode() {
 }
 
 // Micro-parallax
+// Micro-parallax + depth system
 document.addEventListener("pointermove", (e) => {
+
+  // ⭐ FIX: Prevent fullscreen from being overridden
+  if (playerSection.classList.contains("player-fullscreen")) return;
+
   const tiltX = e.movementX * 0.06;
   const tiltY = e.movementY * 0.04;
 
+  // Apply tilt to all parallax elements
   document.querySelectorAll('.parallax').forEach(el => {
     el.style.transform = `
       perspective(900px)
@@ -1215,6 +1221,7 @@ document.addEventListener("pointermove", (e) => {
     `;
   });
 
+  // Apply tilt + depth to feed cards
   const cards = document.querySelectorAll('.video-card');
   cards.forEach((card, i) => {
     const depth = -40 * i + Math.sin(i * 0.6) * 12;
@@ -1227,6 +1234,7 @@ document.addEventListener("pointermove", (e) => {
     setDepthShadow(card, depth);
   });
 
+  // Apply tilt + depth to tabs
   const tabs = document.querySelectorAll('.parallax-tab');
   tabs.forEach((tab, index) => {
     const baseDepth = -20;
@@ -1241,6 +1249,7 @@ document.addEventListener("pointermove", (e) => {
     setDepthShadow(tab, depth);
   });
 
+  // Depth updates (only when NOT fullscreen)
   applyPlayerDepth();
   applyChannelBannerDepth();
   applyChannelHeaderDepth();
@@ -1254,6 +1263,7 @@ document.addEventListener("pointermove", (e) => {
   applyKeyboardDepth();
   applyTabHighlightDepth();
 });
+
 
 // Theme toggle
 themeToggle.addEventListener("click", () => {
