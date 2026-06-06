@@ -1363,42 +1363,67 @@ trendingTab.addEventListener("click", async () => {
 shortsTab.addEventListener("click", async () => {
   setActiveTab("shorts");
 
-  // Always fetch fresh data
-  const search = await fetchYouTube("search", {
-    part: "snippet",
-    type: "video",
-    maxResults: 40,
-    order: "date",
-    videoEmbeddable: "true"
+  // Fetch trending videos (bigger pool = more vertical videos)
+  const trending = await fetchYouTube("videos", {
+    part: "snippet,contentDetails",
+    chart: "mostPopular",
+    regionCode: "US",
+    maxResults: 50
   });
 
   const shorts = [];
 
-  for (const item of search.items || []) {
-    const videoId = item.id?.videoId;
-    if (!videoId) continue;
-
-    const details = await fetchYouTube("videos", {
-      part: "contentDetails,snippet",
-      id: videoId
-    });
-
-    const info = details.items?.[0];
-    if (!info) continue;
-
-    const duration = info.contentDetails.duration;
-    const thumb = info.snippet.thumbnails?.high;
+  for (const item of trending.items || []) {
+    const snippet = item.snippet;
+    const details = item.contentDetails;
+    const thumb = snippet.thumbnails?.high;
 
     if (!thumb) continue;
 
     const isVertical = thumb.height > thumb.width;
-    const isShort = /^PT([0-5]?[0-9])S$/.test(duration);
+    const isShort = /^PT([0-5]?[0-9])S$/.test(details.duration);
 
     if (isVertical && isShort) {
       shorts.push({
-        id: videoId,
-        snippet: info.snippet
+        id: item.id,
+        snippet
       });
+    }
+  }
+
+  // If still empty, fallback to ANY vertical videos
+  if (shorts.length === 0) {
+    const search = await fetchYouTube("search", {
+      part: "snippet",
+      type: "video",
+      maxResults: 50,
+      order: "date"
+    });
+
+    for (const item of search.items || []) {
+      const videoId = item.id.videoId;
+      if (!videoId) continue;
+
+      const details = await fetchYouTube("videos", {
+        part: "snippet,contentDetails",
+        id: videoId
+      });
+
+      const info = details.items?.[0];
+      if (!info) continue;
+
+      const thumb = info.snippet.thumbnails?.high;
+      if (!thumb) continue;
+
+      const isVertical = thumb.height > thumb.width;
+      const isShort = /^PT([0-5]?[0-9])S$/.test(info.contentDetails.duration);
+
+      if (isVertical && isShort) {
+        shorts.push({
+          id: videoId,
+          snippet: info.snippet
+        });
+      }
     }
   }
 
@@ -1410,25 +1435,41 @@ shortsTab.addEventListener("click", async () => {
 });
 
 
+
 // Movies: FilmRise only
 moviesTab.addEventListener("click", async () => {
   setActiveTab("movies");
 
   const filmRise = "UCp4zT2G0lZ6jTQd3x2Q0WUg";
 
-  const data = await fetchYouTube("search", {
-    part: "snippet",
-    channelId: filmRise,
-    type: "video",
-    maxResults: 25,
-    videoDuration: "long",
-    order: "viewCount",
-    videoEmbeddable: "true"
+  // Step 1: Get uploads playlist
+  const channel = await fetchYouTube("channels", {
+    part: "contentDetails",
+    id: filmRise
   });
 
-  renderFeed(data.items || []);
+  const uploadsId = channel.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploadsId) {
+    showHUD("FilmRise playlist not found");
+    return;
+  }
+
+  // Step 2: Load movies from uploads playlist
+  const movies = await fetchYouTube("playlistItems", {
+    part: "snippet",
+    playlistId: uploadsId,
+    maxResults: 25
+  });
+
+  const items = movies.items.map(v => ({
+    id: v.snippet.resourceId.videoId,
+    snippet: v.snippet
+  }));
+
+  renderFeed(items);
   showHUD("FilmRise Movies");
 });
+
 
 
 
