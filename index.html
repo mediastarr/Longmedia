@@ -1391,12 +1391,12 @@ shortsTab.addEventListener("click", async () => {
 
   const data = await fetchYouTube("search", {
     part: "snippet",
+    q: "youtube shorts",
     type: "video",
-    maxResults: 30,
-    videoDuration: "short",
-    order: "viewCount",
+    videoEmbeddable: "true",
     regionCode: "US",
-    videoEmbeddable: "true"
+    maxResults: 25,
+    order: "relevance"
   });
 
   const items = data.items.map(v => ({
@@ -1404,12 +1404,10 @@ shortsTab.addEventListener("click", async () => {
     snippet: v.snippet
   }));
 
-  shortsItems = items;
-  shortsIndex = 0;
-
   renderFeed(items);
   showHUD("Shorts");
 });
+
 
 // Movies: US short films
 moviesTab.addEventListener("click", async () => {
@@ -1418,11 +1416,11 @@ moviesTab.addEventListener("click", async () => {
 
   const data = await fetchYouTube("search", {
     part: "snippet",
-    q: "short film",
+    q: "short film award winning",
     type: "video",
-    regionCode: "US",
     videoEmbeddable: "true",
-    maxResults: 30,
+    regionCode: "US",
+    maxResults: 25,
     order: "relevance"
   });
 
@@ -1434,6 +1432,7 @@ moviesTab.addEventListener("click", async () => {
   renderFeed(items);
   showHUD("US Short Films");
 });
+
 
 historyTab.addEventListener("click", async () => {
   clearFeed();
