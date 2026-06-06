@@ -652,6 +652,10 @@ const API_KEYS = [
   "AIzaSyA_lsaX7dRjRsaYb2cwxD2mB7U5t6iYdM0",
   "AIzaSyA2aSVuBFCbNdraBsX07qMGmEzmLLrgKD0",
   "AIzaSyBkaog-TrCWGhT2pe9cVQ3aVNwyxvO-vpc",
+  "AIzaSyB5EsdA2VRInBZ8z6iy4KMOZ7-_r384QcM",
+  "AIzaSyB54D3saEQVuEpT9UltMLBQ2pQIfel6rZE",
+  "AIzaSyA9mPjquYawB-dV97IvnWxp_HVUCVaJY08",
+  "AIzaSyCOPM0Lhfc8_eWt5G9XnMn-VqWONOGDdlI",
   "AIzaSyDF7DasyCt4U2nle8U6fPZm7QnOwbg_VKg"
 ];
 
@@ -693,6 +697,7 @@ let miniActive = false;
 let isLight = false;
 let currentChannelId = "UCoLDGQ7a81ep9SJqPlDs2sg";
 let channelNextPageToken = null;
+let channelUploadsId = null;
 let historyList = [];
 let shortsItems = [];
 let shortsIndex = 0;
@@ -735,6 +740,12 @@ function showHUD(text) {
   setTimeout(() => {
     hudEl.style.opacity = 0;
   }, 1200);
+}
+
+// Clear feed
+function clearFeed() {
+  feedEl.innerHTML = "";
+  channelPageEl.innerHTML = "";
 }
 
 // UI hide/show
@@ -1166,13 +1177,11 @@ fullBtn.addEventListener("click", () => {
   showHUD("Fullscreen");
 });
 
-// Close mini-player (X top-right)
+// Close mini-player (X top-right) — restore UI
 closeMini.addEventListener("click", () => {
-  // Hide player
   playerSection.style.display = "none";
   playerFrame.src = "";
 
-  // Restore UI
   topbarEl.style.display = "flex";
   searchTabEl.style.display = "flex";
   tabsEl.style.display = "flex";
@@ -1185,15 +1194,14 @@ closeMini.addEventListener("click", () => {
     channelPageEl.style.display = "none";
   }
 
-  // Restore pointer events
   feedEl.style.pointerEvents = "auto";
   tabsEl.style.pointerEvents = "auto";
   topbarEl.style.pointerEvents = "auto";
   searchTabEl.style.pointerEvents = "auto";
 
+  applyMiniPlayerFrameDepth();
   showHUD("Player closed");
 });
-
 
 // Player commands
 function postToPlayer(command) {
@@ -1214,22 +1222,19 @@ playPauseBtn.addEventListener("click", () => {
 forwardBtn.addEventListener("click", () => {
   postToPlayer({ event: "command", func: "seekBy", args: [10] });
 
-  // NEW — reset scroll origin so vertical scroll works immediately
+  // reset scroll origin so vertical scroll works immediately
   scrollStartX = null;
   scrollStartY = null;
 
-  // NEW — give mini-player pointer priority for 300ms
   playerSection.style.pointerEvents = "auto";
   feedEl.style.pointerEvents = "none";
   tabsEl.style.pointerEvents = "none";
 
   setTimeout(() => {
-    // restore directional logic after 300ms
     feedEl.style.pointerEvents = "auto";
     tabsEl.style.pointerEvents = "auto";
   }, 250);
 });
-
 
 rewindBtn.addEventListener("click", () => {
   postToPlayer({ event: "command", func: "seekBy", args: [-10] });
@@ -1242,7 +1247,7 @@ async function loadChannelPage(channelId) {
   setActiveTab("channel");
 
   const info = await fetchYouTube("channels", {
-    part: "snippet,statistics",
+    part: "snippet,statistics,contentDetails",
     id: channelId
   });
 
@@ -1252,23 +1257,6 @@ async function loadChannelPage(channelId) {
     return;
   }
 
-  renderChannelHeader(channelInfo);
-
-  const uploads = await fetchYouTube("search", {
-    part: "snippet",
-    channelId,
-    type: "video",
-    order: "date",
-    maxResults: 20
-  });
-
-  channelNextPageToken = uploads.nextPageToken || null;
-  renderChannelFeed(uploads.items || []);
-
-  showHUD("Channel: " + channelInfo.snippet.title);
-}
-
-function renderChannelHeader(info) {
   channelPageEl.innerHTML = `
     <div class="channel-banner parallax">
       <div class="banner-logo"></div>
@@ -1276,21 +1264,29 @@ function renderChannelHeader(info) {
     </div>
 
     <div class="channel-header parallax">
-      <img class="channel-pic" src="${info.snippet.thumbnails?.default?.url || ""}">
+      <img class="channel-pic" src="${channelInfo.snippet.thumbnails?.default?.url || ""}">
       <div class="channel-meta">
-        <div class="channel-name">${info.snippet.title}</div>
-        <div class="channel-subs">${info.statistics?.subscriberCount || 0} subscribers</div>
+        <div class="channel-name">${channelInfo.snippet.title}</div>
+        <div class="channel-subs">${channelInfo.statistics?.subscriberCount || 0} subscribers</div>
       </div>
     </div>
   `;
   applyChannelBannerDepth();
   applyChannelHeaderDepth();
-}
 
-function renderChannelFeed(items) {
-  items.forEach((item, i) => {
+  channelUploadsId = channelInfo.contentDetails.relatedPlaylists.uploads;
+
+  const uploads = await fetchYouTube("playlistItems", {
+    part: "snippet",
+    playlistId: channelUploadsId,
+    maxResults: 20
+  });
+
+  channelNextPageToken = uploads.nextPageToken || null;
+
+  uploads.items.forEach(item => {
     const snippet = item.snippet;
-    const videoId = item.id.videoId || item.id;
+    const videoId = snippet.resourceId.videoId;
 
     const card = document.createElement("div");
     card.className = "video-card parallax";
@@ -1313,23 +1309,50 @@ function renderChannelFeed(items) {
     channelPageEl.appendChild(card);
   });
 
-  setTimeout(apply3DStacking, 10);
+  showHUD("Channel: " + channelInfo.snippet.title);
 }
 
 // Infinite scroll for channel
 window.addEventListener("scroll", async () => {
-  if (currentTab === "channel" && channelNextPageToken && window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
-    const more = await fetchYouTube("search", {
+  if (currentTab !== "channel") return;
+  if (!channelNextPageToken) return;
+  if (!channelUploadsId) return;
+
+  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+    const more = await fetchYouTube("playlistItems", {
       part: "snippet",
-      channelId: currentChannelId,
-      type: "video",
-      order: "date",
+      playlistId: channelUploadsId,
       maxResults: 20,
       pageToken: channelNextPageToken
     });
 
     channelNextPageToken = more.nextPageToken || null;
-    renderChannelFeed(more.items || []);
+
+    more.items.forEach(item => {
+      const snippet = item.snippet;
+      const videoId = snippet.resourceId.videoId;
+
+      const card = document.createElement("div");
+      card.className = "video-card parallax";
+
+      card.innerHTML = `
+        <div class="video-thumb">
+          <img src="${snippet.thumbnails.medium.url}">
+        </div>
+        <div class="video-info">
+          <div class="video-title">${snippet.title}</div>
+          <div class="video-channel">${snippet.channelTitle}</div>
+        </div>
+      `;
+
+      card.onclick = () => {
+        setPlayerVideo(videoId, snippet);
+        showHUD("Playing: " + snippet.title);
+      };
+
+      channelPageEl.appendChild(card);
+    });
+
     showHUD("More channel videos");
   }
 });
@@ -1337,6 +1360,7 @@ window.addEventListener("scroll", async () => {
 // Tab handlers
 
 homeTab.addEventListener("click", async () => {
+  clearFeed();
   setActiveTab("home");
   const data = await fetchYouTube("videos", {
     part: "snippet,statistics",
@@ -1348,6 +1372,7 @@ homeTab.addEventListener("click", async () => {
 });
 
 trendingTab.addEventListener("click", async () => {
+  clearFeed();
   setActiveTab("trending");
   const data = await fetchYouTube("videos", {
     part: "snippet,statistics",
@@ -1359,16 +1384,17 @@ trendingTab.addEventListener("click", async () => {
   showHUD("Trending US");
 });
 
-// Shorts: vertical videos only
+// Shorts: real Shorts via videoDuration=short
 shortsTab.addEventListener("click", async () => {
+  clearFeed();
   setActiveTab("shorts");
 
   const data = await fetchYouTube("search", {
     part: "snippet",
     type: "video",
     maxResults: 30,
-    videoDuration: "short",   // < 60 seconds
-    order: "viewCount",       // real Shorts bubble to the top
+    videoDuration: "short",
+    order: "viewCount",
     regionCode: "US",
     videoEmbeddable: "true"
   });
@@ -1378,15 +1404,16 @@ shortsTab.addEventListener("click", async () => {
     snippet: v.snippet
   }));
 
+  shortsItems = items;
+  shortsIndex = 0;
+
   renderFeed(items);
   showHUD("Shorts");
 });
 
-
-
-
-// Movies: FilmRise only
+// Movies: US short films
 moviesTab.addEventListener("click", async () => {
+  clearFeed();
   setActiveTab("movies");
 
   const data = await fetchYouTube("search", {
@@ -1408,11 +1435,8 @@ moviesTab.addEventListener("click", async () => {
   showHUD("US Short Films");
 });
 
-
-
-
-
 historyTab.addEventListener("click", async () => {
+  clearFeed();
   setActiveTab("history");
   const items = historyList.map(h => ({
     id: h.id,
@@ -1420,14 +1444,11 @@ historyTab.addEventListener("click", async () => {
     statistics: { viewCount: "watched" }
   }));
   renderFeed(items);
-  keyboardEl.style.display = "none";
-  searchPanelEl.style.display = "none";
   showHUD("History");
 });
 
 channelTab.addEventListener("click", async () => {
-  keyboardEl.style.display = "none";
-  searchPanelEl.style.display = "none";
+  clearFeed();
   loadChannelPage(currentChannelId);
 });
 
@@ -1507,6 +1528,7 @@ function triggerSearch(q) {
       type: "video",
       maxResults: 25
     });
+    clearFeed();
     setActiveTab("home");
     renderFeed(data.items || []);
     showHUD("Search: " + q);
