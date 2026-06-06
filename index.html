@@ -76,7 +76,7 @@ body {
   cursor: pointer;
 }
 
-/* Glassy search bar (full width, below topbar) */
+/* Glassy search bar */
 
 .search-tab {
   margin: 0 8px 8px;
@@ -120,7 +120,7 @@ body {
   opacity: 0.9;
 }
 
-/* Hidden search input + keyboard container */
+/* Search panel + keyboard */
 
 .search-panel {
   position: relative;
@@ -148,9 +148,8 @@ body {
   color: var(--text);
   outline: none;
   font-size: 13px;
-  padding-left: 14px; /* NEW: prevents text clipping */
+  padding-left: 14px; /* ensure text visible from left */
 }
-
 
 .search-btn {
   padding: 4px 10px;
@@ -161,11 +160,21 @@ body {
   cursor: pointer;
 }
 
-/* Keyboard under search bar */
+.search-back-btn {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(0,0,0,0.6);
+  color: var(--text);
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+/* Keyboard */
 
 .keyboard {
   position: absolute;
-  top: 70px; /* moved down from 40px */
+  top: 80px; /* moved down */
   left: 0;
   right: 0;
   background: rgba(10,10,10,0.95);
@@ -178,7 +187,6 @@ body {
   border: 1px solid rgba(255,255,255,0.15);
   transform-style: preserve-3d;
 }
-
 
 .keyboard-row {
   display: flex;
@@ -244,7 +252,7 @@ body {
   pointer-events: none;
 }
 
-/* Player (auto-scaled square) */
+/* Player */
 
 .player {
   margin: 8px;
@@ -533,6 +541,7 @@ body {
   <div class="search-input-bar">
     <input id="searchInput" class="search-input" placeholder="Search..." />
     <button id="searchGo" class="search-btn">Go</button>
+    <button id="searchBack" class="search-back-btn">Back</button>
   </div>
   <div id="keyboard" class="keyboard">
     <div class="keyboard-row">
@@ -588,7 +597,7 @@ body {
 
 <div class="player parallax" id="playerSection">
   <iframe id="playerFrame" src="" allowfullscreen></iframe>
-  <button id="closeMini" class="ctrl-btn" style="position:absolute; top:6px; left:6px;">X</button>
+  <button id="closeMini" class="ctrl-btn" style="position:absolute; top:6px; right:6px;">X</button>
   <div class="player-controls">
     <button id="backBtn" class="ctrl-btn">Back</button>
     <div>
@@ -605,7 +614,6 @@ body {
 <div id="channelPage" class="channel-page" style="display:none;"></div>
 
 <div id="hud" class="hud"></div>
-
 <script>
 // API keys (replace with your real keys)
 const API_KEYS = [
@@ -717,6 +725,7 @@ const fullBtn = document.getElementById("fullBtn");
 const closeMini = document.getElementById("closeMini");
 const searchInput = document.getElementById("searchInput");
 const searchGo = document.getElementById("searchGo");
+const searchBack = document.getElementById("searchBack");
 
 // HUD
 function showHUD(text) {
@@ -865,7 +874,7 @@ function renderFeed(items) {
   setTimeout(apply3DStacking, 10);
 }
 
-// 3D stacking (advanced staggered)
+// 3D stacking
 function apply3DStacking() {
   const cards = document.querySelectorAll('.video-card');
 
@@ -1146,7 +1155,7 @@ backBtn.addEventListener("click", () => {
   showHUD("Mini-player");
 });
 
-// Fullscreen toggle (resume from mini)
+// Fullscreen toggle
 fullBtn.addEventListener("click", () => {
   if (!playerSection.style.display || playerSection.style.display === "none") return;
   playerSection.classList.remove("player-mini");
@@ -1157,9 +1166,9 @@ fullBtn.addEventListener("click", () => {
   showHUD("Fullscreen");
 });
 
-// Close mini-player
+// Close mini-player (X top-right)
 closeMini.addEventListener("click", () => {
-  if (playerSection.classList.contains("player-mini")) {
+  if (playerSection.style.display !== "none") {
     playerSection.style.display = "none";
     playerFrame.src = "";
     applyMiniPlayerFrameDepth();
@@ -1167,7 +1176,7 @@ closeMini.addEventListener("click", () => {
   }
 });
 
-// Simple play/pause/seek using postMessage
+// Player commands
 function postToPlayer(command) {
   if (!playerFrame.contentWindow) return;
   playerFrame.contentWindow.postMessage(JSON.stringify(command), "*");
@@ -1326,7 +1335,8 @@ shortsTab.addEventListener("click", async () => {
     safeSearch: "none",
     topicId: "/m/0jgv",
     videoDuration: "short",
-    relevanceLanguage: "en"
+    relevanceLanguage: "en",
+    videoEmbeddable: "true"
   });
 
   shortsItems = data.items || [];
@@ -1348,7 +1358,8 @@ relatedTab.addEventListener("click", async () => {
     relatedToVideoId: currentVideoId,
     type: "video",
     maxResults: 25,
-    safeSearch: "none"
+    safeSearch: "none",
+    videoEmbeddable: "true"
   });
   renderFeed(data.items || []);
   keyboardEl.style.display = "none";
@@ -1380,12 +1391,10 @@ channelTab.addEventListener("click", async () => {
 function openKeyboard() {
   searchPanelEl.style.display = "block";
   keyboardEl.style.display = "block";
-  document.querySelector(".search-input-bar").style.display = "none";
+  document.querySelector(".search-input-bar").style.display = "flex";
 
-  // Hide feed so keyboard receives all input
   feedEl.style.display = "none";
 
-  // NEW — disable UI behind keyboard
   tabsEl.style.pointerEvents = "none";
   feedEl.style.pointerEvents = "none";
   playerSection.style.pointerEvents = "none";
@@ -1397,16 +1406,12 @@ function openKeyboard() {
   applyHUDDepthFull();
 }
 
-
-
 function closeKeyboard() {
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
 
-  // Restore feed
   feedEl.style.display = "block";
 
-  // NEW — re-enable UI
   tabsEl.style.pointerEvents = "auto";
   feedEl.style.pointerEvents = "auto";
   playerSection.style.pointerEvents = "auto";
@@ -1414,9 +1419,13 @@ function closeKeyboard() {
   exitSearchDepthMode();
 }
 
-
 searchTabEl.addEventListener("click", () => {
   openKeyboard();
+});
+
+searchBack.addEventListener("click", () => {
+  searchInput.value = "";
+  closeKeyboard();
 });
 
 searchGo.addEventListener("click", () => {
@@ -1460,7 +1469,7 @@ function triggerSearch(q) {
   })();
 }
 
-// Swipe up/down Shorts navigation (Shorts tab only)
+// Shorts swipe navigation
 let touchStartY = null;
 let pointerStartY = null;
 
@@ -1523,7 +1532,7 @@ applySearchBarDepth();
 applyTabDepthStacking();
 applyHUDDepthFull();
 
-// Initial load: Home like YouTube
+// Initial load
 (async () => {
   const data = await fetchYouTube("videos", {
     part: "snippet,statistics",
