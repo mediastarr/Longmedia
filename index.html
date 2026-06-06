@@ -1017,8 +1017,12 @@ function applyMiniPlayerFrameDepth() {
   if (!player) return;
 
   let depth = -30;
-  if (player.classList.contains("player-fullscreen")) depth = 40;
-  if (!player.classList.contains("player-mini")) depth = -60;
+
+  if (player.classList.contains("player-fullscreen")) {
+    depth = 40; // fullscreen depth
+  } else if (player.classList.contains("player-mini")) {
+    depth = -10; // mini depth
+  }
 
   player.style.transform = `
     perspective(900px)
@@ -1026,6 +1030,7 @@ function applyMiniPlayerFrameDepth() {
   `;
   setDepthShadow(player, depth);
 }
+
 
 function applyChannelBannerDepth() {
   const banner = document.querySelector(".channel-banner");
