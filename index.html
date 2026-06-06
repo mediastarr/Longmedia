@@ -1,805 +1,688 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>ViewTube OS</title>
+<meta charset="UTF-8" />
+<title>ViewTube AR OS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <style>
 :root {
-  --bg: rgba(0,0,0,0.75);
-  --card: rgba(10,10,10,0.8);
-  --text: #fff;
-  --blur: 22px;
+  --bg-dark: #05060a;
+  --bg-light: #f4f5fb;
+  --accent: #3cf2ff;
+  --accent-soft: rgba(60, 242, 255, 0.35);
+  --accent-strong: rgba(60, 242, 255, 0.85);
+  --shadow-soft: 0 18px 40px rgba(0,0,0,0.45);
+  --shadow-strong: 0 26px 70px rgba(0,0,0,0.75);
+  --shadow-glow: 0 0 40px rgba(60,242,255,0.65);
+}
 
-  /* AR depth shadows */
-  --shadow-soft: 0 8px 24px rgba(0,0,0,0.6);
-  --shadow-strong: 0 14px 40px rgba(0,0,0,0.85);
-  --shadow-glow: 0 0 22px rgba(255,255,255,0.35);
-
-  /* FX colors */
-  --fx-ambient: rgba(255, 80, 80, 0.45);
-  --fx-bloom: rgba(255, 255, 255, 0.35);
-  --fx-glass-edge: rgba(255, 255, 255, 0.18);
-  --fx-scanline: rgba(0, 255, 255, 0.55);
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #000;
-  color: var(--text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  background: radial-gradient(circle at 10% 0%, #05060a 0%, #020308 40%, #000000 100%);
+  color: #f5f7ff;
+  overflow-x: hidden;
+  min-height: 100vh;
 }
 
-/* Top bar */
+body.light {
+  background: radial-gradient(circle at 0% 0%, #fdfdff 0%, #e4e7ff 40%, #cfd3ff 100%);
+  color: #05060a;
+}
 
-.topbar {
+/* Layout */
+
+.app-shell {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  background: var(--bg);
-  border-radius: 22px;
-  backdrop-filter: blur(var(--blur)) saturate(1.2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
-  border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: var(--shadow-soft);
-  margin: 8px;
-  z-index: 60;
-  transform-style: preserve-3d;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 16px 18px 24px;
 }
 
-.app-title-wrap {
+/* Topbar */
+
+#topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(10,12,20,0.9), rgba(20,24,40,0.9));
+  color: #f5f7ff;
+  position: relative;
+  z-index: 20;
+}
+
+body.light #topbar {
+  background: linear-gradient(135deg, rgba(240,242,255,0.95), rgba(220,224,255,0.95));
+  color: #05060a;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-orb {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: radial-gradient(circle, var(--accent-strong), transparent 70%);
+  box-shadow: 0 0 24px rgba(60,242,255,0.9);
+}
+
+.topbar-title {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-size: 14px;
+}
+
+.topbar-right {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.youtube-logo {
-  width: 28px;
-  height: 20px;
-  background: #FF0000;
-  border-radius: 6px;
-  position: relative;
-}
-
-.youtube-logo::after {
-  content: "";
-  position: absolute;
-  left: 10px;
-  top: 4px;
-  width: 12px;
-  height: 12px;
-  border-style: solid;
-  border-width: 6px 0 6px 12px;
-  border-color: transparent transparent transparent white;
-}
-
-.app-title {
-  font-weight: 600;
-  letter-spacing: 0.5px;
-}
-
-.btn {
-  padding: 6px 10px;
+.topbar-btn {
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.25);
-  background: transparent;
-  color: var(--text);
+  border: 1px solid rgba(120,130,160,0.6);
+  padding: 6px 10px;
+  font-size: 12px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
+  color: #f5f7ff;
   cursor: pointer;
 }
 
-/* Glassy search bar */
+body.light .topbar-btn {
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.12), rgba(240,242,255,0.95));
+  color: #05060a;
+}
 
-.search-tab {
-  margin: 0 8px 8px;
-  padding: 10px 14px;
-  border-radius: 18px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.18);
-  backdrop-filter: blur(26px) saturate(1.3);
-  -webkit-backdrop-filter: blur(26px) saturate(1.3);
+/* Search bar */
+
+#searchTab {
+  margin-top: 12px;
   display: flex;
   align-items: center;
   gap: 10px;
-  cursor: pointer;
-  box-shadow: var(--shadow-soft);
-  z-index: 55;
-  transform-style: preserve-3d;
-}
-
-.search-icon {
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  border: 2px solid rgba(255,255,255,0.8);
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(8,10,18,0.9), rgba(16,20,32,0.9));
   position: relative;
+  z-index: 18;
 }
 
-.search-icon::after {
-  content: "";
-  position: absolute;
-  width: 10px;
-  height: 2px;
-  background: rgba(255,255,255,0.8);
-  border-radius: 999px;
-  transform: rotate(45deg);
-  right: -6px;
-  bottom: -1px;
+body.light #searchTab {
+  background: linear-gradient(135deg, rgba(238,240,255,0.95), rgba(224,228,255,0.95));
 }
 
 .search-label {
-  font-size: 13px;
-  opacity: 0.9;
-}
-
-/* Search panel + keyboard */
-
-.search-panel {
-  position: relative;
-  margin: 0 8px 8px;
-  display: none;
-}
-
-.search-input-bar {
-  display: flex;
-  gap: 6px;
-  padding: 6px 8px;
-  background: rgba(255,255,255,0.04);
-  border-radius: 18px;
-  backdrop-filter: blur(26px) saturate(1.3);
-  -webkit-backdrop-filter: blur(26px) saturate(1.3);
-  border: 1px solid rgba(255,255,255,0.18);
-  transform-style: preserve-3d;
-  z-index: 9999;
-  position: relative;
-  padding-left: 14px;
-}
-
-.search-input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  outline: none;
-  font-size: 13px;
-  padding-left: 14px;
-  position: relative;
-  z-index: 9999;
-}
-
-.search-btn {
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.25);
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-}
-
-.search-back-btn {
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.25);
-  background: rgba(0,0,0,0.6);
-  color: var(--text);
-  cursor: pointer;
-  margin-left: 6px;
-}
-
-/* Keyboard */
-
-.keyboard {
-  position: absolute;
-  top: 80px;
-  left: 0;
-  right: 0;
-  background: rgba(10,10,10,0.95);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  padding: 8px;
-  display: none;
-  z-index: 340;
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.15);
-  transform-style: preserve-3d;
-}
-
-.keyboard-row {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-
-.key-btn {
-  min-width: 32px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.25);
-  background: rgba(40,40,40,0.9);
-  color: var(--text);
   font-size: 12px;
+  opacity: 0.8;
+}
+
+.search-open-btn {
+  margin-left: auto;
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.6);
+  padding: 6px 10px;
+  font-size: 12px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
+  color: #f5f7ff;
   cursor: pointer;
-  transform-style: preserve-3d;
 }
 
-/* Suggestions */
-
-.suggestions {
-  margin-top: 6px;
-  background: rgba(20,20,20,0.85);
-  border-radius: 16px;
-  padding: 6px;
-  border: 1px solid rgba(255,255,255,0.15);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  display: none;
-  max-height: 220px;
-  overflow-y: auto;
-  box-shadow: var(--shadow-soft);
-  position: relative;
-  z-index: 9999;
-}
-
-.suggestion-item {
-  padding: 8px 12px;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text);
-  opacity: 0.9;
-}
-
-.suggestion-item:hover {
-  background: rgba(255,255,255,0.12);
-  opacity: 1;
+body.light .search-open-btn {
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.12), rgba(240,242,255,0.95));
+  color: #05060a;
 }
 
 /* Tabs */
 
-.tabs {
+#tabs {
+  margin-top: 12px;
   display: flex;
-  gap: 6px;
-  padding: 6px 8px;
-  margin: 8px;
-  background: var(--bg);
-  border-radius: 22px;
-  backdrop-filter: blur(var(--blur)) saturate(1.2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
-  border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: var(--shadow-soft);
-  z-index: 50;
-  transform-style: preserve-3d;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  position: relative;
+  z-index: 16;
 }
 
 .tab-btn {
-  padding: 6px 10px;
+  flex: 0 0 auto;
+  padding: 7px 12px;
   border-radius: 999px;
-  border: none;
-  background: transparent;
-  color: var(--text);
+  border: 1px solid rgba(120,130,160,0.6);
+  font-size: 12px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.12), rgba(10,12,20,0.9));
+  color: #f5f7ff;
   cursor: pointer;
-  opacity: 0.7;
-}
-
-.tab-btn.active {
-  background: rgba(255,255,255,0.12);
-  opacity: 1;
-  transform-style: preserve-3d;
   position: relative;
 }
 
-.tab-btn.active::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.25);
-  filter: blur(6px);
-  transform-style: preserve-3d;
-  pointer-events: none;
+body.light .tab-btn {
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.08), rgba(240,242,255,0.95));
+  color: #05060a;
+}
+
+.tab-btn.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 18px rgba(60,242,255,0.7);
 }
 
 /* Player */
 
-.player {
-  margin: 8px;
-  padding: 8px;
-  background: var(--card);
+#playerSection {
+  margin-top: 16px;
   border-radius: 22px;
-  backdrop-filter: blur(var(--blur)) saturate(1.2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
-  border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: var(--shadow-strong);
-  transform-style: preserve-3d;
-  transition:
-    transform 0.28s ease,
-    width 0.28s ease,
-    height 0.28s ease,
-    top 0.28s ease,
-    left 0.28s ease,
-    border-radius 0.28s ease,
-    box-shadow 0.28s ease;
-  z-index: 30;
-  position: relative;
-  display: none;
-  width: min(600px, 90vw);
-  height: min(600px, 90vw);
-}
-
-/* FX: Volumetric bloom + ambient halo + glass refraction + scanlines */
-
-.player.fx-bloom::before {
-  content: "";
-  position: absolute;
-  inset: -40px;
-  border-radius: 40px;
-  background: radial-gradient(circle, var(--fx-bloom) 0%, transparent 60%);
-  opacity: 0.9;
-  pointer-events: none;
-  filter: blur(26px);
-  z-index: -1;
-}
-
-.player.fx-ambient::after {
-  content: "";
-  position: absolute;
-  inset: -80px;
-  border-radius: 80px;
-  background:
-    radial-gradient(circle at 20% 20%, rgba(255, 0, 0, 0.45), transparent 60%),
-    radial-gradient(circle at 80% 30%, rgba(0, 180, 255, 0.45), transparent 60%),
-    radial-gradient(circle at 50% 80%, rgba(255, 255, 0, 0.35), transparent 60%);
-  mix-blend-mode: screen;
-  opacity: 0.9;
-  pointer-events: none;
-  filter: blur(32px);
-  z-index: -2;
-}
-
-.player.fx-glass {
-  border: 1px solid rgba(255,255,255,0.18);
-  background: radial-gradient(circle at top left, rgba(255,255,255,0.18), transparent 55%),
-              radial-gradient(circle at bottom right, rgba(255,255,255,0.12), transparent 55%),
-              var(--card);
-  backdrop-filter: blur(26px) saturate(1.4);
-  -webkit-backdrop-filter: blur(26px) saturate(1.4);
-}
-
-.player.fx-glass iframe {
-  border-radius: 20px;
-  box-shadow:
-    0 0 0 1px rgba(255,255,255,0.12),
-    0 0 22px rgba(255,255,255,0.25);
-}
-
-/* Scanlines overlay on video */
-
-.player.fx-scanlines iframe {
-  position: relative;
   overflow: hidden;
+  position: relative;
+  background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.18), rgba(5,6,12,0.98));
+  height: 260px;
+  display: none;
 }
 
-.player.fx-scanlines iframe::after {
-  content: "";
-  position: absolute;
+#playerSection.player-mini {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 260px;
+  height: 150px;
+  z-index: 40;
+}
+
+#playerSection.player-fullscreen {
+  position: fixed;
   inset: 0;
-  background-image: linear-gradient(
-    to bottom,
-    rgba(0,0,0,0.0) 0%,
-    rgba(0,255,255,0.18) 50%,
-    rgba(0,0,0,0.0) 100%
-  );
-  background-size: 100% 6px;
-  mix-blend-mode: screen;
-  opacity: 0.65;
-  pointer-events: none;
-  animation: scanlineMove 2.4s linear infinite;
+  margin: 0;
+  border-radius: 0;
+  z-index: 50;
 }
 
-@keyframes scanlineMove {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(6px); }
-}
+/* Player iframe */
 
-.player-mini {
-  box-shadow: var(--shadow-strong);
-}
-
-.player-fullscreen {
-  box-shadow: var(--shadow-strong);
-}
-
-.player iframe {
+#playerFrame {
   width: 100%;
   height: 100%;
-  border-radius: 18px;
   border: none;
+  display: block;
 }
+
+/* Player controls */
 
 .player-controls {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
-  right: 8px;
+  left: 12px;
+  bottom: 10px;
   display: flex;
-  justify-content: space-between;
-  gap: 6px;
-  transform-style: preserve-3d;
+  gap: 8px;
+  z-index: 10;
 }
 
-.ctrl-btn {
-  padding: 4px 8px;
+.player-controls button {
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.25);
-  background: rgba(0,0,0,0.5);
-  color: var(--text);
-  cursor: pointer;
+  border: 1px solid rgba(120,130,160,0.7);
+  padding: 5px 9px;
   font-size: 11px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
+  color: #f5f7ff;
+  cursor: pointer;
 }
 
-/* Fullscreen */
-
-.player-fullscreen {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  margin: 0;
-  border-radius: 0;
-  z-index: 9999;
-  transform: none !important;
+body.light .player-controls button {
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.12), rgba(240,242,255,0.95));
+  color: #05060a;
 }
 
-/* Mini-player */
+/* Close mini button */
 
-.player-mini {
+#closeMini {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.7);
+  padding: 4px 8px;
+  font-size: 11px;
+  background: radial-gradient(circle at 0% 0%, rgba(255,80,80,0.35), rgba(10,12,20,0.9));
+  color: #f5f7ff;
+  cursor: pointer;
+  z-index: 12;
+}
+
+/* HUD */
+
+#hud {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 220px;
-  height: 220px;
-  border-radius: 18px;
-  overflow: hidden;
-  z-index: 40;
-  box-shadow: var(--shadow-strong);
-  backdrop-filter: blur(var(--blur));
-  -webkit-backdrop-filter: blur(var(--blur));
-  display: block;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(60,242,255,0.22), rgba(10,12,20,0.95));
+  color: #f5f7ff;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 60;
 }
 
 /* Feed */
 
-.feed {
-  margin: 8px;
+#feed {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  position: relative;
+  z-index: 10;
 }
+
+/* Video cards */
 
 .video-card {
-  position: relative;
-  background: var(--card);
-  border-radius: 22px;
-  padding: 12px;
-  margin-bottom: 8px;
-  backdrop-filter: blur(var(--blur)) saturate(1.2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
-  border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: var(--shadow-soft);
-  transform-style: preserve-3d;
-  transition: transform 0.25s ease-out, box-shadow 0.25s ease-out;
-  z-index: 5;
   display: flex;
-  gap: 8px;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 18px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.08), rgba(8,10,16,0.96));
   cursor: pointer;
+  position: relative;
 }
 
-/* FX: glass + bloom + scanlines on cards */
-
-.video-card.fx-glass {
-  border: 1px solid var(--fx-glass-edge);
-  background:
-    radial-gradient(circle at top left, rgba(255,255,255,0.16), transparent 55%),
-    radial-gradient(circle at bottom right, rgba(255,255,255,0.10), transparent 55%),
-    var(--card);
-  backdrop-filter: blur(20px) saturate(1.3);
-  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+body.light .video-card {
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.06), rgba(238,240,255,0.98));
 }
 
-.video-card.fx-bloom::before {
-  content: "";
-  position: absolute;
-  inset: -20px;
-  border-radius: 26px;
-  background: radial-gradient(circle, rgba(255,255,255,0.25) 0%, transparent 60%);
-  opacity: 0.8;
-  filter: blur(18px);
-  pointer-events: none;
-  z-index: -1;
-}
-
-.video-card.fx-scanlines::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 22px;
-  background-image: linear-gradient(
-    to bottom,
-    rgba(0,0,0,0.0) 0%,
-    var(--fx-scanline) 50%,
-    rgba(0,0,0,0.0) 100%
-  );
-  background-size: 100% 5px;
-  mix-blend-mode: screen;
-  opacity: 0.45;
-  pointer-events: none;
-  animation: scanlineMove 2.8s linear infinite;
+.video-thumb {
+  flex: 0 0 140px;
+  height: 80px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #11131c;
 }
 
 .video-thumb img {
-  width: 120px;
-  height: 68px;
-  border-radius: 12px;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .video-info {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
 }
 
 .video-title {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 4px;
-  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .video-channel {
-  font-size: 12px;
+  font-size: 11px;
   opacity: 0.8;
-  margin-bottom: 2px;
-  color: var(--text);
 }
 
 .video-meta {
   font-size: 11px;
   opacity: 0.7;
-  color: var(--text);
-}
-
-/* HUD */
-
-.hud {
-  position: fixed;
-  top: 10px;
-  right: 10px;
-  padding: 6px 10px;
-  background: var(--card);
-  border-radius: 999px;
-  backdrop-filter: blur(var(--blur)) saturate(1.2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
-  border: 1px solid rgba(255,255,255,0.12);
-  font-size: 11px;
-  box-shadow: var(--shadow-soft), var(--shadow-glow);
-  z-index: 999;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease-out;
-  transform-style: preserve-3d;
 }
 
 /* Channel page */
 
-.channel-page {
-  padding: 12px;
-  margin: 8px;
-  background: var(--card);
-  border-radius: 22px;
-  backdrop-filter: blur(var(--blur)) saturate(1.2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
-  border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: var(--shadow-soft);
-  transform-style: preserve-3d;
-  transition: transform 0.25s ease-out;
+#channelPage {
+  margin-top: 16px;
+  display: none;
+  position: relative;
+  z-index: 10;
 }
 
-/* Banner */
-
 .channel-banner {
+  height: 90px;
+  border-radius: 18px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.25), rgba(8,10,16,0.96));
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 18px;
-  margin-bottom: 14px;
-  background: var(--card);
-  border-radius: 22px;
-  backdrop-filter: blur(var(--blur)) saturate(1.2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
-  border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: var(--shadow-strong);
-  transform-style: preserve-3d;
-  transition: transform 0.25s ease-out;
-  z-index: 11;
+  padding: 14px;
+  gap: 10px;
 }
 
 .banner-logo {
-  width: 42px;
-  height: 28px;
-  background: #FF0000;
-  border-radius: 6px;
-  position: relative;
-}
-
-.banner-logo::after {
-  content: "";
-  position: absolute;
-  left: 14px;
-  top: 7px;
-  width: 14px;
-  height: 14px;
-  border-style: solid;
-  border-width: 7px 0 7px 14px;
-  border-color: transparent transparent transparent white;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(60,242,255,0.9), transparent 70%);
+  box-shadow: 0 0 26px rgba(60,242,255,0.9);
 }
 
 .banner-text {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: 0.5px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-/* Channel header */
-
 .channel-header {
+  margin-top: 10px;
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 10px;
-  z-index: 10;
-  transform-style: preserve-3d;
 }
 
 .channel-pic {
-  width: 40px;
-  height: 40px;
+  width: 46px;
+  height: 46px;
   border-radius: 999px;
+  object-fit: cover;
 }
 
 .channel-meta {
   display: flex;
   flex-direction: column;
-  transform-style: preserve-3d;
+  gap: 3px;
 }
 
 .channel-name {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
 }
 
 .channel-subs {
-  font-size: 12px;
-  opacity: 0.7;
+  font-size: 11px;
+  opacity: 0.8;
 }
 
-/* Parallax */
+/* Search panel + keyboard */
+
+#searchPanel {
+  margin-top: 12px;
+  display: none;
+  position: relative;
+  z-index: 30;
+}
+
+.search-input-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));
+}
+
+.search-input-bar input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #f5f7ff;
+  font-size: 13px;
+}
+
+.search-input-bar button {
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.7);
+  padding: 5px 9px;
+  font-size: 11px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
+  color: #f5f7ff;
+  cursor: pointer;
+}
+
+#keyboard {
+  margin-top: 10px;
+  display: none;
+  padding: 10px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));
+}
+
+.keyboard-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.key-btn {
+  flex: 1;
+  padding: 7px 0;
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.7);
+  font-size: 11px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
+  color: #f5f7ff;
+  text-align: center;
+  cursor: pointer;
+}
+
+/* Suggestions */
+
+#suggestions {
+  margin-top: 8px;
+  display: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));
+  padding: 6px 8px;
+}
+
+.suggestion-item {
+  padding: 5px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+.suggestion-item:hover {
+  background: rgba(60,242,255,0.16);
+}
+
+/* Depth + parallax helpers */
 
 .parallax {
-  transform-style: preserve-3d;
-  transition: transform 0.12s ease-out;
+  will-change: transform;
+}
+
+.parallax-tab {
+  will-change: transform;
+}
+
+/* Depth shadows */
+
+.fx-shadow-strong {
+  box-shadow: var(--shadow-strong);
+}
+
+.fx-shadow-soft {
+  box-shadow: var(--shadow-soft);
+}
+
+/* Holographic FX: Bloom, Ambient, Glass, Chroma, Audio Glow */
+
+/* Bloom glow around player */
+#playerSection.fx-bloom {
+  box-shadow: 0 0 40px rgba(60,242,255,0.65), 0 26px 70px rgba(0,0,0,0.85);
+}
+
+/* Ambient halo behind player */
+#playerSection.fx-ambient {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(60,242,255,0.25), transparent 60%),
+    radial-gradient(circle at 0% 100%, rgba(120,80,255,0.18), transparent 70%),
+    radial-gradient(circle at 100% 100%, rgba(0,255,180,0.18), transparent 70%),
+    radial-gradient(circle at 50% 50%, rgba(5,6,12,0.98), rgba(2,3,8,1));
+}
+
+/* Glass refraction */
+#playerSection.fx-glass {
+  backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid rgba(120,130,160,0.7);
+}
+
+/* Chromatic aberration glow */
+#playerSection.fx-chroma::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: var(--chroma-opacity, 0.25);
+  filter: blur(var(--chroma-blur, 4px));
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255,0,80,0.35), transparent 60%),
+    radial-gradient(circle at 80% 20%, rgba(0,200,255,0.35), transparent 60%),
+    radial-gradient(circle at 50% 80%, rgba(0,255,180,0.35), transparent 60%);
+  transition: opacity 0.15s ease-out, filter 0.15s ease-out;
+  z-index: -2;
+}
+
+/* Audio-reactive glow */
+#playerSection.fx-audio::after {
+  content: "";
+  position: absolute;
+  inset: -40px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255,255,255,0.35), transparent 70%);
+  mix-blend-mode: screen;
+  opacity: var(--audio-glow-opacity, 0.25);
+  filter: blur(var(--audio-glow-blur, 20px));
+  transition: opacity 0.12s ease-out, filter 0.12s ease-out;
+  z-index: -3;
 }
 
 /* Search depth mode */
 
-.search-depth-mode .video-card,
-.search-depth-mode .tabs,
-.search-depth-mode .topbar,
-.search-depth-mode .channel-page,
-.search-depth-mode .player {
-  transform: translateZ(-120px) !important;
-  opacity: 0.35;
-  transition: transform 0.25s ease-out, opacity 0.25s ease-out;
+body.search-depth-mode #feed,
+body.search-depth-mode #channelPage {
+  filter: blur(4px) brightness(0.7);
+  pointer-events: none;
 }
 
-/* Keep search input bar forward in depth mode */
-.search-depth-mode .search-input-bar {
-  transform: translateZ(140px) !important;
-  opacity: 1 !important;
-  z-index: 9999 !important;
+/* Scrollbar */
+
+#tabs::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  height: 4px;
+  width: 4px;
+}
+
+#tabs::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  background: rgba(120,130,160,0.7);
+  border-radius: 999px;
 }
 </style>
 </head>
 <body>
-
-<div id="topbar" class="topbar parallax">
-  <div class="app-title-wrap">
-    <div class="youtube-logo"></div>
-    <div class="app-title">ViewTube</div>
-  </div>
-  <button id="themeToggle" class="btn">Mode</button>
-</div>
-
-<div id="searchTab" class="search-tab parallax">
-  <div class="search-icon"></div>
-  <div class="search-label">Search YouTube</div>
-</div>
-
-<div id="searchPanel" class="search-panel parallax">
-  <div class="search-input-bar">
-    <input id="searchInput" class="search-input" placeholder="Search..." />
-    <button id="searchGo" class="search-btn">Go</button>
-    <button id="searchBack" class="search-back-btn">Back</button>
-  </div>
-  <div id="keyboard" class="keyboard">
-    <div class="keyboard-row">
-      <button class="key-btn">A</button>
-      <button class="key-btn">B</button>
-      <button class="key-btn">C</button>
-      <button class="key-btn">D</button>
-      <button class="key-btn">E</button>
-      <button class="key-btn">F</button>
+<div class="app-shell">
+  <!-- Topbar -->
+  <div id="topbar" class="parallax">
+    <div class="topbar-left">
+      <div class="logo-orb"></div>
+      <div class="topbar-title">VIEWTUBE AR OS</div>
     </div>
-    <div class="keyboard-row">
-      <button class="key-btn">G</button>
-      <button class="key-btn">H</button>
-      <button class="key-btn">I</button>
-      <button class="key-btn">J</button>
-      <button class="key-btn">K</button>
-      <button class="key-btn">L</button>
-    </div>
-    <div class="keyboard-row">
-      <button class="key-btn">M</button>
-      <button class="key-btn">N</button>
-      <button class="key-btn">O</button>
-      <button class="key-btn">P</button>
-      <button class="key-btn">Q</button>
-      <button class="key-btn">R</button>
-    </div>
-    <div class="keyboard-row">
-      <button class="key-btn">S</button>
-      <button class="key-btn">T</button>
-      <button class="key-btn">U</button>
-      <button class="key-btn">V</button>
-      <button class="key-btn">W</button>
-      <button class="key-btn">X</button>
-    </div>
-    <div class="keyboard-row">
-      <button class="key-btn">Y</button>
-      <button class="key-btn">Z</button>
-      <button class="key-btn" data-key="SPACE">SPACE</button>
-      <button class="key-btn" data-key="DELETE">DELETE</button>
-      <button class="key-btn" data-key="ENTER">ENTER</button>
+    <div class="topbar-right">
+      <button id="themeToggle" class="topbar-btn">Theme</button>
+      <button id="backBtn" class="topbar-btn">Mini</button>
     </div>
   </div>
-  <div id="suggestions" class="suggestions"></div>
-</div>
 
-<div id="tabs" class="tabs parallax">
-  <button id="homeTab" class="tab-btn active parallax-tab">Home</button>
-  <button id="shortsTab" class="tab-btn parallax-tab">Shorts</button>
-  <button id="moviesTab" class="tab-btn parallax-tab">Movies</button>
-  <button id="historyTab" class="tab-btn parallax-tab">History</button>
-  <button id="trendingTab" class="tab-btn parallax-tab">Trending</button>
-  <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
-</div>
-
-<div class="player parallax fx-bloom fx-ambient fx-glass fx-scanlines" id="playerSection">
-  <iframe id="playerFrame" src="" allowfullscreen></iframe>
-  <button id="closeMini" class="ctrl-btn" style="position:absolute; top:6px; right:6px;">X</button>
-  <div class="player-controls">
-    <button id="backBtn" class="ctrl-btn">Back</button>
-    <div>
-      <button id="rewindBtn" class="ctrl-btn">⏪ 10s</button>
-      <button id="playPauseBtn" class="ctrl-btn">Pause</button>
-      <button id="forwardBtn" class="ctrl-btn">⏩ 10s</button>
-      <button id="fullBtn" class="ctrl-btn">Full</button>
-    </div>
+  <!-- Search bar -->
+  <div id="searchTab" class="parallax-tab">
+    <div class="search-label">Search holographic feed</div>
+    <button class="search-open-btn">Open Keyboard</button>
   </div>
+
+  <!-- Tabs -->
+  <div id="tabs">
+    <button id="homeTab" class="tab-btn parallax-tab active">Home</button>
+    <button id="shortsTab" class="tab-btn parallax-tab">Shorts</button>
+    <button id="moviesTab" class="tab-btn parallax-tab">Movies</button>
+    <button id="historyTab" class="tab-btn parallax-tab">History</button>
+    <button id="trendingTab" class="tab-btn parallax-tab">Trending</button>
+    <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
+  </div>
+
+  <!-- Player -->
+  <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
+    <iframe id="playerFrame" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
+    <div class="player-controls">
+      <button id="playPauseBtn">Pause</button>
+      <button id="rewindBtn">-10s</button>
+      <button id="forwardBtn">+10s</button>
+      <button id="fullBtn">Full</button>
+    </div>
+
+    <button id="closeMini">✕</button>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud"></div>
+
+  <!-- Search panel -->
+  <div id="searchPanel">
+    <div class="search-input-bar">
+      <input id="searchInput" type="text" placeholder="Search videos..." />
+      <button id="searchBack">Back</button>
+      <button id="searchGo">Go</button>
+    </div>
+    <div id="keyboard">
+      <div class="keyboard-row">
+        <div class="key-btn" data-key="Q">Q</div>
+        <div class="key-btn" data-key="W">W</div>
+        <div class="key-btn" data-key="E">E</div>
+        <div class="key-btn" data-key="R">R</div>
+        <div class="key-btn" data-key="T">T</div>
+        <div class="key-btn" data-key="Y">Y</div>
+      </div>
+      <div class="keyboard-row">
+        <div class="key-btn" data-key="A">A</div>
+        <div class="key-btn" data-key="S">S</div>
+        <div class="key-btn" data-key="D">D</div>
+        <div class="key-btn" data-key="F">F</div>
+        <div class="key-btn" data-key="G">G</div>
+        <div class="key-btn" data-key="H">H</div>
+      </div>
+      <div class="keyboard-row">
+        <div class="key-btn" data-key="Z">Z</div>
+        <div class="key-btn" data-key="X">X</div>
+        <div class="key-btn" data-key="C">C</div>
+        <div class="key-btn" data-key="V">V</div>
+        <div class="key-btn" data-key="B">B</div>
+        <div class="key-btn" data-key="N">N</div>
+      </div>
+      <div class="keyboard-row">
+        <div class="key-btn" data-key="SPACE">Space</div>
+        <div class="key-btn" data-key="DELETE">Delete</div>
+        <div class="key-btn" data-key="ENTER">Enter</div>
+      </div>
+    </div>
+    <div id="suggestions"></div>
+  </div>
+
+  <!-- Feed -->
+  <div id="feed"></div>
+
+  <!-- Channel page -->
+  <div id="channelPage"></div>
 </div>
-
-<div id="feed" class="feed"></div>
-
-<div id="channelPage" class="channel-page" style="display:none;"></div>
-
-<div id="hud" class="hud"></div>
 
 <script>
 // API keys (replace with your real key)
@@ -1006,16 +889,13 @@ function setPlayerVideo(videoId, snippet) {
   currentVideoId = videoId;
   playerSection.style.display = "block";
   playerSection.classList.remove("player-mini", "player-fullscreen");
-
-  // ensure FX classes are present
-  playerSection.classList.add("fx-bloom", "fx-ambient", "fx-glass", "fx-scanlines");
-
   playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
   historyList.unshift({ id: videoId, snippet });
   if (historyList.length > 50) historyList.pop();
   hideUIForVideo();
   playPauseBtn.textContent = "Pause";
   applyMiniPlayerFrameDepth();
+  initAudioReactiveGlow();
 }
 
 // Tabs
@@ -1054,7 +934,7 @@ function renderFeed(items) {
     const videoId = item.id?.videoId || item.id;
 
     const card = document.createElement("div");
-    card.className = "video-card parallax fx-glass fx-bloom fx-scanlines";
+    card.className = "video-card parallax";
 
     const thumb = document.createElement("div");
     thumb.className = "video-thumb";
@@ -1121,7 +1001,7 @@ function apply3DStacking() {
   const cards = document.querySelectorAll('.video-card');
 
   cards.forEach((card, i) => {
-    const depth = -60 - i * 8;
+    const depth = -40 * i + Math.sin(i * 0.6) * 12;
     card.style.transform = `
       perspective(900px)
       translateZ(${depth}px)
@@ -1135,8 +1015,8 @@ function applyPlayerDepth() {
   const player = document.getElementById("playerSection");
   if (!player) return;
 
-  let depth = -40;
-  if (player.classList.contains("player-fullscreen")) depth = 20;
+  let depth = -60;
+  if (player.classList.contains("player-fullscreen")) depth = 40;
   else if (player.classList.contains("player-mini")) depth = -10;
 
   player.style.transform = `
@@ -1153,9 +1033,9 @@ function applyMiniPlayerFrameDepth() {
   let depth = -30;
 
   if (player.classList.contains("player-fullscreen")) {
-    depth = 20;
+    depth = 40; // fullscreen depth
   } else if (player.classList.contains("player-mini")) {
-    depth = -10;
+    depth = -10; // mini depth
   }
 
   player.style.transform = `
@@ -1340,14 +1220,44 @@ function exitSearchDepthMode() {
   document.body.classList.remove("search-depth-mode");
 }
 
+// Chromatic aberration driver
+function applyChromaticAberration(xTilt, yTilt) {
+  const intensity = Math.min(1, Math.abs(xTilt) + Math.abs(yTilt));
+  const blur = 4 + intensity * 12;
+  const opacity = 0.25 + intensity * 0.45;
+  playerSection.style.setProperty("--chroma-blur", `${blur}px`);
+  playerSection.style.setProperty("--chroma-opacity", opacity);
+}
+
+// Audio-reactive glow (simulated pulse)
+let audioGlowInitialized = false;
+
+function initAudioReactiveGlow() {
+  if (audioGlowInitialized) return;
+  audioGlowInitialized = true;
+  animateAudioGlow();
+}
+
+function animateAudioGlow() {
+  const t = Date.now() / 600;
+  const level = (Math.sin(t) + 1) / 2; // 0 → 1
+  const blur = 20 + level * 60;
+  const opacity = 0.25 + level * 0.55;
+  playerSection.style.setProperty("--audio-glow-blur", `${blur}px`);
+  playerSection.style.setProperty("--audio-glow-opacity", opacity);
+  requestAnimationFrame(animateAudioGlow);
+}
+
 // Micro-parallax + depth system
 document.addEventListener("pointermove", (e) => {
 
+  // Prevent fullscreen from being overridden
   if (playerSection.classList.contains("player-fullscreen")) return;
 
   const tiltX = e.movementX * 0.06;
   const tiltY = e.movementY * 0.04;
 
+  // Apply tilt to all parallax elements
   document.querySelectorAll('.parallax').forEach(el => {
     el.style.transform = `
       perspective(900px)
@@ -1356,9 +1266,10 @@ document.addEventListener("pointermove", (e) => {
     `;
   });
 
+  // Apply tilt + depth to feed cards
   const cards = document.querySelectorAll('.video-card');
   cards.forEach((card, i) => {
-    const depth = -60 - i * 8;
+    const depth = -40 * i + Math.sin(i * 0.6) * 12;
     card.style.transform = `
       perspective(900px)
       translateZ(${depth}px)
@@ -1368,9 +1279,12 @@ document.addEventListener("pointermove", (e) => {
     setDepthShadow(card, depth);
   });
 
+  // Apply tilt + depth to tabs
   const tabs = document.querySelectorAll('.parallax-tab');
   tabs.forEach((tab, index) => {
-    const depth = -30 - index * 10;
+    const baseDepth = -20;
+    const step = -12;
+    const depth = baseDepth + step * index;
     tab.style.transform = `
       perspective(900px)
       translateZ(${depth}px)
@@ -1380,6 +1294,7 @@ document.addEventListener("pointermove", (e) => {
     setDepthShadow(tab, depth);
   });
 
+  // Depth updates (only when NOT fullscreen)
   applyPlayerDepth();
   applyChannelBannerDepth();
   applyChannelHeaderDepth();
@@ -1392,6 +1307,9 @@ document.addEventListener("pointermove", (e) => {
   applyMiniControlsDepth();
   applyKeyboardDepth();
   applyTabHighlightDepth();
+
+  // Chromatic aberration
+  applyChromaticAberration(tiltX, tiltY);
 });
 
 // Theme toggle
@@ -1497,7 +1415,6 @@ rewindBtn.addEventListener("click", () => {
 });
 
 // Channel page
-
 async function loadChannelPage(channelId) {
   currentChannelId = channelId;
   setActiveTab("channel");
@@ -1545,7 +1462,7 @@ async function loadChannelPage(channelId) {
     const videoId = snippet.resourceId.videoId;
 
     const card = document.createElement("div");
-    card.className = "video-card parallax fx-glass fx-bloom fx-scanlines";
+    card.className = "video-card parallax";
 
     card.innerHTML = `
       <div class="video-thumb">
@@ -1589,7 +1506,7 @@ window.addEventListener("scroll", async () => {
       const videoId = snippet.resourceId.videoId;
 
       const card = document.createElement("div");
-      card.className = "video-card parallax fx-glass fx-bloom fx-scanlines";
+      card.className = "video-card parallax";
 
       card.innerHTML = `
         <div class="video-thumb">
@@ -1614,7 +1531,6 @@ window.addEventListener("scroll", async () => {
 });
 
 // Tab handlers
-
 homeTab.addEventListener("click", async () => {
   clearFeed();
   setActiveTab("home");
@@ -1719,7 +1635,6 @@ channelTab.addEventListener("click", async () => {
 });
 
 // Suggestions
-
 async function fetchSuggestions(query) {
   if (!query.trim()) return [];
   const data = await fetchYouTube("search", {
@@ -1753,7 +1668,6 @@ function showSuggestions(list) {
 }
 
 // Search tab + keyboard
-
 function openKeyboard() {
   searchPanelEl.style.display = "block";
   keyboardEl.style.display = "block";
