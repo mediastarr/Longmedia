@@ -1282,16 +1282,19 @@ backBtn.addEventListener("click", () => {
 fullBtn.addEventListener("click", () => {
   if (!playerSection.style.display || playerSection.style.display === "none") return;
 
-  miniActive = false; // ⭐ FIX: exit mini mode
+  miniActive = false; // ⭐ FIX #1
 
   playerSection.classList.remove("player-mini");
   playerSection.classList.add("player-fullscreen");
 
   hideUIForVideo();
-  applyMiniPlayerFrameDepth();
+
+  applyPlayerDepth(); // ⭐ FIX #2
   applyMiniControlsDepth();
+
   showHUD("Fullscreen");
 });
+
 
 
 // Close mini-player (X top-right) — restore UI
