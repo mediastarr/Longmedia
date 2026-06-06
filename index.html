@@ -148,7 +148,9 @@ body {
   color: var(--text);
   outline: none;
   font-size: 13px;
+  padding-left: 14px; /* NEW: prevents text clipping */
 }
+
 
 .search-btn {
   padding: 4px 10px;
@@ -163,7 +165,7 @@ body {
 
 .keyboard {
   position: absolute;
-  top: 40px;
+  top: 70px; /* moved down from 40px */
   left: 0;
   right: 0;
   background: rgba(10,10,10,0.95);
@@ -176,6 +178,7 @@ body {
   border: 1px solid rgba(255,255,255,0.15);
   transform-style: preserve-3d;
 }
+
 
 .keyboard-row {
   display: flex;
@@ -1379,8 +1382,13 @@ function openKeyboard() {
   keyboardEl.style.display = "block";
   document.querySelector(".search-input-bar").style.display = "none";
 
-  // NEW — hide feed so keyboard receives all input
+  // Hide feed so keyboard receives all input
   feedEl.style.display = "none";
+
+  // NEW — disable UI behind keyboard
+  tabsEl.style.pointerEvents = "none";
+  feedEl.style.pointerEvents = "none";
+  playerSection.style.pointerEvents = "none";
 
   applyKeyboardDepth();
   applyKeyboardPanelDepthFull();
@@ -1390,15 +1398,22 @@ function openKeyboard() {
 }
 
 
+
 function closeKeyboard() {
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
 
-  // NEW — restore feed
+  // Restore feed
   feedEl.style.display = "block";
+
+  // NEW — re-enable UI
+  tabsEl.style.pointerEvents = "auto";
+  feedEl.style.pointerEvents = "auto";
+  playerSection.style.pointerEvents = "auto";
 
   exitSearchDepthMode();
 }
+
 
 searchTabEl.addEventListener("click", () => {
   openKeyboard();
