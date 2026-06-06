@@ -4,7 +4,11 @@
 <meta charset="UTF-8" />
 <title>ViewTube AR OS</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
 <style>
+/* -----------------------------------------------------------
+   GLOBAL THEME
+----------------------------------------------------------- */
 :root {
   --bg-dark: #05060a;
   --bg-light: #f4f5fb;
@@ -35,8 +39,9 @@ body.light {
   color: #05060a;
 }
 
-/* Layout */
-
+/* -----------------------------------------------------------
+   LAYOUT
+----------------------------------------------------------- */
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -44,8 +49,9 @@ body.light {
   padding: 16px 18px 24px;
 }
 
-/* Topbar */
-
+/* -----------------------------------------------------------
+   TOPBAR
+----------------------------------------------------------- */
 #topbar {
   display: flex;
   align-items: center;
@@ -105,8 +111,9 @@ body.light .topbar-btn {
   color: #05060a;
 }
 
-/* Search bar */
-
+/* -----------------------------------------------------------
+   SEARCH BAR
+----------------------------------------------------------- */
 #searchTab {
   margin-top: 12px;
   display: flex;
@@ -139,13 +146,9 @@ body.light #searchTab {
   cursor: pointer;
 }
 
-body.light .search-open-btn {
-  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.12), rgba(240,242,255,0.95));
-  color: #05060a;
-}
-
-/* Tabs */
-
+/* -----------------------------------------------------------
+   TABS
+----------------------------------------------------------- */
 #tabs {
   margin-top: 12px;
   display: flex;
@@ -166,12 +169,6 @@ body.light .search-open-btn {
   background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.12), rgba(10,12,20,0.9));
   color: #f5f7ff;
   cursor: pointer;
-  position: relative;
-}
-
-body.light .tab-btn {
-  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.08), rgba(240,242,255,0.95));
-  color: #05060a;
 }
 
 .tab-btn.active {
@@ -179,8 +176,9 @@ body.light .tab-btn {
   box-shadow: 0 0 18px rgba(60,242,255,0.7);
 }
 
-/* Player */
-
+/* -----------------------------------------------------------
+   PLAYER
+----------------------------------------------------------- */
 #playerSection {
   margin-top: 16px;
   border-radius: 22px;
@@ -208,8 +206,6 @@ body.light .tab-btn {
   z-index: 50;
 }
 
-/* Player iframe */
-
 #playerFrame {
   width: 100%;
   height: 100%;
@@ -217,8 +213,9 @@ body.light .tab-btn {
   display: block;
 }
 
-/* Player controls */
-
+/* -----------------------------------------------------------
+   PLAYER CONTROLS
+----------------------------------------------------------- */
 .player-controls {
   position: absolute;
   left: 12px;
@@ -238,13 +235,6 @@ body.light .tab-btn {
   cursor: pointer;
 }
 
-body.light .player-controls button {
-  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.12), rgba(240,242,255,0.95));
-  color: #05060a;
-}
-
-/* Close mini button */
-
 #closeMini {
   position: absolute;
   right: 10px;
@@ -259,8 +249,9 @@ body.light .player-controls button {
   z-index: 12;
 }
 
-/* HUD */
-
+/* -----------------------------------------------------------
+   HUD
+----------------------------------------------------------- */
 #hud {
   position: fixed;
   left: 50%;
@@ -278,8 +269,9 @@ body.light .player-controls button {
   z-index: 60;
 }
 
-/* Feed */
-
+/* -----------------------------------------------------------
+   FEED
+----------------------------------------------------------- */
 #feed {
   margin-top: 16px;
   display: grid;
@@ -289,8 +281,6 @@ body.light .player-controls button {
   z-index: 10;
 }
 
-/* Video cards */
-
 .video-card {
   display: flex;
   gap: 10px;
@@ -299,10 +289,6 @@ body.light .player-controls button {
   background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.08), rgba(8,10,16,0.96));
   cursor: pointer;
   position: relative;
-}
-
-body.light .video-card {
-  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.06), rgba(238,240,255,0.98));
 }
 
 .video-thumb {
@@ -317,7 +303,6 @@ body.light .video-card {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
 }
 
 .video-info {
@@ -343,8 +328,9 @@ body.light .video-card {
   opacity: 0.7;
 }
 
-/* Channel page */
-
+/* -----------------------------------------------------------
+   CHANNEL PAGE
+----------------------------------------------------------- */
 #channelPage {
   margin-top: 16px;
   display: none;
@@ -407,8 +393,9 @@ body.light .video-card {
   opacity: 0.8;
 }
 
-/* Search panel + keyboard */
-
+/* -----------------------------------------------------------
+   SEARCH PANEL + KEYBOARD
+----------------------------------------------------------- */
 #searchPanel {
   margin-top: 12px;
   display: none;
@@ -423,6 +410,7 @@ body.light .video-card {
   padding: 8px 12px;
   border-radius: 16px;
   background: linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));
+  overflow: hidden;
 }
 
 .search-input-bar input {
@@ -432,6 +420,9 @@ body.light .video-card {
   background: transparent;
   color: #f5f7ff;
   font-size: 13px;
+  padding-left: 6px;
+  width: 100%;
+  overflow-x: auto;
 }
 
 .search-input-bar button {
@@ -444,34 +435,50 @@ body.light .video-card {
   cursor: pointer;
 }
 
+/* -----------------------------------------------------------
+   FULL-WIDTH QWERTY KEYBOARD (AUTO-FLEX)
+----------------------------------------------------------- */
 #keyboard {
   margin-top: 10px;
   display: none;
   padding: 10px;
   border-radius: 18px;
   background: linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));
+  width: 100%;
 }
 
 .keyboard-row {
   display: flex;
+  width: 100%;
   gap: 6px;
   margin-bottom: 6px;
 }
 
 .key-btn {
   flex: 1;
-  padding: 7px 0;
-  border-radius: 999px;
+  padding: 10px 0;
+  border-radius: 12px;
   border: 1px solid rgba(120,130,160,0.7);
-  font-size: 11px;
+  font-size: 14px;
   background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
   color: #f5f7ff;
   text-align: center;
   cursor: pointer;
+  user-select: none;
 }
 
-/* Suggestions */
+.key-btn[data-key="SPACE"] {
+  flex: 4;
+}
 
+.key-btn[data-key="DELETE"],
+.key-btn[data-key="ENTER"] {
+  flex: 2;
+}
+
+/* -----------------------------------------------------------
+   SUGGESTIONS
+----------------------------------------------------------- */
 #suggestions {
   margin-top: 8px;
   display: none;
@@ -491,34 +498,13 @@ body.light .video-card {
   background: rgba(60,242,255,0.16);
 }
 
-/* Depth + parallax helpers */
-
-.parallax {
-  will-change: transform;
-}
-
-.parallax-tab {
-  will-change: transform;
-}
-
-/* Depth shadows */
-
-.fx-shadow-strong {
-  box-shadow: var(--shadow-strong);
-}
-
-.fx-shadow-soft {
-  box-shadow: var(--shadow-soft);
-}
-
-/* Holographic FX: Bloom, Ambient, Glass, Chroma, Audio Glow */
-
-/* Bloom glow around player */
+/* -----------------------------------------------------------
+   HOLOGRAPHIC EFFECTS (PLAYER ONLY)
+----------------------------------------------------------- */
 #playerSection.fx-bloom {
   box-shadow: 0 0 40px rgba(60,242,255,0.65), 0 26px 70px rgba(0,0,0,0.85);
 }
 
-/* Ambient halo behind player */
 #playerSection.fx-ambient {
   background:
     radial-gradient(circle at 50% 0%, rgba(60,242,255,0.25), transparent 60%),
@@ -527,13 +513,11 @@ body.light .video-card {
     radial-gradient(circle at 50% 50%, rgba(5,6,12,0.98), rgba(2,3,8,1));
 }
 
-/* Glass refraction */
 #playerSection.fx-glass {
   backdrop-filter: blur(18px) saturate(1.4);
   border: 1px solid rgba(120,130,160,0.7);
 }
 
-/* Chromatic aberration glow */
 #playerSection.fx-chroma::before {
   content: "";
   position: absolute;
@@ -551,7 +535,6 @@ body.light .video-card {
   z-index: -2;
 }
 
-/* Audio-reactive glow */
 #playerSection.fx-audio::after {
   content: "";
   position: absolute;
@@ -566,32 +549,21 @@ body.light .video-card {
   z-index: -3;
 }
 
-/* Search depth mode */
-
+/* -----------------------------------------------------------
+   DEPTH MODE
+----------------------------------------------------------- */
 body.search-depth-mode #feed,
 body.search-depth-mode #channelPage {
   filter: blur(4px) brightness(0.7);
   pointer-events: none;
 }
 
-/* Scrollbar */
-
-#tabs::-webkit-scrollbar,
-body::-webkit-scrollbar {
-  height: 4px;
-  width: 4px;
-}
-
-#tabs::-webkit-scrollbar-thumb,
-body::-webkit-scrollbar-thumb {
-  background: rgba(120,130,160,0.7);
-  border-radius: 999px;
-}
 </style>
 </head>
 <body>
 <div class="app-shell">
-  <!-- Topbar -->
+
+  <!-- TOPBAR -->
   <div id="topbar" class="parallax">
     <div class="topbar-left">
       <div class="logo-orb"></div>
@@ -603,13 +575,13 @@ body::-webkit-scrollbar-thumb {
     </div>
   </div>
 
-  <!-- Search bar -->
+  <!-- SEARCH BAR -->
   <div id="searchTab" class="parallax-tab">
     <div class="search-label">Search holographic feed</div>
     <button class="search-open-btn">Open Keyboard</button>
   </div>
 
-  <!-- Tabs -->
+  <!-- TABS -->
   <div id="tabs">
     <button id="homeTab" class="tab-btn parallax-tab active">Home</button>
     <button id="shortsTab" class="tab-btn parallax-tab">Shorts</button>
@@ -619,9 +591,12 @@ body::-webkit-scrollbar-thumb {
     <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
   </div>
 
-  <!-- Player -->
+  <!-- PLAYER -->
   <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
-    <iframe id="playerFrame" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    <iframe id="playerFrame"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowfullscreen>
+    </iframe>
 
     <div class="player-controls">
       <button id="playPauseBtn">Pause</button>
@@ -636,14 +611,19 @@ body::-webkit-scrollbar-thumb {
   <!-- HUD -->
   <div id="hud"></div>
 
-  <!-- Search panel -->
+  <!-- SEARCH PANEL -->
   <div id="searchPanel">
+
     <div class="search-input-bar">
       <input id="searchInput" type="text" placeholder="Search videos..." />
       <button id="searchBack">Back</button>
       <button id="searchGo">Go</button>
     </div>
+
+    <!-- FULL-WIDTH QWERTY KEYBOARD -->
     <div id="keyboard">
+
+      <!-- ROW 1 -->
       <div class="keyboard-row">
         <div class="key-btn" data-key="Q">Q</div>
         <div class="key-btn" data-key="W">W</div>
@@ -651,7 +631,13 @@ body::-webkit-scrollbar-thumb {
         <div class="key-btn" data-key="R">R</div>
         <div class="key-btn" data-key="T">T</div>
         <div class="key-btn" data-key="Y">Y</div>
+        <div class="key-btn" data-key="U">U</div>
+        <div class="key-btn" data-key="I">I</div>
+        <div class="key-btn" data-key="O">O</div>
+        <div class="key-btn" data-key="P">P</div>
       </div>
+
+      <!-- ROW 2 -->
       <div class="keyboard-row">
         <div class="key-btn" data-key="A">A</div>
         <div class="key-btn" data-key="S">S</div>
@@ -659,7 +645,12 @@ body::-webkit-scrollbar-thumb {
         <div class="key-btn" data-key="F">F</div>
         <div class="key-btn" data-key="G">G</div>
         <div class="key-btn" data-key="H">H</div>
+        <div class="key-btn" data-key="J">J</div>
+        <div class="key-btn" data-key="K">K</div>
+        <div class="key-btn" data-key="L">L</div>
       </div>
+
+      <!-- ROW 3 -->
       <div class="keyboard-row">
         <div class="key-btn" data-key="Z">Z</div>
         <div class="key-btn" data-key="X">X</div>
@@ -667,25 +658,34 @@ body::-webkit-scrollbar-thumb {
         <div class="key-btn" data-key="V">V</div>
         <div class="key-btn" data-key="B">B</div>
         <div class="key-btn" data-key="N">N</div>
+        <div class="key-btn" data-key="M">M</div>
       </div>
+
+      <!-- ROW 4 -->
       <div class="keyboard-row">
-        <div class="key-btn" data-key="SPACE">Space</div>
-        <div class="key-btn" data-key="DELETE">Delete</div>
-        <div class="key-btn" data-key="ENTER">Enter</div>
+        <div class="key-btn" data-key="SPACE">SPACE</div>
+        <div class="key-btn" data-key="DELETE">DELETE</div>
+        <div class="key-btn" data-key="ENTER">ENTER</div>
       </div>
+
     </div>
+
+    <!-- SUGGESTIONS -->
     <div id="suggestions"></div>
+
   </div>
 
-  <!-- Feed -->
+  <!-- FEED -->
   <div id="feed"></div>
 
-  <!-- Channel page -->
+  <!-- CHANNEL PAGE -->
   <div id="channelPage"></div>
-</div>
 
+</div>
 <script>
-// API keys (replace with your real key)
+/* -----------------------------------------------------------
+   YOUTUBE API KEY ROTATION
+----------------------------------------------------------- */
 const API_KEYS = [
   "AIzaSyCx0wjIv9VdzaI3oyz34zwkkFgTDj7LgEw",
   "AIzaSyD4tP4THh9ZeDcVW041l_JCjJztZA2zJCA",
@@ -696,60 +696,7 @@ const API_KEYS = [
   "AIzaSyBBhb74OgptZl6MuKxFZZhwBW3WF1PEoS8",
   "AIzaSyAxFZPU9JU9pVBUYat0Emidq1T-halZl7g",
   "AIzaSyDwIOQ1vUPiSSdnXDsCLSSpKw0iJhNSq2Q",
-  "AIzaSyA8C0Zvavj5NvS8DG4mWiznxmlR1knfWDY",
-  "AIzaSyBR_sU9r1Mo54Mu14jINl8mucfdGmUah4g",
-  "AIzaSyAH0tTfPpID0ZZCwMb_MYBAcIyfzzCSNGk",
-  "AIzaSyDp1vo7FcVtv8jwucExrjhlmmCoqvcjzZo",
-  "AIzaSyCUEZU2myLSXROR8y07aVSGfTA3rXfBc2w",
-  "AIzaSyBdzXWI8Rf3hiZJcmnMjmeD1HCGL0yt3M4",
-  "AIzaSyAgolv-EsBdBecdfL8BDuOiWKkFC85U9mc",
-  "AIzaSyDFW7lzp07iP8sJH16E0OYo6TOIMza3xF0",
-  "AIzaSyBlLAJmjYeWjVPlGxGQ5Oh7gIZdD6W7mOM",
-  "AIzaSyB1CjeraEYGWbzhsa3vbdpLen9pnodEDIY",
-  "AIzaSyA8w3wy8azWbI9eqmfEhjjmO-6nfwCQ7Ic",
-  "AIzaSyBtbd-LojMkkkaVgT_Av4yK4xVzasfzuV0",
-  "AIzaSyCiQPGZAvQLdpfRTrjP_Vg_d3poEoDuapk",
-  "AIzaSyCcps1pDfH1jO8nr7EhAiuqDHKySSnlz54",
-  "AIzaSyDpzL3t3dz5KOVcbX35NmJg5q3nk37Xy2A",
-  "AIzaSyBrexuOL6CvUUt4ZN2p7NJ9IcGsNK__Ykk",
-  "AIzaSyB6MhVJKunfoT6cHIRQFYSbiz6xmY2nt38",
-  "AIzaSyAstACkdoCO_qv6f5bSU2M1UtSxSUvACdo",
-  "AIzaSyADtKlLaH0JJ30n5dkVhZ9evF2FZvc2_Mc",
-  "AIzaSyCxyK9dFKRi98vNkpUjXtKZkWSgfuX-e8Y",
-  "AIzaSyAuSRLjd2l7af5VEJRKvVmocVq1nMBiqGk",
-  "AIzaSyBlDHyLe6pdlAieC4KMXR5X5OkAoZfFv98",
-  "AIzaSyA7iqN8H1R3b15urhl8Z_ywLw5_PvRaqfs",
-  "AIzaSyAX3Zhid-j1yC82-eY-kOY7n717sBTNoxs",
-  "AIzaSyCpWPsXdc9V9whBM09cMuiR3dSUzD4oj9w",
-  "AIzaSyCREh_Jkfelq-xhs74eDEKMX0UmSANCmgc",
-  "AIzaSyCfezvfQdwcIal-J95kTadI_C3l_8DPNyQ",
-  "AIzaSyBzMfP7pb8ElXOKw15Bkq_UZl70IGOyW60",
-  "AIzaSyBTcuCT4lJVGZjt5zWE-aNpODIUUzqdRKA",
-  "AIzaSyANiBbMpulLju8bd1GXlEntyZT6p-p9JJE",
-  "AIzaSyCPY56vV6npb4TQxhCezhNtxgv6azNYfGs",
-  "AIzaSyDNaTzdbxfWD5B_wLWcfDfyX4YUiIPvFek",
-  "AIzaSyDvBKboWImQcErI75-7si8NeO_Nyc3IrjU",
-  "AIzaSyA3pZ4T1frGgAVJ-AsWLZ-GG9De6NiZw4I",
-  "AIzaSyD9xE5H3jbID9GRMnDbNd2aTo2YLoQFpjA",
-  "AIzaSyCNyZw102C5tKe8snKbkYQnf0VL9LEol2k",
-  "AIzaSyBrQr7qNm02b-Hg1pZnm4_lv660VPcNz-M",
-  "AIzaSyDwZobEvLGX7kKEMO1IbVjVstiIbe-sg7E",
-  "AIzaSyBt57smlSuTwGWpJ-zvvS4ViHhmsZ_KgRk",
-  "AIzaSyB7J43Wgv5bWnppisatVNjr_JcTOk6fCgE",
-  "AIzaSyCXJNqsKpax8u_JaffKyVeHc6G7M-OLXGo",
-  "AIzaSyBc3UQfL7QLs1AfyepSMQN4czBKeCmr5xs",
-  "AIzaSyBFQbbs_sIZtVxhgcYRitx7VERco44davE",
-  "AIzaSyBLLDdz4RWjFtjYLXPeX4drs1OomkDvoaE",
-  "AIzaSyAf00dqj-JI7r4NefyzEpYqHZZvv0Dhh8U",
-  "AIzaSyB_MooQA2zN_Pxu1yiX3UmmQFZ88NPC4Sc",
-  "AIzaSyCNKHUZDe3Ku-o788_QuqSy_OmPTg1wWNU",
-  "AIzaSyCtXGuTRHg5uhaQLv7aVUSPtAxxvwP-VRk",
-  "AIzaSyCTEF9kn3c-9YD3vNTbYuxrbJqmmYYHDfE",
-  "AIzaSyBtAjCHLUqzrxo8ShrW0dVKfyC4W7Yj2IA",
-  "AIzaSyD77ub12hPKZZTxJBr72PqEaQ9ykUwVtig",
-  "AIzaSyAsC6kZKAUhW4KMN04s8JJS9Hu4fFsgy04",
-  "AIzaSyBCBZCfKfVg5kMUPjxmRq41uqrbrnmpu-I",
-  "AIzaSyBk_q3XUQyI3rtUVCc46kjKJPh5Pm7u9QQ"
+  "AIzaSyA8C0Zvavj5NvS8DG4mWiznxmlR1knfWDY"
 ];
 
 let keyIndex = 0;
@@ -762,39 +709,39 @@ async function fetchYouTube(endpoint, params = {}) {
   params.key = key;
 
   Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null) {
-      url.searchParams.append(k, v);
-    }
+    if (v !== undefined && v !== null) url.searchParams.append(k, v);
   });
 
   url.searchParams.append("_", Date.now());
 
   try {
     const res = await fetch(url.toString(), { cache: "no-store" });
-    if (!res.ok) {
-      console.warn("Key failed, switching to next key:", key);
-      return fetchYouTube(endpoint, params);
-    }
+    if (!res.ok) return fetchYouTube(endpoint, params);
     return await res.json();
   } catch (err) {
-    console.error("Network error, retrying with next key:", err);
     return fetchYouTube(endpoint, params);
   }
 }
 
-// State
+/* -----------------------------------------------------------
+   GLOBAL STATE
+----------------------------------------------------------- */
 let currentTab = "home";
 let currentVideoId = null;
 let miniActive = false;
 let isLight = false;
+
 let currentChannelId = "UCoLDGQ7a81ep9SJqPlDs2sg";
 let channelNextPageToken = null;
 let channelUploadsId = null;
+
 let historyList = [];
 let shortsItems = [];
 let shortsIndex = 0;
 
-// Elements
+/* -----------------------------------------------------------
+   ELEMENTS
+----------------------------------------------------------- */
 const feedEl = document.getElementById("feed");
 const playerFrame = document.getElementById("playerFrame");
 const playerSection = document.getElementById("playerSection");
@@ -814,50 +761,53 @@ const moviesTab = document.getElementById("moviesTab");
 const historyTab = document.getElementById("historyTab");
 const trendingTab = document.getElementById("trendingTab");
 const channelTab = document.getElementById("channelTab");
+
 const themeToggle = document.getElementById("themeToggle");
 const backBtn = document.getElementById("backBtn");
+
 const playPauseBtn = document.getElementById("playPauseBtn");
 const forwardBtn = document.getElementById("forwardBtn");
 const rewindBtn = document.getElementById("rewindBtn");
 const fullBtn = document.getElementById("fullBtn");
 const closeMini = document.getElementById("closeMini");
+
 const searchInput = document.getElementById("searchInput");
 const searchGo = document.getElementById("searchGo");
 const searchBack = document.getElementById("searchBack");
 
-// HUD
+/* -----------------------------------------------------------
+   HUD
+----------------------------------------------------------- */
 function showHUD(text) {
   hudEl.textContent = text;
   hudEl.style.opacity = 1;
-  applyHUDDepthFull();
-  setTimeout(() => {
-    hudEl.style.opacity = 0;
-  }, 1200);
+  setTimeout(() => (hudEl.style.opacity = 0), 1200);
 }
 
-// Depth shadow helper
-function setDepthShadow(el, depth) {
-  if (!el) return;
-  if (depth >= 40) {
-    el.style.boxShadow = "var(--shadow-strong), var(--shadow-glow)";
-  } else if (depth >= 10) {
-    el.style.boxShadow = "var(--shadow-strong)";
-  } else if (depth >= -10) {
-    el.style.boxShadow = "var(--shadow-soft)";
-  } else {
-    el.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
-  }
+/* -----------------------------------------------------------
+   PLAYER
+----------------------------------------------------------- */
+function setPlayerVideo(videoId, snippet) {
+  currentVideoId = videoId;
+  playerSection.style.display = "block";
+  playerSection.classList.remove("player-mini", "player-fullscreen");
+
+  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
+
+  historyList.unshift({ id: videoId, snippet });
+  if (historyList.length > 50) historyList.pop();
+
+  hideUIForVideo();
+  playPauseBtn.textContent = "Pause";
+
+  initAudioGlow();
 }
 
-// Clear feed
-function clearFeed() {
-  feedEl.innerHTML = "";
-  channelPageEl.innerHTML = "";
-}
-
-// UI hide/show
+/* -----------------------------------------------------------
+   UI HIDE/SHOW
+----------------------------------------------------------- */
 function hideUIForVideo() {
-  topbarEl.style.display = "none";
+  topbarEl.style.display = "flex";   // FIXED
   searchTabEl.style.display = "none";
   searchPanelEl.style.display = "none";
   tabsEl.style.display = "none";
@@ -871,9 +821,6 @@ function showUIWithMiniPlayer() {
   topbarEl.style.display = "flex";
   searchTabEl.style.display = "flex";
   tabsEl.style.display = "flex";
-  searchPanelEl.style.display = "none";
-  keyboardEl.style.display = "none";
-  suggestionsEl.style.display = "none";
 
   if (currentTab === "channel") {
     channelPageEl.style.display = "block";
@@ -884,504 +831,48 @@ function showUIWithMiniPlayer() {
   }
 }
 
-// Player
-function setPlayerVideo(videoId, snippet) {
-  currentVideoId = videoId;
-  playerSection.style.display = "block";
-  playerSection.classList.remove("player-mini", "player-fullscreen");
-  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
-  historyList.unshift({ id: videoId, snippet });
-  if (historyList.length > 50) historyList.pop();
-  hideUIForVideo();
-  playPauseBtn.textContent = "Pause";
-  applyMiniPlayerFrameDepth();
-  initAudioReactiveGlow();
-}
-
-// Tabs
-function setActiveTab(tab) {
-  currentTab = tab;
-  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab]
-    .forEach(btn => btn.classList.remove("active"));
-  if (tab === "home") homeTab.classList.add("active");
-  if (tab === "shorts") shortsTab.classList.add("active");
-  if (tab === "movies") moviesTab.classList.add("active");
-  if (tab === "history") historyTab.classList.add("active");
-  if (tab === "trending") trendingTab.classList.add("active");
-  if (tab === "channel") channelTab.classList.add("active");
-
-  if (tab === "channel") {
-    feedEl.style.display = "none";
-    channelPageEl.style.display = "block";
-  } else {
-    feedEl.style.display = "block";
-    channelPageEl.style.display = "none";
-  }
-
-  keyboardEl.style.display = "none";
-  searchPanelEl.style.display = "none";
-  suggestionsEl.style.display = "none";
-  applyTabHighlightDepth();
-}
-
-// Feed renderer
-function renderFeed(items) {
-  feedEl.innerHTML = "";
-
-  items.forEach((item, i) => {
-    const snippet = item.snippet || {};
-    const stats = item.statistics || {};
-    const videoId = item.id?.videoId || item.id;
-
-    const card = document.createElement("div");
-    card.className = "video-card parallax";
-
-    const thumb = document.createElement("div");
-    thumb.className = "video-thumb";
-    const img = document.createElement("img");
-    img.src = snippet.thumbnails?.high?.url
-           || snippet.thumbnails?.medium?.url
-           || snippet.thumbnails?.default?.url
-           || "";
-    thumb.appendChild(img);
-
-    const info = document.createElement("div");
-    info.className = "video-info";
-
-    const title = document.createElement("div");
-    title.className = "video-title";
-    title.textContent = snippet.title || "Untitled";
-
-    const channel = document.createElement("div");
-    channel.className = "video-channel";
-    channel.textContent = snippet.channelTitle || "Unknown channel";
-
-    const meta = document.createElement("div");
-    meta.className = "video-meta";
-    meta.textContent = `${stats.viewCount || 0} views`;
-
-    info.appendChild(title);
-    info.appendChild(channel);
-    info.appendChild(meta);
-
-    card.appendChild(thumb);
-    card.appendChild(info);
-
-    card.onclick = () => {
-      setPlayerVideo(videoId, snippet);
-      showHUD("Playing: " + snippet.title);
-    };
-
-    img.onclick = (e) => {
-      e.stopPropagation();
-      setPlayerVideo(videoId, snippet);
-      showHUD("Playing: " + snippet.title);
-    };
-
-    title.onclick = (e) => {
-      e.stopPropagation();
-      setPlayerVideo(videoId, snippet);
-      showHUD("Playing: " + snippet.title);
-    };
-
-    channel.onclick = (e) => {
-      e.stopPropagation();
-      const channelId = snippet.channelId || currentChannelId;
-      loadChannelPage(channelId);
-    };
-
-    feedEl.appendChild(card);
-  });
-
-  setTimeout(apply3DStacking, 10);
-}
-
-// 3D stacking
-function apply3DStacking() {
-  const cards = document.querySelectorAll('.video-card');
-
-  cards.forEach((card, i) => {
-    const depth = -40 * i + Math.sin(i * 0.6) * 12;
-    card.style.transform = `
-      perspective(900px)
-      translateZ(${depth}px)
-    `;
-    setDepthShadow(card, depth);
-  });
-}
-
-// Depth helpers
-function applyPlayerDepth() {
-  const player = document.getElementById("playerSection");
-  if (!player) return;
-
-  let depth = -60;
-  if (player.classList.contains("player-fullscreen")) depth = 40;
-  else if (player.classList.contains("player-mini")) depth = -10;
-
-  player.style.transform = `
-    perspective(900px)
-    translateZ(${depth}px)
-  `;
-  setDepthShadow(player, depth);
-}
-
-function applyMiniPlayerFrameDepth() {
-  const player = document.getElementById("playerSection");
-  if (!player) return;
-
-  let depth = -30;
-
-  if (player.classList.contains("player-fullscreen")) {
-    depth = 40; // fullscreen depth
-  } else if (player.classList.contains("player-mini")) {
-    depth = -10; // mini depth
-  }
-
-  player.style.transform = `
-    perspective(900px)
-    translateZ(${depth}px)
-  `;
-  setDepthShadow(player, depth);
-}
-
-function applyChannelBannerDepth() {
-  const banner = document.querySelector(".channel-banner");
-  if (!banner) return;
-
-  const depth = -20;
-  banner.style.transform = `
-    perspective(900px)
-    translateZ(${depth}px)
-  `;
-  setDepthShadow(banner, depth);
-}
-
-function applyChannelHeaderDepth() {
-  const header = document.querySelector(".channel-header");
-  const meta = document.querySelector(".channel-meta");
-
-  if (header) {
-    const depth = -15;
-    header.style.transform = `
-      perspective(900px)
-      translateZ(${depth}px)
-    `;
-    setDepthShadow(header, depth);
-  }
-
-  if (meta) {
-    const depth = 5;
-    meta.style.transform = `
-      perspective(900px)
-      translateZ(${depth}px)
-    `;
-    setDepthShadow(meta, depth);
-  }
-}
-
-function applySearchBarDepthFull() {
-  const bar = document.getElementById("searchTab");
-  if (!bar) return;
-
-  bar.style.transform = `
-    perspective(900px)
-    translateZ(80px)
-  `;
-}
-
-function applySearchInputDepthFull() {
-  const bar = document.querySelector(".search-input-bar");
-  if (!bar) return;
-
-  if (bar.style.display !== "none") {
-    bar.style.transform = `
-      perspective(900px)
-      translateZ(110px)
-    `;
-  }
-}
-
-function applyKeyboardPanelDepthFull() {
-  const kb = document.getElementById("keyboard");
-  if (!kb) return;
-
-  kb.style.transform = `
-    perspective(900px)
-    translateZ(70px)
-  `;
-}
-
-function applyKeyboardKeyDepthFull() {
-  const keys = document.querySelectorAll('.key-btn');
-
-  keys.forEach((key, i) => {
-    const row = Math.floor(i / 6);
-    const col = i % 6;
-    const depth = 40 - row * 12 - col * 2;
-
-    key.style.transform = `
-      perspective(900px)
-      translateZ(${depth}px)
-    `;
-  });
-}
-
-function applyHUDDepthFull() {
-  const hud = document.getElementById("hud");
-  if (!hud) return;
-
-  const depth = 160;
-  hud.style.transform = `
-    perspective(900px)
-    translateZ(${depth}px)
-  `;
-  setDepthShadow(hud, depth);
-}
-
-function applyTopbarDepth() {
-  const topbar = document.getElementById("topbar");
-  if (!topbar) return;
-
-  const depth = 60;
-  topbar.style.transform = `
-    perspective(900px)
-    translateZ(${depth}px)
-  `;
-  setDepthShadow(topbar, depth);
-}
-
-function applySearchBarDepth() {
-  const bar = document.getElementById("searchTab");
-  if (!bar) return;
-
-  const depth = -10;
-  bar.style.transform = `
-    perspective(900px)
-    translateZ(${depth}px)
-  `;
-  setDepthShadow(bar, depth);
-}
-
-function applyMiniControlsDepth() {
-  const controls = document.querySelector(".player-controls");
-  if (!controls) return;
-
-  const depth = 20;
-  controls.style.transform = `
-    perspective(900px)
-    translateZ(${depth}px)
-  `;
-}
-
-function applyKeyboardDepth() {
-  const keys = document.querySelectorAll('.key-btn');
-
-  keys.forEach((key, i) => {
-    const depth = -5 + (i % 6) * -3;
-    key.style.transform = `
-      perspective(900px)
-      translateZ(${depth}px)
-    `;
-  });
-}
-
-function applyTabDepthStacking() {
-  const tabs = document.querySelectorAll('.parallax-tab');
-  const baseDepth = -20;
-  const step = -12;
-
-  tabs.forEach((tab, index) => {
-    const depth = baseDepth + step * index;
-    tab.style.transform = `
-      perspective(900px)
-      translateZ(${depth}px)
-    `;
-  });
-}
-
-function applyTabHighlightDepth() {
-  const activeTab = document.querySelector(".tab-btn.active");
-  if (!activeTab) return;
-
-  const depth = 25;
-  activeTab.style.transform = `
-    perspective(900px)
-    translateZ(${depth}px)
-  `;
-}
-
-// Search depth mode
-function enterSearchDepthMode() {
-  document.body.classList.add("search-depth-mode");
-}
-
-function exitSearchDepthMode() {
-  document.body.classList.remove("search-depth-mode");
-}
-
-// Chromatic aberration driver
-function applyChromaticAberration(xTilt, yTilt) {
-  const intensity = Math.min(1, Math.abs(xTilt) + Math.abs(yTilt));
-  const blur = 4 + intensity * 12;
-  const opacity = 0.25 + intensity * 0.45;
-  playerSection.style.setProperty("--chroma-blur", `${blur}px`);
-  playerSection.style.setProperty("--chroma-opacity", opacity);
-}
-
-// Audio-reactive glow (simulated pulse)
-let audioGlowInitialized = false;
-
-function initAudioReactiveGlow() {
-  if (audioGlowInitialized) return;
-  audioGlowInitialized = true;
-  animateAudioGlow();
-}
-
-function animateAudioGlow() {
-  const t = Date.now() / 600;
-  const level = (Math.sin(t) + 1) / 2; // 0 → 1
-  const blur = 20 + level * 60;
-  const opacity = 0.25 + level * 0.55;
-  playerSection.style.setProperty("--audio-glow-blur", `${blur}px`);
-  playerSection.style.setProperty("--audio-glow-opacity", opacity);
-  requestAnimationFrame(animateAudioGlow);
-}
-
-// Micro-parallax + depth system
-document.addEventListener("pointermove", (e) => {
-
-  // Prevent fullscreen from being overridden
-  if (playerSection.classList.contains("player-fullscreen")) return;
-
-  const tiltX = e.movementX * 0.06;
-  const tiltY = e.movementY * 0.04;
-
-  // Apply tilt to all parallax elements
-  document.querySelectorAll('.parallax').forEach(el => {
-    el.style.transform = `
-      perspective(900px)
-      rotateX(${tiltY}deg)
-      rotateY(${tiltX}deg)
-    `;
-  });
-
-  // Apply tilt + depth to feed cards
-  const cards = document.querySelectorAll('.video-card');
-  cards.forEach((card, i) => {
-    const depth = -40 * i + Math.sin(i * 0.6) * 12;
-    card.style.transform = `
-      perspective(900px)
-      translateZ(${depth}px)
-      rotateX(${tiltY}deg)
-      rotateY(${tiltX}deg)
-    `;
-    setDepthShadow(card, depth);
-  });
-
-  // Apply tilt + depth to tabs
-  const tabs = document.querySelectorAll('.parallax-tab');
-  tabs.forEach((tab, index) => {
-    const baseDepth = -20;
-    const step = -12;
-    const depth = baseDepth + step * index;
-    tab.style.transform = `
-      perspective(900px)
-      translateZ(${depth}px)
-      rotateX(${tiltY}deg)
-      rotateY(${tiltX}deg)
-    `;
-    setDepthShadow(tab, depth);
-  });
-
-  // Depth updates (only when NOT fullscreen)
-  applyPlayerDepth();
-  applyChannelBannerDepth();
-  applyChannelHeaderDepth();
-  applySearchBarDepthFull();
-  applySearchInputDepthFull();
-  applyKeyboardPanelDepthFull();
-  applyKeyboardKeyDepthFull();
-  applyHUDDepthFull();
-  applyTopbarDepth();
-  applyMiniControlsDepth();
-  applyKeyboardDepth();
-  applyTabHighlightDepth();
-
-  // Chromatic aberration
-  applyChromaticAberration(tiltX, tiltY);
-});
-
-// Theme toggle
-themeToggle.addEventListener("click", () => {
-  isLight = !isLight;
-  document.body.classList.toggle("light", isLight);
-  showHUD(isLight ? "Light Mode" : "Dark Mode");
-  applyTabDepthStacking();
-});
-
-// Back → mini bottom-right + show UI
+/* -----------------------------------------------------------
+   MINI PLAYER
+----------------------------------------------------------- */
 backBtn.addEventListener("click", () => {
-  if (!playerSection.style.display || playerSection.style.display === "none") return;
+  if (playerSection.style.display === "none") return;
+
   playerSection.classList.remove("player-fullscreen");
   playerSection.classList.add("player-mini");
+
   miniActive = true;
   showUIWithMiniPlayer();
-  keyboardEl.style.display = "none";
-  searchPanelEl.style.display = "none";
-  suggestionsEl.style.display = "none";
-  applyMiniPlayerFrameDepth();
-  applyMiniControlsDepth();
   showHUD("Mini-player");
 });
 
-// Fullscreen toggle
-fullBtn.addEventListener("click", () => {
-  if (!playerSection.style.display || playerSection.style.display === "none") return;
-
-  miniActive = false;
-
-  playerSection.classList.remove("player-mini");
-  playerSection.classList.add("player-fullscreen");
-
-  hideUIForVideo();
-
-  applyPlayerDepth();
-  applyMiniControlsDepth();
-
-  showHUD("Fullscreen");
-});
-
-// Close mini-player (X top-right) — restore UI
 closeMini.addEventListener("click", () => {
   playerSection.style.display = "none";
   playerFrame.src = "";
 
-  topbarEl.style.display = "flex";
-  searchTabEl.style.display = "flex";
-  tabsEl.style.display = "flex";
-
-  if (currentTab === "channel") {
-    channelPageEl.style.display = "block";
-    feedEl.style.display = "none";
-  } else {
-    feedEl.style.display = "block";
-    channelPageEl.style.display = "none";
-  }
-
-  feedEl.style.pointerEvents = "auto";
-  tabsEl.style.pointerEvents = "auto";
-  topbarEl.style.pointerEvents = "auto";
-  searchTabEl.style.pointerEvents = "auto";
-
-  applyMiniPlayerFrameDepth();
+  showUIWithMiniPlayer();
   showHUD("Player closed");
 });
 
-// Player commands
-function postToPlayer(command) {
+/* -----------------------------------------------------------
+   FULLSCREEN
+----------------------------------------------------------- */
+fullBtn.addEventListener("click", () => {
+  if (playerSection.style.display === "none") return;
+
+  miniActive = false;
+  playerSection.classList.remove("player-mini");
+  playerSection.classList.add("player-fullscreen");
+
+  hideUIForVideo();
+  showHUD("Fullscreen");
+});
+
+/* -----------------------------------------------------------
+   PLAYER COMMANDS
+----------------------------------------------------------- */
+function postToPlayer(cmd) {
   if (!playerFrame.contentWindow) return;
-  playerFrame.contentWindow.postMessage(JSON.stringify(command), "*");
+  playerFrame.contentWindow.postMessage(JSON.stringify(cmd), "*");
 }
 
 playPauseBtn.addEventListener("click", () => {
@@ -1396,28 +887,207 @@ playPauseBtn.addEventListener("click", () => {
 
 forwardBtn.addEventListener("click", () => {
   postToPlayer({ event: "command", func: "seekBy", args: [10] });
-
-  scrollStartX = null;
-  scrollStartY = null;
-
-  playerSection.style.pointerEvents = "auto";
-  feedEl.style.pointerEvents = "none";
-  tabsEl.style.pointerEvents = "none";
-
-  setTimeout(() => {
-    feedEl.style.pointerEvents = "auto";
-    tabsEl.style.pointerEvents = "auto";
-  }, 250);
 });
 
 rewindBtn.addEventListener("click", () => {
   postToPlayer({ event: "command", func: "seekBy", args: [-10] });
 });
 
-// Channel page
+/* -----------------------------------------------------------
+   FEED RENDERING
+----------------------------------------------------------- */
+function renderFeed(items) {
+  feedEl.innerHTML = "";
+
+  items.forEach((item) => {
+    const snippet = item.snippet || {};
+    const stats = item.statistics || {};
+    const videoId = item.id?.videoId || item.id;
+
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
+
+    card.innerHTML = `
+      <div class="video-thumb">
+        <img src="${snippet.thumbnails?.high?.url || ""}">
+      </div>
+      <div class="video-info">
+        <div class="video-title">${snippet.title}</div>
+        <div class="video-channel">${snippet.channelTitle}</div>
+        <div class="video-meta">${stats.viewCount || 0} views</div>
+      </div>
+    `;
+
+    card.onclick = () => {
+      setPlayerVideo(videoId, snippet);
+      showHUD("Playing: " + snippet.title);
+    };
+
+    feedEl.appendChild(card);
+  });
+}
+
+/* -----------------------------------------------------------
+   TABS
+----------------------------------------------------------- */
+function setActiveTab(tab) {
+  currentTab = tab;
+
+  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab]
+    .forEach(btn => btn.classList.remove("active"));
+
+  if (tab === "home") homeTab.classList.add("active");
+  if (tab === "shorts") shortsTab.classList.add("active");
+  if (tab === "movies") moviesTab.classList.add("active");
+  if (tab === "history") historyTab.classList.add("active");
+  if (tab === "trending") trendingTab.classList.add("active");
+  if (tab === "channel") channelTab.classList.add("active");
+
+  if (tab === "channel") {
+    feedEl.style.display = "none";
+    channelPageEl.style.display = "block";
+  } else {
+    feedEl.style.display = "block";
+    channelPageEl.style.display = "none";
+  }
+}
+
+/* -----------------------------------------------------------
+   HOME TAB
+----------------------------------------------------------- */
+homeTab.addEventListener("click", async () => {
+  setActiveTab("home");
+  const data = await fetchYouTube("videos", {
+    part: "snippet,statistics",
+    chart: "mostPopular",
+    maxResults: 25
+  });
+  renderFeed(data.items || []);
+  showHUD("Home");
+});
+
+/* -----------------------------------------------------------
+   TRENDING
+----------------------------------------------------------- */
+trendingTab.addEventListener("click", async () => {
+  setActiveTab("trending");
+  const data = await fetchYouTube("videos", {
+    part: "snippet,statistics",
+    chart: "mostPopular",
+    regionCode: "US",
+    maxResults: 25
+  });
+  renderFeed(data.items || []);
+  showHUD("Trending");
+});
+
+/* -----------------------------------------------------------
+   SHORTS
+----------------------------------------------------------- */
+shortsTab.addEventListener("click", async () => {
+  setActiveTab("shorts");
+
+  const data = await fetchYouTube("search", {
+    part: "snippet",
+    q: "youtube shorts",
+    type: "video",
+    videoEmbeddable: "true",
+    regionCode: "US",
+    maxResults: 25
+  });
+
+  shortsItems = data.items.map(v => ({
+    id: v.id.videoId,
+    snippet: v.snippet
+  }));
+
+  shortsIndex = 0;
+  renderFeed(shortsItems);
+  showHUD("Shorts");
+});
+
+function playShortAt(i) {
+  if (!shortsItems[i]) return;
+  const item = shortsItems[i];
+  setPlayerVideo(item.id, item.snippet);
+}
+
+function nextShort() {
+  if (shortsIndex < shortsItems.length - 1) {
+    shortsIndex++;
+    playShortAt(shortsIndex);
+  }
+}
+
+function prevShort() {
+  if (shortsIndex > 0) {
+    shortsIndex--;
+    playShortAt(shortsIndex);
+  }
+}
+
+let touchStartY = null;
+document.addEventListener("touchstart", e => {
+  if (currentTab !== "shorts") return;
+  touchStartY = e.touches[0].clientY;
+});
+
+document.addEventListener("touchend", e => {
+  if (currentTab !== "shorts") return;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  if (Math.abs(dy) > 50) dy < 0 ? nextShort() : prevShort();
+});
+
+/* -----------------------------------------------------------
+   MOVIES
+----------------------------------------------------------- */
+moviesTab.addEventListener("click", async () => {
+  setActiveTab("movies");
+
+  const data = await fetchYouTube("search", {
+    part: "snippet",
+    q: "short film award winning",
+    type: "video",
+    videoEmbeddable: "true",
+    regionCode: "US",
+    maxResults: 25
+  });
+
+  const items = data.items.map(v => ({
+    id: v.id.videoId,
+    snippet: v.snippet
+  }));
+
+  renderFeed(items);
+  showHUD("Short Films");
+});
+
+/* -----------------------------------------------------------
+   HISTORY
+----------------------------------------------------------- */
+historyTab.addEventListener("click", () => {
+  setActiveTab("history");
+
+  const items = historyList.map(h => ({
+    id: h.id,
+    snippet: h.snippet,
+    statistics: { viewCount: "watched" }
+  }));
+
+  renderFeed(items);
+  showHUD("History");
+});
+
+/* -----------------------------------------------------------
+   CHANNEL PAGE
+----------------------------------------------------------- */
+channelTab.addEventListener("click", () => {
+  loadChannelPage(currentChannelId);
+});
+
 async function loadChannelPage(channelId) {
-  currentChannelId = channelId;
   setActiveTab("channel");
+  currentChannelId = channelId;
 
   const info = await fetchYouTube("channels", {
     part: "snippet,statistics,contentDetails",
@@ -1425,10 +1095,7 @@ async function loadChannelPage(channelId) {
   });
 
   const channelInfo = info.items?.[0];
-  if (!channelInfo) {
-    showHUD("Channel not found");
-    return;
-  }
+  if (!channelInfo) return;
 
   channelPageEl.innerHTML = `
     <div class="channel-banner parallax">
@@ -1437,15 +1104,13 @@ async function loadChannelPage(channelId) {
     </div>
 
     <div class="channel-header parallax">
-      <img class="channel-pic" src="${channelInfo.snippet.thumbnails?.default?.url || ""}">
+      <img class="channel-pic" src="${channelInfo.snippet.thumbnails?.default?.url}">
       <div class="channel-meta">
         <div class="channel-name">${channelInfo.snippet.title}</div>
-        <div class="channel-subs">${channelInfo.statistics?.subscriberCount || 0} subscribers</div>
+        <div class="channel-subs">${channelInfo.statistics?.subscriberCount} subscribers</div>
       </div>
     </div>
   `;
-  applyChannelBannerDepth();
-  applyChannelHeaderDepth();
 
   channelUploadsId = channelInfo.contentDetails.relatedPlaylists.uploads;
 
@@ -1474,185 +1139,34 @@ async function loadChannelPage(channelId) {
       </div>
     `;
 
-    card.onclick = () => {
-      setPlayerVideo(videoId, snippet);
-      showHUD("Playing: " + snippet.title);
-    };
-
+    card.onclick = () => setPlayerVideo(videoId, snippet);
     channelPageEl.appendChild(card);
   });
 
-  showHUD("Channel: " + channelInfo.snippet.title);
+  showHUD("Channel Loaded");
 }
 
-// Infinite scroll for channel
-window.addEventListener("scroll", async () => {
-  if (currentTab !== "channel") return;
-  if (!channelNextPageToken) return;
-  if (!channelUploadsId) return;
-
-  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
-    const more = await fetchYouTube("playlistItems", {
-      part: "snippet",
-      playlistId: channelUploadsId,
-      maxResults: 20,
-      pageToken: channelNextPageToken
-    });
-
-    channelNextPageToken = more.nextPageToken || null;
-
-    more.items.forEach(item => {
-      const snippet = item.snippet;
-      const videoId = snippet.resourceId.videoId;
-
-      const card = document.createElement("div");
-      card.className = "video-card parallax";
-
-      card.innerHTML = `
-        <div class="video-thumb">
-          <img src="${snippet.thumbnails.medium.url}">
-        </div>
-        <div class="video-info">
-          <div class="video-title">${snippet.title}</div>
-          <div class="video-channel">${snippet.channelTitle}</div>
-        </div>
-      `;
-
-      card.onclick = () => {
-        setPlayerVideo(videoId, snippet);
-        showHUD("Playing: " + snippet.title);
-      };
-
-      channelPageEl.appendChild(card);
-    });
-
-    showHUD("More channel videos");
-  }
-});
-
-// Tab handlers
-homeTab.addEventListener("click", async () => {
-  clearFeed();
-  setActiveTab("home");
-  const data = await fetchYouTube("videos", {
-    part: "snippet,statistics",
-    chart: "mostPopular",
-    maxResults: 25
-  });
-  renderFeed(data.items || []);
-  showHUD("Home");
-});
-
-trendingTab.addEventListener("click", async () => {
-  clearFeed();
-  setActiveTab("trending");
-  const data = await fetchYouTube("videos", {
-    part: "snippet,statistics",
-    chart: "mostPopular",
-    regionCode: "US",
-    maxResults: 25
-  });
-  renderFeed(data.items || []);
-  showHUD("Trending US");
-});
-
-// Shorts: real Shorts via search
-shortsTab.addEventListener("click", async () => {
-  clearFeed();
-  setActiveTab("shorts");
-
+/* -----------------------------------------------------------
+   SEARCH + SUGGESTIONS
+----------------------------------------------------------- */
+async function fetchSuggestions(q) {
+  if (!q.trim()) return [];
   const data = await fetchYouTube("search", {
     part: "snippet",
-    q: "youtube shorts",
-    type: "video",
-    videoEmbeddable: "true",
-    regionCode: "US",
-    maxResults: 25,
-    order: "relevance"
-  });
-
-  if (!data.items || data.items.length === 0) {
-    showHUD("No Shorts found");
-    return;
-  }
-
-  const items = data.items.map(v => ({
-    id: v.id.videoId,
-    snippet: v.snippet
-  }));
-
-  shortsItems = items;
-  shortsIndex = 0;
-
-  renderFeed(items);
-  showHUD("Shorts");
-});
-
-// Movies: US short films
-moviesTab.addEventListener("click", async () => {
-  clearFeed();
-  setActiveTab("movies");
-
-  const data = await fetchYouTube("search", {
-    part: "snippet",
-    q: "short film award winning",
-    type: "video",
-    videoEmbeddable: "true",
-    regionCode: "US",
-    maxResults: 25,
-    order: "relevance"
-  });
-
-  if (!data.items || data.items.length === 0) {
-    showHUD("No short films found");
-    return;
-  }
-
-  const items = data.items.map(v => ({
-    id: v.id.videoId,
-    snippet: v.snippet
-  }));
-
-  renderFeed(items);
-  showHUD("US Short Films");
-});
-
-historyTab.addEventListener("click", async () => {
-  clearFeed();
-  setActiveTab("history");
-  const items = historyList.map(h => ({
-    id: h.id,
-    snippet: h.snippet,
-    statistics: { viewCount: "watched" }
-  }));
-  renderFeed(items);
-  showHUD("History");
-});
-
-channelTab.addEventListener("click", async () => {
-  clearFeed();
-  loadChannelPage(currentChannelId);
-});
-
-// Suggestions
-async function fetchSuggestions(query) {
-  if (!query.trim()) return [];
-  const data = await fetchYouTube("search", {
-    part: "snippet",
-    q: query,
+    q,
     type: "video",
     maxResults: 8
   });
-  if (!data.items) return [];
-  return data.items.map(v => v.snippet.title);
+  return data.items?.map(v => v.snippet.title) || [];
 }
 
 function showSuggestions(list) {
   suggestionsEl.innerHTML = "";
-  if (list.length === 0) {
+  if (!list.length) {
     suggestionsEl.style.display = "none";
     return;
   }
+
   list.forEach(text => {
     const item = document.createElement("div");
     item.className = "suggestion-item";
@@ -1660,30 +1174,19 @@ function showSuggestions(list) {
     item.onclick = () => {
       searchInput.value = text;
       triggerSearch(text);
-      suggestionsEl.style.display = "none";
     };
     suggestionsEl.appendChild(item);
   });
+
   suggestionsEl.style.display = "block";
 }
 
-// Search tab + keyboard
 function openKeyboard() {
   searchPanelEl.style.display = "block";
   keyboardEl.style.display = "block";
   document.querySelector(".search-input-bar").style.display = "flex";
 
   feedEl.style.display = "none";
-
-  tabsEl.style.pointerEvents = "none";
-  feedEl.style.pointerEvents = "none";
-  playerSection.style.pointerEvents = "none";
-
-  applyKeyboardDepth();
-  applyKeyboardPanelDepthFull();
-  enterSearchDepthMode();
-  applySearchBarDepthFull();
-  applyHUDDepthFull();
 }
 
 function closeKeyboard() {
@@ -1692,56 +1195,37 @@ function closeKeyboard() {
   suggestionsEl.style.display = "none";
 
   feedEl.style.display = "block";
-
-  tabsEl.style.pointerEvents = "auto";
-  feedEl.style.pointerEvents = "auto";
-  playerSection.style.pointerEvents = "auto";
-
-  exitSearchDepthMode();
 }
 
-searchTabEl.addEventListener("click", () => {
-  openKeyboard();
-});
-
-searchBack.addEventListener("click", () => {
-  searchInput.value = "";
-  closeKeyboard();
-});
+searchTabEl.addEventListener("click", openKeyboard);
+searchBack.addEventListener("click", closeKeyboard);
 
 searchGo.addEventListener("click", () => {
   const q = searchInput.value.trim() || "music";
   triggerSearch(q);
 });
 
-keyboardEl.addEventListener("click", async (e) => {
-  const btn = e.target.closest(".key-btn");
-  if (!btn) return;
-
-  document.querySelector(".search-input-bar").style.display = "flex";
-  applySearchInputDepthFull();
-
-  const key = btn.dataset.key || btn.textContent;
-
-  if (key === "SPACE") {
-    searchInput.value += " ";
-  } else if (key === "DELETE") {
-    searchInput.value = searchInput.value.slice(0, -1);
-  } else if (key === "ENTER") {
-    const q = searchInput.value.trim() || "music";
-    triggerSearch(q);
-    suggestionsEl.style.display = "none";
-    return;
-  } else {
-    searchInput.value += key;
-  }
-
+searchInput.addEventListener("input", async () => {
   const q = searchInput.value.trim();
   const suggestions = await fetchSuggestions(q);
   showSuggestions(suggestions);
 });
 
-searchInput.addEventListener("input", async () => {
+keyboardEl.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".key-btn");
+  if (!btn) return;
+
+  const key = btn.dataset.key;
+
+  if (key === "SPACE") searchInput.value += " ";
+  else if (key === "DELETE") searchInput.value = searchInput.value.slice(0, -1);
+  else if (key === "ENTER") {
+    triggerSearch(searchInput.value.trim());
+    return;
+  } else {
+    searchInput.value += key;
+  }
+
   const q = searchInput.value.trim();
   const suggestions = await fetchSuggestions(q);
   showSuggestions(suggestions);
@@ -1755,119 +1239,91 @@ function triggerSearch(q) {
       type: "video",
       maxResults: 25
     });
-    clearFeed();
-    setActiveTab("home");
+
     renderFeed(data.items || []);
-    showHUD("Search: " + q);
     closeKeyboard();
+    showHUD("Search: " + q);
   })();
 }
 
-// Shorts swipe navigation
-let touchStartY = null;
-let pointerStartY = null;
+/* -----------------------------------------------------------
+   HOLOGRAPHIC EFFECTS
+----------------------------------------------------------- */
+function applyChroma(xTilt, yTilt) {
+  const intensity = Math.min(1, Math.abs(xTilt) + Math.abs(yTilt));
+  const blur = 4 + intensity * 12;
+  const opacity = 0.25 + intensity * 0.45;
 
-function playShortAt(index) {
-  if (!shortsItems[index]) return;
-  const item = shortsItems[index];
-  const snippet = item.snippet || {};
-  const videoId = item.id;
-  setPlayerVideo(videoId, snippet);
-  showHUD("Short " + (index + 1));
+  playerSection.style.setProperty("--chroma-blur", `${blur}px`);
+  playerSection.style.setProperty("--chroma-opacity", opacity);
 }
 
-function nextShort() {
-  if (shortsIndex < shortsItems.length - 1) {
-    shortsIndex++;
-    playShortAt(shortsIndex);
+/* -----------------------------------------------------------
+   AUDIO GLOW (SIMULATED)
+----------------------------------------------------------- */
+let audioGlowActive = false;
+
+function initAudioGlow() {
+  if (audioGlowActive) return;
+  audioGlowActive = true;
+
+  function animateGlow() {
+    if (!audioGlowActive) return;
+
+    const pulse = 0.25 + Math.random() * 0.35;
+    const blur = 20 + Math.random() * 25;
+
+    playerSection.style.setProperty("--audio-glow-opacity", pulse);
+    playerSection.style.setProperty("--audio-glow-blur", `${blur}px`);
+
+    requestAnimationFrame(animateGlow);
   }
+
+  animateGlow();
 }
 
-function prevShort() {
-  if (shortsIndex > 0) {
-    shortsIndex--;
-    playShortAt(shortsIndex);
-  }
-}
+/* -----------------------------------------------------------
+   PARALLAX / DEPTH ENGINE
+----------------------------------------------------------- */
+document.addEventListener("mousemove", (e) => {
+  const x = (e.clientX / window.innerWidth) * 2 - 1;
+  const y = (e.clientY / window.innerHeight) * 2 - 1;
 
-document.addEventListener("touchstart", (e) => {
-  if (currentTab !== "shorts") return;
-  touchStartY = e.touches[0].clientY;
+  document.querySelectorAll(".parallax").forEach((el) => {
+    const depth = 8;
+    el.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
+  });
+
+  document.querySelectorAll(".parallax-tab").forEach((el) => {
+    const depth = 4;
+    el.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
+  });
+
+  applyChroma(x, y);
 });
 
-document.addEventListener("touchend", (e) => {
-  if (currentTab !== "shorts" || touchStartY === null) return;
-  const dy = e.changedTouches[0].clientY - touchStartY;
-  if (Math.abs(dy) > 50) {
-    if (dy < 0) nextShort();
-    else prevShort();
-  }
-  touchStartY = null;
+/* -----------------------------------------------------------
+   THEME TOGGLE
+----------------------------------------------------------- */
+themeToggle.addEventListener("click", () => {
+  isLight = !isLight;
+  document.body.classList.toggle("light", isLight);
+  showHUD(isLight ? "Light Mode" : "Dark Mode");
 });
 
-document.addEventListener("pointerdown", (e) => {
-  if (currentTab !== "shorts") return;
-  pointerStartY = e.clientY;
-});
-
-document.addEventListener("pointerup", (e) => {
-  if (currentTab !== "shorts" || pointerStartY === null) return;
-  const dy = e.clientY - pointerStartY;
-  if (Math.abs(dy) > 50) {
-    if (dy < 0) nextShort();
-    else prevShort();
-  }
-  pointerStartY = null;
-});
-
-// Direction-aware pointer routing for mini-player
-let scrollStartX = null;
-let scrollStartY = null;
-
-document.addEventListener("pointerdown", (e) => {
-  if (!playerSection.classList.contains("player-mini")) return;
-  scrollStartX = e.clientX;
-  scrollStartY = e.clientY;
-});
-
-document.addEventListener("pointermove", (e) => {
-  if (!playerSection.classList.contains("player-mini")) return;
-  if (scrollStartX === null || scrollStartY === null) return;
-
-  const dx = e.clientX - scrollStartX;
-  const dy = e.clientY - scrollStartY;
-
-  if (Math.abs(dx) > Math.abs(dy)) {
-    feedEl.style.pointerEvents = "auto";
-    tabsEl.style.pointerEvents = "auto";
-    playerSection.style.pointerEvents = "none";
-  } else {
-    feedEl.style.pointerEvents = "none";
-    tabsEl.style.pointerEvents = "none";
-    playerSection.style.pointerEvents = "auto";
-  }
-});
-
-document.addEventListener("pointerup", () => {
-  scrollStartX = null;
-  scrollStartY = null;
-});
-
-// Initial depth setup
-applyTopbarDepth();
-applySearchBarDepth();
-applyTabDepthStacking();
-applyHUDDepthFull();
-
-// Initial load
-(async () => {
+/* -----------------------------------------------------------
+   INITIAL LOAD
+----------------------------------------------------------- */
+(async function init() {
   const data = await fetchYouTube("videos", {
     part: "snippet,statistics",
     chart: "mostPopular",
     maxResults: 25
   });
+
   renderFeed(data.items || []);
 })();
 </script>
+
 </body>
 </html>
