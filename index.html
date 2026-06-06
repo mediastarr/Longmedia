@@ -563,6 +563,28 @@ body.search-depth-mode #channelPage {
   pointer-events: none;
 }
 
+ /* -----------------------------------------------------------
+   FULLSCREEN BACK BUTTON
+----------------------------------------------------------- */
+.exit-full-btn {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.7);
+  padding: 6px 10px;
+  font-size: 12px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.25), rgba(10,12,20,0.9));
+  color: #f5f7ff;
+  cursor: pointer;
+  z-index: 99999;
+  display: none;
+}
+
+#playerSection.player-fullscreen .exit-full-btn {
+  display: block;
+}
+  
 </style>
 </head>
 <body>
@@ -598,6 +620,8 @@ body.search-depth-mode #channelPage {
 
   <!-- PLAYER -->
   <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
+     <button id="exitFullBtn" class="exit-full-btn">Back</button>
+
     <iframe id="playerFrame"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
       allowfullscreen>
@@ -701,7 +725,60 @@ const API_KEYS = [
   "AIzaSyBBhb74OgptZl6MuKxFZZhwBW3WF1PEoS8",
   "AIzaSyAxFZPU9JU9pVBUYat0Emidq1T-halZl7g",
   "AIzaSyDwIOQ1vUPiSSdnXDsCLSSpKw0iJhNSq2Q",
-  "AIzaSyA8C0Zvavj5NvS8DG4mWiznxmlR1knfWDY"
+  "AIzaSyA8C0Zvavj5NvS8DG4mWiznxmlR1knfWDY",
+   "AIzaSyBR_sU9r1Mo54Mu14jINl8mucfdGmUah4g",
+  "AIzaSyAH0tTfPpID0ZZCwMb_MYBAcIyfzzCSNGk",
+  "AIzaSyDp1vo7FcVtv8jwucExrjhlmmCoqvcjzZo",
+  "AIzaSyCUEZU2myLSXROR8y07aVSGfTA3rXfBc2w",
+  "AIzaSyBdzXWI8Rf3hiZJcmnMjmeD1HCGL0yt3M4",
+  "AIzaSyAgolv-EsBdBecdfL8BDuOiWKkFC85U9mc",
+  "AIzaSyDFW7lzp07iP8sJH16E0OYo6TOIMza3xF0",
+  "AIzaSyBlLAJmjYeWjVPlGxGQ5Oh7gIZdD6W7mOM",
+  "AIzaSyB1CjeraEYGWbzhsa3vbdpLen9pnodEDIY",
+  "AIzaSyA8w3wy8azWbI9eqmfEhjjmO-6nfwCQ7Ic",
+  "AIzaSyBtbd-LojMkkkaVgT_Av4yK4xVzasfzuV0",
+  "AIzaSyCiQPGZAvQLdpfRTrjP_Vg_d3poEoDuapk",
+  "AIzaSyCcps1pDfH1jO8nr7EhAiuqDHKySSnlz54",
+  "AIzaSyDpzL3t3dz5KOVcbX35NmJg5q3nk37Xy2A",
+  "AIzaSyBrexuOL6CvUUt4ZN2p7NJ9IcGsNK__Ykk",
+  "AIzaSyB6MhVJKunfoT6cHIRQFYSbiz6xmY2nt38",
+  "AIzaSyAstACkdoCO_qv6f5bSU2M1UtSxSUvACdo",
+  "AIzaSyADtKlLaH0JJ30n5dkVhZ9evF2FZvc2_Mc",
+  "AIzaSyCxyK9dFKRi98vNkpUjXtKZkWSgfuX-e8Y",
+  "AIzaSyAuSRLjd2l7af5VEJRKvVmocVq1nMBiqGk",
+  "AIzaSyBlDHyLe6pdlAieC4KMXR5X5OkAoZfFv98",
+  "AIzaSyA7iqN8H1R3b15urhl8Z_ywLw5_PvRaqfs",
+  "AIzaSyAX3Zhid-j1yC82-eY-kOY7n717sBTNoxs",
+  "AIzaSyCpWPsXdc9V9whBM09cMuiR3dSUzD4oj9w",
+  "AIzaSyCREh_Jkfelq-xhs74eDEKMX0UmSANCmgc",
+  "AIzaSyCfezvfQdwcIal-J95kTadI_C3l_8DPNyQ",
+  "AIzaSyBzMfP7pb8ElXOKw15Bkq_UZl70IGOyW60",
+  "AIzaSyBTcuCT4lJVGZjt5zWE-aNpODIUUzqdRKA",
+  "AIzaSyANiBbMpulLju8bd1GXlEntyZT6p-p9JJE",
+  "AIzaSyCPY56vV6npb4TQxhCezhNtxgv6azNYfGs",
+  "AIzaSyDNaTzdbxfWD5B_wLWcfDfyX4YUiIPvFek",
+  "AIzaSyDvBKboWImQcErI75-7si8NeO_Nyc3IrjU",
+  "AIzaSyA3pZ4T1frGgAVJ-AsWLZ-GG9De6NiZw4I",
+  "AIzaSyD9xE5H3jbID9GRMnDbNd2aTo2YLoQFpjA",
+  "AIzaSyCNyZw102C5tKe8snKbkYQnf0VL9LEol2k",
+  "AIzaSyBrQr7qNm02b-Hg1pZnm4_lv660VPcNz-M",
+  "AIzaSyDwZobEvLGX7kKEMO1IbVjVstiIbe-sg7E",
+  "AIzaSyBt57smlSuTwGWpJ-zvvS4ViHhmsZ_KgRk",
+  "AIzaSyB7J43Wgv5bWnppisatVNjr_JcTOk6fCgE",
+  "AIzaSyCXJNqsKpax8u_JaffKyVeHc6G7M-OLXGo",
+  "AIzaSyBc3UQfL7QLs1AfyepSMQN4czBKeCmr5xs",
+  "AIzaSyBFQbbs_sIZtVxhgcYRitx7VERco44davE",
+  "AIzaSyBLLDdz4RWjFtjYLXPeX4drs1OomkDvoaE",
+  "AIzaSyAf00dqj-JI7r4NefyzEpYqHZZvv0Dhh8U",
+  "AIzaSyB_MooQA2zN_Pxu1yiX3UmmQFZ88NPC4Sc",
+  "AIzaSyCNKHUZDe3Ku-o788_QuqSy_OmPTg1wWNU",
+  "AIzaSyCtXGuTRHg5uhaQLv7aVUSPtAxxvwP-VRk",
+  "AIzaSyCTEF9kn3c-9YD3vNTbYuxrbJqmmYYHDfE",
+  "AIzaSyBtAjCHLUqzrxo8ShrW0dVKfyC4W7Yj2IA",
+  "AIzaSyD77ub12hPKZZTxJBr72PqEaQ9ykUwVtig",
+  "AIzaSyAsC6kZKAUhW4KMN04s8JJS9Hu4fFsgy04",
+  "AIzaSyBCBZCfKfVg5kMUPjxmRq41uqrbrnmpu-I",
+  "AIzaSyBk_q3XUQyI3rtUVCc46kjKJPh5Pm7u9QQ"
 ];
 
 let keyIndex = 0;
@@ -871,6 +948,24 @@ fullBtn.addEventListener("click", () => {
   hideUIForVideo();
   showHUD("Fullscreen");
 });
+   /* -----------------------------------------------------------
+   EXIT FULLSCREEN BUTTON
+----------------------------------------------------------- */
+const exitFullBtn = document.getElementById("exitFullBtn");
+
+exitFullBtn.addEventListener("click", () => {
+  playerSection.classList.remove("player-fullscreen");
+
+  if (miniActive) {
+    playerSection.classList.add("player-mini");
+    showUIWithMiniPlayer();
+  } else {
+    showUIWithMiniPlayer();
+  }
+
+  showHUD("Exited Fullscreen");
+});
+
 
 /* -----------------------------------------------------------
    PLAYER COMMANDS
