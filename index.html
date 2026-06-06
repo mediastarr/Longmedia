@@ -14,6 +14,27 @@
   --shadow-soft: 0 8px 24px rgba(0,0,0,0.6);
   --shadow-strong: 0 14px 40px rgba(0,0,0,0.85);
   --shadow-glow: 0 0 22px rgba(255,255,255,0.35);
+
+  /* AR light falloff */
+  --light-foreground: 1;
+  --light-mid: 0.75;
+  --light-background: 0.45;
+  --light-far: 0.25;
+
+  --sat-foreground: 1;
+  --sat-mid: 0.85;
+  --sat-background: 0.65;
+  --sat-far: 0.45;
+
+  /* AR Ambient Occlusion */
+  --ao-soft: 0 4px 18px rgba(0,0,0,0.35);
+  --ao-medium: 0 6px 26px rgba(0,0,0,0.45);
+  --ao-strong: 0 10px 40px rgba(0,0,0,0.55);
+
+  /* AR Bloom Glow */
+  --bloom-low: drop-shadow(0 0 6px rgba(255,255,255,0.25));
+  --bloom-mid: drop-shadow(0 0 12px rgba(255,255,255,0.35));
+  --bloom-high: drop-shadow(0 0 22px rgba(255,255,255,0.55));
 }
 
 body {
@@ -21,6 +42,52 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background: #000;
   color: var(--text);
+}
+
+/* Light falloff classes */
+
+.light-fg {
+  filter: brightness(var(--light-foreground)) saturate(var(--sat-foreground));
+}
+
+.light-mid {
+  filter: brightness(var(--light-mid)) saturate(var(--sat-mid));
+}
+
+.light-bg {
+  filter: brightness(var(--light-background)) saturate(var(--sat-background));
+}
+
+.light-far {
+  filter: brightness(var(--light-far)) saturate(var(--sat-far));
+}
+
+/* AO classes */
+
+.ao-soft {
+  box-shadow: var(--ao-soft);
+}
+
+.ao-medium {
+  box-shadow: var(--ao-medium);
+}
+
+.ao-strong {
+  box-shadow: var(--ao-strong);
+}
+
+/* Bloom classes */
+
+.bloom-low {
+  filter: var(--bloom-low);
+}
+
+.bloom-mid {
+  filter: var(--bloom-mid);
+}
+
+.bloom-high {
+  filter: var(--bloom-high);
 }
 
 /* Top bar */
@@ -652,7 +719,7 @@ body {
   <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
 </div>
 
-<div class="player parallax" id="playerSection">
+<div class="player parallax bloom-mid" id="playerSection">
   <iframe id="playerFrame" src="" allowfullscreen></iframe>
   <button id="closeMini" class="ctrl-btn" style="position:absolute; top:6px; right:6px;">X</button>
   <div class="player-controls">
@@ -670,7 +737,7 @@ body {
 
 <div id="channelPage" class="channel-page" style="display:none;"></div>
 
-<div id="hud" class="hud"></div>
+<div id="hud" class="hud bloom-high"></div>
 <script>
 // API keys (replace with your real key)
 const API_KEYS = [
@@ -834,6 +901,28 @@ function applyLightFalloff(el, depth) {
   else el.classList.add("light-far");
 }
 
+// AO
+function applyAO(el, depth) {
+  if (!el) return;
+
+  el.classList.remove("ao-soft", "ao-medium", "ao-strong");
+
+  if (depth >= 40) el.classList.add("ao-strong");
+  else if (depth >= 10) el.classList.add("ao-medium");
+  else el.classList.add("ao-soft");
+}
+
+// Bloom
+function applyBloom(el, depth) {
+  if (!el) return;
+
+  el.classList.remove("bloom-low", "bloom-mid", "bloom-high");
+
+  if (depth >= 40) el.classList.add("bloom-high");
+  else if (depth >= 10) el.classList.add("bloom-mid");
+  else el.classList.add("bloom-low");
+}
+
 // Depth shadow helper
 function setDepthShadow(el, depth) {
   if (!el) return;
@@ -847,6 +936,7 @@ function setDepthShadow(el, depth) {
     el.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
   }
   applyLightFalloff(el, depth);
+  applyAO(el, depth);
 }
 
 // Clear feed
@@ -895,6 +985,7 @@ function setPlayerVideo(videoId, snippet) {
   hideUIForVideo();
   playPauseBtn.textContent = "Pause";
   applyMiniPlayerFrameDepth();
+  applyBloom(playerSection, 40);
 }
 
 // Tabs
@@ -936,7 +1027,7 @@ function renderFeed(items) {
     card.className = "video-card parallax";
 
     const thumb = document.createElement("div");
-    thumb.className = "video-thumb";
+    thumb.className = "video-thumb bloom-low";
     const img = document.createElement("img");
     img.src = snippet.thumbnails?.high?.url
            || snippet.thumbnails?.medium?.url
@@ -1006,6 +1097,7 @@ function apply3DStacking() {
       translateZ(${depth}px)
     `;
     setDepthShadow(card, depth);
+    applyBloom(card, depth);
   });
 }
 
@@ -1023,6 +1115,7 @@ function applyPlayerDepth() {
     translateZ(${depth}px)
   `;
   setDepthShadow(player, depth);
+  applyBloom(player, depth);
 }
 
 function applyMiniPlayerFrameDepth() {
@@ -1038,6 +1131,7 @@ function applyMiniPlayerFrameDepth() {
     translateZ(${depth}px)
   `;
   setDepthShadow(player, depth);
+  applyBloom(player, depth);
 }
 
 function applyChannelBannerDepth() {
@@ -1050,6 +1144,7 @@ function applyChannelBannerDepth() {
     translateZ(${depth}px)
   `;
   setDepthShadow(banner, depth);
+  applyBloom(banner, depth);
 }
 
 function applyChannelHeaderDepth() {
@@ -1063,6 +1158,7 @@ function applyChannelHeaderDepth() {
       translateZ(${depth}px)
     `;
     setDepthShadow(header, depth);
+    applyBloom(header, depth);
   }
 
   if (meta) {
@@ -1072,6 +1168,7 @@ function applyChannelHeaderDepth() {
       translateZ(${depth}px)
     `;
     setDepthShadow(meta, depth);
+    applyBloom(meta, depth);
   }
 }
 
@@ -1085,6 +1182,7 @@ function applySearchBarDepthFull() {
     translateZ(${depth}px)
   `;
   setDepthShadow(bar, depth);
+  applyBloom(bar, depth);
 }
 
 function applySearchInputDepthFull() {
@@ -1098,6 +1196,7 @@ function applySearchInputDepthFull() {
       translateZ(${depth}px)
     `;
     setDepthShadow(bar, depth);
+    applyBloom(bar, depth);
   }
 }
 
@@ -1111,6 +1210,7 @@ function applyKeyboardPanelDepthFull() {
     translateZ(${depth}px)
   `;
   setDepthShadow(kb, depth);
+  applyBloom(kb, depth);
 }
 
 function applyKeyboardKeyDepthFull() {
@@ -1126,6 +1226,7 @@ function applyKeyboardKeyDepthFull() {
       translateZ(${depth}px)
     `;
     setDepthShadow(key, depth);
+    applyBloom(key, depth);
   });
 }
 
@@ -1139,6 +1240,7 @@ function applyHUDDepthFull() {
     translateZ(${depth}px)
   `;
   setDepthShadow(hud, depth);
+  applyBloom(hud, depth);
 }
 
 function applyTopbarDepth() {
@@ -1151,6 +1253,7 @@ function applyTopbarDepth() {
     translateZ(${depth}px)
   `;
   setDepthShadow(topbar, depth);
+  applyBloom(topbar, depth);
 }
 
 function applySearchBarDepth() {
@@ -1163,6 +1266,7 @@ function applySearchBarDepth() {
     translateZ(${depth}px)
   `;
   setDepthShadow(bar, depth);
+  applyBloom(bar, depth);
 }
 
 function applyMiniControlsDepth() {
@@ -1175,6 +1279,7 @@ function applyMiniControlsDepth() {
     translateZ(${depth}px)
   `;
   setDepthShadow(controls, depth);
+  applyBloom(controls, depth);
 }
 
 function applyKeyboardDepth() {
@@ -1187,6 +1292,7 @@ function applyKeyboardDepth() {
       translateZ(${depth}px)
     `;
     setDepthShadow(key, depth);
+    applyBloom(key, depth);
   });
 }
 
@@ -1202,6 +1308,7 @@ function applyTabDepthStacking() {
       translateZ(${depth}px)
     `;
     setDepthShadow(tab, depth);
+    applyBloom(tab, depth);
   });
 }
 
@@ -1215,6 +1322,7 @@ function applyTabHighlightDepth() {
     translateZ(${depth}px)
   `;
   setDepthShadow(activeTab, depth);
+  applyBloom(activeTab, depth);
 }
 
 // Search depth mode
@@ -1254,6 +1362,7 @@ document.addEventListener("pointermove", (e) => {
       rotateY(${tiltX}deg)
     `;
     setDepthShadow(card, depth);
+    applyBloom(card, depth);
   });
 
   const tabs = document.querySelectorAll('.parallax-tab');
@@ -1268,6 +1377,7 @@ document.addEventListener("pointermove", (e) => {
       rotateY(${tiltX}deg)
     `;
     setDepthShadow(tab, depth);
+    applyBloom(tab, depth);
   });
 
   const player = document.getElementById("playerSection");
@@ -1282,6 +1392,7 @@ document.addEventListener("pointermove", (e) => {
       rotateY(${tiltX}deg)
     `;
     setDepthShadow(player, depth);
+    applyBloom(player, depth);
   }
 
   applyChannelBannerDepth();
@@ -1411,7 +1522,7 @@ async function loadChannelPage(channelId) {
   }
 
   channelPageEl.innerHTML = `
-    <div class="channel-banner parallax">
+    <div class="channel-banner parallax bloom-mid">
       <div class="banner-logo"></div>
       <div class="banner-text">ViewTube</div>
     </div>
@@ -1442,7 +1553,7 @@ async function loadChannelPage(channelId) {
     const videoId = snippet.resourceId.videoId;
 
     const card = document.createElement("div");
-    card.className = "video-card parallax";
+    card.className = "video-card parallax bloom-low";
 
     card.innerHTML = `
       <div class="video-thumb">
@@ -1486,7 +1597,7 @@ window.addEventListener("scroll", async () => {
       const videoId = snippet.resourceId.videoId;
 
       const card = document.createElement("div");
-      card.className = "video-card parallax";
+      card.className = "video-card parallax bloom-low";
 
       card.innerHTML = `
         <div class="video-thumb">
