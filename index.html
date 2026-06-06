@@ -216,6 +216,10 @@ body.light #searchTab {
   height: 100%;
   border: none;
   display: block;
+
+  /* ⭐ Add this line ⭐ */
+  position: relative;
+  z-index: 1;
 }
 
 /* -----------------------------------------------------------
@@ -574,16 +578,17 @@ body.search-depth-mode #channelPage {
   border: 1px solid rgba(120,130,160,0.7);
   padding: 6px 10px;
   font-size: 12px;
-  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.25), rgba(10,12,20,0.9));
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.35), rgba(10,12,20,0.9));
   color: #f5f7ff;
   cursor: pointer;
-  z-index: 99999;
+
+  /* ⭐ THIS IS THE IMPORTANT PART ⭐ */
+  z-index: 999999999 !important;
+  pointer-events: auto;
+
   display: none;
 }
 
-#playerSection.player-fullscreen .exit-full-btn {
-  display: block;
-}
   
 </style>
 </head>
