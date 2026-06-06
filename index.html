@@ -822,6 +822,18 @@ function showHUD(text) {
   }, 1200);
 }
 
+// AR light falloff
+function applyLightFalloff(el, depth) {
+  if (!el) return;
+
+  el.classList.remove("light-fg", "light-mid", "light-bg", "light-far");
+
+  if (depth >= 40) el.classList.add("light-fg");
+  else if (depth >= 10) el.classList.add("light-mid");
+  else if (depth >= -40) el.classList.add("light-bg");
+  else el.classList.add("light-far");
+}
+
 // Depth shadow helper
 function setDepthShadow(el, depth) {
   if (!el) return;
@@ -834,6 +846,7 @@ function setDepthShadow(el, depth) {
   } else {
     el.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
   }
+  applyLightFalloff(el, depth);
 }
 
 // Clear feed
@@ -1066,10 +1079,12 @@ function applySearchBarDepthFull() {
   const bar = document.getElementById("searchTab");
   if (!bar) return;
 
+  const depth = 80;
   bar.style.transform = `
     perspective(900px)
-    translateZ(80px)
+    translateZ(${depth}px)
   `;
+  setDepthShadow(bar, depth);
 }
 
 function applySearchInputDepthFull() {
@@ -1077,10 +1092,12 @@ function applySearchInputDepthFull() {
   if (!bar) return;
 
   if (bar.style.display !== "none") {
+    const depth = 110;
     bar.style.transform = `
       perspective(900px)
-      translateZ(110px)
+      translateZ(${depth}px)
     `;
+    setDepthShadow(bar, depth);
   }
 }
 
@@ -1088,10 +1105,12 @@ function applyKeyboardPanelDepthFull() {
   const kb = document.getElementById("keyboard");
   if (!kb) return;
 
+  const depth = 70;
   kb.style.transform = `
     perspective(900px)
-    translateZ(70px)
+    translateZ(${depth}px)
   `;
+  setDepthShadow(kb, depth);
 }
 
 function applyKeyboardKeyDepthFull() {
@@ -1106,6 +1125,7 @@ function applyKeyboardKeyDepthFull() {
       perspective(900px)
       translateZ(${depth}px)
     `;
+    setDepthShadow(key, depth);
   });
 }
 
@@ -1154,6 +1174,7 @@ function applyMiniControlsDepth() {
     perspective(900px)
     translateZ(${depth}px)
   `;
+  setDepthShadow(controls, depth);
 }
 
 function applyKeyboardDepth() {
@@ -1165,6 +1186,7 @@ function applyKeyboardDepth() {
       perspective(900px)
       translateZ(${depth}px)
     `;
+    setDepthShadow(key, depth);
   });
 }
 
@@ -1179,6 +1201,7 @@ function applyTabDepthStacking() {
       perspective(900px)
       translateZ(${depth}px)
     `;
+    setDepthShadow(tab, depth);
   });
 }
 
@@ -1191,15 +1214,21 @@ function applyTabHighlightDepth() {
     perspective(900px)
     translateZ(${depth}px)
   `;
+  setDepthShadow(activeTab, depth);
 }
 
 // Search depth mode
 function enterSearchDepthMode() {
   document.body.classList.add("search-depth-mode");
+  document.querySelectorAll('.video-card, .tabs, .topbar, .channel-page, .player')
+    .forEach(el => applyLightFalloff(el, -120));
 }
 
 function exitSearchDepthMode() {
   document.body.classList.remove("search-depth-mode");
+  apply3DStacking();
+  applyTopbarDepth();
+  applyPlayerDepth();
 }
 
 // Micro-parallax
@@ -1241,7 +1270,20 @@ document.addEventListener("pointermove", (e) => {
     setDepthShadow(tab, depth);
   });
 
-  applyPlayerDepth();
+  const player = document.getElementById("playerSection");
+  if (player) {
+    let depth = -60;
+    if (player.classList.contains("player-fullscreen")) depth = 40;
+    else if (player.classList.contains("player-mini")) depth = -10;
+    player.style.transform = `
+      perspective(900px)
+      translateZ(${depth}px)
+      rotateX(${tiltY}deg)
+      rotateY(${tiltX}deg)
+    `;
+    setDepthShadow(player, depth);
+  }
+
   applyChannelBannerDepth();
   applyChannelHeaderDepth();
   applySearchBarDepthFull();
