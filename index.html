@@ -212,6 +212,36 @@ body {
   transform-style: preserve-3d;
 }
 
+/* Suggestions */
+
+.suggestions {
+  margin-top: 6px;
+  background: rgba(20,20,20,0.85);
+  border-radius: 16px;
+  padding: 6px;
+  border: 1px solid rgba(255,255,255,0.15);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  display: none;
+  max-height: 220px;
+  overflow-y: auto;
+  box-shadow: var(--shadow-soft);
+}
+
+.suggestion-item {
+  padding: 8px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0.9;
+}
+
+.suggestion-item:hover {
+  background: rgba(255,255,255,0.12);
+  opacity: 1;
+}
+
 /* Tabs */
 
 .tabs {
@@ -597,6 +627,7 @@ body {
       <button class="key-btn" data-key="ENTER">ENTER</button>
     </div>
   </div>
+  <div id="suggestions" class="suggestions"></div>
 </div>
 
 <div id="tabs" class="tabs parallax">
@@ -749,6 +780,7 @@ const tabsEl = document.getElementById("tabs");
 const searchTabEl = document.getElementById("searchTab");
 const searchPanelEl = document.getElementById("searchPanel");
 const keyboardEl = document.getElementById("keyboard");
+const suggestionsEl = document.getElementById("suggestions");
 
 const homeTab = document.getElementById("homeTab");
 const shortsTab = document.getElementById("shortsTab");
@@ -806,6 +838,7 @@ function hideUIForVideo() {
   feedEl.style.display = "none";
   channelPageEl.style.display = "none";
   keyboardEl.style.display = "none";
+  suggestionsEl.style.display = "none";
 }
 
 function showUIWithMiniPlayer() {
@@ -814,6 +847,7 @@ function showUIWithMiniPlayer() {
   tabsEl.style.display = "flex";
   searchPanelEl.style.display = "none";
   keyboardEl.style.display = "none";
+  suggestionsEl.style.display = "none";
 
   if (currentTab === "channel") {
     channelPageEl.style.display = "block";
@@ -859,6 +893,7 @@ function setActiveTab(tab) {
 
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
+  suggestionsEl.style.display = "none";
   applyTabHighlightDepth();
 }
 
@@ -1224,6 +1259,7 @@ backBtn.addEventListener("click", () => {
   showUIWithMiniPlayer();
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
+  suggestionsEl.style.display = "none";
   applyMiniPlayerFrameDepth();
   applyMiniControlsDepth();
   showHUD("Mini-player");
@@ -1524,6 +1560,40 @@ channelTab.addEventListener("click", async () => {
   loadChannelPage(currentChannelId);
 });
 
+// Suggestions
+
+async function fetchSuggestions(query) {
+  if (!query.trim()) return [];
+  const data = await fetchYouTube("search", {
+    part: "snippet",
+    q: query,
+    type: "video",
+    maxResults: 8
+  });
+  if (!data.items) return [];
+  return data.items.map(v => v.snippet.title);
+}
+
+function showSuggestions(list) {
+  suggestionsEl.innerHTML = "";
+  if (list.length === 0) {
+    suggestionsEl.style.display = "none";
+    return;
+  }
+  list.forEach(text => {
+    const item = document.createElement("div");
+    item.className = "suggestion-item";
+    item.textContent = text;
+    item.onclick = () => {
+      searchInput.value = text;
+      triggerSearch(text);
+      suggestionsEl.style.display = "none";
+    };
+    suggestionsEl.appendChild(item);
+  });
+  suggestionsEl.style.display = "block";
+}
+
 // Search tab + keyboard
 
 function openKeyboard() {
@@ -1547,6 +1617,7 @@ function openKeyboard() {
 function closeKeyboard() {
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
+  suggestionsEl.style.display = "none";
 
   feedEl.style.display = "block";
 
@@ -1571,7 +1642,7 @@ searchGo.addEventListener("click", () => {
   triggerSearch(q);
 });
 
-keyboardEl.addEventListener("click", (e) => {
+keyboardEl.addEventListener("click", async (e) => {
   const btn = e.target.closest(".key-btn");
   if (!btn) return;
 
@@ -1587,9 +1658,21 @@ keyboardEl.addEventListener("click", (e) => {
   } else if (key === "ENTER") {
     const q = searchInput.value.trim() || "music";
     triggerSearch(q);
+    suggestionsEl.style.display = "none";
+    return;
   } else {
     searchInput.value += key;
   }
+
+  const q = searchInput.value.trim();
+  const suggestions = await fetchSuggestions(q);
+  showSuggestions(suggestions);
+});
+
+searchInput.addEventListener("input", async () => {
+  const q = searchInput.value.trim();
+  const suggestions = await fetchSuggestions(q);
+  showSuggestions(suggestions);
 });
 
 function triggerSearch(q) {
