@@ -567,28 +567,58 @@ body.search-depth-mode #channelPage {
   pointer-events: none;
 }
 
+   /* -----------------------------------------------------------
+   CINEMA MODE (Curved Screen + Darkened Environment)
+----------------------------------------------------------- */
+body.cinema-mode::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(6px);
+  z-index: 9998;
+  pointer-events: none;
+}
+
+#playerSection.player-fullscreen.cinema {
+  border-radius: 40px;
+  overflow: hidden;
+  transform: translate(-50%, -50%) perspective(900px) rotateX(6deg);
+  box-shadow: 0 0 80px rgba(0,0,0,0.6);
+}
+
  /* -----------------------------------------------------------
    FULLSCREEN BACK BUTTON
 ----------------------------------------------------------- */
+/* -----------------------------------------------------------
+   FULLSCREEN BACK BUTTON
+----------------------------------------------------------- */
 .exit-full-btn {
-  position: fixed; /* ⭐ changed from absolute → fixed */
+  position: fixed;
   left: 20px;
   top: 20px;
-
   border-radius: 999px;
   border: 1px solid rgba(120,130,160,0.7);
   padding: 8px 14px;
   font-size: 14px;
-
   background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.35), rgba(10,12,20,0.9));
   color: #f5f7ff;
   cursor: pointer;
-
-  z-index: 999999999 !important; /* ⭐ always on top */
+  z-index: 999999999 !important;
   pointer-events: auto;
-
   display: none;
+
+  /* ⭐ Add this line if not already present */
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
+
+/* ⭐ HOVER GLOW — AR Visibility Boost */
+.exit-full-btn:hover {
+  box-shadow: 0 0 18px rgba(60,242,255,0.9),
+              0 0 30px rgba(60,242,255,0.5);
+  transform: scale(1.08);
+}
+
 
 body.fullscreen-active .exit-full-btn {
   display: block;
@@ -948,6 +978,22 @@ closeMini.addEventListener("click", () => {
   showHUD("Player closed");
 });
 
+ /* -----------------------------------------------------------
+   CINEMA MODE HELPERS
+----------------------------------------------------------- */
+/* -----------------------------------------------------------
+   CINEMA MODE HELPERS
+----------------------------------------------------------- */
+function enableCinemaMode() {
+  document.body.classList.add("cinema-mode");
+  playerSection.classList.add("cinema");
+}
+
+function disableCinemaMode() {
+  document.body.classList.remove("cinema-mode");
+  playerSection.classList.remove("cinema");
+}
+  
 /* -----------------------------------------------------------
    FULLSCREEN
 ----------------------------------------------------------- */
@@ -958,11 +1004,14 @@ fullBtn.addEventListener("click", () => {
   playerSection.classList.remove("player-mini");
   playerSection.classList.add("player-fullscreen");
 
-  document.body.classList.add("fullscreen-active"); // ⭐ add this
+  document.body.classList.add("fullscreen-active");
+
+  enableCinemaMode();   // ⭐ THIS is the missing line
 
   hideUIForVideo();
   showHUD("Fullscreen");
 });
+
 
    /* -----------------------------------------------------------
    EXIT FULLSCREEN BUTTON
@@ -971,7 +1020,7 @@ const exitFullBtn = document.getElementById("exitFullBtn");
 
 exitFullBtn.addEventListener("click", () => {
   playerSection.classList.remove("player-fullscreen");
-  document.body.classList.remove("fullscreen-active"); // ⭐ remove this
+  disableCinemaMode();   // ⭐ required
 
   if (miniActive) {
     playerSection.classList.add("player-mini");
@@ -1156,6 +1205,18 @@ document.addEventListener("touchend", e => {
   if (Math.abs(dy) > 50) dy < 0 ? nextShort() : prevShort();
 });
 
+/* -----------------------------------------------------------
+   EMG GESTURES (Ray‑Ban Neural Wristband)
+----------------------------------------------------------- */
+
+/* DOUBLE‑PINCH → EXIT FULLSCREEN */
+document.addEventListener("emg-doublepinch", () => {
+  if (playerSection.classList.contains("player-fullscreen")) {
+    exitFullBtn.click(); // instantly exit fullscreen
+    showHUD("Exited Fullscreen (Double‑Pinch)");
+  }
+});
+   
 /* -----------------------------------------------------------
    MOVIES
 ----------------------------------------------------------- */
