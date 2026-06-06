@@ -1168,19 +1168,32 @@ fullBtn.addEventListener("click", () => {
 
 // Close mini-player (X top-right)
 closeMini.addEventListener("click", () => {
-  if (playerSection.style.display !== "none") {
-    playerSection.style.display = "none";
-    playerFrame.src = "";
-    applyMiniPlayerFrameDepth();
+  // Hide player
+  playerSection.style.display = "none";
+  playerFrame.src = "";
 
-    feedEl.style.pointerEvents = "auto";
-    tabsEl.style.pointerEvents = "auto";
-    topbarEl.style.pointerEvents = "auto";
-    searchTabEl.style.pointerEvents = "auto";
+  // Restore UI
+  topbarEl.style.display = "flex";
+  searchTabEl.style.display = "flex";
+  tabsEl.style.display = "flex";
 
-    showHUD("Player closed");
+  if (currentTab === "channel") {
+    channelPageEl.style.display = "block";
+    feedEl.style.display = "none";
+  } else {
+    feedEl.style.display = "block";
+    channelPageEl.style.display = "none";
   }
+
+  // Restore pointer events
+  feedEl.style.pointerEvents = "auto";
+  tabsEl.style.pointerEvents = "auto";
+  topbarEl.style.pointerEvents = "auto";
+  searchTabEl.style.pointerEvents = "auto";
+
+  showHUD("Player closed");
 });
+
 
 // Player commands
 function postToPlayer(command) {
@@ -1200,7 +1213,23 @@ playPauseBtn.addEventListener("click", () => {
 
 forwardBtn.addEventListener("click", () => {
   postToPlayer({ event: "command", func: "seekBy", args: [10] });
+
+  // NEW — reset scroll origin so vertical scroll works immediately
+  scrollStartX = null;
+  scrollStartY = null;
+
+  // NEW — give mini-player pointer priority for 300ms
+  playerSection.style.pointerEvents = "auto";
+  feedEl.style.pointerEvents = "none";
+  tabsEl.style.pointerEvents = "none";
+
+  setTimeout(() => {
+    // restore directional logic after 300ms
+    feedEl.style.pointerEvents = "auto";
+    tabsEl.style.pointerEvents = "auto";
+  }, 300);
 });
+
 
 rewindBtn.addEventListener("click", () => {
   postToPlayer({ event: "command", func: "seekBy", args: [-10] });
@@ -1334,19 +1363,18 @@ trendingTab.addEventListener("click", async () => {
 shortsTab.addEventListener("click", async () => {
   setActiveTab("shorts");
 
-  const data = await fetchYouTube("search", {
+  const search = await fetchYouTube("search", {
     part: "snippet",
     type: "video",
-    maxResults: 50,
+    maxResults: 40,
     order: "date",
-    safeSearch: "none",
     videoEmbeddable: "true"
   });
 
-  const verticalShorts = [];
+  const results = [];
 
-  for (const item of data.items || []) {
-    const videoId = item.id?.videoId || item.id;
+  for (const item of search.items || []) {
+    const videoId = item.id.videoId;
     if (!videoId) continue;
 
     const details = await fetchYouTube("videos", {
@@ -1359,28 +1387,24 @@ shortsTab.addEventListener("click", async () => {
 
     const duration = info.contentDetails.duration;
     const thumb = info.snippet.thumbnails?.high;
+
     if (!thumb) continue;
 
-    const width = thumb.width;
-    const height = thumb.height;
-
-    const isVertical = height > width;
+    const isVertical = thumb.height > thumb.width;
     const isShort = /^PT([0-5]?[0-9])S$/.test(duration);
 
     if (isVertical && isShort) {
-      verticalShorts.push({
+      results.push({
         id: videoId,
         snippet: info.snippet
       });
     }
   }
 
-  shortsItems = verticalShorts;
+  shortsItems = results;
   shortsIndex = 0;
 
   renderFeed(shortsItems);
-  keyboardEl.style.display = "none";
-  searchPanelEl.style.display = "none";
   showHUD("Shorts");
 });
 
@@ -1388,22 +1412,22 @@ shortsTab.addEventListener("click", async () => {
 moviesTab.addEventListener("click", async () => {
   setActiveTab("movies");
 
-  const filmRiseChannelId = "UCp4zT2G0lZ6jTQd3x2Q0WUg";
+  const filmRise = "UCp4zT2G0lZ6jTQd3x2Q0WUg";
 
   const data = await fetchYouTube("search", {
     part: "snippet",
-    channelId: filmRiseChannelId,
+    channelId: filmRise,
     type: "video",
-    order: "date",
     maxResults: 25,
+    videoDuration: "long",
+    order: "viewCount",
     videoEmbeddable: "true"
   });
 
   renderFeed(data.items || []);
-  keyboardEl.style.display = "none";
-  searchPanelEl.style.display = "none";
-  showHUD("Free Movies (FilmRise)");
+  showHUD("FilmRise Movies");
 });
+
 
 historyTab.addEventListener("click", async () => {
   setActiveTab("history");
