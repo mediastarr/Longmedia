@@ -571,22 +571,27 @@ body.search-depth-mode #channelPage {
    FULLSCREEN BACK BUTTON
 ----------------------------------------------------------- */
 .exit-full-btn {
-  position: absolute;
-  left: 10px;
-  top: 10px;
+  position: fixed; /* ⭐ changed from absolute → fixed */
+  left: 20px;
+  top: 20px;
+
   border-radius: 999px;
   border: 1px solid rgba(120,130,160,0.7);
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: 8px 14px;
+  font-size: 14px;
+
   background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.35), rgba(10,12,20,0.9));
   color: #f5f7ff;
   cursor: pointer;
 
-  /* ⭐ THIS IS THE IMPORTANT PART ⭐ */
-  z-index: 999999999 !important;
+  z-index: 999999999 !important; /* ⭐ always on top */
   pointer-events: auto;
 
   display: none;
+}
+
+body.fullscreen-active .exit-full-btn {
+  display: block;
 }
 
   
@@ -623,9 +628,9 @@ body.search-depth-mode #channelPage {
     <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
   </div>
 
+  
   <!-- PLAYER -->
-  <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
-     <button id="exitFullBtn" class="exit-full-btn">Back</button>
+<div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
 
     <iframe id="playerFrame"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -640,7 +645,10 @@ body.search-depth-mode #channelPage {
     </div>
 
     <button id="closeMini">✕</button>
-  </div>
+</div>
+
+<!-- ⭐ Move Back button OUTSIDE the player -->
+<button id="exitFullBtn" class="exit-full-btn">Back</button>
 
   <!-- HUD -->
   <div id="hud"></div>
@@ -950,9 +958,12 @@ fullBtn.addEventListener("click", () => {
   playerSection.classList.remove("player-mini");
   playerSection.classList.add("player-fullscreen");
 
+  document.body.classList.add("fullscreen-active"); // ⭐ add this
+
   hideUIForVideo();
   showHUD("Fullscreen");
 });
+
    /* -----------------------------------------------------------
    EXIT FULLSCREEN BUTTON
 ----------------------------------------------------------- */
@@ -960,6 +971,7 @@ const exitFullBtn = document.getElementById("exitFullBtn");
 
 exitFullBtn.addEventListener("click", () => {
   playerSection.classList.remove("player-fullscreen");
+  document.body.classList.remove("fullscreen-active"); // ⭐ remove this
 
   if (miniActive) {
     playerSection.classList.add("player-mini");
@@ -970,6 +982,7 @@ exitFullBtn.addEventListener("click", () => {
 
   showHUD("Exited Fullscreen");
 });
+
 
 
 /* -----------------------------------------------------------
