@@ -671,7 +671,7 @@ async function fetchYouTube(endpoint, params = {}) {
   });
 
   const timestamp = Date.now();
-  url.searchParams.append("_", timestamp);
+  url.searchParams.append("_", Date.now());
 
   try {
     const res = await fetch(url.toString(), { cache: "no-store" });
@@ -1227,7 +1227,7 @@ forwardBtn.addEventListener("click", () => {
     // restore directional logic after 300ms
     feedEl.style.pointerEvents = "auto";
     tabsEl.style.pointerEvents = "auto";
-  }, 300);
+  }, 250);
 });
 
 
@@ -1363,6 +1363,7 @@ trendingTab.addEventListener("click", async () => {
 shortsTab.addEventListener("click", async () => {
   setActiveTab("shorts");
 
+  // Always fetch fresh data
   const search = await fetchYouTube("search", {
     part: "snippet",
     type: "video",
@@ -1371,10 +1372,10 @@ shortsTab.addEventListener("click", async () => {
     videoEmbeddable: "true"
   });
 
-  const results = [];
+  const shorts = [];
 
   for (const item of search.items || []) {
-    const videoId = item.id.videoId;
+    const videoId = item.id?.videoId;
     if (!videoId) continue;
 
     const details = await fetchYouTube("videos", {
@@ -1394,19 +1395,20 @@ shortsTab.addEventListener("click", async () => {
     const isShort = /^PT([0-5]?[0-9])S$/.test(duration);
 
     if (isVertical && isShort) {
-      results.push({
+      shorts.push({
         id: videoId,
         snippet: info.snippet
       });
     }
   }
 
-  shortsItems = results;
+  shortsItems = shorts;
   shortsIndex = 0;
 
-  renderFeed(shortsItems);
+  renderFeed(shorts);
   showHUD("Shorts");
 });
+
 
 // Movies: FilmRise only
 moviesTab.addEventListener("click", async () => {
@@ -1427,6 +1429,7 @@ moviesTab.addEventListener("click", async () => {
   renderFeed(data.items || []);
   showHUD("FilmRise Movies");
 });
+
 
 
 historyTab.addEventListener("click", async () => {
