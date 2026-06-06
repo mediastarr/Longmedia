@@ -32,7 +32,8 @@ body {
   border: 1px solid rgba(255,255,255,0.12);
   box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
   margin: 8px;
-  z-index: 20;
+  z-index: 60;
+  transform-style: preserve-3d;
 }
 
 .app-title-wrap {
@@ -90,7 +91,8 @@ body {
   gap: 10px;
   cursor: pointer;
   box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
-  z-index: 19;
+  z-index: 55;
+  transform-style: preserve-3d;
 }
 
 .search-icon {
@@ -135,6 +137,8 @@ body {
   backdrop-filter: blur(26px) saturate(1.3);
   -webkit-backdrop-filter: blur(26px) saturate(1.3);
   border: 1px solid rgba(255,255,255,0.18);
+  transform-style: preserve-3d;
+  z-index: 350;
 }
 
 .search-input {
@@ -167,9 +171,10 @@ body {
   -webkit-backdrop-filter: blur(18px);
   padding: 8px;
   display: none;
-  z-index: 18;
+  z-index: 340;
   border-radius: 16px;
   border: 1px solid rgba(255,255,255,0.15);
+  transform-style: preserve-3d;
 }
 
 .keyboard-row {
@@ -188,6 +193,7 @@ body {
   color: var(--text);
   font-size: 12px;
   cursor: pointer;
+  transform-style: preserve-3d;
 }
 
 /* Tabs */
@@ -203,7 +209,8 @@ body {
   -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
   border: 1px solid rgba(255,255,255,0.12);
   box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
-  z-index: 17;
+  z-index: 50;
+  transform-style: preserve-3d;
 }
 
 .tab-btn {
@@ -219,6 +226,19 @@ body {
 .tab-btn.active {
   background: rgba(255,255,255,0.12);
   opacity: 1;
+  transform-style: preserve-3d;
+  position: relative;
+}
+
+.tab-btn.active::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.25);
+  filter: blur(6px);
+  transform-style: preserve-3d;
+  pointer-events: none;
 }
 
 /* Player (auto-scaled square) */
@@ -256,6 +276,7 @@ body {
   display: flex;
   justify-content: space-between;
   gap: 6px;
+  transform-style: preserve-3d;
 }
 
 .ctrl-btn {
@@ -369,10 +390,11 @@ body {
   border: 1px solid rgba(255,255,255,0.12);
   font-size: 11px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.7), 0 2px 6px rgba(0,0,0,0.5);
-  z-index: 60;
+  z-index: 999;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease-out;
+  transform-style: preserve-3d;
 }
 
 /* Channel page */
@@ -444,6 +466,7 @@ body {
   gap: 10px;
   margin-bottom: 10px;
   z-index: 10;
+  transform-style: preserve-3d;
 }
 
 .channel-pic {
@@ -455,6 +478,7 @@ body {
 .channel-meta {
   display: flex;
   flex-direction: column;
+  transform-style: preserve-3d;
 }
 
 .channel-name {
@@ -472,6 +496,18 @@ body {
 .parallax {
   transform-style: preserve-3d;
   transition: transform 0.12s ease-out;
+}
+
+/* Search depth mode */
+
+.search-depth-mode .video-card,
+.search-depth-mode .tabs,
+.search-depth-mode .topbar,
+.search-depth-mode .channel-page,
+.search-depth-mode .player {
+  transform: translateZ(-120px) !important;
+  opacity: 0.35;
+  transition: transform 0.25s ease-out, opacity 0.25s ease-out;
 }
 </style>
 </head>
@@ -539,12 +575,12 @@ body {
 </div>
 
 <div id="tabs" class="tabs parallax">
-  <button id="homeTab" class="tab-btn active">Home</button>
-  <button id="shortsTab" class="tab-btn">Shorts</button>
-  <button id="relatedTab" class="tab-btn">Related</button>
-  <button id="historyTab" class="tab-btn">History</button>
-  <button id="trendingTab" class="tab-btn">Trending</button>
-  <button id="channelTab" class="tab-btn">Channel</button>
+  <button id="homeTab" class="tab-btn active parallax-tab">Home</button>
+  <button id="shortsTab" class="tab-btn parallax-tab">Shorts</button>
+  <button id="relatedTab" class="tab-btn parallax-tab">Related</button>
+  <button id="historyTab" class="tab-btn parallax-tab">History</button>
+  <button id="trendingTab" class="tab-btn parallax-tab">Trending</button>
+  <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
 </div>
 
 <div class="player parallax" id="playerSection">
@@ -570,6 +606,9 @@ body {
 <script>
 // API keys (replace with your real keys)
 const API_KEYS = [
+  "AIzaSyBYL4YoQmKcG004BKTZxsZWj8RLJ8gGoVc",
+  "AIzaSyALuvJQ49ybXqKS3lfx0E-mKxfDmofsJKs",
+  "AIzaSyD5MFjvs7uijShvYxqwJfm6_HcKSf1kg5M",
   "AIzaSyAYMawk2KDutvl77rHRUW7Ke6sVsQLbv4k",
   "AIzaSyDvEbhT-7Pze6cD8FMjYVfJ04SENWoWeAU",
   "AIzaSyDw6IUNvuDz100eGn-vObZ0tAa8a1jSu9U",
@@ -620,7 +659,6 @@ async function fetchYouTube(endpoint, params = {}) {
     }
   });
 
-  // force fresh results each call
   const timestamp = Date.now();
   url.searchParams.append("_", timestamp);
 
@@ -645,6 +683,8 @@ let isLight = false;
 let currentChannelId = "UCoLDGQ7a81ep9SJqPlDs2sg";
 let channelNextPageToken = null;
 let historyList = [];
+let shortsItems = [];
+let shortsIndex = 0;
 
 // Elements
 const feedEl = document.getElementById("feed");
@@ -679,6 +719,7 @@ const searchGo = document.getElementById("searchGo");
 function showHUD(text) {
   hudEl.textContent = text;
   hudEl.style.opacity = 1;
+  applyHUDDepthFull();
   setTimeout(() => {
     hudEl.style.opacity = 0;
   }, 1200);
@@ -721,6 +762,7 @@ function setPlayerVideo(videoId, snippet) {
   if (historyList.length > 50) historyList.pop();
   hideUIForVideo();
   playPauseBtn.textContent = "Pause";
+  applyMiniPlayerFrameDepth();
 }
 
 // Tabs
@@ -743,9 +785,9 @@ function setActiveTab(tab) {
     channelPageEl.style.display = "none";
   }
 
-  // keyboard must disappear when switching tabs
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
+  applyTabHighlightDepth();
 }
 
 // Feed renderer
@@ -763,7 +805,10 @@ function renderFeed(items) {
     const thumb = document.createElement("div");
     thumb.className = "video-thumb";
     const img = document.createElement("img");
-    img.src = snippet.thumbnails?.medium?.url || "";
+    img.src = snippet.thumbnails?.high?.url
+           || snippet.thumbnails?.medium?.url
+           || snippet.thumbnails?.default?.url
+           || "";
     thumb.appendChild(img);
 
     const info = document.createElement("div");
@@ -817,13 +862,212 @@ function renderFeed(items) {
   setTimeout(apply3DStacking, 10);
 }
 
-// 3D stacking
+// 3D stacking (advanced staggered)
 function apply3DStacking() {
   const cards = document.querySelectorAll('.video-card');
+
   cards.forEach((card, i) => {
-    const depth = i * -40;
-    card.style.transform = `translateZ(${depth}px)`;
+    const depth = -40 * i + Math.sin(i * 0.6) * 12;
+    card.style.transform = `
+      perspective(900px)
+      translateZ(${depth}px)
+    `;
   });
+}
+
+// Depth helpers
+function applyPlayerDepth() {
+  const player = document.getElementById("playerSection");
+  if (!player) return;
+
+  let depth = -60;
+  if (player.classList.contains("player-fullscreen")) depth = 40;
+  else if (player.classList.contains("player-mini")) depth = -10;
+
+  player.style.transform = `
+    perspective(900px)
+    translateZ(${depth}px)
+  `;
+}
+
+function applyMiniPlayerFrameDepth() {
+  const player = document.getElementById("playerSection");
+  if (!player) return;
+
+  let depth = -30;
+  if (player.classList.contains("player-fullscreen")) depth = 40;
+  if (!player.classList.contains("player-mini")) depth = -60;
+
+  player.style.transform = `
+    perspective(900px)
+    translateZ(${depth}px)
+  `;
+}
+
+function applyChannelBannerDepth() {
+  const banner = document.querySelector(".channel-banner");
+  if (!banner) return;
+
+  const depth = -20;
+  banner.style.transform = `
+    perspective(900px)
+    translateZ(${depth}px)
+  `;
+}
+
+function applyChannelHeaderDepth() {
+  const header = document.querySelector(".channel-header");
+  const meta = document.querySelector(".channel-meta");
+
+  if (header) {
+    header.style.transform = `
+      perspective(900px)
+      translateZ(-15px)
+    `;
+  }
+
+  if (meta) {
+    meta.style.transform = `
+      perspective(900px)
+      translateZ(5px)
+    `;
+  }
+}
+
+function applySearchBarDepthFull() {
+  const bar = document.getElementById("searchTab");
+  if (!bar) return;
+
+  bar.style.transform = `
+    perspective(900px)
+    translateZ(80px)
+  `;
+}
+
+function applySearchInputDepthFull() {
+  const bar = document.querySelector(".search-input-bar");
+  if (!bar) return;
+
+  if (bar.style.display !== "none") {
+    bar.style.transform = `
+      perspective(900px)
+      translateZ(110px)
+    `;
+  }
+}
+
+function applyKeyboardPanelDepthFull() {
+  const kb = document.getElementById("keyboard");
+  if (!kb) return;
+
+  kb.style.transform = `
+    perspective(900px)
+    translateZ(70px)
+  `;
+}
+
+function applyKeyboardKeyDepthFull() {
+  const keys = document.querySelectorAll('.key-btn');
+
+  keys.forEach((key, i) => {
+    const row = Math.floor(i / 6);
+    const col = i % 6;
+    const depth = 40 - row * 12 - col * 2;
+
+    key.style.transform = `
+      perspective(900px)
+      translateZ(${depth}px)
+    `;
+  });
+}
+
+function applyHUDDepthFull() {
+  const hud = document.getElementById("hud");
+  if (!hud) return;
+
+  hud.style.transform = `
+    perspective(900px)
+    translateZ(160px)
+  `;
+}
+
+function applyTopbarDepth() {
+  const topbar = document.getElementById("topbar");
+  if (!topbar) return;
+
+  const depth = 60;
+  topbar.style.transform = `
+    perspective(900px)
+    translateZ(${depth}px)
+  `;
+}
+
+function applySearchBarDepth() {
+  const bar = document.getElementById("searchTab");
+  if (!bar) return;
+
+  const depth = -10;
+  bar.style.transform = `
+    perspective(900px)
+    translateZ(${depth}px)
+  `;
+}
+
+function applyMiniControlsDepth() {
+  const controls = document.querySelector(".player-controls");
+  if (!controls) return;
+
+  const depth = 20;
+  controls.style.transform = `
+    perspective(900px)
+    translateZ(${depth}px)
+  `;
+}
+
+function applyKeyboardDepth() {
+  const keys = document.querySelectorAll('.key-btn');
+
+  keys.forEach((key, i) => {
+    const depth = -5 + (i % 6) * -3;
+    key.style.transform = `
+      perspective(900px)
+      translateZ(${depth}px)
+    `;
+  });
+}
+
+function applyTabDepthStacking() {
+  const tabs = document.querySelectorAll('.parallax-tab');
+  const baseDepth = -20;
+  const step = -12;
+
+  tabs.forEach((tab, index) => {
+    const depth = baseDepth + step * index;
+    tab.style.transform = `
+      perspective(900px)
+      translateZ(${depth}px)
+    `;
+  });
+}
+
+function applyTabHighlightDepth() {
+  const activeTab = document.querySelector(".tab-btn.active");
+  if (!activeTab) return;
+
+  const depth = 25;
+  activeTab.style.transform = `
+    perspective(900px)
+    translateZ(${depth}px)
+  `;
+}
+
+// Search depth mode
+function enterSearchDepthMode() {
+  document.body.classList.add("search-depth-mode");
+}
+
+function exitSearchDepthMode() {
+  document.body.classList.remove("search-depth-mode");
 }
 
 // Micro-parallax
@@ -841,7 +1085,7 @@ document.addEventListener("pointermove", (e) => {
 
   const cards = document.querySelectorAll('.video-card');
   cards.forEach((card, i) => {
-    const depth = i * -40;
+    const depth = -40 * i + Math.sin(i * 0.6) * 12;
     card.style.transform = `
       perspective(900px)
       translateZ(${depth}px)
@@ -849,6 +1093,32 @@ document.addEventListener("pointermove", (e) => {
       rotateY(${tiltX}deg)
     `;
   });
+
+  const tabs = document.querySelectorAll('.parallax-tab');
+  tabs.forEach((tab, index) => {
+    const baseDepth = -20;
+    const step = -12;
+    const depth = baseDepth + step * index;
+    tab.style.transform = `
+      perspective(900px)
+      translateZ(${depth}px)
+      rotateX(${tiltY}deg)
+      rotateY(${tiltX}deg)
+    `;
+  });
+
+  applyPlayerDepth();
+  applyChannelBannerDepth();
+  applyChannelHeaderDepth();
+  applySearchBarDepthFull();
+  applySearchInputDepthFull();
+  applyKeyboardPanelDepthFull();
+  applyKeyboardKeyDepthFull();
+  applyHUDDepthFull();
+  applyTopbarDepth();
+  applyMiniControlsDepth();
+  applyKeyboardDepth();
+  applyTabHighlightDepth();
 });
 
 // Theme toggle
@@ -856,6 +1126,7 @@ themeToggle.addEventListener("click", () => {
   isLight = !isLight;
   document.body.classList.toggle("light", isLight);
   showHUD(isLight ? "Light Mode" : "Dark Mode");
+  applyTabDepthStacking();
 });
 
 // Back → mini bottom-right + show UI
@@ -867,6 +1138,8 @@ backBtn.addEventListener("click", () => {
   showUIWithMiniPlayer();
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
+  applyMiniPlayerFrameDepth();
+  applyMiniControlsDepth();
   showHUD("Mini-player");
 });
 
@@ -876,6 +1149,8 @@ fullBtn.addEventListener("click", () => {
   playerSection.classList.remove("player-mini");
   playerSection.classList.add("player-fullscreen");
   hideUIForVideo();
+  applyMiniPlayerFrameDepth();
+  applyMiniControlsDepth();
   showHUD("Fullscreen");
 });
 
@@ -884,6 +1159,7 @@ closeMini.addEventListener("click", () => {
   if (playerSection.classList.contains("player-mini")) {
     playerSection.style.display = "none";
     playerFrame.src = "";
+    applyMiniPlayerFrameDepth();
     showHUD("Player closed");
   }
 });
@@ -960,6 +1236,8 @@ function renderChannelHeader(info) {
       </div>
     </div>
   `;
+  applyChannelBannerDepth();
+  applyChannelHeaderDepth();
 }
 
 function renderChannelFeed(items) {
@@ -1036,17 +1314,21 @@ trendingTab.addEventListener("click", async () => {
 
 shortsTab.addEventListener("click", async () => {
   setActiveTab("shorts");
+
   const data = await fetchYouTube("search", {
     part: "snippet",
     type: "video",
-    videoDuration: "short",
     maxResults: 25,
     order: "date",
     safeSearch: "none",
-    relevanceLanguage: "en",
-    topicId: "/m/0jgv"
+    topicId: "/m/0jgv",
+    videoDuration: "short",
+    relevanceLanguage: "en"
   });
-  renderFeed(data.items || []);
+
+  shortsItems = data.items || [];
+  shortsIndex = 0;
+  renderFeed(shortsItems);
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
   showHUD("Shorts");
@@ -1096,11 +1378,17 @@ function openKeyboard() {
   searchPanelEl.style.display = "block";
   keyboardEl.style.display = "block";
   document.querySelector(".search-input-bar").style.display = "none";
+  applyKeyboardDepth();
+  applyKeyboardPanelDepthFull();
+  enterSearchDepthMode();
+  applySearchBarDepthFull();
+  applyHUDDepthFull();
 }
 
 function closeKeyboard() {
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
+  exitSearchDepthMode();
 }
 
 searchTabEl.addEventListener("click", () => {
@@ -1116,8 +1404,8 @@ keyboardEl.addEventListener("click", (e) => {
   const btn = e.target.closest(".key-btn");
   if (!btn) return;
 
-  // reveal search bar when typing begins
   document.querySelector(".search-input-bar").style.display = "flex";
+  applySearchInputDepthFull();
 
   const key = btn.dataset.key || btn.textContent;
 
@@ -1147,6 +1435,69 @@ function triggerSearch(q) {
     closeKeyboard();
   })();
 }
+
+// Swipe up/down Shorts navigation (Shorts tab only)
+let touchStartY = null;
+let pointerStartY = null;
+
+function playShortAt(index) {
+  if (!shortsItems[index]) return;
+  const item = shortsItems[index];
+  const snippet = item.snippet || {};
+  const videoId = item.id?.videoId || item.id;
+  setPlayerVideo(videoId, snippet);
+  showHUD("Short " + (index + 1));
+}
+
+function nextShort() {
+  if (shortsIndex < shortsItems.length - 1) {
+    shortsIndex++;
+    playShortAt(shortsIndex);
+  }
+}
+
+function prevShort() {
+  if (shortsIndex > 0) {
+    shortsIndex--;
+    playShortAt(shortsIndex);
+  }
+}
+
+document.addEventListener("touchstart", (e) => {
+  if (currentTab !== "shorts") return;
+  touchStartY = e.touches[0].clientY;
+});
+
+document.addEventListener("touchend", (e) => {
+  if (currentTab !== "shorts" || touchStartY === null) return;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  if (Math.abs(dy) > 50) {
+    if (dy < 0) nextShort();
+    else prevShort();
+  }
+  touchStartY = null;
+});
+
+document.addEventListener("pointerdown", (e) => {
+  if (currentTab !== "shorts") return;
+  pointerStartY = e.clientY;
+});
+
+document.addEventListener("pointerup", (e) => {
+  if (currentTab !== "shorts" || pointerStartY === null) return;
+  const dy = e.clientY - pointerStartY;
+  if (Math.abs(dy) > 50) {
+    if (dy < 0) nextShort();
+    else prevShort();
+  }
+  pointerStartY = null;
+});
+
+// Initial depth setup
+applyTopbarDepth();
+applySearchBarDepth();
+applyTabDepthStacking();
+applyHUDDepthFull();
 
 // Initial load: Home like YouTube
 (async () => {
