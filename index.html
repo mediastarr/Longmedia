@@ -14,27 +14,6 @@
   --shadow-soft: 0 8px 24px rgba(0,0,0,0.6);
   --shadow-strong: 0 14px 40px rgba(0,0,0,0.85);
   --shadow-glow: 0 0 22px rgba(255,255,255,0.35);
-
-  /* AR light falloff */
-  --light-foreground: 1;
-  --light-mid: 0.75;
-  --light-background: 0.45;
-  --light-far: 0.25;
-
-  --sat-foreground: 1;
-  --sat-mid: 0.85;
-  --sat-background: 0.65;
-  --sat-far: 0.45;
-
-  /* AR Ambient Occlusion */
-  --ao-soft: 0 4px 18px rgba(0,0,0,0.35);
-  --ao-medium: 0 6px 26px rgba(0,0,0,0.45);
-  --ao-strong: 0 10px 40px rgba(0,0,0,0.55);
-
-  /* AR Bloom Glow */
-  --bloom-low: drop-shadow(0 0 6px rgba(255,255,255,0.25));
-  --bloom-mid: drop-shadow(0 0 12px rgba(255,255,255,0.35));
-  --bloom-high: drop-shadow(0 0 22px rgba(255,255,255,0.55));
 }
 
 body {
@@ -42,52 +21,6 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background: #000;
   color: var(--text);
-}
-
-/* Light falloff classes */
-
-.light-fg {
-  filter: brightness(var(--light-foreground)) saturate(var(--sat-foreground));
-}
-
-.light-mid {
-  filter: brightness(var(--light-mid)) saturate(var(--sat-mid));
-}
-
-.light-bg {
-  filter: brightness(var(--light-background)) saturate(var(--sat-background));
-}
-
-.light-far {
-  filter: brightness(var(--light-far)) saturate(var(--sat-far));
-}
-
-/* AO classes */
-
-.ao-soft {
-  box-shadow: var(--ao-soft);
-}
-
-.ao-medium {
-  box-shadow: var(--ao-medium);
-}
-
-.ao-strong {
-  box-shadow: var(--ao-strong);
-}
-
-/* Bloom classes */
-
-.bloom-low {
-  filter: var(--bloom-low);
-}
-
-.bloom-mid {
-  filter: var(--bloom-mid);
-}
-
-.bloom-high {
-  filter: var(--bloom-high);
 }
 
 /* Top bar */
@@ -213,11 +146,6 @@ body {
   z-index: 9999;
   position: relative;
   padding-left: 14px;
-
-  /* scroll fix */
-  overflow-x: hidden;
-  overscroll-behavior-x: none;
-  touch-action: none;
 }
 
 .search-input {
@@ -267,9 +195,6 @@ body {
   border-radius: 16px;
   border: 1px solid rgba(255,255,255,0.15);
   transform-style: preserve-3d;
-
-  /* lock to vertical interaction */
-  touch-action: pan-y;
 }
 
 .keyboard-row {
@@ -727,7 +652,7 @@ body {
   <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
 </div>
 
-<div class="player parallax bloom-mid" id="playerSection">
+<div class="player parallax" id="playerSection">
   <iframe id="playerFrame" src="" allowfullscreen></iframe>
   <button id="closeMini" class="ctrl-btn" style="position:absolute; top:6px; right:6px;">X</button>
   <div class="player-controls">
@@ -745,7 +670,76 @@ body {
 
 <div id="channelPage" class="channel-page" style="display:none;"></div>
 
-<div id="hud" class="hud bloom-high"></div>let keyIndex = 0;
+<div id="hud" class="hud"></div>
+<script>
+// API keys (replace with your real key)
+const API_KEYS = [
+  "AIzaSyCx0wjIv9VdzaI3oyz34zwkkFgTDj7LgEw",
+  "AIzaSyD4tP4THh9ZeDcVW041l_JCjJztZA2zJCA",
+  "AIzaSyBKcKeVWaq_AVca-W3iEGnoQCVb7u0bvUk",
+  "AIzaSyDLl8aAik8w2a9CqoQDUcN6rv_cfckDSYg",
+  "AIzaSyA2glQivSu01moNJnBr7fqs31E4Zz7K1hs",
+  "AIzaSyAvHMZmzEG-ibFKRpRIZUw--7xNSstbmYg",
+  "AIzaSyBBhb74OgptZl6MuKxFZZhwBW3WF1PEoS8",
+  "AIzaSyAxFZPU9JU9pVBUYat0Emidq1T-halZl7g",
+  "AIzaSyDwIOQ1vUPiSSdnXDsCLSSpKw0iJhNSq2Q",
+  "AIzaSyA8C0Zvavj5NvS8DG4mWiznxmlR1knfWDY",
+  "AIzaSyBR_sU9r1Mo54Mu14jINl8mucfdGmUah4g",
+  "AIzaSyAH0tTfPpID0ZZCwMb_MYBAcIyfzzCSNGk",
+  "AIzaSyDp1vo7FcVtv8jwucExrjhlmmCoqvcjzZo",
+  "AIzaSyCUEZU2myLSXROR8y07aVSGfTA3rXfBc2w",
+  "AIzaSyBdzXWI8Rf3hiZJcmnMjmeD1HCGL0yt3M4",
+  "AIzaSyAgolv-EsBdBecdfL8BDuOiWKkFC85U9mc",
+  "AIzaSyDFW7lzp07iP8sJH16E0OYo6TOIMza3xF0",
+  "AIzaSyBlLAJmjYeWjVPlGxGQ5Oh7gIZdD6W7mOM",
+  "AIzaSyB1CjeraEYGWbzhsa3vbdpLen9pnodEDIY",
+  "AIzaSyA8w3wy8azWbI9eqmfEhjjmO-6nfwCQ7Ic",
+  "AIzaSyBtbd-LojMkkkaVgT_Av4yK4xVzasfzuV0",
+  "AIzaSyCiQPGZAvQLdpfRTrjP_Vg_d3poEoDuapk",
+  "AIzaSyCcps1pDfH1jO8nr7EhAiuqDHKySSnlz54",
+  "AIzaSyDpzL3t3dz5KOVcbX35NmJg5q3nk37Xy2A",
+  "AIzaSyBrexuOL6CvUUt4ZN2p7NJ9IcGsNK__Ykk",
+  "AIzaSyB6MhVJKunfoT6cHIRQFYSbiz6xmY2nt38",
+  "AIzaSyAstACkdoCO_qv6f5bSU2M1UtSxSUvACdo",
+  "AIzaSyADtKlLaH0JJ30n5dkVhZ9evF2FZvc2_Mc",
+  "AIzaSyCxyK9dFKRi98vNkpUjXtKZkWSgfuX-e8Y",
+  "AIzaSyAuSRLjd2l7af5VEJRKvVmocVq1nMBiqGk",
+  "AIzaSyBlDHyLe6pdlAieC4KMXR5X5OkAoZfFv98",
+  "AIzaSyA7iqN8H1R3b15urhl8Z_ywLw5_PvRaqfs",
+  "AIzaSyAX3Zhid-j1yC82-eY-kOY7n717sBTNoxs",
+  "AIzaSyCpWPsXdc9V9whBM09cMuiR3dSUzD4oj9w",
+  "AIzaSyCREh_Jkfelq-xhs74eDEKMX0UmSANCmgc",
+  "AIzaSyCfezvfQdwcIal-J95kTadI_C3l_8DPNyQ",
+  "AIzaSyBzMfP7pb8ElXOKw15Bkq_UZl70IGOyW60",
+  "AIzaSyBTcuCT4lJVGZjt5zWE-aNpODIUUzqdRKA",
+  "AIzaSyANiBbMpulLju8bd1GXlEntyZT6p-p9JJE",
+  "AIzaSyCPY56vV6npb4TQxhCezhNtxgv6azNYfGs",
+  "AIzaSyDNaTzdbxfWD5B_wLWcfDfyX4YUiIPvFek",
+  "AIzaSyDvBKboWImQcErI75-7si8NeO_Nyc3IrjU",
+  "AIzaSyA3pZ4T1frGgAVJ-AsWLZ-GG9De6NiZw4I",
+  "AIzaSyD9xE5H3jbID9GRMnDbNd2aTo2YLoQFpjA",
+  "AIzaSyCNyZw102C5tKe8snKbkYQnf0VL9LEol2k",
+  "AIzaSyBrQr7qNm02b-Hg1pZnm4_lv660VPcNz-M",
+  "AIzaSyDwZobEvLGX7kKEMO1IbVjVstiIbe-sg7E",
+  "AIzaSyBt57smlSuTwGWpJ-zvvS4ViHhmsZ_KgRk",
+  "AIzaSyB7J43Wgv5bWnppisatVNjr_JcTOk6fCgE",
+  "AIzaSyCXJNqsKpax8u_JaffKyVeHc6G7M-OLXGo",
+  "AIzaSyBc3UQfL7QLs1AfyepSMQN4czBKeCmr5xs",
+  "AIzaSyBFQbbs_sIZtVxhgcYRitx7VERco44davE",
+  "AIzaSyBLLDdz4RWjFtjYLXPeX4drs1OomkDvoaE",
+  "AIzaSyAf00dqj-JI7r4NefyzEpYqHZZvv0Dhh8U",
+  "AIzaSyB_MooQA2zN_Pxu1yiX3UmmQFZ88NPC4Sc",
+  "AIzaSyCNKHUZDe3Ku-o788_QuqSy_OmPTg1wWNU",
+  "AIzaSyCtXGuTRHg5uhaQLv7aVUSPtAxxvwP-VRk",
+  "AIzaSyCTEF9kn3c-9YD3vNTbYuxrbJqmmYYHDfE",
+  "AIzaSyBtAjCHLUqzrxo8ShrW0dVKfyC4W7Yj2IA",
+  "AIzaSyD77ub12hPKZZTxJBr72PqEaQ9ykUwVtig",
+  "AIzaSyAsC6kZKAUhW4KMN04s8JJS9Hu4fFsgy04",
+  "AIzaSyBCBZCfKfVg5kMUPjxmRq41uqrbrnmpu-I",
+  "AIzaSyBk_q3XUQyI3rtUVCc46kjKJPh5Pm7u9QQ"
+];
+
+let keyIndex = 0;
 
 async function fetchYouTube(endpoint, params = {}) {
   const key = API_KEYS[keyIndex];
@@ -818,15 +812,6 @@ const searchInput = document.getElementById("searchInput");
 const searchGo = document.getElementById("searchGo");
 const searchBack = document.getElementById("searchBack");
 
-// prevent keyboard pointer events from bubbling into search bar
-keyboardEl.addEventListener("pointerdown", e => {
-  e.stopPropagation();
-}, true);
-
-keyboardEl.addEventListener("pointermove", e => {
-  e.stopPropagation();
-}, true);
-
 // HUD
 function showHUD(text) {
   hudEl.textContent = text;
@@ -835,40 +820,6 @@ function showHUD(text) {
   setTimeout(() => {
     hudEl.style.opacity = 0;
   }, 1200);
-}
-
-// AR light falloff
-function applyLightFalloff(el, depth) {
-  if (!el) return;
-
-  el.classList.remove("light-fg", "light-mid", "light-bg", "light-far");
-
-  if (depth >= 40) el.classList.add("light-fg");
-  else if (depth >= 10) el.classList.add("light-mid");
-  else if (depth >= -40) el.classList.add("light-bg");
-  else el.classList.add("light-far");
-}
-
-// AO
-function applyAO(el, depth) {
-  if (!el) return;
-
-  el.classList.remove("ao-soft", "ao-medium", "ao-strong");
-
-  if (depth >= 40) el.classList.add("ao-strong");
-  else if (depth >= 10) el.classList.add("ao-medium");
-  else el.classList.add("ao-soft");
-}
-
-// Bloom
-function applyBloom(el, depth) {
-  if (!el) return;
-
-  el.classList.remove("bloom-low", "bloom-mid", "bloom-high");
-
-  if (depth >= 40) el.classList.add("bloom-high");
-  else if (depth >= 10) el.classList.add("bloom-mid");
-  else el.classList.add("bloom-low");
 }
 
 // Depth shadow helper
@@ -883,8 +834,6 @@ function setDepthShadow(el, depth) {
   } else {
     el.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
   }
-  applyLightFalloff(el, depth);
-  applyAO(el, depth);
 }
 
 // Clear feed
@@ -933,7 +882,6 @@ function setPlayerVideo(videoId, snippet) {
   hideUIForVideo();
   playPauseBtn.textContent = "Pause";
   applyMiniPlayerFrameDepth();
-  applyBloom(playerSection, 40);
 }
 
 // Tabs
@@ -975,7 +923,7 @@ function renderFeed(items) {
     card.className = "video-card parallax";
 
     const thumb = document.createElement("div");
-    thumb.className = "video-thumb bloom-low";
+    thumb.className = "video-thumb";
     const img = document.createElement("img");
     img.src = snippet.thumbnails?.high?.url
            || snippet.thumbnails?.medium?.url
@@ -1045,7 +993,6 @@ function apply3DStacking() {
       translateZ(${depth}px)
     `;
     setDepthShadow(card, depth);
-    applyBloom(card, depth);
   });
 }
 
@@ -1063,7 +1010,6 @@ function applyPlayerDepth() {
     translateZ(${depth}px)
   `;
   setDepthShadow(player, depth);
-  applyBloom(player, depth);
 }
 
 function applyMiniPlayerFrameDepth() {
@@ -1079,7 +1025,6 @@ function applyMiniPlayerFrameDepth() {
     translateZ(${depth}px)
   `;
   setDepthShadow(player, depth);
-  applyBloom(player, depth);
 }
 
 function applyChannelBannerDepth() {
@@ -1092,7 +1037,6 @@ function applyChannelBannerDepth() {
     translateZ(${depth}px)
   `;
   setDepthShadow(banner, depth);
-  applyBloom(banner, depth);
 }
 
 function applyChannelHeaderDepth() {
@@ -1106,7 +1050,6 @@ function applyChannelHeaderDepth() {
       translateZ(${depth}px)
     `;
     setDepthShadow(header, depth);
-    applyBloom(header, depth);
   }
 
   if (meta) {
@@ -1116,7 +1059,6 @@ function applyChannelHeaderDepth() {
       translateZ(${depth}px)
     `;
     setDepthShadow(meta, depth);
-    applyBloom(meta, depth);
   }
 }
 
@@ -1124,13 +1066,10 @@ function applySearchBarDepthFull() {
   const bar = document.getElementById("searchTab");
   if (!bar) return;
 
-  const depth = 80;
   bar.style.transform = `
     perspective(900px)
-    translateZ(${depth}px)
+    translateZ(80px)
   `;
-  setDepthShadow(bar, depth);
-  applyBloom(bar, depth);
 }
 
 function applySearchInputDepthFull() {
@@ -1138,13 +1077,10 @@ function applySearchInputDepthFull() {
   if (!bar) return;
 
   if (bar.style.display !== "none") {
-    const depth = 110;
     bar.style.transform = `
       perspective(900px)
-      translateZ(${depth}px)
+      translateZ(110px)
     `;
-    setDepthShadow(bar, depth);
-    applyBloom(bar, depth);
   }
 }
 
@@ -1152,13 +1088,10 @@ function applyKeyboardPanelDepthFull() {
   const kb = document.getElementById("keyboard");
   if (!kb) return;
 
-  const depth = 70;
   kb.style.transform = `
     perspective(900px)
-    translateZ(${depth}px)
+    translateZ(70px)
   `;
-  setDepthShadow(kb, depth);
-  applyBloom(kb, depth);
 }
 
 function applyKeyboardKeyDepthFull() {
@@ -1173,8 +1106,6 @@ function applyKeyboardKeyDepthFull() {
       perspective(900px)
       translateZ(${depth}px)
     `;
-    setDepthShadow(key, depth);
-    applyBloom(key, depth);
   });
 }
 
@@ -1188,7 +1119,6 @@ function applyHUDDepthFull() {
     translateZ(${depth}px)
   `;
   setDepthShadow(hud, depth);
-  applyBloom(hud, depth);
 }
 
 function applyTopbarDepth() {
@@ -1201,7 +1131,6 @@ function applyTopbarDepth() {
     translateZ(${depth}px)
   `;
   setDepthShadow(topbar, depth);
-  applyBloom(topbar, depth);
 }
 
 function applySearchBarDepth() {
@@ -1214,7 +1143,6 @@ function applySearchBarDepth() {
     translateZ(${depth}px)
   `;
   setDepthShadow(bar, depth);
-  applyBloom(bar, depth);
 }
 
 function applyMiniControlsDepth() {
@@ -1226,8 +1154,6 @@ function applyMiniControlsDepth() {
     perspective(900px)
     translateZ(${depth}px)
   `;
-  setDepthShadow(controls, depth);
-  applyBloom(controls, depth);
 }
 
 function applyKeyboardDepth() {
@@ -1239,8 +1165,6 @@ function applyKeyboardDepth() {
       perspective(900px)
       translateZ(${depth}px)
     `;
-    setDepthShadow(key, depth);
-    applyBloom(key, depth);
   });
 }
 
@@ -1255,8 +1179,6 @@ function applyTabDepthStacking() {
       perspective(900px)
       translateZ(${depth}px)
     `;
-    setDepthShadow(tab, depth);
-    applyBloom(tab, depth);
   });
 }
 
@@ -1269,22 +1191,15 @@ function applyTabHighlightDepth() {
     perspective(900px)
     translateZ(${depth}px)
   `;
-  setDepthShadow(activeTab, depth);
-  applyBloom(activeTab, depth);
 }
 
 // Search depth mode
 function enterSearchDepthMode() {
   document.body.classList.add("search-depth-mode");
-  document.querySelectorAll('.video-card, .tabs, .topbar, .channel-page, .player')
-    .forEach(el => applyLightFalloff(el, -120));
 }
 
 function exitSearchDepthMode() {
   document.body.classList.remove("search-depth-mode");
-  apply3DStacking();
-  applyTopbarDepth();
-  applyPlayerDepth();
 }
 
 // Micro-parallax
@@ -1310,7 +1225,6 @@ document.addEventListener("pointermove", (e) => {
       rotateY(${tiltX}deg)
     `;
     setDepthShadow(card, depth);
-    applyBloom(card, depth);
   });
 
   const tabs = document.querySelectorAll('.parallax-tab');
@@ -1325,24 +1239,9 @@ document.addEventListener("pointermove", (e) => {
       rotateY(${tiltX}deg)
     `;
     setDepthShadow(tab, depth);
-    applyBloom(tab, depth);
   });
 
-  const player = document.getElementById("playerSection");
-  if (player) {
-    let depth = -60;
-    if (player.classList.contains("player-fullscreen")) depth = 40;
-    else if (player.classList.contains("player-mini")) depth = -10;
-    player.style.transform = `
-      perspective(900px)
-      translateZ(${depth}px)
-      rotateX(${tiltY}deg)
-      rotateY(${tiltX}deg)
-    `;
-    setDepthShadow(player, depth);
-    applyBloom(player, depth);
-  }
-
+  applyPlayerDepth();
   applyChannelBannerDepth();
   applyChannelHeaderDepth();
   applySearchBarDepthFull();
@@ -1470,7 +1369,7 @@ async function loadChannelPage(channelId) {
   }
 
   channelPageEl.innerHTML = `
-    <div class="channel-banner parallax bloom-mid">
+    <div class="channel-banner parallax">
       <div class="banner-logo"></div>
       <div class="banner-text">ViewTube</div>
     </div>
@@ -1501,7 +1400,7 @@ async function loadChannelPage(channelId) {
     const videoId = snippet.resourceId.videoId;
 
     const card = document.createElement("div");
-    card.className = "video-card parallax bloom-low";
+    card.className = "video-card parallax";
 
     card.innerHTML = `
       <div class="video-thumb">
@@ -1545,7 +1444,7 @@ window.addEventListener("scroll", async () => {
       const videoId = snippet.resourceId.videoId;
 
       const card = document.createElement("div");
-      card.className = "video-card parallax bloom-low";
+      card.className = "video-card parallax";
 
       card.innerHTML = `
         <div class="video-thumb">
@@ -1633,7 +1532,7 @@ moviesTab.addEventListener("click", async () => {
   clearFeed();
   setActiveTab("movies");
 
-  const data = await.fetchYouTube("search", {
+  const data = await fetchYouTube("search", {
     part: "snippet",
     q: "short film award winning",
     type: "video",
