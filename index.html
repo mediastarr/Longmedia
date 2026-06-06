@@ -14,6 +14,12 @@
   --shadow-soft: 0 8px 24px rgba(0,0,0,0.6);
   --shadow-strong: 0 14px 40px rgba(0,0,0,0.85);
   --shadow-glow: 0 0 22px rgba(255,255,255,0.35);
+
+  /* FX colors */
+  --fx-ambient: rgba(255, 80, 80, 0.45);
+  --fx-bloom: rgba(255, 255, 255, 0.35);
+  --fx-glass-edge: rgba(255, 255, 255, 0.18);
+  --fx-scanline: rgba(0, 255, 255, 0.55);
 }
 
 body {
@@ -311,12 +317,88 @@ body {
     height 0.28s ease,
     top 0.28s ease,
     left 0.28s ease,
-    border-radius 0.28s ease;
+    border-radius 0.28s ease,
+    box-shadow 0.28s ease;
   z-index: 30;
   position: relative;
   display: none;
   width: min(600px, 90vw);
   height: min(600px, 90vw);
+}
+
+/* FX: Volumetric bloom + ambient halo + glass refraction + scanlines */
+
+.player.fx-bloom::before {
+  content: "";
+  position: absolute;
+  inset: -40px;
+  border-radius: 40px;
+  background: radial-gradient(circle, var(--fx-bloom) 0%, transparent 60%);
+  opacity: 0.9;
+  pointer-events: none;
+  filter: blur(26px);
+  z-index: -1;
+}
+
+.player.fx-ambient::after {
+  content: "";
+  position: absolute;
+  inset: -80px;
+  border-radius: 80px;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 0, 0, 0.45), transparent 60%),
+    radial-gradient(circle at 80% 30%, rgba(0, 180, 255, 0.45), transparent 60%),
+    radial-gradient(circle at 50% 80%, rgba(255, 255, 0, 0.35), transparent 60%);
+  mix-blend-mode: screen;
+  opacity: 0.9;
+  pointer-events: none;
+  filter: blur(32px);
+  z-index: -2;
+}
+
+.player.fx-glass {
+  border: 1px solid rgba(255,255,255,0.18);
+  background: radial-gradient(circle at top left, rgba(255,255,255,0.18), transparent 55%),
+              radial-gradient(circle at bottom right, rgba(255,255,255,0.12), transparent 55%),
+              var(--card);
+  backdrop-filter: blur(26px) saturate(1.4);
+  -webkit-backdrop-filter: blur(26px) saturate(1.4);
+}
+
+.player.fx-glass iframe {
+  border-radius: 20px;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.12),
+    0 0 22px rgba(255,255,255,0.25);
+}
+
+/* Scanlines overlay on video */
+
+.player.fx-scanlines iframe {
+  position: relative;
+  overflow: hidden;
+}
+
+.player.fx-scanlines iframe::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.0) 0%,
+    rgba(0,255,255,0.18) 50%,
+    rgba(0,0,0,0.0) 100%
+  );
+  background-size: 100% 6px;
+  mix-blend-mode: screen;
+  opacity: 0.65;
+  pointer-events: none;
+  animation: scanlineMove 2.4s linear infinite;
+}
+
+@keyframes scanlineMove {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(6px); }
 }
 
 .player-mini {
@@ -403,11 +485,53 @@ body {
   border: 1px solid rgba(255,255,255,0.12);
   box-shadow: var(--shadow-soft);
   transform-style: preserve-3d;
-  transition: transform 0.25s ease-out;
+  transition: transform 0.25s ease-out, box-shadow 0.25s ease-out;
   z-index: 5;
   display: flex;
   gap: 8px;
   cursor: pointer;
+}
+
+/* FX: glass + bloom + scanlines on cards */
+
+.video-card.fx-glass {
+  border: 1px solid var(--fx-glass-edge);
+  background:
+    radial-gradient(circle at top left, rgba(255,255,255,0.16), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(255,255,255,0.10), transparent 55%),
+    var(--card);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+}
+
+.video-card.fx-bloom::before {
+  content: "";
+  position: absolute;
+  inset: -20px;
+  border-radius: 26px;
+  background: radial-gradient(circle, rgba(255,255,255,0.25) 0%, transparent 60%);
+  opacity: 0.8;
+  filter: blur(18px);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.video-card.fx-scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 22px;
+  background-image: linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.0) 0%,
+    var(--fx-scanline) 50%,
+    rgba(0,0,0,0.0) 100%
+  );
+  background-size: 100% 5px;
+  mix-blend-mode: screen;
+  opacity: 0.45;
+  pointer-events: none;
+  animation: scanlineMove 2.8s linear infinite;
 }
 
 .video-thumb img {
@@ -657,7 +781,7 @@ body {
   <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
 </div>
 
-<div class="player parallax" id="playerSection">
+<div class="player parallax fx-bloom fx-ambient fx-glass fx-scanlines" id="playerSection">
   <iframe id="playerFrame" src="" allowfullscreen></iframe>
   <button id="closeMini" class="ctrl-btn" style="position:absolute; top:6px; right:6px;">X</button>
   <div class="player-controls">
@@ -676,6 +800,7 @@ body {
 <div id="channelPage" class="channel-page" style="display:none;"></div>
 
 <div id="hud" class="hud"></div>
+
 <script>
 // API keys (replace with your real key)
 const API_KEYS = [
@@ -881,6 +1006,10 @@ function setPlayerVideo(videoId, snippet) {
   currentVideoId = videoId;
   playerSection.style.display = "block";
   playerSection.classList.remove("player-mini", "player-fullscreen");
+
+  // ensure FX classes are present
+  playerSection.classList.add("fx-bloom", "fx-ambient", "fx-glass", "fx-scanlines");
+
   playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
   historyList.unshift({ id: videoId, snippet });
   if (historyList.length > 50) historyList.pop();
@@ -925,7 +1054,7 @@ function renderFeed(items) {
     const videoId = item.id?.videoId || item.id;
 
     const card = document.createElement("div");
-    card.className = "video-card parallax";
+    card.className = "video-card parallax fx-glass fx-bloom fx-scanlines";
 
     const thumb = document.createElement("div");
     thumb.className = "video-thumb";
@@ -1219,7 +1348,6 @@ document.addEventListener("pointermove", (e) => {
   const tiltX = e.movementX * 0.06;
   const tiltY = e.movementY * 0.04;
 
-  // Apply tilt to all parallax elements
   document.querySelectorAll('.parallax').forEach(el => {
     el.style.transform = `
       perspective(900px)
@@ -1228,7 +1356,6 @@ document.addEventListener("pointermove", (e) => {
     `;
   });
 
-  // Apply tilt + depth to feed cards
   const cards = document.querySelectorAll('.video-card');
   cards.forEach((card, i) => {
     const depth = -60 - i * 8;
@@ -1241,7 +1368,6 @@ document.addEventListener("pointermove", (e) => {
     setDepthShadow(card, depth);
   });
 
-  // Apply tilt + depth to tabs
   const tabs = document.querySelectorAll('.parallax-tab');
   tabs.forEach((tab, index) => {
     const depth = -30 - index * 10;
@@ -1419,7 +1545,7 @@ async function loadChannelPage(channelId) {
     const videoId = snippet.resourceId.videoId;
 
     const card = document.createElement("div");
-    card.className = "video-card parallax";
+    card.className = "video-card parallax fx-glass fx-bloom fx-scanlines";
 
     card.innerHTML = `
       <div class="video-thumb">
@@ -1463,7 +1589,7 @@ window.addEventListener("scroll", async () => {
       const videoId = snippet.resourceId.videoId;
 
       const card = document.createElement("div");
-      card.className = "video-card parallax";
+      card.className = "video-card parallax fx-glass fx-bloom fx-scanlines";
 
       card.innerHTML = `
         <div class="video-thumb">
