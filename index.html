@@ -148,7 +148,7 @@ body {
   color: var(--text);
   outline: none;
   font-size: 13px;
-  padding-left: 14px; /* ensure text visible from left */
+  padding-left: 14px;
 }
 
 .search-btn {
@@ -174,7 +174,7 @@ body {
 
 .keyboard {
   position: absolute;
-  top: 80px; /* moved down */
+  top: 80px;
   left: 0;
   right: 0;
   background: rgba(10,10,10,0.95);
@@ -589,7 +589,7 @@ body {
 <div id="tabs" class="tabs parallax">
   <button id="homeTab" class="tab-btn active parallax-tab">Home</button>
   <button id="shortsTab" class="tab-btn parallax-tab">Shorts</button>
-  <button id="relatedTab" class="tab-btn parallax-tab">Related</button>
+  <button id="moviesTab" class="tab-btn parallax-tab">Movies</button>
   <button id="historyTab" class="tab-btn parallax-tab">History</button>
   <button id="trendingTab" class="tab-btn parallax-tab">Trending</button>
   <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
@@ -674,7 +674,7 @@ async function fetchYouTube(endpoint, params = {}) {
   url.searchParams.append("_", timestamp);
 
   try {
-    const res = await fetch(url);
+    const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) {
       console.warn("Key failed, switching to next key:", key);
       return fetchYouTube(endpoint, params);
@@ -712,7 +712,7 @@ const keyboardEl = document.getElementById("keyboard");
 
 const homeTab = document.getElementById("homeTab");
 const shortsTab = document.getElementById("shortsTab");
-const relatedTab = document.getElementById("relatedTab");
+const moviesTab = document.getElementById("moviesTab");
 const historyTab = document.getElementById("historyTab");
 const trendingTab = document.getElementById("trendingTab");
 const channelTab = document.getElementById("channelTab");
@@ -780,11 +780,11 @@ function setPlayerVideo(videoId, snippet) {
 // Tabs
 function setActiveTab(tab) {
   currentTab = tab;
-  [homeTab, shortsTab, relatedTab, historyTab, trendingTab, channelTab]
+  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab]
     .forEach(btn => btn.classList.remove("active"));
   if (tab === "home") homeTab.classList.add("active");
   if (tab === "shorts") shortsTab.classList.add("active");
-  if (tab === "related") relatedTab.classList.add("active");
+  if (tab === "movies") moviesTab.classList.add("active");
   if (tab === "history") historyTab.classList.add("active");
   if (tab === "trending") trendingTab.classList.add("active");
   if (tab === "channel") channelTab.classList.add("active");
@@ -1172,6 +1172,12 @@ closeMini.addEventListener("click", () => {
     playerSection.style.display = "none";
     playerFrame.src = "";
     applyMiniPlayerFrameDepth();
+
+    feedEl.style.pointerEvents = "auto";
+    tabsEl.style.pointerEvents = "auto";
+    topbarEl.style.pointerEvents = "auto";
+    searchTabEl.style.pointerEvents = "auto";
+
     showHUD("Player closed");
   }
 });
@@ -1324,47 +1330,79 @@ trendingTab.addEventListener("click", async () => {
   showHUD("Trending US");
 });
 
+// Shorts: vertical videos only
 shortsTab.addEventListener("click", async () => {
   setActiveTab("shorts");
 
   const data = await fetchYouTube("search", {
     part: "snippet",
     type: "video",
-    maxResults: 25,
+    maxResults: 50,
     order: "date",
     safeSearch: "none",
-    topicId: "/m/0jgv",
-    videoDuration: "short",
-    relevanceLanguage: "en",
     videoEmbeddable: "true"
   });
 
-  shortsItems = data.items || [];
+  const verticalShorts = [];
+
+  for (const item of data.items || []) {
+    const videoId = item.id?.videoId || item.id;
+    if (!videoId) continue;
+
+    const details = await fetchYouTube("videos", {
+      part: "contentDetails,snippet",
+      id: videoId
+    });
+
+    const info = details.items?.[0];
+    if (!info) continue;
+
+    const duration = info.contentDetails.duration;
+    const thumb = info.snippet.thumbnails?.high;
+    if (!thumb) continue;
+
+    const width = thumb.width;
+    const height = thumb.height;
+
+    const isVertical = height > width;
+    const isShort = /^PT([0-5]?[0-9])S$/.test(duration);
+
+    if (isVertical && isShort) {
+      verticalShorts.push({
+        id: videoId,
+        snippet: info.snippet
+      });
+    }
+  }
+
+  shortsItems = verticalShorts;
   shortsIndex = 0;
+
   renderFeed(shortsItems);
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
   showHUD("Shorts");
 });
 
-relatedTab.addEventListener("click", async () => {
-  setActiveTab("related");
-  if (!currentVideoId) {
-    showHUD("Play a video first");
-    return;
-  }
+// Movies: FilmRise only
+moviesTab.addEventListener("click", async () => {
+  setActiveTab("movies");
+
+  const filmRiseChannelId = "UCp4zT2G0lZ6jTQd3x2Q0WUg";
+
   const data = await fetchYouTube("search", {
     part: "snippet",
-    relatedToVideoId: currentVideoId,
+    channelId: filmRiseChannelId,
     type: "video",
+    order: "date",
     maxResults: 25,
-    safeSearch: "none",
     videoEmbeddable: "true"
   });
+
   renderFeed(data.items || []);
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
-  showHUD("Related");
+  showHUD("Free Movies (FilmRise)");
 });
 
 historyTab.addEventListener("click", async () => {
@@ -1477,7 +1515,7 @@ function playShortAt(index) {
   if (!shortsItems[index]) return;
   const item = shortsItems[index];
   const snippet = item.snippet || {};
-  const videoId = item.id?.videoId || item.id;
+  const videoId = item.id;
   setPlayerVideo(videoId, snippet);
   showHUD("Short " + (index + 1));
 }
@@ -1524,6 +1562,39 @@ document.addEventListener("pointerup", (e) => {
     else prevShort();
   }
   pointerStartY = null;
+});
+
+// Direction-aware pointer routing for mini-player
+let scrollStartX = null;
+let scrollStartY = null;
+
+document.addEventListener("pointerdown", (e) => {
+  if (!playerSection.classList.contains("player-mini")) return;
+  scrollStartX = e.clientX;
+  scrollStartY = e.clientY;
+});
+
+document.addEventListener("pointermove", (e) => {
+  if (!playerSection.classList.contains("player-mini")) return;
+  if (scrollStartX === null || scrollStartY === null) return;
+
+  const dx = e.clientX - scrollStartX;
+  const dy = e.clientY - scrollStartY;
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    feedEl.style.pointerEvents = "auto";
+    tabsEl.style.pointerEvents = "auto";
+    playerSection.style.pointerEvents = "none";
+  } else {
+    feedEl.style.pointerEvents = "none";
+    tabsEl.style.pointerEvents = "none";
+    playerSection.style.pointerEvents = "auto";
+  }
+});
+
+document.addEventListener("pointerup", () => {
+  scrollStartX = null;
+  scrollStartY = null;
 });
 
 // Initial depth setup
