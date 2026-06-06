@@ -1378,6 +1378,10 @@ function openKeyboard() {
   searchPanelEl.style.display = "block";
   keyboardEl.style.display = "block";
   document.querySelector(".search-input-bar").style.display = "none";
+
+  // NEW — hide feed so keyboard receives all input
+  feedEl.style.display = "none";
+
   applyKeyboardDepth();
   applyKeyboardPanelDepthFull();
   enterSearchDepthMode();
@@ -1385,9 +1389,14 @@ function openKeyboard() {
   applyHUDDepthFull();
 }
 
+
 function closeKeyboard() {
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
+
+  // NEW — restore feed
+  feedEl.style.display = "block";
+
   exitSearchDepthMode();
 }
 
