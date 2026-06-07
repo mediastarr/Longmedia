@@ -637,6 +637,53 @@ body.fullscreen-active .exit-full-btn {
 <body>
 <div class="app-shell">
 
+  <!-- ⭐ UI ROOT WRAPPER START -->
+  <div id="uiRoot">
+
+    <!-- TOPBAR -->
+    <div id="topbar" class="parallax">...</div>
+
+    <!-- SEARCH BAR -->
+    <div id="searchTab" class="parallax-tab">...</div>
+
+    <!-- TABS -->
+    <div id="tabs">...</div>
+
+    <!-- HUD -->
+    <div id="hud"></div>
+
+    <!-- SEARCH PANEL -->
+    <div id="searchPanel">...</div>
+
+    <!-- FEED -->
+    <div id="feed"></div>
+
+    <!-- CHANNEL PAGE -->
+    <div id="channelPage"></div>
+
+  </div>
+  <!-- ⭐ UI ROOT WRAPPER END -->
+
+  <!-- ⭐ EXIT FULLSCREEN BUTTON -->
+  <button id="exitFullBtn" class="exit-full-btn">Back</button>
+
+  <!-- ⭐ PLAYER (OUTSIDE UI ROOT) -->
+  <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
+    <iframe id="playerFrame" ...></iframe>
+
+    <div class="player-controls">
+      <button id="playPauseBtn">Pause</button>
+      <button id="rewindBtn">-10s</button>
+      <button id="forwardBtn">+10s</button>
+      <button id="fullBtn">Full</button>
+    </div>
+
+    <button id="closeMini">✕</button>
+  </div>
+
+</div> <!-- app-shell -->
+
+
   <!-- TOPBAR -->
   <div id="topbar" class="parallax">
     <div class="topbar-left">
@@ -667,6 +714,10 @@ body.fullscreen-active .exit-full-btn {
 
   
   <!-- PLAYER -->
+<!-- ⭐ Move Back button OUTSIDE the player -->
+   
+<button id="exitFullBtn" class="exit-full-btn">Back</button>   
+   
 <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
 
   <iframe
@@ -688,8 +739,7 @@ body.fullscreen-active .exit-full-btn {
   <button id="closeMini">✕</button>
 </div>
 
-<!-- ⭐ Move Back button OUTSIDE the player -->
-<button id="exitFullBtn" class="exit-full-btn">Back</button>
+
 
   <!-- HUD -->
   <div id="hud"></div>
