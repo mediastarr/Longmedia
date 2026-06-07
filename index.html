@@ -588,15 +588,96 @@ body.cinema-mode::before {
   box-shadow: 0 0 80px rgba(0,0,0,0.6);
 }
 
+/* -----------------------------------------------------------
+   CINEMA MODE — AMBIENT GLOW BOOST
+----------------------------------------------------------- */
+body.cinema-mode #playerSection {
+  --audio-glow-opacity: 0.55 !important;
+  --audio-glow-blur: 55px !important;
+
+  --chroma-opacity: 0.45 !important;
+  --chroma-blur: 18px !important;
+
+  box-shadow:
+    0 0 120px rgba(60,242,255,0.55),
+    0 0 180px rgba(0,200,255,0.45),
+    0 0 260px rgba(0,255,180,0.35);
+  transition: box-shadow 0.35s ease, filter 0.35s ease;
+}
+
+/* -----------------------------------------------------------
+   CINEMA MODE — TRANSITIONS
+----------------------------------------------------------- */
+#playerSection {
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.45s ease,
+    filter 0.45s ease;
+}
+
+body.cinema-mode::before {
+  transition:
+    background 0.45s ease,
+    backdrop-filter 0.45s ease;
+}
+
+body.cinema-mode #playerSection {
+  transition:
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.55s ease,
+    filter 0.55s ease;
+}
+   
+/* -----------------------------------------------------------
+   CINEMA MODE — ZOOM INTRO ANIMATION
+----------------------------------------------------------- */
+@keyframes cinemaZoomIntro {
+  0% {
+    transform:
+      translate(-50%, -50%)
+      scale(0.88)
+      perspective(900px)
+      rotateX(0deg);
+    opacity: 0.6;
+    filter: brightness(0.7);
+  }
+
+  60% {
+    transform:
+      translate(-50%, -50%)
+      scale(1.03)
+      perspective(900px)
+      rotateX(4deg);
+    opacity: 1;
+    filter: brightness(1);
+  }
+
+  100% {
+    transform:
+      translate(-50%, -50%)
+      scale(1)
+      perspective(900px)
+      rotateX(6deg);
+    opacity: 1;
+    filter: brightness(1);
+  }
+}
+
+/* Apply animation ONLY when Cinema Mode activates */
+#playerSection.player-fullscreen.cinema.zoom-intro {
+  animation: cinemaZoomIntro 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+   
 /* BACK BUTTON VISIBILITY */
 body.fullscreen-active .exit-full-btn {
   display: block;
 }
 
 
- /* -----------------------------------------------------------
-   FULLSCREEN BACK BUTTON
------------------------------------------------------------ */
+
 /* -----------------------------------------------------------
    FULLSCREEN BACK BUTTON
 ----------------------------------------------------------- */
@@ -985,9 +1066,8 @@ closeMini.addEventListener("click", () => {
   showHUD("Player closed");
 });
 
- /* -----------------------------------------------------------
-   CINEMA MODE HELPERS
------------------------------------------------------------ */
+
+
 /* -----------------------------------------------------------
    CINEMA MODE HELPERS
 ----------------------------------------------------------- */
@@ -1000,7 +1080,13 @@ function disableCinemaMode() {
   document.body.classList.remove("cinema-mode");
   playerSection.classList.remove("cinema");
 }
-  
+
+function playCinemaZoomIntro() {
+  playerSection.classList.remove("zoom-intro"); // reset
+  void playerSection.offsetWidth;               // force reflow
+  playerSection.classList.add("zoom-intro");    // play animation
+}
+
 /* -----------------------------------------------------------
    FULLSCREEN
 ----------------------------------------------------------- */
@@ -1012,33 +1098,44 @@ fullBtn.addEventListener("click", () => {
   playerSection.classList.add("player-fullscreen");
 
   document.body.classList.add("fullscreen-active");
-
-  enableCinemaMode();   // ⭐ THIS is the missing line
-  document.body.classList.add("fullscreen-active"); // ⭐ REQUIRED
+  enableCinemaMode();          
+  playCinemaZoomIntro();       // ⭐ REQUIRED — triggers the zoom intro animation
 
   hideUIForVideo();
   showHUD("Fullscreen");
 });
 
 
-   /* -----------------------------------------------------------
+
+  /* -----------------------------------------------------------
    EXIT FULLSCREEN BUTTON
 ----------------------------------------------------------- */
 const exitFullBtn = document.getElementById("exitFullBtn");
 
 exitFullBtn.addEventListener("click", () => {
   playerSection.classList.remove("player-fullscreen");
-  document.body.classList.remove("fullscreen-active"); // ⭐ REQUIRED
-  disableCinemaMode();   // ⭐ required
+  document.body.classList.remove("fullscreen-active");
+  disableCinemaMode();         // ⭐ turn Cinema Mode OFF
 
   if (miniActive) {
     playerSection.classList.add("player-mini");
-    showUIWithMiniPlayer();
-  } else {
-    showUIWithMiniPlayer();
   }
 
+  showUIWithMiniPlayer();
   showHUD("Exited Fullscreen");
+});
+
+/* -----------------------------------------------------------
+   ESC / RAY‑BAN EMG EXIT FULLSCREEN
+----------------------------------------------------------- */
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    playerSection.classList.remove("player-fullscreen");
+    document.body.classList.remove("fullscreen-active");
+    disableCinemaMode();
+    showUIWithMiniPlayer();
+    showHUD("Exited Fullscreen (Ray‑Ban EMG)");
+  }
 });
 
 
@@ -1217,15 +1314,6 @@ document.addEventListener("touchend", e => {
 /* -----------------------------------------------------------
    EMG GESTURES (Ray‑Ban Neural Wristband)
 ----------------------------------------------------------- */
-
-/* DOUBLE‑PINCH → EXIT FULLSCREEN */
-document.addEventListener("emg-doublepinch", () => {
-  if (playerSection.classList.contains("player-fullscreen")) {
-    exitFullBtn.click(); // instantly exit fullscreen
-    showHUD("Exited Fullscreen (Double‑Pinch)");
-  }
-});
- 
    
 /* -----------------------------------------------------------
    MOVIES
