@@ -983,7 +983,10 @@ backBtn.addEventListener("click", () => {
 
 closeMini.addEventListener("click", () => {
   playerSection.style.display = "none";
+  setTimeout(() => {
   playerFrame.src = "";
+}, 200);
+
 
   showUIWithMiniPlayer();
   showHUD("Player closed");
@@ -1005,39 +1008,49 @@ function disableCinemaMode() {
   playerSection.classList.remove("cinema");
 }
   
+
 /* -----------------------------------------------------------
    FULLSCREEN
 ----------------------------------------------------------- */
+let fullscreenLock = false;
+
 fullBtn.addEventListener("click", async () => {
+  if (fullscreenLock) return;
+  fullscreenLock = true;
+  setTimeout(() => fullscreenLock = false, 400);
+
   // Prevent fullscreen before video loads
-  if (!playerFrame.src || playerFrame.src.trim() === "" || playerFrame.src === "about:blank") {
+  if (!playerFrame.src || playerFrame.src === "about:blank") {
     showHUD("Load a video first");
     return;
   }
 
-  // Delay to ensure YouTube iframe is initialized
-  await new Promise(r => setTimeout(r, 150));
+  // Ensure iframe is visible before fullscreen
+  playerSection.style.display = "block";
+  playerFrame.style.opacity = "1";
 
-  // Enter REAL fullscreen on the iframe
-  if (!document.fullscreenElement) {
-    try {
-      await playerFrame.requestFullscreen();
-    } catch (err) {
-      console.warn("Fullscreen failed:", err);
-      showHUD("Fullscreen blocked");
-      return;
-    }
+  // Give YouTube iframe time to initialize
+  await new Promise(r => setTimeout(r, 200));
+
+  // Enter REAL fullscreen
+  try {
+    await playerFrame.requestFullscreen();
+  } catch (err) {
+    console.warn("Fullscreen failed:", err);
+    showHUD("Fullscreen blocked");
+    return;
   }
 
+  // Apply fullscreen UI
   playerSection.classList.add("player-fullscreen");
   enableCinemaMode();
   document.body.classList.add("fullscreen-active");
-  hideUIForVideo();
+
+  // Delay UI hide to prevent Ray‑Ban freeze
+  setTimeout(() => hideUIForVideo(), 50);
+
   showHUD("Fullscreen");
 });
-
-
-
 
 
 
@@ -1057,6 +1070,7 @@ exitFullBtn.addEventListener("click", () => {
   showUIWithMiniPlayer();
   showHUD("Exited Fullscreen");
 });
+
 
 
 
