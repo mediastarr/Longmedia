@@ -1286,6 +1286,9 @@ homeTab.addEventListener("click", async () => {
 /* -----------------------------------------------------------
    TRENDING
 ----------------------------------------------------------- */
+/* -----------------------------------------------------------
+   TRENDING
+----------------------------------------------------------- */
 trendingTab.addEventListener("click", async () => {
   setActiveTab("trending");
 
@@ -1298,6 +1301,11 @@ trendingTab.addEventListener("click", async () => {
     maxResults: 25,
     _: timestamp
   });
+
+  renderFeed(data.items || []);
+  showHUD("Trending");
+});
+
 
 
 /* -----------------------------------------------------------
