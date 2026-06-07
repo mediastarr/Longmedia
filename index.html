@@ -637,53 +637,6 @@ body.fullscreen-active .exit-full-btn {
 <body>
 <div class="app-shell">
 
-  <!-- ⭐ UI ROOT WRAPPER START -->
-  <div id="uiRoot">
-
-    <!-- TOPBAR -->
-    <div id="topbar" class="parallax">...</div>
-
-    <!-- SEARCH BAR -->
-    <div id="searchTab" class="parallax-tab">...</div>
-
-    <!-- TABS -->
-    <div id="tabs">...</div>
-
-    <!-- HUD -->
-    <div id="hud"></div>
-
-    <!-- SEARCH PANEL -->
-    <div id="searchPanel">...</div>
-
-    <!-- FEED -->
-    <div id="feed"></div>
-
-    <!-- CHANNEL PAGE -->
-    <div id="channelPage"></div>
-
-  </div>
-  <!-- ⭐ UI ROOT WRAPPER END -->
-
-  <!-- ⭐ EXIT FULLSCREEN BUTTON -->
-  <button id="exitFullBtn" class="exit-full-btn">Back</button>
-
-  <!-- ⭐ PLAYER (OUTSIDE UI ROOT) -->
-  <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
-    <iframe id="playerFrame" ...></iframe>
-
-    <div class="player-controls">
-      <button id="playPauseBtn">Pause</button>
-      <button id="rewindBtn">-10s</button>
-      <button id="forwardBtn">+10s</button>
-      <button id="fullBtn">Full</button>
-    </div>
-
-    <button id="closeMini">✕</button>
-  </div>
-
-</div> <!-- app-shell -->
-
-
   <!-- TOPBAR -->
   <div id="topbar" class="parallax">
     <div class="topbar-left">
@@ -714,32 +667,25 @@ body.fullscreen-active .exit-full-btn {
 
   
   <!-- PLAYER -->
-<!-- ⭐ Move Back button OUTSIDE the player -->
-   
-<button id="exitFullBtn" class="exit-full-btn">Back</button>   
-   
 <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
 
-  <iframe
-    id="playerFrame"
-    src="about:blank"
-    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-    allowfullscreen
-    webkitallowfullscreen
-    mozallowfullscreen
-  ></iframe>
+    <iframe id="playerFrame"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowfullscreen>
+    </iframe>
 
-  <div class="player-controls">
-    <button id="playPauseBtn">Pause</button>
-    <button id="rewindBtn">-10s</button>
-    <button id="forwardBtn">+10s</button>
-    <button id="fullBtn">Full</button>
-  </div>
+    <div class="player-controls">
+      <button id="playPauseBtn">Pause</button>
+      <button id="rewindBtn">-10s</button>
+      <button id="forwardBtn">+10s</button>
+      <button id="fullBtn">Full</button>
+    </div>
 
-  <button id="closeMini">✕</button>
+    <button id="closeMini">✕</button>
 </div>
 
-
+<!-- ⭐ Move Back button OUTSIDE the player -->
+<button id="exitFullBtn" class="exit-full-btn">Back</button>
 
   <!-- HUD -->
   <div id="hud"></div>
@@ -1033,10 +979,7 @@ backBtn.addEventListener("click", () => {
 
 closeMini.addEventListener("click", () => {
   playerSection.style.display = "none";
-  setTimeout(() => {
   playerFrame.src = "";
-}, 200);
-
 
   showUIWithMiniPlayer();
   showHUD("Player closed");
@@ -1058,45 +1001,24 @@ function disableCinemaMode() {
   playerSection.classList.remove("cinema");
 }
   
-
 /* -----------------------------------------------------------
    FULLSCREEN
 ----------------------------------------------------------- */
-let fullscreenLock = false;
+fullBtn.addEventListener("click", () => {
+  if (playerSection.style.display === "none") return;
 
-fullBtn.addEventListener("click", async () => {
-  if (fullscreenLock) return;
-  fullscreenLock = true;
-  setTimeout(() => fullscreenLock = false, 400);
-
-  if (!playerFrame.src || playerFrame.src === "about:blank") {
-    showHUD("Load a video first");
-    return;
-  }
-
-  playerSection.style.display = "block";
-  playerFrame.style.opacity = "1";
-
-  await new Promise(r => setTimeout(r, 200));
-
-  try {
-    await playerFrame.requestFullscreen();
-  } catch (err) {
-    console.warn("Fullscreen failed:", err);
-    showHUD("Fullscreen blocked");
-    return;
-  }
-
+  miniActive = false;
+  playerSection.classList.remove("player-mini");
   playerSection.classList.add("player-fullscreen");
-  enableCinemaMode();
+
   document.body.classList.add("fullscreen-active");
 
-  setTimeout(() => hideUIForVideo(), 50);
+  enableCinemaMode();   // ⭐ THIS is the missing line
+  document.body.classList.add("fullscreen-active"); // ⭐ REQUIRED
 
+  hideUIForVideo();
   showHUD("Fullscreen");
 });
-
-
 
 
    /* -----------------------------------------------------------
@@ -1105,19 +1027,19 @@ fullBtn.addEventListener("click", async () => {
 const exitFullBtn = document.getElementById("exitFullBtn");
 
 exitFullBtn.addEventListener("click", () => {
-  if (document.fullscreenElement) {
-    document.exitFullscreen();
+  playerSection.classList.remove("player-fullscreen");
+  document.body.classList.remove("fullscreen-active"); // ⭐ REQUIRED
+  disableCinemaMode();   // ⭐ required
+
+  if (miniActive) {
+    playerSection.classList.add("player-mini");
+    showUIWithMiniPlayer();
+  } else {
+    showUIWithMiniPlayer();
   }
 
-  playerSection.classList.remove("player-fullscreen");
-  document.body.classList.remove("fullscreen-active");
-  disableCinemaMode();
-  showUIWithMiniPlayer();
   showHUD("Exited Fullscreen");
 });
-
-
-
 
 
 
@@ -1292,29 +1214,19 @@ document.addEventListener("touchend", e => {
   if (Math.abs(dy) > 50) dy < 0 ? nextShort() : prevShort();
 });
 
-
-
 /* -----------------------------------------------------------
-   META RAY-BAN EMG DOUBLE-PINCH → ESCAPE FULLSCREEN
-   (System-level ESC/back event — THIS is the real one)
+   EMG GESTURES (Ray‑Ban Neural Wristband)
 ----------------------------------------------------------- */
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    }
 
-    playerSection.classList.remove("player-fullscreen");
-    document.body.classList.remove("fullscreen-active");
-    disableCinemaMode();
-    showUIWithMiniPlayer();
-    showHUD("Exited Fullscreen (Ray‑Ban EMG)");
+/* DOUBLE‑PINCH → EXIT FULLSCREEN */
+document.addEventListener("emg-doublepinch", () => {
+  if (playerSection.classList.contains("player-fullscreen")) {
+    exitFullBtn.click(); // instantly exit fullscreen
+    showHUD("Exited Fullscreen (Double‑Pinch)");
   }
 });
-
-
-
-  
+ 
+   
 /* -----------------------------------------------------------
    MOVIES
 ----------------------------------------------------------- */
