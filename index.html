@@ -1051,7 +1051,12 @@ function setPlayerVideo(videoId, snippet) {
   playPauseBtn.textContent = "Pause";
 
   initAudioGlow();
+
+  // ⭐ FIX: Restore medium-player controls
+  document.querySelector(".player-controls").style.opacity = "1";
+  document.querySelector(".player-controls").style.pointerEvents = "auto";
 }
+
 
 
 /* -----------------------------------------------------------
