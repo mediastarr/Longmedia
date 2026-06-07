@@ -669,10 +669,13 @@ body.fullscreen-active .exit-full-btn {
   <!-- PLAYER -->
 <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
 
-    <iframe id="playerFrame"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowfullscreen>
-    </iframe>
+    <iframe
+      id="playerFrame"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+      allowfullscreen
+      webkitallowfullscreen
+      mozallowfullscreen
+    ></iframe>
 
     <div class="player-controls">
       <button id="playPauseBtn">Pause</button>
