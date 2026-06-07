@@ -1139,57 +1139,52 @@ function playCinemaZoomIntro() {
 /* -----------------------------------------------------------
    FULLSCREEN
 ----------------------------------------------------------- */
-document.addEventListener("DOMContentLoaded", () => {
+const fullBtn = document.getElementById("fullBtn");
+const exitFullBtn = document.getElementById("exitFullBtn");
+const playerSection = document.getElementById("playerSection");
 
-  const fullBtn = document.getElementById("fullBtn");
-  const exitFullBtn = document.getElementById("exitFullBtn");
-  const playerSection = document.getElementById("playerSection");
+fullBtn.addEventListener("click", () => {
+  if (playerSection.style.display === "none") return;
 
-  fullBtn.addEventListener("click", () => {
-    if (playerSection.style.display === "none") return;
+  playerSection.style.display = "block";
+  miniActive = false;
+  playerSection.classList.remove("player-mini");
 
-    playerSection.style.display = "block";
-    miniActive = false;
-    playerSection.classList.remove("player-mini");
+  playerSection.classList.add("player-fullscreen");
+  document.body.classList.add("fullscreen-active");
 
-    playerSection.classList.add("player-fullscreen");
-    document.body.classList.add("fullscreen-active");
-
-    requestAnimationFrame(() => {
-      enableCinemaMode();
-      playCinemaZoomIntro();
-    });
-
-    hideUIForVideo();
-    showHUD("Fullscreen");
+  requestAnimationFrame(() => {
+    enableCinemaMode();
+    playCinemaZoomIntro();
   });
 
-  /* -----------------------------------------------------------
-     EXIT FULLSCREEN BUTTON
-  ----------------------------------------------------------- */
-  exitFullBtn.addEventListener("click", () => {
-    playerSection.classList.remove("player-fullscreen");
-    document.body.classList.remove("fullscreen-active");
-
-    disableCinemaMode();
-    showUIWithMiniPlayer();
-  });
-
-  /* -----------------------------------------------------------
-     ESC / RAY‑BAN EMG EXIT FULLSCREEN
-  ----------------------------------------------------------- */
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      playerSection.classList.remove("player-fullscreen");
-      document.body.classList.remove("fullscreen-active");
-      disableCinemaMode();
-      showUIWithMiniPlayer();
-      showHUD("Exited Fullscreen (Ray‑Ban EMG)");
-    }
-  });
-
+  hideUIForVideo();
+  showHUD("Fullscreen");
 });
 
+/* -----------------------------------------------------------
+   EXIT FULLSCREEN BUTTON
+----------------------------------------------------------- */
+exitFullBtn.addEventListener("click", () => {
+  playerSection.classList.remove("player-fullscreen");
+  document.body.classList.remove("fullscreen-active");
+
+  disableCinemaMode();
+  showUIWithMiniPlayer();
+});
+
+/* -----------------------------------------------------------
+   ESC / RAY‑BAN EMG EXIT FULLSCREEN
+----------------------------------------------------------- */
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    playerSection.classList.remove("player-fullscreen");
+    document.body.classList.remove("fullscreen-active");
+    disableCinemaMode();
+    showUIWithMiniPlayer();
+    showHUD("Exited Fullscreen (Ray‑Ban EMG)");
+  }
+});
 
 
 /* -----------------------------------------------------------
