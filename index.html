@@ -1007,16 +1007,22 @@ function disableCinemaMode() {
 fullBtn.addEventListener("click", () => {
   if (playerSection.style.display === "none") return;
 
+  // Enter REAL fullscreen (required for Ray-Ban curved mode)
+  if (!document.fullscreenElement) {
+    playerSection.requestFullscreen();
+  }
+
   miniActive = false;
   playerSection.classList.remove("player-mini");
   playerSection.classList.add("player-fullscreen");
 
-  enableCinemaMode();                     // ⭐ REQUIRED for curved screen
-  document.body.classList.add("fullscreen-active"); // ⭐ REQUIRED for back button
+  enableCinemaMode();
+  document.body.classList.add("fullscreen-active");
 
   hideUIForVideo();
   showHUD("Fullscreen");
 });
+
 
 
 
@@ -1026,19 +1032,18 @@ fullBtn.addEventListener("click", () => {
 const exitFullBtn = document.getElementById("exitFullBtn");
 
 exitFullBtn.addEventListener("click", () => {
-  playerSection.classList.remove("player-fullscreen");
-  document.body.classList.remove("fullscreen-active"); // ⭐ REQUIRED
-  disableCinemaMode();                                 // ⭐ REQUIRED
-
-  if (miniActive) {
-    playerSection.classList.add("player-mini");
-    showUIWithMiniPlayer();
-  } else {
-    showUIWithMiniPlayer();
+  // ⭐ REQUIRED for Ray-Ban EMG + curved fullscreen
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
   }
 
+  playerSection.classList.remove("player-fullscreen");
+  document.body.classList.remove("fullscreen-active");
+  disableCinemaMode();
+  showUIWithMiniPlayer();
   showHUD("Exited Fullscreen");
 });
+
 
 
 
@@ -1218,11 +1223,32 @@ document.addEventListener("touchend", e => {
    EMG GESTURES (Ray‑Ban Neural Wristband)
 ----------------------------------------------------------- */
 
-/* DOUBLE‑PINCH → EXIT FULLSCREEN */
+/* DOUBLE‑PINCH → EXIT FULLSCREEN (custom event, not used by Meta) */
 document.addEventListener("emg-doublepinch", () => {
   if (playerSection.classList.contains("player-fullscreen")) {
-    exitFullBtn.click(); // instantly exit fullscreen
+    exitFullBtn.click();
     showHUD("Exited Fullscreen (Double‑Pinch)");
+  }
+});
+
+/* -----------------------------------------------------------
+   META RAY-BAN EMG DOUBLE-PINCH → ESCAPE FULLSCREEN
+   (System-level ESC/back event)
+----------------------------------------------------------- */
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+
+    // Exit REAL fullscreen (required for Ray-Ban EMG)
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    }
+
+    // Your UI cleanup
+    playerSection.classList.remove("player-fullscreen");
+    document.body.classList.remove("fullscreen-active");
+    disableCinemaMode();
+    showUIWithMiniPlayer();
+    showHUD("Exited Fullscreen (Ray‑Ban EMG)");
   }
 });
  
