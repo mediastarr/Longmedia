@@ -1628,11 +1628,24 @@ function initAudioGlow() {
 /* -----------------------------------------------------------
    PARALLAX / DEPTH ENGINE
 ----------------------------------------------------------- */
+/* -----------------------------------------------------------
+   PARALLAX / DEPTH ENGINE
+----------------------------------------------------------- */
 document.addEventListener("mousemove", (e) => {
   const x = (e.clientX / window.innerWidth) * 2 - 1;
   const y = (e.clientY / window.innerHeight) * 2 - 1;
 
   document.querySelectorAll(".parallax").forEach((el) => {
+
+    // ⭐ Skip playerSection in ANY fullscreen state
+    if (
+      el.id === "playerSection" &&
+      (playerSection.classList.contains("player-fullscreen") ||
+       document.body.classList.contains("cinema-mode"))
+    ) {
+      return;
+    }
+
     const depth = 8;
     el.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
   });
@@ -1644,6 +1657,8 @@ document.addEventListener("mousemove", (e) => {
 
   applyChroma(x, y);
 });
+
+
 
 /* -----------------------------------------------------------
    THEME TOGGLE
