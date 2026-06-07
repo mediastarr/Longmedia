@@ -204,11 +204,11 @@ body.light #searchTab {
   left: 50%;
   width: 140vw;
   height: 140vh;
-  transform: translate(-50%, -50%);
   margin: 0;
   border-radius: 0;
   z-index: 9999;
 }
+
 
 
 #playerFrame {
@@ -1098,12 +1098,14 @@ fullBtn.addEventListener("click", () => {
   playerSection.classList.add("player-fullscreen");
 
   document.body.classList.add("fullscreen-active");
-  enableCinemaMode();          
-  playCinemaZoomIntro();       // ⭐ REQUIRED — triggers the zoom intro animation
 
-  hideUIForVideo();
+  enableCinemaMode();      // adds .cinema + .cinema-mode
+  playCinemaZoomIntro();   // plays the IMAX intro
+
+  hideUIForVideo();        // hide UI AFTER animation triggers
   showHUD("Fullscreen");
 });
+
 
 
 
