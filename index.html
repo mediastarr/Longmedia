@@ -1069,20 +1069,16 @@ fullBtn.addEventListener("click", async () => {
   fullscreenLock = true;
   setTimeout(() => fullscreenLock = false, 400);
 
-  // Prevent fullscreen before video loads
   if (!playerFrame.src || playerFrame.src === "about:blank") {
     showHUD("Load a video first");
     return;
   }
 
-  // Ensure iframe is visible before fullscreen
   playerSection.style.display = "block";
   playerFrame.style.opacity = "1";
 
-  // Give YouTube iframe time to initialize
   await new Promise(r => setTimeout(r, 200));
 
-  // Enter REAL fullscreen
   try {
     await playerFrame.requestFullscreen();
   } catch (err) {
@@ -1091,16 +1087,15 @@ fullBtn.addEventListener("click", async () => {
     return;
   }
 
-  // Apply fullscreen UI
   playerSection.classList.add("player-fullscreen");
   enableCinemaMode();
   document.body.classList.add("fullscreen-active");
 
-  // Delay UI hide to prevent Ray‑Ban freeze
   setTimeout(() => hideUIForVideo(), 50);
 
   showHUD("Fullscreen");
 });
+
 
 
 
@@ -1305,7 +1300,6 @@ document.addEventListener("touchend", e => {
 ----------------------------------------------------------- */
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-
     if (document.fullscreenElement) {
       document.exitFullscreen();
     }
@@ -1317,6 +1311,7 @@ document.addEventListener("keydown", (e) => {
     showHUD("Exited Fullscreen (Ray‑Ban EMG)");
   }
 });
+
 
 
   
