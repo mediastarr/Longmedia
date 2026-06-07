@@ -1011,14 +1011,13 @@ fullBtn.addEventListener("click", () => {
   playerSection.classList.remove("player-mini");
   playerSection.classList.add("player-fullscreen");
 
-  document.body.classList.add("fullscreen-active");
-
-  enableCinemaMode();   // ⭐ THIS is the missing line
-  document.body.classList.add("fullscreen-active"); // ⭐ REQUIRED
+  enableCinemaMode();                     // ⭐ REQUIRED for curved screen
+  document.body.classList.add("fullscreen-active"); // ⭐ REQUIRED for back button
 
   hideUIForVideo();
   showHUD("Fullscreen");
 });
+
 
 
    /* -----------------------------------------------------------
@@ -1029,7 +1028,7 @@ const exitFullBtn = document.getElementById("exitFullBtn");
 exitFullBtn.addEventListener("click", () => {
   playerSection.classList.remove("player-fullscreen");
   document.body.classList.remove("fullscreen-active"); // ⭐ REQUIRED
-  disableCinemaMode();   // ⭐ required
+  disableCinemaMode();                                 // ⭐ REQUIRED
 
   if (miniActive) {
     playerSection.classList.add("player-mini");
@@ -1040,6 +1039,7 @@ exitFullBtn.addEventListener("click", () => {
 
   showHUD("Exited Fullscreen");
 });
+
 
 
 
