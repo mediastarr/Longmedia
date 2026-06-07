@@ -570,6 +570,7 @@ body.search-depth-mode #channelPage {
    /* -----------------------------------------------------------
    CINEMA MODE (Curved Screen + Darkened Environment)
 ----------------------------------------------------------- */
+/* CINEMA MODE */
 body.cinema-mode::before {
   content: "";
   position: fixed;
@@ -586,6 +587,12 @@ body.cinema-mode::before {
   transform: translate(-50%, -50%) perspective(900px) rotateX(6deg);
   box-shadow: 0 0 80px rgba(0,0,0,0.6);
 }
+
+/* BACK BUTTON VISIBILITY */
+body.fullscreen-active .exit-full-btn {
+  display: block;
+}
+
 
  /* -----------------------------------------------------------
    FULLSCREEN BACK BUTTON
@@ -1007,6 +1014,7 @@ fullBtn.addEventListener("click", () => {
   document.body.classList.add("fullscreen-active");
 
   enableCinemaMode();   // ⭐ THIS is the missing line
+  document.body.classList.add("fullscreen-active"); // ⭐ REQUIRED
 
   hideUIForVideo();
   showHUD("Fullscreen");
@@ -1020,6 +1028,7 @@ const exitFullBtn = document.getElementById("exitFullBtn");
 
 exitFullBtn.addEventListener("click", () => {
   playerSection.classList.remove("player-fullscreen");
+  document.body.classList.remove("fullscreen-active"); // ⭐ REQUIRED
   disableCinemaMode();   // ⭐ required
 
   if (miniActive) {
@@ -1216,6 +1225,7 @@ document.addEventListener("emg-doublepinch", () => {
     showHUD("Exited Fullscreen (Double‑Pinch)");
   }
 });
+ 
    
 /* -----------------------------------------------------------
    MOVIES
