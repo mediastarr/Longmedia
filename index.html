@@ -202,12 +202,13 @@ body.light #searchTab {
   position: fixed;
   top: 50%;
   left: 50%;
-  width: 140vw;
-  height: 140vh;
+  width: 92vw;
+  height: 72vh;
   margin: 0;
-  border-radius: 0;
+  border-radius: 20px;
   z-index: 9999;
   transform: translate(-50%, -50%);
+  overflow: hidden;
 
 }
 
@@ -583,9 +584,8 @@ body.cinema-mode::before {
   pointer-events: none;
 }
 
+/* ⭐ Cinema Mode curve + glow */
 #playerSection.player-fullscreen.cinema {
-  border-radius: 40px;
-  overflow: hidden;
   transform: translate(-50%, -50%) perspective(900px) rotateX(6deg);
   box-shadow: 0 0 80px rgba(0,0,0,0.6);
 }
