@@ -214,15 +214,15 @@ body.light #searchTab {
 
 
 #playerFrame {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   border: none;
-  display: block;
-
-  /* ⭐ Add this line ⭐ */
-  position: relative;
   z-index: 1;
 }
+
 
 /* -----------------------------------------------------------
    PLAYER CONTROLS
@@ -751,10 +751,11 @@ body.fullscreen-active .exit-full-btn {
   <!-- PLAYER -->
 <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
 
+   
     <iframe id="playerFrame"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowfullscreen>
-    </iframe>
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
+</iframe>
+
 
     <div class="player-controls">
       <button id="playPauseBtn">Pause</button>
@@ -1124,59 +1125,55 @@ function playCinemaZoomIntro() {
 /* -----------------------------------------------------------
    FULLSCREEN
 ----------------------------------------------------------- */
-fullBtn.addEventListener("click", () => {
-  if (playerSection.style.display === "none") return;
+document.addEventListener("DOMContentLoaded", () => {
 
-  playerSection.style.display = "block";
+  const fullBtn = document.getElementById("fullBtn");
+  const exitFullBtn = document.getElementById("exitFullBtn");
+  const playerSection = document.getElementById("playerSection");
 
-  miniActive = false;
-  playerSection.classList.remove("player-mini");
-  playerSection.classList.add("player-fullscreen");
+  fullBtn.addEventListener("click", () => {
+    if (playerSection.style.display === "none") return;
 
-  document.body.classList.add("fullscreen-active");
+    playerSection.style.display = "block";
+    miniActive = false;
+    playerSection.classList.remove("player-mini");
 
-  // ⭐ Delay Cinema Mode so the element is visible first
-  requestAnimationFrame(() => {
-    enableCinemaMode();
-    playCinemaZoomIntro();
+    playerSection.classList.add("player-fullscreen");
+    document.body.classList.add("fullscreen-active");
+
+    requestAnimationFrame(() => {
+      enableCinemaMode();
+      playCinemaZoomIntro();
+    });
+
+    hideUIForVideo();
+    showHUD("Fullscreen");
   });
 
-  hideUIForVideo();
-  showHUD("Fullscreen");
-});
-
-
-
-
   /* -----------------------------------------------------------
-   EXIT FULLSCREEN BUTTON
------------------------------------------------------------ */
-const exitFullBtn = document.getElementById("exitFullBtn");
-
-exitFullBtn.addEventListener("click", () => {
-  playerSection.classList.remove("player-fullscreen");
-  document.body.classList.remove("fullscreen-active");
-  disableCinemaMode();         // ⭐ turn Cinema Mode OFF
-
-  if (miniActive) {
-    playerSection.classList.add("player-mini");
-  }
-
-  showUIWithMiniPlayer();
-  showHUD("Exited Fullscreen");
-});
-
-/* -----------------------------------------------------------
-   ESC / RAY‑BAN EMG EXIT FULLSCREEN
------------------------------------------------------------ */
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
+     EXIT FULLSCREEN BUTTON
+  ----------------------------------------------------------- */
+  exitFullBtn.addEventListener("click", () => {
     playerSection.classList.remove("player-fullscreen");
     document.body.classList.remove("fullscreen-active");
+
     disableCinemaMode();
     showUIWithMiniPlayer();
-    showHUD("Exited Fullscreen (Ray‑Ban EMG)");
-  }
+  });
+
+  /* -----------------------------------------------------------
+     ESC / RAY‑BAN EMG EXIT FULLSCREEN
+  ----------------------------------------------------------- */
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      playerSection.classList.remove("player-fullscreen");
+      document.body.classList.remove("fullscreen-active");
+      disableCinemaMode();
+      showUIWithMiniPlayer();
+      showHUD("Exited Fullscreen (Ray‑Ban EMG)");
+    }
+  });
+
 });
 
 
