@@ -1297,16 +1297,7 @@ document.addEventListener("touchend", e => {
   if (Math.abs(dy) > 50) dy < 0 ? nextShort() : prevShort();
 });
 
-/* -----------------------------------------------------------
-   EMG GESTURES (Ray‑Ban Neural Wristband)
-   (Custom event — will NOT fire on Ray‑Ban Display)
------------------------------------------------------------ */
-document.addEventListener("emg-doublepinch", () => {
-  if (playerSection.classList.contains("player-fullscreen")) {
-    exitFullBtn.click();
-    showHUD("Exited Fullscreen (Double‑Pinch)");
-  }
-});
+
 
 /* -----------------------------------------------------------
    META RAY-BAN EMG DOUBLE-PINCH → ESCAPE FULLSCREEN
