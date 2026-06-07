@@ -594,7 +594,6 @@ body.cinema-mode::before {
 body.cinema-mode #playerSection {
   --audio-glow-opacity: 0.55 !important;
   --audio-glow-blur: 55px !important;
-
   --chroma-opacity: 0.45 !important;
   --chroma-blur: 18px !important;
 
@@ -1126,7 +1125,6 @@ function playCinemaZoomIntro() {
 fullBtn.addEventListener("click", () => {
   if (playerSection.style.display === "none") return;
 
-  // ⭐ PATCH 1 — REQUIRED
   playerSection.style.display = "block";
 
   miniActive = false;
@@ -1135,12 +1133,16 @@ fullBtn.addEventListener("click", () => {
 
   document.body.classList.add("fullscreen-active");
 
-  enableCinemaMode();
-  playCinemaZoomIntro();
+  // ⭐ Delay Cinema Mode so the element is visible first
+  requestAnimationFrame(() => {
+    enableCinemaMode();
+    playCinemaZoomIntro();
+  });
 
   hideUIForVideo();
   showHUD("Fullscreen");
 });
+
 
 
 
@@ -1267,11 +1269,16 @@ function setActiveTab(tab) {
 ----------------------------------------------------------- */
 homeTab.addEventListener("click", async () => {
   setActiveTab("home");
+
+  const timestamp = Date.now();
+
   const data = await fetchYouTube("videos", {
     part: "snippet,statistics",
     chart: "mostPopular",
-    maxResults: 25
+    maxResults: 25,
+    _: timestamp
   });
+
   renderFeed(data.items || []);
   showHUD("Home");
 });
@@ -1281,15 +1288,17 @@ homeTab.addEventListener("click", async () => {
 ----------------------------------------------------------- */
 trendingTab.addEventListener("click", async () => {
   setActiveTab("trending");
+
+  const timestamp = Date.now();
+
   const data = await fetchYouTube("videos", {
     part: "snippet,statistics",
     chart: "mostPopular",
     regionCode: "US",
-    maxResults: 25
+    maxResults: 25,
+    _: timestamp
   });
-  renderFeed(data.items || []);
-  showHUD("Trending");
-});
+
 
 /* -----------------------------------------------------------
    SHORTS
@@ -1297,14 +1306,18 @@ trendingTab.addEventListener("click", async () => {
 shortsTab.addEventListener("click", async () => {
   setActiveTab("shorts");
 
+  const timestamp = Date.now();
+
   const data = await fetchYouTube("search", {
     part: "snippet",
     q: "youtube shorts",
     type: "video",
     videoEmbeddable: "true",
     regionCode: "US",
-    maxResults: 25
+    maxResults: 25,
+    _: timestamp
   });
+
 
   shortsItems = data.items.map(v => ({
     id: v.id.videoId,
@@ -1358,14 +1371,18 @@ document.addEventListener("touchend", e => {
 moviesTab.addEventListener("click", async () => {
   setActiveTab("movies");
 
+  const timestamp = Date.now();
+
   const data = await fetchYouTube("search", {
     part: "snippet",
     q: "short film award winning",
     type: "video",
     videoEmbeddable: "true",
     regionCode: "US",
-    maxResults: 25
+    maxResults: 25,
+    _: timestamp
   });
+
 
   const items = data.items.map(v => ({
     id: v.id.videoId,
@@ -1428,11 +1445,15 @@ async function loadChannelPage(channelId) {
 
   channelUploadsId = channelInfo.contentDetails.relatedPlaylists.uploads;
 
-  const uploads = await fetchYouTube("playlistItems", {
-    part: "snippet",
-    playlistId: channelUploadsId,
-    maxResults: 20
-  });
+  const timestamp = Date.now();
+
+const uploads = await fetchYouTube("playlistItems", {
+  part: "snippet",
+  playlistId: channelUploadsId,
+  maxResults: 20,
+  _: timestamp
+});
+
 
   channelNextPageToken = uploads.nextPageToken || null;
 
@@ -1629,10 +1650,14 @@ themeToggle.addEventListener("click", () => {
    INITIAL LOAD
 ----------------------------------------------------------- */
 (async function init() {
+
+  const timestamp = Date.now();
+
   const data = await fetchYouTube("videos", {
     part: "snippet,statistics",
     chart: "mostPopular",
-    maxResults: 25
+    maxResults: 25,
+    _: timestamp
   });
 
   renderFeed(data.items || []);
