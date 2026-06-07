@@ -948,9 +948,20 @@ let currentChannelId = "UCoLDGQ7a81ep9SJqPlDs2sg";
 let channelNextPageToken = null;
 let channelUploadsId = null;
 
-let historyList = [];
+let historyList = JSON.parse(localStorage.getItem("historyList") || "[]");
+
 let shortsItems = [];
 let shortsIndex = 0;
+
+/* -----------------------------------------------------------
+   HISTORY SAVE FUNCTION (PATCH 3)
+----------------------------------------------------------- */
+function saveToHistory(video) {
+  historyList = historyList.filter(v => v.id !== video.id); // remove duplicates
+  historyList.unshift(video);                               // add to top
+  localStorage.setItem("historyList", JSON.stringify(historyList));
+}
+   
 
 /* -----------------------------------------------------------
    ELEMENTS
@@ -973,7 +984,7 @@ const shortsTab = document.getElementById("shortsTab");
 const moviesTab = document.getElementById("moviesTab");
 const historyTab = document.getElementById("historyTab");
 const trendingTab = document.getElementById("trendingTab");
-const channelTab = document.getElementById("channelTab");
+const channelTab = document.getElementById("channelTab");  
 
 const themeToggle = document.getElementById("themeToggle");
 const backBtn = document.getElementById("backBtn");
@@ -987,6 +998,28 @@ const closeMini = document.getElementById("closeMini");
 const searchInput = document.getElementById("searchInput");
 const searchGo = document.getElementById("searchGo");
 const searchBack = document.getElementById("searchBack");
+
+/* -----------------------------------------------------------
+   TAB CLICK ROUTING (PATCH 2)
+----------------------------------------------------------- */
+homeTab.onclick = () => loadTab("home");
+shortsTab.onclick = () => loadTab("shorts");
+moviesTab.onclick = () => loadTab("movies");
+historyTab.onclick = () => loadTab("history");
+trendingTab.onclick = () => loadTab("trending");
+channelTab.onclick = () => loadTab("channel");
+
+function loadTab(tab) {
+  setActiveTab(tab);
+  feedEl.innerHTML = "";
+
+  if (tab === "home") homeTab.click();
+  if (tab === "shorts") shortsTab.click();
+  if (tab === "movies") moviesTab.click();
+  if (tab === "history") historyTab.click();
+  if (tab === "trending") trendingTab.click();
+  if (tab === "channel") channelTab.click();
+}   
 
 /* -----------------------------------------------------------
    HUD
@@ -1007,8 +1040,8 @@ function setPlayerVideo(videoId, snippet) {
 
   playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
 
-  historyList.unshift({ id: videoId, snippet });
-  if (historyList.length > 50) historyList.pop();
+  saveToHistory({ id: videoId, snippet });
+
 
   hideUIForVideo();
   playPauseBtn.textContent = "Pause";
@@ -1093,19 +1126,21 @@ function playCinemaZoomIntro() {
 fullBtn.addEventListener("click", () => {
   if (playerSection.style.display === "none") return;
 
+  // ⭐ PATCH 1 — REQUIRED
+  playerSection.style.display = "block";
+
   miniActive = false;
   playerSection.classList.remove("player-mini");
   playerSection.classList.add("player-fullscreen");
 
   document.body.classList.add("fullscreen-active");
 
-  enableCinemaMode();      // adds .cinema + .cinema-mode
-  playCinemaZoomIntro();   // plays the IMAX intro
+  enableCinemaMode();
+  playCinemaZoomIntro();
 
-  hideUIForVideo();        // hide UI AFTER animation triggers
+  hideUIForVideo();
   showHUD("Fullscreen");
 });
-
 
 
 
@@ -1434,7 +1469,7 @@ async function fetchSuggestions(q) {
     part: "snippet",
     q,
     type: "video",
-    maxResults: 8
+    maxResults: 20
   });
   return data.items?.map(v => v.snippet.title) || [];
 }
