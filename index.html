@@ -1037,19 +1037,22 @@ function showHUD(text) {
 ----------------------------------------------------------- */
 function setPlayerVideo(videoId, snippet) {
   currentVideoId = videoId;
+
+  // Reset all player states
   playerSection.style.display = "block";
-  playerSection.classList.remove("player-mini", "player-fullscreen");
+  playerSection.classList.remove("player-mini", "player-fullscreen", "cinema", "zoom-intro");
+  document.body.classList.remove("cinema-mode");
 
   playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
 
   saveToHistory({ id: videoId, snippet });
-
 
   hideUIForVideo();
   playPauseBtn.textContent = "Pause";
 
   initAudioGlow();
 }
+
 
 /* -----------------------------------------------------------
    UI HIDE/SHOW
@@ -1063,6 +1066,9 @@ function hideUIForVideo() {
   channelPageEl.style.display = "none";
   keyboardEl.style.display = "none";
   suggestionsEl.style.display = "none";
+  document.querySelector(".player-controls").style.opacity = "0";
+  document.querySelector(".player-controls").style.pointerEvents = "none";
+
 }
 
 function showUIWithMiniPlayer() {
@@ -1076,6 +1082,9 @@ function showUIWithMiniPlayer() {
   } else {
     feedEl.style.display = "block";
     channelPageEl.style.display = "none";
+    document.querySelector(".player-controls").style.opacity = "1";
+    document.querySelector(".player-controls").style.pointerEvents = "auto";
+
   }
 }
 
