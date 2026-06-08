@@ -219,12 +219,21 @@ body.light #searchTab {
   top: 50%;
   left: 50%;
   width: 96vw;              /* ⭐ Ultra-wide Vision Pro window */
-  height: 68vh;             /* ⭐ Slightly shorter for IMAX curve */
-  transform: translate(-50%, -50%);
+  height: 64vh !important;
+  transform-origin: center center;
   border-radius: 22px;      /* ⭐ Vision Pro rounded corners */
   overflow: hidden !important;
   background: black;
   z-index: 9999;
+}
+
+/* -----------------------------------------------------------
+   RAY‑BAN SAFE OVERFLOW PATCH
+----------------------------------------------------------- */
+#playerSection.player-fullscreen,
+#playerSection.player-fullscreen *,
+#playerFrame {
+  overflow: hidden !important;
 }
 
 
@@ -777,8 +786,12 @@ body.fullscreen-active .exit-full-btn {
 
    
     <iframe id="playerFrame"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
-</iframe>
+      src=""
+      frameborder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      allowfullscreen>
+    </iframe>
+
 
 
     <div class="player-controls">
@@ -1314,9 +1327,7 @@ homeTab.addEventListener("click", async () => {
   showHUD("Home");
 });
 
-/* -----------------------------------------------------------
-   TRENDING
------------------------------------------------------------ */
+
 /* -----------------------------------------------------------
    TRENDING
 ----------------------------------------------------------- */
@@ -1689,8 +1700,8 @@ document.addEventListener("mousemove", (e) => {
 document.addEventListener("mousemove", (e) => {
   if (!playerSection.classList.contains("player-fullscreen")) return;
 
-  const x = (e.clientX / window.innerWidth - 0.5) * 3;  // ⭐ Subtle Vision Pro tilt
-  const y = (e.clientY / window.innerHeight - 0.5) * -2;
+  const x = (e.clientX / window.innerWidth - 0.5) * 1.2;  // ⭐ Subtle Vision Pro tilt
+  const y = (e.clientY / window.innerHeight - 0.5) * -0.81;
 
   playerSection.style.transform =
     `translate(-50%, -50%)
