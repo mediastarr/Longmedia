@@ -202,7 +202,7 @@ body.light #searchTab {
   position: fixed;
   top: 50%;
   left: 50%;
-  width: 140vw;
+  width: 130vw;
   height: 110vh;
   margin: 0;
   border-radius: 0;
@@ -953,11 +953,6 @@ let historyList = JSON.parse(localStorage.getItem("historyList") || "[]");
 let shortsItems = [];
 let shortsIndex = 0;
 
-/* ⭐ INFINITE SCROLL STATE ⭐ */
-let nextPageToken = null;     // pagination token for all tabs
-let isLoadingMore = false;    // prevents double-loading
-
-
 /* -----------------------------------------------------------
    HISTORY SAVE FUNCTION (PATCH 3)
 ----------------------------------------------------------- */
@@ -1242,41 +1237,6 @@ function renderFeed(items) {
   });
 }
 
-
-/* -----------------------------------------------------------
-   ⭐ APPEND FEED (STEP 5)
------------------------------------------------------------ */
-function appendFeed(items) {
-  items.forEach((item) => {
-    const snippet = item.snippet || {};
-    const stats = item.statistics || {};
-    const videoId = item.id?.videoId || item.id;
-
-    const card = document.createElement("div");
-    card.className = "video-card parallax";
-
-    card.innerHTML = `
-      <div class="video-thumb">
-        <img src="${snippet.thumbnails?.high?.url || ""}">
-      </div>
-      <div class="video-info">
-        <div class="video-title">${snippet.title}</div>
-        <div class="video-channel">${snippet.channelTitle}</div>
-        <div class="video-meta">${stats.viewCount || 0} views</div>
-      </div>
-    `;
-
-    card.onclick = () => {
-      setPlayerVideo(videoId, snippet);
-      showHUD("Playing: " + snippet.title);
-    };
-
-    feedEl.appendChild(card);
-  });
-}
-
-
-   
 /* -----------------------------------------------------------
    TABS
 ----------------------------------------------------------- */
@@ -1307,43 +1267,29 @@ function setActiveTab(tab) {
 ----------------------------------------------------------- */
 homeTab.addEventListener("click", async () => {
   setActiveTab("home");
-
   const data = await fetchYouTube("videos", {
-    part: "snippet,statistics,contentDetails",
+    part: "snippet,statistics",
     chart: "mostPopular",
-    regionCode: "US",
-    maxResults: 50,
-    _: Date.now()
+    maxResults: 50
   });
-
-  nextPageToken = data.nextPageToken || null;
-
   renderFeed(data.items || []);
   showHUD("Home");
 });
-
-
 
 /* -----------------------------------------------------------
    TRENDING
 ----------------------------------------------------------- */
 trendingTab.addEventListener("click", async () => {
   setActiveTab("trending");
-
   const data = await fetchYouTube("videos", {
-    part: "snippet,statistics,contentDetails",
+    part: "snippet,statistics",
     chart: "mostPopular",
     regionCode: "US",
-    maxResults: 50,
-    _: Date.now()
+    maxResults: 50
   });
-
-   nextPageToken = data.nextPageToken || null;
-
   renderFeed(data.items || []);
   showHUD("Trending");
 });
-
 
 /* -----------------------------------------------------------
    SHORTS
@@ -1353,13 +1299,11 @@ shortsTab.addEventListener("click", async () => {
 
   const data = await fetchYouTube("search", {
     part: "snippet",
-    q: "shorts funny trending viral"
+    q: "youtube shorts",
     type: "video",
-    videoDuration: "short",
     videoEmbeddable: "true",
     regionCode: "US",
-    maxResults: 50,
-    _: Date.now()
+    maxResults: 30
   });
 
   shortsItems = data.items.map(v => ({
@@ -1368,13 +1312,9 @@ shortsTab.addEventListener("click", async () => {
   }));
 
   shortsIndex = 0;
-  nextPageToken = data.nextPageToken || null;   // ⭐ REQUIRED for infinite scroll
-
   renderFeed(shortsItems);
   showHUD("Shorts");
 });
-
-
 
 function playShortAt(i) {
   if (!shortsItems[i]) return;
@@ -1420,15 +1360,12 @@ moviesTab.addEventListener("click", async () => {
 
   const data = await fetchYouTube("search", {
     part: "snippet",
-    q: "full movie",
+    q: "short film award winning",
     type: "video",
-    videoDuration: "long",
     videoEmbeddable: "true",
-    maxResults: 50,
-    _: Date.now()
+    regionCode: "US",
+    maxResults: 50
   });
-
-   nextPageToken = data.nextPageToken || null;
 
   const items = data.items.map(v => ({
     id: v.id.videoId,
@@ -1436,9 +1373,8 @@ moviesTab.addEventListener("click", async () => {
   }));
 
   renderFeed(items);
-  showHUD("Movies");
+  showHUD("Short Films");
 });
-
 
 /* -----------------------------------------------------------
    HISTORY
@@ -1446,7 +1382,7 @@ moviesTab.addEventListener("click", async () => {
 historyTab.addEventListener("click", () => {
   setActiveTab("history");
 
-  const items = historyList.slice(0, 50).map(h => ({
+  const items = historyList.map(h => ({
     id: h.id,
     snippet: h.snippet,
     statistics: { viewCount: "watched" }
@@ -1455,7 +1391,6 @@ historyTab.addEventListener("click", () => {
   renderFeed(items);
   showHUD("History");
 });
-
 
 /* -----------------------------------------------------------
    CHANNEL PAGE
@@ -1496,7 +1431,7 @@ async function loadChannelPage(channelId) {
   const uploads = await fetchYouTube("playlistItems", {
     part: "snippet",
     playlistId: channelUploadsId,
-    maxResults: 20
+    maxResults: 50
   });
 
   channelNextPageToken = uploads.nextPageToken || null;
@@ -1526,107 +1461,6 @@ async function loadChannelPage(channelId) {
 }
 
 /* -----------------------------------------------------------
-   ⭐ LOAD MORE VIDEOS (STEP 4)
------------------------------------------------------------ */
-async function loadMoreVideos() {
-  if (!nextPageToken) return;
-
-  let data;
-
-  if (currentTab === "home") {
-    data = await fetchYouTube("videos", {
-      part: "snippet,statistics,contentDetails",
-      chart: "mostPopular",
-      regionCode: "US",
-      maxResults: 50,
-      pageToken: nextPageToken,
-      _: Date.now()
-    });
-  }
-
-  if (currentTab === "shorts") {
-    data = await fetchYouTube("search", {
-      part: "snippet",
-      type: "video",
-      videoDuration: "short",
-      videoEmbeddable: "true",
-      maxResults: 50,
-      pageToken: nextPageToken,
-      _: Date.now()
-    });
-  }
-
-  if (currentTab === "movies") {
-    data = await fetchYouTube("search", {
-      part: "snippet",
-      q: "full movie",
-      type: "video",
-      videoDuration: "long",
-      videoEmbeddable: "true",
-      maxResults: 50,
-      pageToken: nextPageToken,
-      _: Date.now()
-    });
-  }
-
-  if (currentTab === "trending") {
-    data = await fetchYouTube("videos", {
-      part: "snippet,statistics,contentDetails",
-      chart: "mostPopular",
-      regionCode: "US",
-      maxResults: 50,
-      pageToken: nextPageToken,
-      _: Date.now()
-    });
-  }
-
-  if (currentTab === "search") {
-    data = await fetchYouTube("search", {
-      part: "snippet",
-      q: lastSearchQuery,
-      type: "video",
-      maxResults: 50,
-      pageToken: nextPageToken,
-      _: Date.now()
-    });
-  }
-
-  if (currentTab === "channel") {
-    data = await fetchYouTube("playlistItems", {
-      part: "snippet",
-      playlistId: channelUploadsId,
-      maxResults: 50,
-      pageToken: nextPageToken,
-      _: Date.now()
-    });
-  }
-
-  nextPageToken = data.nextPageToken || null;
-
-  appendFeed(data.items || []);
-}
-
-
-   
-
-/* -----------------------------------------------------------
-   ⭐ INFINITE SCROLL LISTENER (STEP 3)
------------------------------------------------------------ */
-window.addEventListener("scroll", async () => {
-  if (isLoadingMore) return;
-  if (!nextPageToken) return;
-
-  const scrollPos = window.innerHeight + window.scrollY;
-  const bottom = document.body.offsetHeight - 200;
-
-  if (scrollPos >= bottom) {
-    isLoadingMore = true;
-    await loadMoreVideos();
-    isLoadingMore = false;
-  }
-});   
-
-/* -----------------------------------------------------------
    SEARCH + SUGGESTIONS
 ----------------------------------------------------------- */
 async function fetchSuggestions(q) {
@@ -1635,7 +1469,7 @@ async function fetchSuggestions(q) {
     part: "snippet",
     q,
     type: "video",
-    maxResults: 20
+    maxResults: 50
   });
   return data.items?.map(v => v.snippet.title) || [];
 }
@@ -1717,8 +1551,7 @@ function triggerSearch(q) {
       part: "snippet",
       q,
       type: "video",
-      maxResults: 50,
-      _: Date.now()
+      maxResults: 50
     });
 
     renderFeed(data.items || []);
@@ -1726,7 +1559,6 @@ function triggerSearch(q) {
     showHUD("Search: " + q);
   })();
 }
-
 
 /* -----------------------------------------------------------
    HOLOGRAPHIC EFFECTS
