@@ -342,6 +342,27 @@ body.light #searchTab {
     filter 0.15s ease-out;
 }
 
+/* ⭐ Ambient Occlusion Layer */
+.video-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  z-index: -2;
+
+  background: radial-gradient(
+    circle at 50% 60%,
+    rgba(0,0,0,0.35),
+    rgba(0,0,0,0.0) 70%
+  );
+
+  opacity: var(--ao-opacity, 0.35);
+  filter: blur(var(--ao-blur, 22px));
+
+  transition:
+    opacity 0.2s ease-out,
+    filter 0.2s ease-out;
+}
 
    
 .video-thumb {
@@ -1817,6 +1838,17 @@ document.addEventListener("mousemove", (e) => {
     card.style.setProperty("--shadow-y", `${shadowY}px`);
     card.style.setProperty("--shadow-blur", `${blur}px`);
     card.style.setProperty("--shadow-opacity", opacity);
+  });
+
+  // ⭐ Ambient Occlusion depth response
+  document.querySelectorAll(".video-card").forEach((card) => {
+    const isHover = card.matches(":hover");
+
+    const aoOpacity = isHover ? 0.22 : 0.35;
+    const aoBlur = isHover ? 32 : 22;
+
+    card.style.setProperty("--ao-opacity", aoOpacity);
+    card.style.setProperty("--ao-blur", `${aoBlur}px`);
   });
 
   applyChroma(x, y);
