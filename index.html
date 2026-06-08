@@ -954,6 +954,8 @@ let historyList = JSON.parse(localStorage.getItem("historyList") || "[]");
 
 let shortsItems = [];
 let shortsIndex = 0;
+let lastSearchQuery = "";
+
 
 /* ⭐ INFINITE SCROLL STATE ⭐ */
 let nextPageToken = null;     // pagination token for all tabs
@@ -1007,27 +1009,6 @@ const searchInput = document.getElementById("searchInput");
 const searchGo = document.getElementById("searchGo");
 const searchBack = document.getElementById("searchBack");
 
-/* -----------------------------------------------------------
-   TAB CLICK ROUTING (PATCH 2)
------------------------------------------------------------ */
-homeTab.onclick = () => loadTab("home");
-shortsTab.onclick = () => loadTab("shorts");
-moviesTab.onclick = () => loadTab("movies");
-historyTab.onclick = () => loadTab("history");
-trendingTab.onclick = () => loadTab("trending");
-channelTab.onclick = () => loadTab("channel");
-
-function loadTab(tab) {
-  setActiveTab(tab);
-  feedEl.innerHTML = "";
-
-  if (tab === "home") homeTab.click();
-  if (tab === "shorts") shortsTab.click();
-  if (tab === "movies") moviesTab.click();
-  if (tab === "history") historyTab.click();
-  if (tab === "trending") trendingTab.click();
-  if (tab === "channel") channelTab.click();
-}   
 
 /* -----------------------------------------------------------
    HUD
@@ -1305,7 +1286,7 @@ function setActiveTab(tab) {
 }
 
 /* -----------------------------------------------------------
-   HOME TAB
+   HOME TAB — 50 fresh videos
 ----------------------------------------------------------- */
 homeTab.addEventListener("click", async () => {
   setActiveTab("home");
@@ -1325,9 +1306,8 @@ homeTab.addEventListener("click", async () => {
 });
 
 
-
 /* -----------------------------------------------------------
-   TRENDING
+   TRENDING TAB — 50 trending videos
 ----------------------------------------------------------- */
 trendingTab.addEventListener("click", async () => {
   setActiveTab("trending");
@@ -1348,7 +1328,7 @@ trendingTab.addEventListener("click", async () => {
 
 
 /* -----------------------------------------------------------
-   SHORTS
+   SHORTS TAB — real Shorts feed (fixed)
 ----------------------------------------------------------- */
 shortsTab.addEventListener("click", async () => {
   setActiveTab("shorts");
@@ -1370,52 +1350,15 @@ shortsTab.addEventListener("click", async () => {
   }));
 
   shortsIndex = 0;
-  nextPageToken = data.nextPageToken || null;   // ⭐ REQUIRED for infinite scroll
+  nextPageToken = data.nextPageToken || null;
 
   renderFeed(shortsItems);
   showHUD("Shorts");
 });
 
 
-
-function playShortAt(i) {
-  if (!shortsItems[i]) return;
-  const item = shortsItems[i];
-  setPlayerVideo(item.id, item.snippet);
-}
-
-function nextShort() {
-  if (shortsIndex < shortsItems.length - 1) {
-    shortsIndex++;
-    playShortAt(shortsIndex);
-  }
-}
-
-function prevShort() {
-  if (shortsIndex > 0) {
-    shortsIndex--;
-    playShortAt(shortsIndex);
-  }
-}
-
-let touchStartY = null;
-document.addEventListener("touchstart", e => {
-  if (currentTab !== "shorts") return;
-  touchStartY = e.touches[0].clientY;
-});
-
-document.addEventListener("touchend", e => {
-  if (currentTab !== "shorts") return;
-  const dy = e.changedTouches[0].clientY - touchStartY;
-  if (Math.abs(dy) > 50) dy < 0 ? nextShort() : prevShort();
-});
-
 /* -----------------------------------------------------------
-   EMG GESTURES (Ray‑Ban Neural Wristband)
------------------------------------------------------------ */
-   
-/* -----------------------------------------------------------
-   MOVIES
+   MOVIES TAB — real long-form movies
 ----------------------------------------------------------- */
 moviesTab.addEventListener("click", async () => {
   setActiveTab("movies");
@@ -1426,28 +1369,25 @@ moviesTab.addEventListener("click", async () => {
     type: "video",
     videoDuration: "long",
     videoEmbeddable: "true",
+    regionCode: "US",
     maxResults: 50,
     _: Date.now()
   });
-
-  nextPageToken = data.nextPageToken || null;
 
   const items = data.items.map(v => ({
     id: v.id.videoId,
     snippet: v.snippet
   }));
 
+  nextPageToken = data.nextPageToken || null;
+
   renderFeed(items);
   showHUD("Movies");
 });
 
 
-  renderFeed(items);
-  showHUD("Short Films");
-});
-
 /* -----------------------------------------------------------
-   HISTORY
+   HISTORY TAB — watched videos
 ----------------------------------------------------------- */
 historyTab.addEventListener("click", () => {
   setActiveTab("history");
@@ -1458,22 +1398,23 @@ historyTab.addEventListener("click", () => {
     statistics: { viewCount: "watched" }
   }));
 
-  nextPageToken = data.nextPageToken || null;
- 
+  nextPageToken = null; // no infinite scroll for history
+
   renderFeed(items);
   showHUD("History");
 });
 
 
 /* -----------------------------------------------------------
-   CHANNEL PAGE
+   CHANNEL TAB — channel uploads
 ----------------------------------------------------------- */
 channelTab.addEventListener("click", () => {
   loadChannelPage(currentChannelId);
 });
 
+
 /* -----------------------------------------------------------
-   ⭐ LOAD MORE VIDEOS 
+   ⭐ LOAD MORE VIDEOS (STEP 4)
 ----------------------------------------------------------- */
 async function loadMoreVideos() {
   if (!nextPageToken) return;
@@ -1494,6 +1435,7 @@ async function loadMoreVideos() {
   if (currentTab === "shorts") {
     data = await fetchYouTube("search", {
       part: "snippet",
+      q: "shorts",
       type: "video",
       videoDuration: "short",
       videoEmbeddable: "true",
@@ -1552,6 +1494,7 @@ async function loadMoreVideos() {
 
   appendFeed(data.items || []);
 }
+
  
 /* -----------------------------------------------------------
    ⭐ INFINITE SCROLL LISTENER (STEP 3)
@@ -1608,6 +1551,8 @@ async function loadChannelPage(channelId) {
 
 
   channelNextPageToken = uploads.nextPageToken || null;
+  nextPageToken = uploads.nextPageToken || null;
+
 
   uploads.items.forEach(item => {
     const snippet = item.snippet;
@@ -1719,6 +1664,8 @@ keyboardEl.addEventListener("click", async (e) => {
 });
 
 function triggerSearch(q) {
+  lastSearchQuery = q;   // ⭐ STORE THE QUERY FOR INFINITE SCROLL
+
   (async () => {
     const data = await fetchYouTube("search", {
       part: "snippet",
@@ -1728,11 +1675,14 @@ function triggerSearch(q) {
       _: Date.now()
     });
 
+    nextPageToken = data.nextPageToken || null;
+
     renderFeed(data.items || []);
     closeKeyboard();
     showHUD("Search: " + q);
   })();
 }
+
 
 
 /* -----------------------------------------------------------
