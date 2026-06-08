@@ -220,6 +220,12 @@ body.light #searchTab {
   background: black;
 }
 
+#playerSection.player-fullscreen #playerFrame {
+  width: 100%;
+  height: 100%;
+}
+
+   
 #playerFrame {
   width: 100%;
   height: 100%;
@@ -665,9 +671,10 @@ body.cinema-mode::before {
 #playerSection.player-fullscreen.cinema {
   border-radius: 40px;
   overflow: hidden;
-  transform: translate(-50%, -50%) perspective(900px) rotateX(6deg);
+  transform: perspective(900px) rotateX(6deg); /* ⭐ REMOVE translate(-50%, -50%) */
   box-shadow: 0 0 80px rgba(0,0,0,0.6);
 }
+
 
 /* -----------------------------------------------------------
    CINEMA MODE — AMBIENT GLOW BOOST
@@ -717,7 +724,6 @@ body.cinema-mode #playerSection {
 @keyframes cinemaZoomIntro {
   0% {
     transform:
-      translate(-50%, -50%)
       scale(0.88)
       perspective(900px)
       rotateX(0deg);
@@ -727,7 +733,6 @@ body.cinema-mode #playerSection {
 
   60% {
     transform:
-      translate(-50%, -50%)
       scale(1.03)
       perspective(900px)
       rotateX(4deg);
@@ -737,7 +742,6 @@ body.cinema-mode #playerSection {
 
   100% {
     transform:
-      translate(-50%, -50%)
       scale(1)
       perspective(900px)
       rotateX(6deg);
@@ -745,6 +749,7 @@ body.cinema-mode #playerSection {
     filter: brightness(1);
   }
 }
+
 
 /* Apply animation ONLY when Cinema Mode activates */
 #playerSection.player-fullscreen.cinema.zoom-intro {
