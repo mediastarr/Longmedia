@@ -314,6 +314,35 @@ body.light #searchTab {
   transition: transform 0.15s ease-out, box-shadow 0.2s ease-out;
 }
    
+
+/* ⭐ Depth‑Layered Holographic Shadow */
+.video-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  z-index: -1;
+
+  transform: translate(
+    var(--shadow-x, 0px),
+    var(--shadow-y, 0px)
+  );
+
+  filter: blur(var(--shadow-blur, 18px));
+  opacity: var(--shadow-opacity, 0.55);
+
+  box-shadow:
+    0 12px 28px rgba(0,0,0,0.45),
+    0 0 22px rgba(60,242,255,0.12),
+    0 0 40px rgba(120,60,255,0.10);
+
+  transition:
+    transform 0.15s ease-out,
+    opacity 0.15s ease-out,
+    filter 0.15s ease-out;
+}
+
+
    
 .video-thumb {
   flex: 0 0 140px;
@@ -1755,30 +1784,44 @@ document.addEventListener("mousemove", (e) => {
   });
 
   // ⭐ IMAX tilt + Hover Intensity Boost
-document.querySelectorAll(".video-card").forEach((card) => {
-  const tiltX = y * -8;
-  const tiltY = x * 8;
-  const shiftX = x * 12;
-  const shiftY = y * 12;
+  document.querySelectorAll(".video-card").forEach((card) => {
+    const tiltX = y * -8;
+    const tiltY = x * 8;
+    const shiftX = x * 12;
+    const shiftY = y * 12;
 
-  // If hovered, amplify the effect
-  const isHover = card.matches(":hover");
-  const boost = isHover ? 1.6 : 1;   // ⭐ 60% stronger tilt on hover
-  const lift = isHover ? 18 : 0;     // ⭐ Z-lift on hover
+    const isHover = card.matches(":hover");
+    const boost = isHover ? 1.6 : 1;
+    const lift = isHover ? 18 : 0;
 
-  card.style.transform = `
-    perspective(1100px)
-    rotateX(${tiltX * boost}deg)
-    rotateY(${tiltY * boost}deg)
-    translateX(${shiftX}px)
-    translateY(${shiftY}px)
-    translateZ(${lift}px)
-  `;
-});
+    card.style.transform = `
+      perspective(1100px)
+      rotateX(${tiltX * boost}deg)
+      rotateY(${tiltY * boost}deg)
+      translateX(${shiftX}px)
+      translateY(${shiftY}px)
+      translateZ(${lift}px)
+    `;
+  });
 
+  // ⭐ Depth‑reactive holographic shadow
+  document.querySelectorAll(".video-card").forEach((card) => {
+    const shadowX = x * 14;
+    const shadowY = y * 14;
+
+    const isHover = card.matches(":hover");
+    const blur = isHover ? 28 : 18;
+    const opacity = isHover ? 0.75 : 0.55;
+
+    card.style.setProperty("--shadow-x", `${shadowX}px`);
+    card.style.setProperty("--shadow-y", `${shadowY}px`);
+    card.style.setProperty("--shadow-blur", `${blur}px`);
+    card.style.setProperty("--shadow-opacity", opacity);
+  });
 
   applyChroma(x, y);
 });
+
 
 
 /* -----------------------------------------------------------
