@@ -1353,15 +1353,14 @@ shortsTab.addEventListener("click", async () => {
 
   const data = await fetchYouTube("search", {
     part: "snippet",
-    q: "",
+    q: "shorts funny trending viral"
     type: "video",
     videoDuration: "short",
     videoEmbeddable: "true",
+    regionCode: "US",
     maxResults: 50,
     _: Date.now()
   });
-
-   nextPageToken = data.nextPageToken || null;
 
   shortsItems = data.items.map(v => ({
     id: v.id.videoId,
@@ -1369,9 +1368,12 @@ shortsTab.addEventListener("click", async () => {
   }));
 
   shortsIndex = 0;
+  nextPageToken = data.nextPageToken || null;   // ⭐ REQUIRED for infinite scroll
+
   renderFeed(shortsItems);
   showHUD("Shorts");
 });
+
 
 
 function playShortAt(i) {
@@ -1471,8 +1473,6 @@ async function loadChannelPage(channelId) {
     id: channelId
   });
 
-   nextPageToken = data.nextPageToken || null;
-
   const channelInfo = info.items?.[0];
   if (!channelInfo) return;
 
@@ -1494,12 +1494,10 @@ async function loadChannelPage(channelId) {
   channelUploadsId = channelInfo.contentDetails.relatedPlaylists.uploads;
 
   const uploads = await fetchYouTube("playlistItems", {
-  part: "snippet",
-  playlistId: channelUploadsId,
-  maxResults: 50,
-  _: Date.now()
-});
-
+    part: "snippet",
+    playlistId: channelUploadsId,
+    maxResults: 20
+  });
 
   channelNextPageToken = uploads.nextPageToken || null;
 
@@ -1526,7 +1524,6 @@ async function loadChannelPage(channelId) {
 
   showHUD("Channel Loaded");
 }
-
 
 /* -----------------------------------------------------------
    ⭐ LOAD MORE VIDEOS (STEP 4)
