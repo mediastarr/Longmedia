@@ -300,6 +300,21 @@ body.light #searchTab {
   position: relative;
 }
 
+.video-card {
+  transform-style: preserve-3d;
+  perspective: 1100px;
+  transition: transform 0.15s ease-out;
+}
+
+/* ⭐ Hover Intensity Boost */
+.video-card:hover {
+  transform: translateZ(22px) scale(1.03);
+  box-shadow: 0 0 28px rgba(60,242,255,0.35),
+              0 0 55px rgba(60,242,255,0.18);
+  transition: transform 0.15s ease-out, box-shadow 0.2s ease-out;
+}
+   
+   
 .video-thumb {
   flex: 0 0 140px;
   height: 80px;
@@ -1728,6 +1743,7 @@ document.addEventListener("mousemove", (e) => {
   const x = (e.clientX / window.innerWidth) * 2 - 1;
   const y = (e.clientY / window.innerHeight) * 2 - 1;
 
+  // existing parallax
   document.querySelectorAll(".parallax").forEach((el) => {
     const depth = 8;
     el.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
@@ -1738,8 +1754,32 @@ document.addEventListener("mousemove", (e) => {
     el.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
   });
 
+  // ⭐ IMAX tilt + Hover Intensity Boost
+document.querySelectorAll(".video-card").forEach((card) => {
+  const tiltX = y * -8;
+  const tiltY = x * 8;
+  const shiftX = x * 12;
+  const shiftY = y * 12;
+
+  // If hovered, amplify the effect
+  const isHover = card.matches(":hover");
+  const boost = isHover ? 1.6 : 1;   // ⭐ 60% stronger tilt on hover
+  const lift = isHover ? 18 : 0;     // ⭐ Z-lift on hover
+
+  card.style.transform = `
+    perspective(1100px)
+    rotateX(${tiltX * boost}deg)
+    rotateY(${tiltY * boost}deg)
+    translateX(${shiftX}px)
+    translateY(${shiftY}px)
+    translateZ(${lift}px)
+  `;
+});
+
+
   applyChroma(x, y);
 });
+
 
 /* -----------------------------------------------------------
    THEME TOGGLE
