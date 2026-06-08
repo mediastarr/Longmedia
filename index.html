@@ -15,6 +15,14 @@ html, body {
   overflow-y: hidden !important;
 }
 
+.app-shell {
+  overflow: hidden !important;
+}
+
+#playerSection {
+  overflow: hidden !important;
+}
+
 
    
 /* -----------------------------------------------------------
@@ -244,7 +252,8 @@ body.light #searchTab {
 body.fullscreen-active {
   overflow: hidden !important;
   height: 100vh !important;
-  background: black !important; /* Ensures full black backdrop */
+  background: transparent !important;
+
 }
 
    
@@ -626,7 +635,7 @@ body.cinema-mode::before {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.40);   /* ⭐ Soft dim, not blackout */
-  backdrop-filter: blur(12px);   /* ⭐ Vision Pro environment blur */
+  backdrop-filter: blur(0px);   /* ⭐ Vision Pro environment blur */
   z-index: 9997;                 /* ⭐ Below player, above room */
   pointer-events: auto; /* ⭐ FIX: block clicks */
 }
@@ -649,6 +658,18 @@ body.cinema-mode .buttons {
   pointer-events: none;
   transition: opacity 0.25s ease;
 }
+
+body.fullscreen-active #topbar,
+body.fullscreen-active #searchTab,
+body.fullscreen-active #tabs,
+body.fullscreen-active #feed,
+body.fullscreen-active #channelPage,
+body.fullscreen-active #searchPanel,
+body.fullscreen-active #keyboard,
+body.fullscreen-active #suggestions {
+  display: none !important;
+}
+
    
 /* -----------------------------------------------------------
    VISION PRO IMAX — CINEMA MODE CURVE + GLOW + DEPTH
@@ -1231,8 +1252,7 @@ window.addEventListener("load", () => {
     document.body.classList.add("fullscreen-active");
 
     requestAnimationFrame(() => {
-      enableCinemaMode();
-      playCinemaZoomIntro();
+      playCinemaZoomIntro(); // keep the zoom animation
     });
 
     hideUIForVideo();
