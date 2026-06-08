@@ -6,41 +6,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <style>
-
 /* -----------------------------------------------------------
-   GLOBAL SCROLLBAR LOCK (Fixes Ray‑Ban fullscreen scrollbar)
------------------------------------------------------------ */
-html, body {
-  overflow-x: hidden !important;
-  overflow-y: hidden !important;
-}
-
-body, html {
-  height: 100%;
-}
-
-   
-.app-shell {
-  height: 100%;
-  overflow: hidden !important;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-
-
-#playerSection {
-  overflow: hidden !important;
-}
-
-
-   
-/* -----------------------------------------------------------
-   GLOBAL THEME + CINEMA MODE VARIABLES
+   GLOBAL THEME
 ----------------------------------------------------------- */
 :root {
-  /* Theme */
   --bg-dark: #05060a;
   --bg-light: #f4f5fb;
   --accent: #3cf2ff;
@@ -49,25 +18,14 @@ body, html {
   --shadow-soft: 0 18px 40px rgba(0,0,0,0.45);
   --shadow-strong: 0 26px 70px rgba(0,0,0,0.75);
   --shadow-glow: 0 0 40px rgba(60,242,255,0.65);
-
-  /* Cinema Mode */
-  --cinema-curve: 8deg;
-  --cinema-perspective: 1200px;
-  --cinema-glow-size: 120px;
-  --cinema-glow-strength: 0.28;
-  --cinema-shadow-y: 26px;
-  --cinema-shadow-blur: 60px;
-  --cinema-shadow-strength: 0.35;
-  --cinema-zoom-speed: 0.65s;
-  --cinema-dim: 0.40;
-  --cinema-blur: 12px;
-  --parallax-strength-x: 3;
-  --parallax-strength-y: 2;
 }
 
-/* -----------------------------------------------------------
-   BODY STYLES
------------------------------------------------------------ */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
   background: radial-gradient(circle at 10% 0%, #05060a 0%, #020308 40%, #000000 100%);
@@ -81,6 +39,15 @@ body.light {
   color: #05060a;
 }
 
+/* -----------------------------------------------------------
+   LAYOUT
+----------------------------------------------------------- */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 16px 18px 24px;
+}
 
 /* -----------------------------------------------------------
    TOPBAR
@@ -231,57 +198,29 @@ body.light #searchTab {
   z-index: 40;
 }
 
-/* -----------------------------------------------------------
-   VISION PRO IMAX — FULLSCREEN PLAYER
------------------------------------------------------------ */
 #playerSection.player-fullscreen {
   position: fixed;
   top: 50%;
   left: 50%;
-  width: 96vw;              /* ⭐ Ultra-wide Vision Pro window */
-  height: 64vh !important;
-  transform-origin: center center;
-  border-radius: 22px;      /* ⭐ Vision Pro rounded corners */
-  overflow: hidden !important;
-  background: black;
+  width: 140vw;
+  height: 140vh;
+  margin: 0;
+  border-radius: 0;
   z-index: 9999;
 }
 
-/* -----------------------------------------------------------
-   BODY FULLSCREEN LOCK (Fixes scrollbar)
------------------------------------------------------------ */
-body.fullscreen-active {
-  overflow: hidden !important;
-  height: 100vh !important;
-  background: transparent !important;
 
-}
 
-   
-/* -----------------------------------------------------------
-   RAY‑BAN SAFE OVERFLOW PATCH
------------------------------------------------------------ */
-#playerSection.player-fullscreen,
-#playerSection.player-fullscreen *,
 #playerFrame {
-  overflow: hidden !important;
-}
-
-
-
-/* -----------------------------------------------------------
-   VISION PRO IMAX — PLAYER IFRAME FIX
------------------------------------------------------------ */
-#playerFrame {
-  position: absolute;
-  inset: 0;
   width: 100%;
   height: 100%;
   border: none;
-  overflow: hidden !important;  /* ⭐ Prevent scrollbars */
+  display: block;
+
+  /* ⭐ Add this line ⭐ */
+  position: relative;
   z-index: 1;
 }
-
 
 /* -----------------------------------------------------------
    PLAYER CONTROLS
@@ -628,61 +567,26 @@ body.search-depth-mode #channelPage {
   pointer-events: none;
 }
 
-/* -----------------------------------------------------------
-   VISION PRO IMAX — AMBIENT DARKENING
+   /* -----------------------------------------------------------
+   CINEMA MODE (Curved Screen + Darkened Environment)
 ----------------------------------------------------------- */
+/* CINEMA MODE */
 body.cinema-mode::before {
   content: "";
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.40);   /* ⭐ Soft dim, not blackout */
-  backdrop-filter: blur(0px);   /* ⭐ Vision Pro environment blur */
-  z-index: 9997;                 /* ⭐ Below player, above room */
-  pointer-events: auto; /* ⭐ FIX: block clicks */
-}
-
-/* -----------------------------------------------------------
-   FORCE DIM LAYER ABOVE ALL UI (Fixes missing black background)
------------------------------------------------------------ */
-body.cinema-mode *:not(#playerSection):not(.exit-full-btn) {
-  z-index: 1 !important;
-}
-
-   
-/* -----------------------------------------------------------
-   VISION PRO IMAX — HIDE UI IN FULLSCREEN
------------------------------------------------------------ */
-body.cinema-mode .ui-layer,
-body.cinema-mode .tabs,
-body.cinema-mode .buttons {
-  opacity: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(6px);
+  z-index: 9998;
   pointer-events: none;
-  transition: opacity 0.25s ease;
 }
 
-body.fullscreen-active #topbar,
-body.fullscreen-active #searchTab,
-body.fullscreen-active #tabs,
-body.fullscreen-active #feed,
-body.fullscreen-active #channelPage,
-body.fullscreen-active #searchPanel,
-body.fullscreen-active #keyboard,
-body.fullscreen-active #suggestions {
-  display: none !important;
-}
-
-   
-/* -----------------------------------------------------------
-   VISION PRO IMAX — CINEMA MODE CURVE + GLOW + DEPTH
------------------------------------------------------------ */
 #playerSection.player-fullscreen.cinema {
-  transform: translate(-50%, -50%)
-             perspective(1200px)      /* ⭐ Deep spatial depth */
-             rotateX(8deg);           /* ⭐ Vision Pro curve */
-  box-shadow: 0 0 120px rgba(255,255,255,0.28); /* ⭐ Soft bloom */
-  filter: drop-shadow(0 26px 60px rgba(0,0,0,0.35)); /* ⭐ Floating window shadow */
+  border-radius: 40px;
+  overflow: hidden;
+  transform: translate(-50%, -50%) perspective(900px) rotateX(6deg);
+  box-shadow: 0 0 80px rgba(0,0,0,0.6);
 }
-
 
 /* -----------------------------------------------------------
    CINEMA MODE — AMBIENT GLOW BOOST
@@ -690,6 +594,7 @@ body.fullscreen-active #suggestions {
 body.cinema-mode #playerSection {
   --audio-glow-opacity: 0.55 !important;
   --audio-glow-blur: 55px !important;
+
   --chroma-opacity: 0.45 !important;
   --chroma-blur: 18px !important;
 
@@ -725,19 +630,29 @@ body.cinema-mode #playerSection {
     filter 0.55s ease;
 }
    
-
 /* -----------------------------------------------------------
-   CINEMA MODE — Zoom Intro Animation
+   CINEMA MODE — ZOOM INTRO ANIMATION
 ----------------------------------------------------------- */
-@keyframes cinemaZoom {
-  0% { transform: translate(-50%, -50%) scale(0.92); opacity: 0.4; }
-  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-}
+@keyframes cinemaZoomIntro {
+  0% {
+    transform:
+      translate(-50%, -50%)
+      scale(0.88)
+      perspective(900px)
+      rotateX(0deg);
+    opacity: 0.6;
+    filter: brightness(0.7);
+  }
 
-#playerSection.zoom-intro {
-  animation: cinemaZoom var(--cinema-zoom-speed, 0.45s) ease-out;
-}
-
+  60% {
+    transform:
+      translate(-50%, -50%)
+      scale(1.03)
+      perspective(900px)
+      rotateX(4deg);
+    opacity: 1;
+    filter: brightness(1);
+  }
 
   100% {
     transform:
@@ -835,15 +750,10 @@ body.fullscreen-active .exit-full-btn {
   <!-- PLAYER -->
 <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
 
-   
     <iframe id="playerFrame"
-      src=""
-      frameborder="0"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
       allowfullscreen>
     </iframe>
-
-
 
     <div class="player-controls">
       <button id="playPauseBtn">Pause</button>
@@ -1125,27 +1035,19 @@ function showHUD(text) {
 ----------------------------------------------------------- */
 function setPlayerVideo(videoId, snippet) {
   currentVideoId = videoId;
-
-  // Reset all player states
   playerSection.style.display = "block";
-  playerSection.classList.remove("player-mini", "player-fullscreen", "cinema", "zoom-intro");
-  document.body.classList.remove("cinema-mode");
+  playerSection.classList.remove("player-mini", "player-fullscreen");
 
   playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
 
   saveToHistory({ id: videoId, snippet });
 
+
   hideUIForVideo();
   playPauseBtn.textContent = "Pause";
 
   initAudioGlow();
-
-  // ⭐ FIX: Restore medium-player controls
-  document.querySelector(".player-controls").style.opacity = "1";
-  document.querySelector(".player-controls").style.pointerEvents = "auto";
 }
-
-
 
 /* -----------------------------------------------------------
    UI HIDE/SHOW
@@ -1159,9 +1061,6 @@ function hideUIForVideo() {
   channelPageEl.style.display = "none";
   keyboardEl.style.display = "none";
   suggestionsEl.style.display = "none";
-  document.querySelector(".player-controls").style.opacity = "0";
-  document.querySelector(".player-controls").style.pointerEvents = "none";
-
 }
 
 function showUIWithMiniPlayer() {
@@ -1175,9 +1074,6 @@ function showUIWithMiniPlayer() {
   } else {
     feedEl.style.display = "block";
     channelPageEl.style.display = "none";
-    document.querySelector(".player-controls").style.opacity = "1";
-    document.querySelector(".player-controls").style.pointerEvents = "auto";
-
   }
 }
 
@@ -1196,21 +1092,12 @@ backBtn.addEventListener("click", () => {
 });
 
 closeMini.addEventListener("click", () => {
-  // Exit fullscreen if active
-  document.body.classList.remove("fullscreen-active");
-  document.body.classList.remove("cinema-mode");
-  playerSection.classList.remove("player-fullscreen");
-  playerSection.classList.remove("cinema");
-
-  // Close player
   playerSection.style.display = "none";
   playerFrame.src = "";
 
-  // Restore UI
   showUIWithMiniPlayer();
   showHUD("Player closed");
 });
-
 
 
 
@@ -1236,48 +1123,56 @@ function playCinemaZoomIntro() {
 /* -----------------------------------------------------------
    FULLSCREEN
 ----------------------------------------------------------- */
-window.addEventListener("load", () => {
+fullBtn.addEventListener("click", () => {
+  if (playerSection.style.display === "none") return;
 
-  const fullBtn = document.getElementById("fullBtn");
-  const exitFullBtn = document.getElementById("exitFullBtn");
-  const playerSection = document.getElementById("playerSection");
+  // ⭐ PATCH 1 — REQUIRED
+  playerSection.style.display = "block";
 
-  fullBtn.addEventListener("click", () => {
-    if (playerSection.style.display === "none") return;
+  miniActive = false;
+  playerSection.classList.remove("player-mini");
+  playerSection.classList.add("player-fullscreen");
 
-    playerSection.style.display = "block";
-    miniActive = false;
-    playerSection.classList.remove("player-mini");
+  document.body.classList.add("fullscreen-active");
 
-    playerSection.classList.add("player-fullscreen");
-    document.body.classList.add("fullscreen-active");
+  enableCinemaMode();
+  playCinemaZoomIntro();
 
-    requestAnimationFrame(() => {
-      playCinemaZoomIntro(); // keep the zoom animation
-    });
+  hideUIForVideo();
+  showHUD("Fullscreen");
+});
 
-    hideUIForVideo();
-    showHUD("Fullscreen");
-  });
 
-  exitFullBtn.addEventListener("click", () => {
+
+  /* -----------------------------------------------------------
+   EXIT FULLSCREEN BUTTON
+----------------------------------------------------------- */
+const exitFullBtn = document.getElementById("exitFullBtn");
+
+exitFullBtn.addEventListener("click", () => {
+  playerSection.classList.remove("player-fullscreen");
+  document.body.classList.remove("fullscreen-active");
+  disableCinemaMode();         // ⭐ turn Cinema Mode OFF
+
+  if (miniActive) {
+    playerSection.classList.add("player-mini");
+  }
+
+  showUIWithMiniPlayer();
+  showHUD("Exited Fullscreen");
+});
+
+/* -----------------------------------------------------------
+   ESC / RAY‑BAN EMG EXIT FULLSCREEN
+----------------------------------------------------------- */
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
     playerSection.classList.remove("player-fullscreen");
     document.body.classList.remove("fullscreen-active");
-
     disableCinemaMode();
     showUIWithMiniPlayer();
-  });
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      playerSection.classList.remove("player-fullscreen");
-      document.body.classList.remove("fullscreen-active");
-      disableCinemaMode();
-      showUIWithMiniPlayer();
-      showHUD("Exited Fullscreen (Ray‑Ban EMG)");
-    }
-  });
-
+    showHUD("Exited Fullscreen (Ray‑Ban EMG)");
+  }
 });
 
 
@@ -1372,42 +1267,29 @@ function setActiveTab(tab) {
 ----------------------------------------------------------- */
 homeTab.addEventListener("click", async () => {
   setActiveTab("home");
-
-  const timestamp = Date.now();
-
   const data = await fetchYouTube("videos", {
     part: "snippet,statistics",
     chart: "mostPopular",
-    maxResults: 25,
-    _: timestamp
+    maxResults: 25
   });
-
   renderFeed(data.items || []);
   showHUD("Home");
 });
-
 
 /* -----------------------------------------------------------
    TRENDING
 ----------------------------------------------------------- */
 trendingTab.addEventListener("click", async () => {
   setActiveTab("trending");
-
-  const timestamp = Date.now();
-
   const data = await fetchYouTube("videos", {
     part: "snippet,statistics",
     chart: "mostPopular",
     regionCode: "US",
-    maxResults: 25,
-    _: timestamp
+    maxResults: 25
   });
-
   renderFeed(data.items || []);
   showHUD("Trending");
 });
-
-
 
 /* -----------------------------------------------------------
    SHORTS
@@ -1415,18 +1297,14 @@ trendingTab.addEventListener("click", async () => {
 shortsTab.addEventListener("click", async () => {
   setActiveTab("shorts");
 
-  const timestamp = Date.now();
-
   const data = await fetchYouTube("search", {
     part: "snippet",
     q: "youtube shorts",
     type: "video",
     videoEmbeddable: "true",
     regionCode: "US",
-    maxResults: 25,
-    _: timestamp
+    maxResults: 25
   });
-
 
   shortsItems = data.items.map(v => ({
     id: v.id.videoId,
@@ -1480,18 +1358,14 @@ document.addEventListener("touchend", e => {
 moviesTab.addEventListener("click", async () => {
   setActiveTab("movies");
 
-  const timestamp = Date.now();
-
   const data = await fetchYouTube("search", {
     part: "snippet",
     q: "short film award winning",
     type: "video",
     videoEmbeddable: "true",
     regionCode: "US",
-    maxResults: 25,
-    _: timestamp
+    maxResults: 25
   });
-
 
   const items = data.items.map(v => ({
     id: v.id.videoId,
@@ -1554,15 +1428,11 @@ async function loadChannelPage(channelId) {
 
   channelUploadsId = channelInfo.contentDetails.relatedPlaylists.uploads;
 
-  const timestamp = Date.now();
-
-const uploads = await fetchYouTube("playlistItems", {
-  part: "snippet",
-  playlistId: channelUploadsId,
-  maxResults: 20,
-  _: timestamp
-});
-
+  const uploads = await fetchYouTube("playlistItems", {
+    part: "snippet",
+    playlistId: channelUploadsId,
+    maxResults: 20
+  });
 
   channelNextPageToken = uploads.nextPageToken || null;
 
@@ -1726,21 +1596,14 @@ function initAudioGlow() {
   animateGlow();
 }
 
-
 /* -----------------------------------------------------------
-   PARALLAX / DEPTH ENGINE (UI Parallax)
+   PARALLAX / DEPTH ENGINE
 ----------------------------------------------------------- */
 document.addEventListener("mousemove", (e) => {
   const x = (e.clientX / window.innerWidth) * 2 - 1;
   const y = (e.clientY / window.innerHeight) * 2 - 1;
 
   document.querySelectorAll(".parallax").forEach((el) => {
-    if (
-      el.id === "playerSection" &&
-      (playerSection.classList.contains("player-fullscreen") ||
-       document.body.classList.contains("cinema-mode"))
-    ) return;
-
     const depth = 8;
     el.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
   });
@@ -1752,26 +1615,6 @@ document.addEventListener("mousemove", (e) => {
 
   applyChroma(x, y);
 });
-
-/* -----------------------------------------------------------
-   VISION PRO IMAX — PARALLAX TILT
------------------------------------------------------------ */
-document.addEventListener("mousemove", (e) => {
-  if (!playerSection.classList.contains("player-fullscreen")) return;
-
-  const x = (e.clientX / window.innerWidth - 0.5) * 1.2;
-  const y = (e.clientY / window.innerHeight - 0.5) * -0.81;
-
-  playerSection.style.transform =
-    `translate(-50%, -50%)
-     perspective(1200px)
-     rotateX(${8 + y}deg)
-     rotateY(${x}deg)`;
-});
-
-
-
-
 
 /* -----------------------------------------------------------
    THEME TOGGLE
@@ -1786,14 +1629,10 @@ themeToggle.addEventListener("click", () => {
    INITIAL LOAD
 ----------------------------------------------------------- */
 (async function init() {
-
-  const timestamp = Date.now();
-
   const data = await fetchYouTube("videos", {
     part: "snippet,statistics",
     chart: "mostPopular",
-    maxResults: 25,
-    _: timestamp
+    maxResults: 25
   });
 
   renderFeed(data.items || []);
