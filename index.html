@@ -15,9 +15,19 @@ html, body {
   overflow-y: hidden !important;
 }
 
-.app-shell {
-  overflow: hidden !important;
+body, html {
+  height: 100%;
 }
+
+   
+.app-shell {
+  height: 100%;
+  overflow: hidden !important;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 
 #playerSection {
   overflow: hidden !important;
@@ -1758,16 +1768,16 @@ document.addEventListener("mousemove", (e) => {
 document.addEventListener("mousemove", (e) => {
   if (!playerSection.classList.contains("player-fullscreen")) return;
 
-  const x = (e.clientX / window.innerWidth - 0.5) * 1.2;  // ⭐ Subtle Vision Pro tilt
+  const x = (e.clientX / window.innerWidth - 0.5) * 1.2;
   const y = (e.clientY / window.innerHeight - 0.5) * -0.81;
 
   playerSection.style.transform =
     `translate(-50%, -50%)
-     scale(1)                           /* ⭐ Prevent width shrink */
      perspective(1200px)
-     rotateX(calc(8deg + ${y}deg))
+     rotateX(${8 + y}deg)
      rotateY(${x}deg)`;
 });
+
 
 
 
