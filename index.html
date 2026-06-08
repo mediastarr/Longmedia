@@ -211,27 +211,34 @@ body.light #searchTab {
   z-index: 40;
 }
 
+/* -----------------------------------------------------------
+   VISION PRO IMAX — FULLSCREEN PLAYER
+----------------------------------------------------------- */
 #playerSection.player-fullscreen {
   position: fixed;
   top: 50%;
   left: 50%;
-  width: 96vw;        /* ⭐ Wider than your medium player */
-  height: 68vh;       /* ⭐ Slightly shorter for IMAX curve */
+  width: 96vw;              /* ⭐ Ultra-wide Vision Pro window */
+  height: 68vh;             /* ⭐ Slightly shorter for IMAX curve */
   transform: translate(-50%, -50%);
-  border-radius: 22px;
-  overflow: hidden;
+  border-radius: 22px;      /* ⭐ Vision Pro rounded corners */
+  overflow: hidden !important;
+  background: black;
   z-index: 9999;
 }
 
 
 
+/* -----------------------------------------------------------
+   VISION PRO IMAX — PLAYER IFRAME FIX
+----------------------------------------------------------- */
 #playerFrame {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
   height: 100%;
   border: none;
+  overflow: hidden !important;  /* ⭐ Prevent scrollbars */
   z-index: 1;
 }
 
@@ -582,31 +589,38 @@ body.search-depth-mode #channelPage {
 }
 
 /* -----------------------------------------------------------
-   CINEMA MODE — Ambient Darkening Layer
+   VISION PRO IMAX — AMBIENT DARKENING
 ----------------------------------------------------------- */
 body.cinema-mode::before {
   content: "";
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,var(--cinema-dim, 0.55));
-  backdrop-filter: blur(var(--cinema-blur, 6px));
-  z-index: 9998;
+  background: rgba(0,0,0,0.40);   /* ⭐ Soft dim, not blackout */
+  backdrop-filter: blur(12px);   /* ⭐ Vision Pro environment blur */
+  z-index: 9997;                 /* ⭐ Below player, above room */
   pointer-events: none;
 }
 
-
 /* -----------------------------------------------------------
-   CINEMA MODE — Curve, Glow, Perspective
+   VISION PRO IMAX — HIDE UI IN FULLSCREEN
+----------------------------------------------------------- */
+body.cinema-mode .ui-layer,
+body.cinema-mode .tabs,
+body.cinema-mode .buttons {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+   
+/* -----------------------------------------------------------
+   VISION PRO IMAX — CINEMA MODE CURVE + GLOW + DEPTH
 ----------------------------------------------------------- */
 #playerSection.player-fullscreen.cinema {
-  transform: translate(-50%, -50%) 
-             perspective(var(--cinema-perspective, 900px)) 
-             rotateX(var(--cinema-curve, 6deg));
-  box-shadow: 0 0 var(--cinema-glow-size, 80px) 
-              rgba(255,255,255,var(--cinema-glow-strength, 0.35));
-  filter: drop-shadow(0 var(--cinema-shadow-y, 20px) 
-                         var(--cinema-shadow-blur, 40px) 
-                         rgba(0,0,0,var(--cinema-shadow-strength, 0.45)));
+  transform: translate(-50%, -50%)
+             perspective(1200px)      /* ⭐ Deep spatial depth */
+             rotateX(8deg);           /* ⭐ Vision Pro curve */
+  box-shadow: 0 0 120px rgba(255,255,255,0.28); /* ⭐ Soft bloom */
+  filter: drop-shadow(0 26px 60px rgba(0,0,0,0.35)); /* ⭐ Floating window shadow */
 }
 
 
@@ -651,9 +665,7 @@ body.cinema-mode #playerSection {
     filter 0.55s ease;
 }
    
-/* -----------------------------------------------------------
-   CINEMA MODE — ZOOM INTRO ANIMATION
------------------------------------------------------------ */
+
 /* -----------------------------------------------------------
    CINEMA MODE — Zoom Intro Animation
 ----------------------------------------------------------- */
@@ -1646,22 +1658,18 @@ function initAudioGlow() {
 
 
 /* -----------------------------------------------------------
-   PARALLAX / DEPTH ENGINE
+   PARALLAX / DEPTH ENGINE (UI Parallax)
 ----------------------------------------------------------- */
 document.addEventListener("mousemove", (e) => {
   const x = (e.clientX / window.innerWidth) * 2 - 1;
   const y = (e.clientY / window.innerHeight) * 2 - 1;
 
   document.querySelectorAll(".parallax").forEach((el) => {
-
-    // ⭐ Skip playerSection in ANY fullscreen state
     if (
       el.id === "playerSection" &&
       (playerSection.classList.contains("player-fullscreen") ||
        document.body.classList.contains("cinema-mode"))
-    ) {
-      return;
-    }
+    ) return;
 
     const depth = 8;
     el.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
@@ -1676,25 +1684,20 @@ document.addEventListener("mousemove", (e) => {
 });
 
 /* -----------------------------------------------------------
-   CINEMA MODE — Parallax Layers (IMAX Tilt)
+   VISION PRO IMAX — PARALLAX TILT
 ----------------------------------------------------------- */
 document.addEventListener("mousemove", (e) => {
   if (!playerSection.classList.contains("player-fullscreen")) return;
 
-  const x = (e.clientX / window.innerWidth - 0.5) 
-            * parseFloat(getComputedStyle(document.body)
-            .getPropertyValue("--parallax-strength-x") || 6);
-
-  const y = (e.clientY / window.innerHeight - 0.5) 
-            * -parseFloat(getComputedStyle(document.body)
-            .getPropertyValue("--parallax-strength-y") || 4);
+  const x = (e.clientX / window.innerWidth - 0.5) * 3;  // ⭐ Subtle Vision Pro tilt
+  const y = (e.clientY / window.innerHeight - 0.5) * -2;
 
   playerSection.style.transform =
-    `translate(-50%, -50%) 
-     perspective(var(--cinema-perspective, 900px)) 
-     rotateX(calc(var(--cinema-curve, 6deg) + ${y}deg)) 
-     rotateY(${x}deg)
-     scale(1)`;  // ⭐ keeps width correct
+    `translate(-50%, -50%)
+     scale(1)                           /* ⭐ Prevent width shrink */
+     perspective(1200px)
+     rotateX(calc(8deg + ${y}deg))
+     rotateY(${x}deg)`;
 });
 
 
