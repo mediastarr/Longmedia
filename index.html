@@ -1167,12 +1167,20 @@ backBtn.addEventListener("click", () => {
 });
 
 closeMini.addEventListener("click", () => {
+  // ALWAYS exit fullscreen if active
+  playerSection.classList.remove("player-fullscreen");
+  document.body.classList.remove("fullscreen-active");
+  disableCinemaMode();   // removes blur + cinema curve
+
+  // Hide player
   playerSection.style.display = "none";
   playerFrame.src = "";
 
+  // Restore UI
   showUIWithMiniPlayer();
   showHUD("Player closed");
 });
+
 
 
 
