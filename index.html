@@ -6,6 +6,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <style>
+
+/* -----------------------------------------------------------
+   GLOBAL SCROLLBAR LOCK (Fixes Ray‑Ban fullscreen scrollbar)
+----------------------------------------------------------- */
+html, body {
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
+}
+
+
+   
 /* -----------------------------------------------------------
    GLOBAL THEME + CINEMA MODE VARIABLES
 ----------------------------------------------------------- */
@@ -617,7 +628,7 @@ body.cinema-mode::before {
   background: rgba(0,0,0,0.40);   /* ⭐ Soft dim, not blackout */
   backdrop-filter: blur(12px);   /* ⭐ Vision Pro environment blur */
   z-index: 9997;                 /* ⭐ Below player, above room */
-  pointer-events: none;
+  pointer-events: auto; /* ⭐ FIX: block clicks */
 }
 
 /* -----------------------------------------------------------
@@ -1163,12 +1174,21 @@ backBtn.addEventListener("click", () => {
 });
 
 closeMini.addEventListener("click", () => {
+  // Exit fullscreen if active
+  document.body.classList.remove("fullscreen-active");
+  document.body.classList.remove("cinema-mode");
+  playerSection.classList.remove("player-fullscreen");
+  playerSection.classList.remove("cinema");
+
+  // Close player
   playerSection.style.display = "none";
   playerFrame.src = "";
 
+  // Restore UI
   showUIWithMiniPlayer();
   showHUD("Player closed");
 });
+
 
 
 
