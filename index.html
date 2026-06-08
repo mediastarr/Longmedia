@@ -228,6 +228,16 @@ body.light #searchTab {
 }
 
 /* -----------------------------------------------------------
+   BODY FULLSCREEN LOCK (Fixes scrollbar)
+----------------------------------------------------------- */
+body.fullscreen-active {
+  overflow: hidden !important;
+  height: 100vh !important;
+  background: black !important; /* Ensures full black backdrop */
+}
+
+   
+/* -----------------------------------------------------------
    RAY‑BAN SAFE OVERFLOW PATCH
 ----------------------------------------------------------- */
 #playerSection.player-fullscreen,
@@ -610,6 +620,14 @@ body.cinema-mode::before {
   pointer-events: none;
 }
 
+/* -----------------------------------------------------------
+   FORCE DIM LAYER ABOVE ALL UI (Fixes missing black background)
+----------------------------------------------------------- */
+body.cinema-mode *:not(#playerSection):not(.exit-full-btn) {
+  z-index: 1 !important;
+}
+
+   
 /* -----------------------------------------------------------
    VISION PRO IMAX — HIDE UI IN FULLSCREEN
 ----------------------------------------------------------- */
