@@ -948,25 +948,6 @@ body.startup-visible {
 
 <audio id="startup-sound" src="startup.mp3" preload="auto"></audio>
 
-<!-- PLAYER OUTSIDE APP-SHELL -->
-<div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
-  <div class="fx-layers"></div>
-
-  <iframe id="playerFrame"
-    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-    allowfullscreen>
-  </iframe>
-
-  <div class="player-controls">
-    <button id="playPauseBtn">Pause</button>
-    <button id="rewindBtn">-10s</button>
-    <button id="forwardBtn">+10s</button>
-    <button id="fullBtn">Full</button>
-  </div>
-
-  <button id="closeMini">✕</button>
-</div>
-
 <button id="exitFullBtn" class="exit-full-btn">Back</button>
 
 <!-- APP SHELL -->
@@ -974,45 +955,39 @@ body.startup-visible {
 
   <!-- TOPBAR -->
   <div id="topbar" class="parallax">
-    <div class="topbar-left">
-      <div class="logo-orb"></div>
-      <div class="topbar-title">VIEWTUBE AR OS</div>
-    </div>
-    <div class="topbar-right">
-      <button id="themeToggle" class="topbar-btn">Theme</button>
-      <button id="backBtn" class="topbar-btn">Mini</button>
-    </div>
+    ...
   </div>
 
   <!-- SEARCH BAR -->
   <div id="searchTab" class="parallax-tab">
-    <div class="search-label">Search holographic feed</div>
-    <button class="search-open-btn">Open Keyboard</button>
+    ...
   </div>
 
   <!-- TABS -->
   <div id="tabs">
-    <button id="homeTab" class="tab-btn parallax-tab active">Home</button>
-    <button id="shortsTab" class="tab-btn parallax-tab">Shorts</button>
-    <button id="moviesTab" class="tab-btn parallax-tab">Movies</button>
-    <button id="historyTab" class="tab-btn parallax-tab">History</button>
-    <button id="trendingTab" class="tab-btn parallax-tab">Trending</button>
-    <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
+    ...
   </div>
 
   <!-- HUD -->
   <div id="hud"></div>
 
-  <!-- SEARCH PANEL -->
-  <div id="searchPanel">
-    <div class="search-input-bar">
-      <input id="searchInput" type="text" placeholder="Search…" />
-      <button id="searchGo">Go</button>
-      <button id="searchBack">Back</button>
+  <!-- PLAYER (MOVED INSIDE APP-SHELL) -->
+  <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
+    <div class="fx-layers"></div>
+
+    <iframe id="playerFrame"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowfullscreen>
+    </iframe>
+
+    <div class="player-controls">
+      <button id="playPauseBtn">Pause</button>
+      <button id="rewindBtn">-10s</button>
+      <button id="forwardBtn">+10s</button>
+      <button id="fullBtn">Full</button>
     </div>
 
-    <div id="keyboard"></div>
-    <div id="suggestions"></div>
+    <button id="closeMini">✕</button>
   </div>
 
   <!-- FEED -->
@@ -1022,6 +997,10 @@ body.startup-visible {
   <div id="channelPage"></div>
 
 </div> <!-- end app-shell -->
+
+<!-- FULLSCREEN EXIT BUTTON (STAYS OUTSIDE) -->
+<button id="exitFullBtn" class="exit-full-btn">Back</button>
+
 
 <script>
 /* -----------------------------------------------------------
@@ -1232,7 +1211,10 @@ function setPlayerVideo(videoId, snippet) {
 
   playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
 
+  // Show player
   playerSection.style.display = "block";
+
+  // Remove all other modes
   playerSection.classList.remove(
     "player-mini",
     "player-fullscreen",
@@ -1240,15 +1222,21 @@ function setPlayerVideo(videoId, snippet) {
     "zoom-intro",
     "player-medium-inline"
   );
+
+  // Apply floating medium mode
   playerSection.classList.add("player-medium");
 
+  // Hide UI
   document.body.classList.add("medium-active");
   document.body.classList.remove("fullscreen-active", "cinema-mode");
 }
 
 /* Mini mode */
 function goMini() {
+  if (!currentVideoId) return;
+
   playerSection.style.display = "block";
+
   playerSection.classList.remove(
     "player-medium",
     "player-fullscreen",
@@ -1256,8 +1244,10 @@ function goMini() {
     "zoom-intro",
     "player-medium-inline"
   );
+
   playerSection.classList.add("player-mini");
 
+  // UI visible
   document.body.classList.remove("medium-active", "fullscreen-active", "cinema-mode");
 }
 
@@ -1266,6 +1256,7 @@ function closeMini() {
   playerSection.style.display = "none";
   playerFrame.src = "";
   miniActive = false;
+
   document.body.classList.remove("fullscreen-active", "cinema-mode", "player-active");
 }
 
@@ -1278,6 +1269,7 @@ fullBtn.addEventListener("click", () => {
     "player-medium",
     "player-medium-inline"
   );
+
   playerSection.classList.add("player-fullscreen", "cinema", "zoom-intro");
 
   document.body.classList.add("fullscreen-active", "cinema-mode", "player-active");
@@ -1287,6 +1279,7 @@ fullBtn.addEventListener("click", () => {
 function restoreInlineMedium() {
   playerSection.style.display = "block";
 
+  // Remove all fullscreen + floating medium classes
   playerSection.classList.remove(
     "player-mini",
     "player-fullscreen",
@@ -1295,8 +1288,10 @@ function restoreInlineMedium() {
     "player-medium"
   );
 
+  // Apply inline medium mode
   playerSection.classList.add("player-medium-inline");
 
+  // UI visible again
   document.body.classList.remove("fullscreen-active", "cinema-mode", "medium-active");
 }
 
@@ -1307,7 +1302,6 @@ exitFullBtn.addEventListener("click", () => {
 
 /* Mini button */
 backBtn.addEventListener("click", () => {
-  if (!currentVideoId) return;
   goMini();
 });
 
@@ -1332,6 +1326,7 @@ playPauseBtn.addEventListener("click", () => {
 
 rewindBtn.addEventListener("click", () => {});
 forwardBtn.addEventListener("click", () => {});
+
 
 
 
