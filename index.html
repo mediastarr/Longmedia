@@ -875,6 +875,7 @@ body.fullscreen-active .exit-full-btn {
     <button id="historyTab" class="tab-btn parallax-tab">History</button>
     <button id="trendingTab" class="tab-btn parallax-tab">Trending</button>
     <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
+     <button id="subsTab" class="tab-btn parallax-tab">Subscriptions</button>
   </div>
 
   
@@ -1125,7 +1126,9 @@ const shortsTab = document.getElementById("shortsTab");
 const moviesTab = document.getElementById("moviesTab");
 const historyTab = document.getElementById("historyTab");
 const trendingTab = document.getElementById("trendingTab");
-const channelTab = document.getElementById("channelTab");  
+const channelTab = document.getElementById("channelTab");
+const subsTab = document.getElementById("subsTab");
+
 
 const themeToggle = document.getElementById("themeToggle");
 const backBtn = document.getElementById("backBtn");
@@ -1462,6 +1465,8 @@ function setActiveTab(tab) {
   if (tab === "history") historyTab.classList.add("active");
   if (tab === "trending") trendingTab.classList.add("active");
   if (tab === "channel") channelTab.classList.add("active");
+  if (tab === "subs") subsTab.classList.add("active");
+
 
   if (tab === "channel") {
     feedEl.style.display = "none";
@@ -1598,6 +1603,42 @@ historyTab.addEventListener("click", () => {
 channelTab.addEventListener("click", () => {
   loadChannelPage(currentChannelId);
 });
+/* -----------------------------------------------------------
+   SUBSCRIPTIONS TAB
+----------------------------------------------------------- */
+subsTab.addEventListener("click", async () => {
+  setActiveTab("subs");
+
+  const token = localStorage.getItem("yt_access_token");
+  if (!token) {
+    showHUD("Login required");
+    accountTab.click(); // redirect user to Account tab
+    return;
+  }
+
+  const res = await fetch(
+    "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50",
+    { headers: { Authorization: "Bearer " + token } }
+  );
+
+  const data = await res.json();
+
+  nextPageToken = data.nextPageToken || null;
+
+  // Convert subscription channels into feed cards
+  const items = data.items.map(sub => ({
+    id: sub.snippet.resourceId.channelId,
+    snippet: {
+      title: sub.snippet.title,
+      channelTitle: sub.snippet.title,
+      thumbnails: sub.snippet.thumbnails
+    }
+  }));
+
+  renderFeed(items);
+  showHUD("Subscriptions");
+});
+
 
 
 /* -----------------------------------------------------------
@@ -1676,6 +1717,17 @@ async function loadMoreVideos() {
       _: Date.now()
     });
   }
+
+  if (currentTab === "subs") {
+  const token = localStorage.getItem("yt_access_token");
+  if (!token) return;
+
+  data = await fetch(
+    `https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&pageToken=${nextPageToken}`,
+    { headers: { Authorization: "Bearer " + token } }
+  ).then(r => r.json());
+}
+ 
 
   nextPageToken = data.nextPageToken || null;
 
@@ -1765,6 +1817,90 @@ async function loadChannelPage(channelId) {
   showHUD("Channel Loaded");
 }
 
+/* -----------------------------------------------------------
+   DEVICE OAUTH LOGIN (GOOGLE / YOUTUBE)
+----------------------------------------------------------- */
+let devicePollInterval = null;
+
+startLoginBtn.addEventListener("click", async () => {
+  showHUD("Requesting login code…");
+
+  const res = await fetch("https://oauth2.googleapis.com/device/code", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: "YOUR_CLIENT_ID",
+      scope: "https://www.googleapis.com/auth/youtube.readonly"
+    })
+  });
+
+  const data = await res.json();
+
+  deviceUserCodeEl.textContent = data.user_code;
+  deviceLoginStatusEl.textContent = "Waiting for login…";
+
+  devicePollInterval = setInterval(async () => {
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: "YOUR_CLIENT_ID",
+        client_secret: "YOUR_CLIENT_SECRET",
+        device_code: data.device_code,
+        grant_type: "urn:ietf:params:oauth:grant-type:device_code"
+      })
+    });
+
+    const tokenData = await tokenRes.json();
+
+    if (tokenData.error === "authorization_pending") return;
+
+    clearInterval(devicePollInterval);
+
+    if (tokenData.access_token) {
+      showHUD("Login successful");
+
+      localStorage.setItem("yt_access_token", tokenData.access_token);
+
+      accountLoginSection.style.display = "none";
+      accountInfoSection.style.display = "block";
+
+      loadYouTubeProfile(tokenData.access_token);
+    }
+  }, data.interval * 1000);
+});
+
+/* -----------------------------------------------------------
+   LOAD YOUTUBE PROFILE
+----------------------------------------------------------- */
+async function loadYouTubeProfile(token) {
+  const res = await fetch(
+    "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true",
+    { headers: { Authorization: "Bearer " + token } }
+  );
+
+  const data = await res.json();
+  const info = data.items[0].snippet;
+
+  document.getElementById("accountAvatar").src = info.thumbnails.default.url;
+  document.getElementById("accountName").textContent = info.title;
+  document.getElementById("accountEmail").textContent = info.customUrl;
+}
+
+/* -----------------------------------------------------------
+   LOGOUT
+----------------------------------------------------------- */
+logoutBtn.addEventListener("click", () => {
+  localStorage.removeItem("yt_access_token");
+
+  accountInfoSection.style.display = "none";
+  accountLoginSection.style.display = "block";
+
+  showHUD("Signed out");
+});
+
+   
+   
 /* -----------------------------------------------------------
    SEARCH + SUGGESTIONS
 ----------------------------------------------------------- */
@@ -2018,8 +2154,13 @@ themeToggle.addEventListener("click", () => {
   });
 
   renderFeed(data.items || []);
-})();
-</script>
 
-</body>
-</html>
+  // Auto-login if token exists
+  const savedToken = localStorage.getItem("yt_access_token");
+  if (savedToken) {
+    accountLoginSection.style.display = "none";
+    accountInfoSection.style.display = "block";
+    loadYouTubeProfile(savedToken);
+  }
+})();
+
