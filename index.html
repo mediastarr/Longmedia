@@ -469,6 +469,12 @@ body.light #searchTab {
   opacity: 0.7;
 }
 
+ /* Prevent feed from stealing clicks when keyboard is open */
+.feed-disabled {
+  pointer-events: none;
+}
+  
+
 /* -----------------------------------------------------------
    CHANNEL PAGE
 ----------------------------------------------------------- */
@@ -1963,6 +1969,8 @@ function openKeyboard() {
   document.querySelector(".search-input-bar").style.display = "flex";
 
   feedEl.style.display = "none";
+  feedEl.classList.add("feed-disabled");
+
 }
 
 function closeKeyboard() {
@@ -1971,6 +1979,8 @@ function closeKeyboard() {
   suggestionsEl.style.display = "none";
 
   feedEl.style.display = "block";
+  feedEl.classList.remove("feed-disabled");
+
 }
 
 searchTabEl.addEventListener("click", openKeyboard);
