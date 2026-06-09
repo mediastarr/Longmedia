@@ -6,6 +6,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <style>
+/* -----------------------------------------------------------
+   GLOBAL THEME
+----------------------------------------------------------- */
 :root {
   --bg-dark: #05060a;
   --bg-light: #f4f5fb;
@@ -31,20 +34,14 @@ body {
   min-height: 100vh;
 }
 
-html, body {
-  overflow: hidden;
-}
-
-body:not(.medium-active):not(.fullscreen-active) {
-  overflow-y: auto;
-}
-
 body.light {
   background: radial-gradient(circle at 0% 0%, #fdfdff 0%, #e4e7ff 40%, #cfd3ff 100%);
   color: #05060a;
 }
 
-/* layout */
+/* -----------------------------------------------------------
+   LAYOUT
+----------------------------------------------------------- */
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -52,11 +49,9 @@ body.light {
   padding: 16px 18px 24px;
 }
 
-body.medium-active .app-shell {
-  display: none !important;
-}
-
-/* topbar */
+/* -----------------------------------------------------------
+   TOPBAR
+----------------------------------------------------------- */
 #topbar {
   display: flex;
   align-items: center;
@@ -70,39 +65,55 @@ body.medium-active .app-shell {
   z-index: 20;
 }
 
-#topbar-left {
+body.light #topbar {
+  background: linear-gradient(135deg, rgba(240,242,255,0.95), rgba(220,224,255,0.95));
+  color: #05060a;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-orb {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: radial-gradient(circle, var(--accent-strong), transparent 70%);
+  box-shadow: 0 0 24px rgba(60,242,255,0.9);
+}
+
+.topbar-title {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-size: 14px;
+}
+
+.topbar-right {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-#topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-#themeToggle {
-  padding: 6px 10px;
+.topbar-btn {
   border-radius: 999px;
   border: 1px solid rgba(120,130,160,0.6);
-  background: rgba(8,10,18,0.9);
+  padding: 6px 10px;
+  font-size: 12px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
   color: #f5f7ff;
-  font-size: 11px;
   cursor: pointer;
 }
 
-#backBtn {
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(120,130,160,0.6);
-  background: rgba(8,10,18,0.9);
-  color: #f5f7ff;
-  font-size: 11px;
-  cursor: pointer;
+body.light .topbar-btn {
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.12), rgba(240,242,255,0.95));
+  color: #05060a;
 }
 
-/* search bar */
+/* -----------------------------------------------------------
+   SEARCH BAR
+----------------------------------------------------------- */
 #searchTab {
   margin-top: 12px;
   display: flex;
@@ -115,68 +126,34 @@ body.medium-active .app-shell {
   z-index: 18;
 }
 
-.search-input-bar {
-  flex: 1;
-  display: none;
-  align-items: center;
-  gap: 8px;
+body.light #searchTab {
+  background: linear-gradient(135deg, rgba(238,240,255,0.95), rgba(224,228,255,0.95));
 }
 
-#searchInput {
-  flex: 1;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(120,130,160,0.6);
-  background: rgba(5,7,12,0.9);
-  color: #f5f7ff;
+.search-label {
   font-size: 12px;
-}
-
-#searchGo {
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(120,130,160,0.6);
-  background: rgba(8,10,18,0.9);
-  color: #f5f7ff;
-  font-size: 11px;
-  cursor: pointer;
+  opacity: 0.8;
 }
 
 .search-open-btn {
-  padding: 6px 10px;
+  margin-left: auto;
   border-radius: 999px;
   border: 1px solid rgba(120,130,160,0.6);
-  background: rgba(8,10,18,0.9);
-  color: #f5f7ff;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-/* suggestions */
-#suggestions {
-  margin-top: 6px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: rgba(8,10,18,0.95);
-  display: none;
-}
-
-.suggestion-item {
-  padding: 4px 6px;
-  border-radius: 8px;
+  padding: 6px 10px;
   font-size: 12px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
+  color: #f5f7ff;
   cursor: pointer;
 }
 
-.suggestion-item:hover {
-  background: rgba(60,242,255,0.18);
-}
-
-/* tabs */
+/* -----------------------------------------------------------
+   TABS
+----------------------------------------------------------- */
 #tabs {
   margin-top: 12px;
   display: flex;
   gap: 8px;
+  flex-wrap: nowrap;
   overflow-x: auto;
   padding-bottom: 4px;
   position: relative;
@@ -199,7 +176,9 @@ body.medium-active .app-shell {
   box-shadow: 0 0 18px rgba(60,242,255,0.7);
 }
 
-/* player */
+/* -----------------------------------------------------------
+   PLAYER
+----------------------------------------------------------- */
 #playerSection {
   margin-top: 16px;
   border-radius: 22px;
@@ -208,27 +187,21 @@ body.medium-active .app-shell {
   background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.18), rgba(5,6,12,0.98));
   height: 260px;
   display: none;
-}
 
-#playerSection.player-medium {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 70vw;
-  height: 40vh;
-  max-width: 960px;
-  max-height: 540px;
-  z-index: 9990;
-}
+  /* Lighting variables */
+  --glow-strength: 0.35;
+  --glow-blur: 22px;
+  --glow-shift-x: 0px;
+  --glow-shift-y: 0px;
 
-#playerSection.player-medium-inline {
-  position: relative !important;
-  width: 100% !important;
-  height: 260px !important;
-  transform: none !important;
-  margin-top: 16px !important;
-  z-index: 10 !important;
+  --bloom-intensity: 0.35;
+  --bloom-radius: 32px;
+
+  --shadow-opacity: 0.45;
+  --shadow-blur: 55px;
+
+  --fog-opacity: 0.0;
+  --fog-blur: 85px;
 }
 
 #playerSection.player-mini {
@@ -237,36 +210,138 @@ body.medium-active .app-shell {
   bottom: 16px;
   width: 260px;
   height: 150px;
-  z-index: 9990;
+  z-index: 40;
 }
 
+/* -----------------------------------------------------------
+   FULLSCREEN PLAYER FIX + VisionOS Transform
+----------------------------------------------------------- */
 #playerSection.player-fullscreen {
-  position: fixed;
-  inset: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 99999;
+  max-width: 100vw;
+  max-height: 100vh;
+  background: black;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+
+  transform:
+    perspective(1200px)
+    translateZ(45px)
+    scale(1.08)
+    rotateX(4deg);
+
+  transition:
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.55s ease,
+    box-shadow 0.55s ease;
 }
 
-body.medium-active #feed,
-body.medium-active #tabs,
-body.medium-active #topbar,
-body.medium-active #searchTab,
-body.medium-active #channelPage {
-  display: none !important;
+#playerSection.player-fullscreen.settled {
+  transform:
+    perspective(1200px)
+    translateZ(0px)
+    scale(1)
+    rotateX(0deg);
 }
 
-body.fullscreen-active .app-shell {
-  display: none !important;
+#playerSection.player-fullscreen iframe,
+#playerSection.player-fullscreen #playerFrame {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: black;
 }
 
+/* -----------------------------------------------------------
+   AR‑GRADE BLOOM (Layer 1)
+----------------------------------------------------------- */
+#playerSection::before {
+  content: "";
+  position: absolute;
+  inset: -40px;
+  pointer-events: none;
+  border-radius: inherit;
+
+  background: radial-gradient(circle, rgba(60,242,255,0.85), transparent 70%);
+  filter: blur(var(--bloom-radius));
+  opacity: var(--bloom-intensity);
+
+  z-index: -2;
+}
+
+/* -----------------------------------------------------------
+   DEPTH‑REACTIVE HOLOGRAPHIC GLOW (Layer 2)
+----------------------------------------------------------- */
+#playerSection::after {
+  content: "";
+  position: absolute;
+  inset: -20px;
+  pointer-events: none;
+  border-radius: inherit;
+
+  background: radial-gradient(circle, rgba(60,242,255,0.55), transparent 70%);
+  filter: blur(var(--glow-blur));
+  opacity: var(--glow-strength);
+  transform: translate(var(--glow-shift-x), var(--glow-shift-y));
+
+  z-index: -1;
+}
+
+/* -----------------------------------------------------------
+   VOLUMETRIC SHADOW (Layer 3)
+----------------------------------------------------------- */
+#playerSection .fx-layers::before {
+  content: "";
+  position: absolute;
+  inset: -60px;
+  pointer-events: none;
+  border-radius: inherit;
+
+  background: radial-gradient(circle, rgba(0,0,0,0.45), transparent 70%);
+  filter: blur(var(--shadow-blur));
+  opacity: var(--shadow-opacity);
+
+  z-index: -3;
+  transform: translateY(40px) scale(1.2);
+}
+
+/* -----------------------------------------------------------
+   VISIONOS DEPTH FOG (Layer 4)
+----------------------------------------------------------- */
+#playerSection .fx-layers::after {
+  content: "";
+  position: absolute;
+  inset: -80px;
+  pointer-events: none;
+  border-radius: inherit;
+
+  background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 80%);
+  filter: blur(var(--fog-blur));
+  opacity: var(--fog-opacity);
+
+  z-index: -4;
+}
+
+/* -----------------------------------------------------------
+   IFRAME FIX
+----------------------------------------------------------- */
 #playerFrame {
   width: 100%;
   height: 100%;
-  border: 0;
+  border: none;
+  display: block;
+  position: relative;
+  z-index: 1;
 }
 
-/* player controls */
+
+   
+/* -----------------------------------------------------------
+   PLAYER CONTROLS
+----------------------------------------------------------- */
 .player-controls {
   position: absolute;
   left: 12px;
@@ -277,12 +352,12 @@ body.fullscreen-active .app-shell {
 }
 
 .player-controls button {
-  padding: 5px 9px;
   border-radius: 999px;
-  border: 1px solid rgba(120,130,160,0.6);
-  background: rgba(8,10,18,0.9);
-  color: #f5f7ff;
+  border: 1px solid rgba(120,130,160,0.7);
+  padding: 5px 9px;
   font-size: 11px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
+  color: #f5f7ff;
   cursor: pointer;
 }
 
@@ -290,17 +365,19 @@ body.fullscreen-active .app-shell {
   position: absolute;
   right: 10px;
   top: 10px;
-  z-index: 12;
-  padding: 4px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(120,130,160,0.6);
-  background: rgba(8,10,18,0.9);
-  color: #f5f7ff;
+  border: 1px solid rgba(120,130,160,0.7);
+  padding: 4px 8px;
   font-size: 11px;
+  background: radial-gradient(circle at 0% 0%, rgba(255,80,80,0.35), rgba(10,12,20,0.9));
+  color: #f5f7ff;
   cursor: pointer;
+  z-index: 12;
 }
 
-/* hud */
+/* -----------------------------------------------------------
+   HUD
+----------------------------------------------------------- */
 #hud {
   position: fixed;
   left: 50%;
@@ -308,49 +385,128 @@ body.fullscreen-active .app-shell {
   transform: translateX(-50%);
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(60,242,255,0.22);
+  background: radial-gradient(circle, rgba(60,242,255,0.22), rgba(10,12,20,0.95));
   color: #f5f7ff;
   font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   opacity: 0;
   pointer-events: none;
   z-index: 60;
 }
 
-/* feed */
+/* -----------------------------------------------------------
+   FEED
+----------------------------------------------------------- */
 #feed {
   margin-top: 16px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+  position: relative;
   z-index: 10;
 }
 
 .video-card {
-  position: relative;
   display: flex;
   gap: 10px;
   padding: 10px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgba(10,12,20,0.95), rgba(20,24,40,0.95));
+  border-radius: 18px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.08), rgba(8,10,16,0.96));
   cursor: pointer;
-  box-shadow: var(--shadow-soft);
+  position: relative;
+}
+
+.video-card {
+  transform-style: preserve-3d;
+  perspective: 1100px;
+  transition: transform 0.15s ease-out;
+}
+
+/* ⭐ Hover Intensity Boost */
+.video-card:hover {
+  transform: translateZ(22px) scale(1.03);
+  box-shadow: 0 0 28px rgba(60,242,255,0.35),
+              0 0 55px rgba(60,242,255,0.18);
+  transition: transform 0.15s ease-out, box-shadow 0.2s ease-out;
+}
+   
+
+/* ⭐ Depth‑Layered Holographic Shadow */
+.video-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  z-index: -1;
+
+  transform: translate(
+    var(--shadow-x, 0px),
+    var(--shadow-y, 0px)
+  );
+
+  filter: blur(var(--shadow-blur, 18px));
+  opacity: var(--shadow-opacity, 0.55);
+
+  box-shadow:
+    0 12px 28px rgba(0,0,0,0.45),
+    0 0 22px rgba(60,242,255,0.12),
+    0 0 40px rgba(120,60,255,0.10);
+
+  transition:
+    transform 0.15s ease-out,
+    opacity 0.15s ease-out,
+    filter 0.15s ease-out;
+}
+
+/* ⭐ Ambient Occlusion Layer */
+.video-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  z-index: -2;
+
+  background: radial-gradient(
+    circle at 50% 60%,
+    rgba(0,0,0,0.35),
+    rgba(0,0,0,0.0) 70%
+  );
+
+  opacity: var(--ao-opacity, 0.35);
+  filter: blur(var(--ao-blur, 22px));
+
+  transition:
+    opacity 0.2s ease-out,
+    filter 0.2s ease-out;
+}
+
+   
+.video-thumb {
+  flex: 0 0 140px;
+  height: 80px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #11131c;
 }
 
 .video-thumb img {
-  width: 160px;
-  height: 90px;
-  border-radius: 12px;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
 }
 
 .video-info {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 4px;
 }
 
 .video-title {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .video-channel {
@@ -359,165 +515,399 @@ body.fullscreen-active .app-shell {
 }
 
 .video-meta {
-  font-size: 10px;
-  opacity: 0.6;
+  font-size: 11px;
+  opacity: 0.7;
 }
 
-/* fullscreen back button */
-.exit-full-btn {
-  position: fixed;
-  left: 20px;
-  top: 20px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: rgba(60,242,255,0.35);
-  color: #f5f7ff;
-  border: 1px solid rgba(120,130,160,0.7);
-  z-index: 999999999;
+/* -----------------------------------------------------------
+   CHANNEL PAGE
+----------------------------------------------------------- */
+#channelPage {
+  margin-top: 16px;
   display: none;
+  position: relative;
+  z-index: 10;
 }
 
-body.fullscreen-active .exit-full-btn {
-  display: block;
+.channel-banner {
+  height: 90px;
+  border-radius: 18px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.25), rgba(8,10,16,0.96));
+  display: flex;
+  align-items: center;
+  padding: 14px;
+  gap: 10px;
 }
 
-/* keyboard */
+.banner-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(60,242,255,0.9), transparent 70%);
+  box-shadow: 0 0 26px rgba(60,242,255,0.9);
+}
+
+.banner-text {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.channel-header {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.channel-pic {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.channel-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.channel-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.channel-subs {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+/* -----------------------------------------------------------
+   SEARCH PANEL + KEYBOARD
+----------------------------------------------------------- */
+#searchPanel {
+  margin-top: 12px;
+  display: none;
+  position: relative;
+  z-index: 30;
+}
+
+.search-input-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));
+  overflow: hidden;
+}
+
+.search-input-bar input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #f5f7ff;
+  font-size: 13px;
+  padding-left: 6px;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.search-input-bar button {
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.7);
+  padding: 5px 9px;
+  font-size: 11px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
+  color: #f5f7ff;
+  cursor: pointer;
+}
+
+/* -----------------------------------------------------------
+   FULL-WIDTH QWERTY KEYBOARD (AUTO-FLEX)
+----------------------------------------------------------- */
 #keyboard {
   margin-top: 10px;
   display: none;
+  padding: 10px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));
+  width: 100%;
 }
 
 .keyboard-row {
   display: flex;
+  width: 100%;
   gap: 6px;
   margin-bottom: 6px;
 }
 
 .key-btn {
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(120,130,160,0.6);
-  background: rgba(8,10,18,0.9);
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 12px;
+  border: 1px solid rgba(120,130,160,0.7);
+  font-size: 14px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
   color: #f5f7ff;
-  font-size: 11px;
+  text-align: center;
   cursor: pointer;
+  user-select: none;
 }
 
-/* startup */
-body.startup-hidden {
-  opacity: 0;
-  transform: scale(1.05);
-  filter: blur(18px);
-  transition: opacity 1s ease-out, transform 1s ease-out, filter 1s ease-out;
+.key-btn[data-key="SPACE"] {
+  flex: 4;
 }
 
-body.startup-visible {
-  opacity: 1;
-  transform: scale(1);
-  filter: blur(0px);
+.key-btn[data-key="DELETE"],
+.key-btn[data-key="ENTER"] {
+  flex: 2;
 }
 
-.startup-logo {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) scale(1.2);
-  opacity: 0;
-  z-index: 999999999;
-  transition: opacity 1s ease-out, transform 1s ease-out;
+/* -----------------------------------------------------------
+   SUGGESTIONS
+----------------------------------------------------------- */
+#suggestions {
+  margin-top: 8px;
+  display: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));
+  padding: 6px 8px;
 }
 
-.startup-logo.show {
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
+.suggestion-item {
+  padding: 5px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 10px;
 }
 
-.startup-logo.hide {
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0.85);
+.suggestion-item:hover {
+  background: rgba(60,242,255,0.16);
 }
 
-#cinematic-fade {
+/* -----------------------------------------------------------
+   HOLOGRAPHIC EFFECTS (PLAYER ONLY)
+----------------------------------------------------------- */
+#playerSection.fx-bloom {
+  box-shadow: 0 0 40px rgba(60,242,255,0.65), 0 26px 70px rgba(0,0,0,0.85);
+}
+
+#playerSection.fx-ambient {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(60,242,255,0.25), transparent 60%),
+    radial-gradient(circle at 0% 100%, rgba(120,80,255,0.18), transparent 70%),
+    radial-gradient(circle at 100% 100%, rgba(0,255,180,0.18), transparent 70%),
+    radial-gradient(circle at 50% 50%, rgba(5,6,12,0.98), rgba(2,3,8,1));
+}
+
+#playerSection.fx-glass {
+  backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid rgba(120,130,160,0.7);
+}
+
+#playerSection.fx-chroma::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: var(--chroma-opacity, 0.25);
+  filter: blur(var(--chroma-blur, 4px));
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255,0,80,0.35), transparent 60%),
+    radial-gradient(circle at 80% 20%, rgba(0,200,255,0.35), transparent 60%),
+    radial-gradient(circle at 50% 80%, rgba(0,255,180,0.35), transparent 60%);
+  transition: opacity 0.15s ease-out, filter 0.15s ease-out;
+  z-index: -2;
+}
+
+#playerSection.fx-audio::after {
+  content: "";
+  position: absolute;
+  inset: -40px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255,255,255,0.35), transparent 70%);
+  mix-blend-mode: screen;
+  opacity: var(--audio-glow-opacity, 0.25);
+  filter: blur(var(--audio-glow-blur, 20px));
+  transition: opacity 0.12s ease-out, filter 0.12s ease-out;
+  z-index: -3;
+}
+
+/* -----------------------------------------------------------
+   DEPTH MODE
+----------------------------------------------------------- */
+body.search-depth-mode #feed,
+body.search-depth-mode #channelPage {
+  filter: blur(4px) brightness(0.7);
+  pointer-events: none;
+}
+
+   /* -----------------------------------------------------------
+   CINEMA MODE (Curved Screen + Darkened Environment)
+----------------------------------------------------------- */
+/* CINEMA MODE */
+body.cinema-mode::before {
+  content: "";
   position: fixed;
   inset: 0;
-  background: black;
-  opacity: 1;
-  z-index: 9999999999;
-  transition: opacity 1.4s ease-out;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(6px);
+  z-index: 9998;
+  pointer-events: none;
 }
 
-#cinematic-fade.hide {
-  opacity: 0;
+#playerSection.player-fullscreen.cinema {
+  border-radius: 40px;
+  overflow: hidden;
+  transform: perspective(900px) rotateX(6deg); /* ⭐ REMOVE translate(-50%, -50%) */
+  box-shadow: 0 0 80px rgba(0,0,0,0.6);
 }
 
-/* simple logo */
-.logo-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: radial-gradient(circle at 30% 0%, #3cf2ff, #05060a);
-  margin: 0 auto 8px;
+
+/* -----------------------------------------------------------
+   CINEMA MODE — AMBIENT GLOW BOOST
+----------------------------------------------------------- */
+body.cinema-mode #playerSection {
+  --audio-glow-opacity: 0.55 !important;
+  --audio-glow-blur: 55px !important;
+
+  --chroma-opacity: 0.45 !important;
+  --chroma-blur: 18px !important;
+
+  box-shadow:
+    0 0 120px rgba(60,242,255,0.55),
+    0 0 180px rgba(0,200,255,0.45),
+    0 0 260px rgba(0,255,180,0.35);
+  transition: box-shadow 0.35s ease, filter 0.35s ease;
 }
 
-.logo-text {
-  text-align: center;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+/* -----------------------------------------------------------
+   CINEMA MODE — TRANSITIONS
+----------------------------------------------------------- */
+#playerSection {
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.45s ease,
+    filter 0.45s ease;
 }
+
+body.cinema-mode::before {
+  transition:
+    background 0.45s ease,
+    backdrop-filter 0.45s ease;
+}
+
+body.cinema-mode #playerSection {
+  transition:
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.55s ease,
+    filter 0.55s ease;
+}
+   
+/* -----------------------------------------------------------
+   CINEMA MODE — ZOOM INTRO ANIMATION
+----------------------------------------------------------- */
+@keyframes cinemaZoomIntro {
+  0% {
+    transform:
+      scale(0.88)
+      perspective(900px)
+      rotateX(0deg);
+    opacity: 0.6;
+    filter: brightness(0.7);
+  }
+
+  60% {
+    transform:
+      scale(1.03)
+      perspective(900px)
+      rotateX(4deg);
+    opacity: 1;
+    filter: brightness(1);
+  }
+
+  100% {
+    transform:
+      scale(1)
+      perspective(900px)
+      rotateX(6deg);
+    opacity: 1;
+    filter: brightness(1);
+  }
+}
+
+
+/* Apply animation ONLY when Cinema Mode activates */
+#playerSection.player-fullscreen.cinema.zoom-intro {
+  animation: cinemaZoomIntro 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+   
+/* BACK BUTTON VISIBILITY */
+body.fullscreen-active .exit-full-btn {
+  display: block;
+}
+
+
+
+/* -----------------------------------------------------------
+   FULLSCREEN BACK BUTTON
+----------------------------------------------------------- */
+.exit-full-btn {
+  position: fixed;
+  left: 20px;
+  top: 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.7);
+  padding: 8px 14px;
+  font-size: 14px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.35), rgba(10,12,20,0.9));
+  color: #f5f7ff;
+  cursor: pointer;
+  z-index: 999999999 !important;
+  pointer-events: auto;
+  display: none;
+
+  /* ⭐ Add this line if not already present */
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+/* ⭐ HOVER GLOW — AR Visibility Boost */
+.exit-full-btn:hover {
+  box-shadow: 0 0 18px rgba(60,242,255,0.9),
+              0 0 30px rgba(60,242,255,0.5);
+  transform: scale(1.08);
+}
+
+
+body.fullscreen-active .exit-full-btn {
+  display: block;
+}
+
+  
 </style>
 </head>
 <body>
 
-<div id="cinematic-fade"></div>
+<!-- ⭐ MOVE PLAYER HERE (OUTSIDE app-shell) -->
+<div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
 
-<div id="startup-logo" class="startup-logo">
-  <div class="logo-icon"></div>
-  <div class="logo-text">ViewTube</div>
-</div>
+    <!-- ⭐ REQUIRED for volumetric shadow + fog layers -->
+    <div class="fx-layers"></div>
 
-<div id="particle-burst"></div>
-<div id="startup-ripple"></div>
-
-<audio id="startup-sound" src="startup.mp3" preload="auto"></audio>
-
-<button id="exitFullBtn" class="exit-full-btn">Back</button>
-
-<div class="app-shell">
-
-  <div id="topbar" class="parallax">
-    <div id="topbar-left">
-      <span>ViewTube AR OS</span>
-    </div>
-    <div id="topbar-right">
-      <button id="backBtn">Mini</button>
-      <button id="themeToggle">Theme</button>
-    </div>
-  </div>
-
-  <div id="searchTab" class="parallax-tab">
-    <button class="search-open-btn">Search</button>
-    <div class="search-input-bar">
-      <input id="searchInput" type="text" placeholder="Search ViewTube..." />
-      <button id="searchGo">Go</button>
-    </div>
-  </div>
-
-  <div id="suggestions"></div>
-
-  <div id="tabs">
-    <button id="homeTab" class="tab-btn active">Home</button>
-    <button id="shortsTab" class="tab-btn">Shorts</button>
-    <button id="moviesTab" class="tab-btn">Movies</button>
-    <button id="trendingTab" class="tab-btn">Trending</button>
-    <button id="searchTabBtn" class="tab-btn">Search</button>
-  </div>
-
-  <div id="hud"></div>
-
-  <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
     <iframe id="playerFrame"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowfullscreen></iframe>
+      allowfullscreen>
+    </iframe>
 
     <div class="player-controls">
       <button id="playPauseBtn">Pause</button>
@@ -527,19 +917,66 @@ body.startup-visible {
     </div>
 
     <button id="closeMini">✕</button>
-  </div>
-
-  <div id="feed"></div>
-  <div id="channelPage"></div>
-
-  <div id="keyboard"></div>
-
 </div>
 
+
+<!-- ⭐ Back button stays outside too -->
+<button id="exitFullBtn" class="exit-full-btn">Back</button>
+
+
+
+<!-- ⭐ NOW START app-shell -->
+<div class="app-shell">
+
+  <!-- TOPBAR -->
+  <div id="topbar" class="parallax">
+    <div class="topbar-left">
+      <div class="logo-orb"></div>
+      <div class="topbar-title">VIEWTUBE AR OS</div>
+    </div>
+    <div class="topbar-right">
+      <button id="themeToggle" class="topbar-btn">Theme</button>
+      <button id="backBtn" class="topbar-btn">Mini</button>
+    </div>
+  </div>
+
+  <!-- SEARCH BAR -->
+  <div id="searchTab" class="parallax-tab">
+    <div class="search-label">Search holographic feed</div>
+    <button class="search-open-btn">Open Keyboard</button>
+  </div>
+
+  <!-- TABS -->
+  <div id="tabs">
+    <button id="homeTab" class="tab-btn parallax-tab active">Home</button>
+    <button id="shortsTab" class="tab-btn parallax-tab">Shorts</button>
+    <button id="moviesTab" class="tab-btn parallax-tab">Movies</button>
+    <button id="historyTab" class="tab-btn parallax-tab">History</button>
+    <button id="trendingTab" class="tab-btn parallax-tab">Trending</button>
+    <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud"></div>
+
+  <!-- SEARCH PANEL -->
+  <div id="searchPanel">
+    ...
+  </div>
+
+  <!-- FEED -->
+  <div id="feed"></div>
+
+  <!-- CHANNEL PAGE -->
+  <div id="channelPage"></div>
+
+</div> <!-- end app-shell -->
+
 <script>
-// -----------------------------------------------------------
-// BASIC WIRING / GLOBALS
-// -----------------------------------------------------------
+
+/* -----------------------------------------------------------
+   YOUTUBE API KEY ROTATION
+----------------------------------------------------------- */
 const API_KEYS = [
   "AIzaSyCx0wjIv9VdzaI3oyz34zwkkFgTDj7LgEw",
   "AIzaSyCNKebUdj8bTiRvLoSv28YqGdNoDn53Tk4",
@@ -608,227 +1045,797 @@ const API_KEYS = [
   "AIzaSyBk_q3XUQyI3rtUVCc46kjKJPh5Pm7u9QQ"
 ];
 
-let currentKeyIndex = 0;
-function getApiKey() {
-  const key = API_KEYS[currentKeyIndex];
-  currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
-  return key;
+let keyIndex = 0;
+
+async function fetchYouTube(endpoint, params = {}) {
+  const key = API_KEYS[keyIndex];
+  keyIndex = (keyIndex + 1) % API_KEYS.length;
+
+  const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
+  params.key = key;
+
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) url.searchParams.append(k, v);
+  });
+
+  url.searchParams.append("_", Date.now());
+
+  try {
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return fetchYouTube(endpoint, params);
+    return await res.json();
+  } catch (err) {
+    return fetchYouTube(endpoint, params);
+  }
 }
 
-const playerSection = document.getElementById("playerSection");
-const themeToggle = document.getElementById("themeToggle");
+/* -----------------------------------------------------------
+   GLOBAL STATE
+----------------------------------------------------------- */
+let currentTab = "home";
+let currentVideoId = null;
+let miniActive = false;
+let isLight = false;
+
+let currentChannelId = "UCoLDGQ7a81ep9SJqPlDs2sg";
+let channelNextPageToken = null;
+let channelUploadsId = null;
+
+let historyList = JSON.parse(localStorage.getItem("historyList") || "[]");
+
+let shortsItems = [];
+let shortsIndex = 0;
+let lastSearchQuery = "";
+
+
+/* ⭐ INFINITE SCROLL STATE ⭐ */
+let nextPageToken = null;     // pagination token for all tabs
+let isLoadingMore = false;    // prevents double-loading
+
+
+   
+/* -----------------------------------------------------------
+   HISTORY SAVE FUNCTION (PATCH 3)
+----------------------------------------------------------- */
+function saveToHistory(video) {
+  historyList = historyList.filter(v => v.id !== video.id); // remove duplicates
+  historyList.unshift(video);                               // add to top
+  localStorage.setItem("historyList", JSON.stringify(historyList));
+}
+   
+
+/* -----------------------------------------------------------
+   ELEMENTS
+----------------------------------------------------------- */
 const feedEl = document.getElementById("feed");
+const playerFrame = document.getElementById("playerFrame");
+const playerSection = document.getElementById("playerSection");
+const hudEl = document.getElementById("hud");
+const channelPageEl = document.getElementById("channelPage");
+
 const topbarEl = document.getElementById("topbar");
 const tabsEl = document.getElementById("tabs");
+const searchTabEl = document.getElementById("searchTab");
+const searchPanelEl = document.getElementById("searchPanel");
 const keyboardEl = document.getElementById("keyboard");
-const searchInput = document.getElementById("searchInput");
-const hudEl = document.getElementById("hud");
-const searchOpenBtn = document.querySelector(".search-open-btn");
-const searchInputBar = document.querySelector(".search-input-bar");
-const searchGoBtn = document.getElementById("searchGo");
-const exitFullBtn = document.getElementById("exitFullBtn");
-const backMiniBtn = document.getElementById("backBtn");
+const suggestionsEl = document.getElementById("suggestions");
+
+const homeTab = document.getElementById("homeTab");
+const shortsTab = document.getElementById("shortsTab");
+const moviesTab = document.getElementById("moviesTab");
+const historyTab = document.getElementById("historyTab");
+const trendingTab = document.getElementById("trendingTab");
+const channelTab = document.getElementById("channelTab");  
+
+const themeToggle = document.getElementById("themeToggle");
+const backBtn = document.getElementById("backBtn");
+
 const playPauseBtn = document.getElementById("playPauseBtn");
-const rewindBtn = document.getElementById("rewindBtn");
 const forwardBtn = document.getElementById("forwardBtn");
+const rewindBtn = document.getElementById("rewindBtn");
 const fullBtn = document.getElementById("fullBtn");
+const closeMini = document.getElementById("closeMini");
 
-let isLight = false;
-let lastSearchQuery = "";
-let nextPageToken = null;
-let isPlaying = true;
+const searchInput = document.getElementById("searchInput");
+const searchGo = document.getElementById("searchGo");
+const searchBack = document.getElementById("searchBack");
 
-// fetch wrapper
-async function fetchYouTube(endpoint, params) {
-  const key = getApiKey();
-  const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
-  Object.entries(params).forEach(([k, v]) => {
-    if (k === "_") return;
-    url.searchParams.set(k, v);
-  });
-  url.searchParams.set("key", key);
 
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error("YouTube API error");
-  return res.json();
+/* -----------------------------------------------------------
+   HUD
+----------------------------------------------------------- */
+function showHUD(text) {
+  hudEl.textContent = text;
+  hudEl.style.opacity = 1;
+  setTimeout(() => (hudEl.style.opacity = 0), 1200);
 }
 
-// feed
+/* -----------------------------------------------------------
+   PLAYER
+----------------------------------------------------------- */
+function setPlayerVideo(videoId, snippet) {
+  currentVideoId = videoId;
+  playerSection.style.display = "block";
+  playerSection.classList.remove("player-mini", "player-fullscreen");
+
+  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
+
+  saveToHistory({ id: videoId, snippet });
+
+
+  hideUIForVideo();
+  playPauseBtn.textContent = "Pause";
+
+  initAudioGlow();
+}
+
+/* -----------------------------------------------------------
+   UI HIDE/SHOW
+----------------------------------------------------------- */
+function hideUIForVideo() {
+  topbarEl.style.display = "flex";   // FIXED
+  searchTabEl.style.display = "none";
+  searchPanelEl.style.display = "none";
+  tabsEl.style.display = "none";
+  feedEl.style.display = "none";
+  channelPageEl.style.display = "none";
+  keyboardEl.style.display = "none";
+  suggestionsEl.style.display = "none";
+}
+
+function showUIWithMiniPlayer() {
+  topbarEl.style.display = "flex";
+  searchTabEl.style.display = "flex";
+  tabsEl.style.display = "flex";
+
+  if (currentTab === "channel") {
+    channelPageEl.style.display = "block";
+    feedEl.style.display = "none";
+  } else {
+    feedEl.style.display = "block";
+    channelPageEl.style.display = "none";
+  }
+}
+
+/* -----------------------------------------------------------
+   MINI PLAYER
+----------------------------------------------------------- */
+backBtn.addEventListener("click", () => {
+  if (playerSection.style.display === "none") return;
+
+  playerSection.classList.remove("player-fullscreen");
+  playerSection.classList.add("player-mini");
+
+  miniActive = true;
+  showUIWithMiniPlayer();
+  showHUD("Mini-player");
+});
+
+closeMini.addEventListener("click", () => {
+  // ALWAYS exit fullscreen if active
+  playerSection.classList.remove("player-fullscreen");
+  document.body.classList.remove("fullscreen-active");
+  disableCinemaMode();   // removes blur + cinema curve
+
+  // Hide player
+  playerSection.style.display = "none";
+  playerFrame.src = "";
+
+  // Restore UI
+  showUIWithMiniPlayer();
+  showHUD("Player closed");
+});
+
+
+
+
+/* -----------------------------------------------------------
+   CINEMA MODE HELPERS
+----------------------------------------------------------- */
+function enableCinemaMode() {
+  document.body.classList.add("cinema-mode");
+  playerSection.classList.add("cinema");
+}
+
+function disableCinemaMode() {
+  document.body.classList.remove("cinema-mode");
+  playerSection.classList.remove("cinema");
+}
+
+function playCinemaZoomIntro() {
+  playerSection.classList.remove("zoom-intro"); // reset
+  void playerSection.offsetWidth;               // force reflow
+  playerSection.classList.add("zoom-intro");    // play animation
+}
+
+/* -----------------------------------------------------------
+   FULLSCREEN
+----------------------------------------------------------- */
+fullBtn.addEventListener("click", () => {
+  if (playerSection.style.display === "none") return;
+
+  // ⭐ PATCH 1 — REQUIRED
+  playerSection.style.display = "block";
+
+  miniActive = false;
+  playerSection.classList.remove("player-mini");
+  playerSection.classList.add("player-fullscreen");
+
+  document.body.classList.add("fullscreen-active");
+
+  enableCinemaMode();
+  playCinemaZoomIntro();
+
+
+  setTimeout(() => {
+  playerSection.classList.add("settled");
+}, 550);
+
+
+  hideUIForVideo();
+  showHUD("Fullscreen");
+});
+
+
+
+  /* -----------------------------------------------------------
+   EXIT FULLSCREEN BUTTON
+----------------------------------------------------------- */
+const exitFullBtn = document.getElementById("exitFullBtn");
+
+exitFullBtn.addEventListener("click", () => {
+  playerSection.classList.remove("player-fullscreen");
+  document.body.classList.remove("fullscreen-active");
+  disableCinemaMode();         // ⭐ turn Cinema Mode OFF
+
+  if (miniActive) {
+    playerSection.classList.add("player-mini");
+  }
+
+   playerSection.classList.remove("settled");
+
+
+  showUIWithMiniPlayer();
+  showHUD("Exited Fullscreen");
+});
+
+
+/* -----------------------------------------------------------
+   FULLSCREEN FAILSAFE (Never get stuck again)
+----------------------------------------------------------- */
+setInterval(() => {
+  const isFullscreen = playerSection.classList.contains("player-fullscreen");
+  const isCinema = document.body.classList.contains("cinema-mode");
+  const isFSBody = document.body.classList.contains("fullscreen-active");
+  const isHidden = playerSection.style.display === "none";
+  const isBlank = !playerFrame.src || playerFrame.src === "about:blank";
+
+  // ❌ Case 1: Player closed but fullscreen still active
+  if (isHidden && (isFullscreen || isCinema || isFSBody)) {
+    playerSection.classList.remove("player-fullscreen");
+    document.body.classList.remove("fullscreen-active");
+    disableCinemaMode();
+    return;
+  }
+
+  // ❌ Case 2: Cinema mode active without fullscreen
+  if (!isFullscreen && isCinema) {
+    disableCinemaMode();
+  }
+
+  // ❌ Case 3: Body fullscreen flag stuck
+  if (!isFullscreen && isFSBody) {
+    document.body.classList.remove("fullscreen-active");
+  }
+
+  // ❌ Case 4: Blank iframe but fullscreen active
+  if (isFullscreen && isBlank) {
+    playerSection.classList.remove("player-fullscreen");
+    document.body.classList.remove("fullscreen-active");
+    disableCinemaMode();
+  }
+}, 150);
+
+
+   
+/* -----------------------------------------------------------
+   ESC / RAY‑BAN EMG EXIT FULLSCREEN
+----------------------------------------------------------- */
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    // Exit fullscreen flags
+    playerSection.classList.remove("player-fullscreen");
+    document.body.classList.remove("fullscreen-active");
+    disableCinemaMode();
+    playerSection.classList.remove("settled");
+
+    // Restore mini if it was active
+    if (miniActive) {
+      playerSection.classList.add("player-mini");
+    }
+
+    showUIWithMiniPlayer();
+    showHUD("Exited Fullscreen (Ray‑Ban EMG)");
+  }
+});
+
+
+/* -----------------------------------------------------------
+   PLAYER COMMANDS
+----------------------------------------------------------- */
+function postToPlayer(cmd) {
+  if (!playerFrame.contentWindow) return;
+  playerFrame.contentWindow.postMessage(JSON.stringify(cmd), "*");
+}
+
+playPauseBtn.addEventListener("click", () => {
+  if (playPauseBtn.textContent === "Pause") {
+    playPauseBtn.textContent = "Play";
+    postToPlayer({ event: "command", func: "pauseVideo", args: [] });
+  } else {
+    playPauseBtn.textContent = "Pause";
+    postToPlayer({ event: "command", func: "playVideo", args: [] });
+  }
+});
+
+forwardBtn.addEventListener("click", () => {
+  postToPlayer({ event: "command", func: "seekBy", args: [10] });
+});
+
+rewindBtn.addEventListener("click", () => {
+  postToPlayer({ event: "command", func: "seekBy", args: [-10] });
+});
+
+/* -----------------------------------------------------------
+   FEED RENDERING
+----------------------------------------------------------- */
 function renderFeed(items) {
   feedEl.innerHTML = "";
+
   items.forEach((item) => {
+    const snippet = item.snippet || {};
+    const stats = item.statistics || {};
+    const videoId = item.id?.videoId || item.id;
+
     const card = document.createElement("div");
-    card.className = "video-card";
+    card.className = "video-card parallax";
 
-    const thumb = document.createElement("div");
-    thumb.className = "video-thumb";
-    const img = document.createElement("img");
-    img.src = item.snippet?.thumbnails?.medium?.url || "";
-    thumb.appendChild(img);
+    card.innerHTML = `
+      <div class="video-thumb">
+        <img src="${snippet.thumbnails?.high?.url || ""}">
+      </div>
+      <div class="video-info">
+        <div class="video-title">${snippet.title}</div>
+        <div class="video-channel">${snippet.channelTitle}</div>
+        <div class="video-meta">${stats.viewCount || 0} views</div>
+      </div>
+    `;
 
-    const info = document.createElement("div");
-    info.className = "video-info";
-
-    const title = document.createElement("div");
-    title.className = "video-title";
-    title.textContent = item.snippet?.title || "Untitled";
-
-    const channel = document.createElement("div");
-    channel.className = "video-channel";
-    channel.textContent = item.snippet?.channelTitle || "";
-
-    const meta = document.createElement("div");
-    meta.className = "video-meta";
-    meta.textContent = item.snippet?.publishedAt || "";
-
-    info.appendChild(title);
-    info.appendChild(channel);
-    info.appendChild(meta);
-
-    card.appendChild(thumb);
-    card.appendChild(info);
-
-    card.addEventListener("click", () => {
-      const videoId = item.id?.videoId || item.id;
-      if (!videoId) return;
-      openPlayer(videoId);
-    });
+    card.onclick = () => {
+      setPlayerVideo(videoId, snippet);
+      showHUD("Playing: " + snippet.title);
+    };
 
     feedEl.appendChild(card);
   });
 }
 
-// HUD
-function showHUD(text) {
-  hudEl.textContent = text;
-  hudEl.style.opacity = "1";
-  setTimeout(() => {
-    hudEl.style.opacity = "0";
-  }, 1800);
-}
+/* -----------------------------------------------------------
+   ⭐ APPEND FEED (STEP 5)
+----------------------------------------------------------- */
+function appendFeed(items) {
+  items.forEach((item) => {
+    const snippet = item.snippet || {};
+    const stats = item.statistics || {};
+    const videoId = item.id?.videoId || item.id;
 
-// player modes
-function openPlayer(videoId) {
-  const frame = document.getElementById("playerFrame");
-  frame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1`;
-  playerSection.style.display = "block";
-  playerSection.classList.remove("player-mini", "player-fullscreen");
-  playerSection.classList.add("player-medium-inline");
-  document.body.classList.add("player-active");
-}
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
 
-function closePlayer() {
-  const frame = document.getElementById("playerFrame");
-  frame.src = "";
-  playerSection.style.display = "none";
-  playerSection.classList.remove("player-mini", "player-medium", "player-medium-inline", "player-fullscreen");
-  document.body.classList.remove("player-active", "fullscreen-active", "medium-active");
-}
+    card.innerHTML = `
+      <div class="video-thumb">
+        <img src="${snippet.thumbnails?.high?.url || ""}">
+      </div>
+      <div class="video-info">
+        <div class="video-title">${snippet.title}</div>
+        <div class="video-channel">${snippet.channelTitle}</div>
+        <div class="video-meta">${stats.viewCount || 0} views</div>
+      </div>
+    `;
 
-document.getElementById("closeMini").addEventListener("click", closePlayer);
+    card.onclick = () => {
+      setPlayerVideo(videoId, snippet);
+      showHUD("Playing: " + snippet.title);
+    };
 
-exitFullBtn.addEventListener("click", () => {
-  document.body.classList.remove("fullscreen-active");
-  playerSection.classList.remove("player-fullscreen");
-  playerSection.classList.add("player-medium-inline");
-});
-
-backMiniBtn.addEventListener("click", () => {
-  if (playerSection.style.display === "none") return;
-  playerSection.classList.remove("player-medium-inline", "player-fullscreen");
-  playerSection.classList.add("player-mini");
-  document.body.classList.remove("fullscreen-active");
-  document.body.classList.add("medium-active");
-});
-
-fullBtn.addEventListener("click", () => {
-  if (playerSection.style.display === "none") return;
-  playerSection.classList.remove("player-mini", "player-medium-inline");
-  playerSection.classList.add("player-fullscreen");
-  document.body.classList.add("fullscreen-active");
-});
-
-// player controls (visual only)
-playPauseBtn.addEventListener("click", () => {
-  isPlaying = !isPlaying;
-  playPauseBtn.textContent = isPlaying ? "Pause" : "Play";
-  showHUD(isPlaying ? "Playing" : "Paused");
-});
-
-rewindBtn.addEventListener("click", () => {
-  showHUD("Rewind -10s");
-});
-
-forwardBtn.addEventListener("click", () => {
-  showHUD("Forward +10s");
-});
-
-// keyboard
-function buildKeyboard() {
-  keyboardEl.innerHTML = "";
-  const rows = [
-    "Q W E R T Y U I O P",
-    "A S D F G H J K L",
-    "Z X C V B N M",
-    "SPACE DELETE ENTER"
-  ];
-
-  rows.forEach((row) => {
-    const rowEl = document.createElement("div");
-    rowEl.className = "keyboard-row";
-    row.split(" ").forEach((key) => {
-      const btn = document.createElement("div");
-      btn.className = "key-btn";
-      btn.dataset.key = key;
-      btn.textContent = key === "SPACE" ? "␣" : key;
-      rowEl.appendChild(btn);
-    });
-    keyboardEl.appendChild(rowEl);
+    feedEl.appendChild(card);
   });
 }
 
+
+   
+/* -----------------------------------------------------------
+   TABS
+----------------------------------------------------------- */
+function setActiveTab(tab) {
+  currentTab = tab;
+
+  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab]
+    .forEach(btn => btn.classList.remove("active"));
+
+  if (tab === "home") homeTab.classList.add("active");
+  if (tab === "shorts") shortsTab.classList.add("active");
+  if (tab === "movies") moviesTab.classList.add("active");
+  if (tab === "history") historyTab.classList.add("active");
+  if (tab === "trending") trendingTab.classList.add("active");
+  if (tab === "channel") channelTab.classList.add("active");
+
+  if (tab === "channel") {
+    feedEl.style.display = "none";
+    channelPageEl.style.display = "block";
+  } else {
+    feedEl.style.display = "block";
+    channelPageEl.style.display = "none";
+  }
+}
+
+/* -----------------------------------------------------------
+   HOME TAB — 50 fresh videos
+----------------------------------------------------------- */
+homeTab.addEventListener("click", async () => {
+  setActiveTab("home");
+
+  const data = await fetchYouTube("videos", {
+    part: "snippet,statistics,contentDetails",
+    chart: "mostPopular",
+    regionCode: "US",
+    maxResults: 50,
+    _: Date.now()
+  });
+
+  nextPageToken = data.nextPageToken || null;
+
+  renderFeed(data.items || []);
+  showHUD("Home");
+});
+
+
+/* -----------------------------------------------------------
+   TRENDING TAB — 50 trending videos
+----------------------------------------------------------- */
+trendingTab.addEventListener("click", async () => {
+  setActiveTab("trending");
+
+  const data = await fetchYouTube("videos", {
+    part: "snippet,statistics,contentDetails",
+    chart: "mostPopular",
+    regionCode: "US",
+    maxResults: 50,
+    _: Date.now()
+  });
+
+  nextPageToken = data.nextPageToken || null;
+
+  renderFeed(data.items || []);
+  showHUD("Trending");
+});
+
+
+/* -----------------------------------------------------------
+   SHORTS TAB — real Shorts feed (fixed)
+----------------------------------------------------------- */
+shortsTab.addEventListener("click", async () => {
+  setActiveTab("shorts");
+
+  const data = await fetchYouTube("search", {
+    part: "snippet",
+    q: "shorts",                 // ⭐ REQUIRED or API returns nothing
+    type: "video",
+    videoDuration: "short",
+    videoEmbeddable: "true",
+    regionCode: "US",
+    maxResults: 50,
+    _: Date.now()
+  });
+
+  shortsItems = data.items.map(v => ({
+    id: v.id.videoId,
+    snippet: v.snippet
+  }));
+
+  shortsIndex = 0;
+  nextPageToken = data.nextPageToken || null;
+
+  renderFeed(shortsItems);
+  showHUD("Shorts");
+});
+
+
+/* -----------------------------------------------------------
+   MOVIES TAB — real long-form movies
+----------------------------------------------------------- */
+moviesTab.addEventListener("click", async () => {
+  setActiveTab("movies");
+
+  const data = await fetchYouTube("search", {
+    part: "snippet",
+    q: "full movie",
+    type: "video",
+    videoDuration: "long",
+    videoEmbeddable: "true",
+    regionCode: "US",
+    maxResults: 50,
+    _: Date.now()
+  });
+
+  const items = data.items.map(v => ({
+    id: v.id.videoId,
+    snippet: v.snippet
+  }));
+
+  nextPageToken = data.nextPageToken || null;
+
+  renderFeed(items);
+  showHUD("Movies");
+});
+
+
+/* -----------------------------------------------------------
+   HISTORY TAB — watched videos
+----------------------------------------------------------- */
+historyTab.addEventListener("click", () => {
+  setActiveTab("history");
+
+  const items = historyList.slice(0, 50).map(h => ({
+    id: h.id,
+    snippet: h.snippet,
+    statistics: { viewCount: "watched" }
+  }));
+
+  nextPageToken = null; // no infinite scroll for history
+
+  renderFeed(items);
+  showHUD("History");
+});
+
+
+/* -----------------------------------------------------------
+   CHANNEL TAB — channel uploads
+----------------------------------------------------------- */
+channelTab.addEventListener("click", () => {
+  loadChannelPage(currentChannelId);
+});
+
+
+/* -----------------------------------------------------------
+   ⭐ LOAD MORE VIDEOS (STEP 4)
+----------------------------------------------------------- */
+async function loadMoreVideos() {
+  if (!nextPageToken || isLoadingMore) return;
+  isLoadingMore = true;
+
+  let data;
+
+  if (currentTab === "home") {
+    data = await fetchYouTube("videos", {
+      part: "snippet,statistics,contentDetails",
+      chart: "mostPopular",
+      regionCode: "US",
+      maxResults: 50,
+      pageToken: nextPageToken,
+      _: Date.now()
+    });
+  }
+
+  if (currentTab === "shorts") {
+    data = await fetchYouTube("search", {
+      part: "snippet",
+      q: "shorts",
+      type: "video",
+      videoDuration: "short",
+      videoEmbeddable: "true",
+      maxResults: 50,
+      pageToken: nextPageToken,
+      _: Date.now()
+    });
+  }
+
+  if (currentTab === "movies") {
+    data = await fetchYouTube("search", {
+      part: "snippet",
+      q: "full movie",
+      type: "video",
+      videoDuration: "long",
+      videoEmbeddable: "true",
+      maxResults: 50,
+      pageToken: nextPageToken,
+      _: Date.now()
+    });
+  }
+
+  if (currentTab === "trending") {
+    data = await fetchYouTube("videos", {
+      part: "snippet,statistics,contentDetails",
+      chart: "mostPopular",
+      regionCode: "US",
+      maxResults: 50,
+      pageToken: nextPageToken,
+      _: Date.now()
+    });
+  }
+
+  if (currentTab === "search") {
+    data = await fetchYouTube("search", {
+      part: "snippet",
+      q: lastSearchQuery,
+      type: "video",
+      maxResults: 50,
+      pageToken: nextPageToken,
+      _: Date.now()
+    });
+  }
+
+  if (currentTab === "channel") {
+    data = await fetchYouTube("playlistItems", {
+      part: "snippet",
+      playlistId: channelUploadsId,
+      maxResults: 50,
+      pageToken: nextPageToken,
+      _: Date.now()
+    });
+  }
+
+  nextPageToken = data.nextPageToken || null;
+  appendFeed(data.items || []);
+
+  isLoadingMore = false;
+}
+
+/* -----------------------------------------------------------
+   ⭐ INFINITE SCROLL LISTENER (STEP 3)
+----------------------------------------------------------- */
+window.addEventListener("scroll", async () => {
+  if (isLoadingMore) return;
+  if (!nextPageToken) return;
+
+  const scrollPos = window.innerHeight + window.scrollY;
+  const bottom = document.body.offsetHeight - 200;
+
+  if (scrollPos >= bottom) {
+    isLoadingMore = true;
+    await loadMoreVideos();
+    isLoadingMore = false;
+  }
+});
+   
+async function loadChannelPage(channelId) {
+  setActiveTab("channel");
+  currentChannelId = channelId;
+
+  const info = await fetchYouTube("channels", {
+    part: "snippet,statistics,contentDetails",
+    id: channelId
+  });
+
+  const channelInfo = info.items?.[0];
+  if (!channelInfo) return;
+
+  channelPageEl.innerHTML = `
+    <div class="channel-banner parallax">
+      <div class="banner-logo"></div>
+      <div class="banner-text">ViewTube</div>
+    </div>
+
+    <div class="channel-header parallax">
+      <img class="channel-pic" src="${channelInfo.snippet.thumbnails?.default?.url}">
+      <div class="channel-meta">
+        <div class="channel-name">${channelInfo.snippet.title}</div>
+        <div class="channel-subs">${channelInfo.statistics?.subscriberCount} subscribers</div>
+      </div>
+    </div>
+  `;
+
+  channelUploadsId = channelInfo.contentDetails.relatedPlaylists.uploads;
+
+  const uploads = await fetchYouTube("playlistItems", {
+  part: "snippet",
+  playlistId: channelUploadsId,
+  maxResults: 50,
+  _: Date.now()
+});
+
+
+  channelNextPageToken = uploads.nextPageToken || null;
+  nextPageToken = uploads.nextPageToken || null;
+
+
+  uploads.items.forEach(item => {
+    const snippet = item.snippet;
+    const videoId = snippet.resourceId.videoId;
+
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
+
+    card.innerHTML = `
+      <div class="video-thumb">
+        <img src="${snippet.thumbnails.medium.url}">
+      </div>
+      <div class="video-info">
+        <div class="video-title">${snippet.title}</div>
+        <div class="video-channel">${snippet.channelTitle}</div>
+      </div>
+    `;
+
+    card.onclick = () => setPlayerVideo(videoId, snippet);
+    channelPageEl.appendChild(card);
+  });
+
+  showHUD("Channel Loaded");
+}
+
+/* -----------------------------------------------------------
+   SEARCH + SUGGESTIONS
+----------------------------------------------------------- */
 async function fetchSuggestions(q) {
-  if (!q) return [];
-  return [q, q + " music", q + " clips"];
+  if (!q.trim()) return [];
+  const data = await fetchYouTube("search", {
+    part: "snippet",
+    q,
+    type: "video",
+    maxResults: 50
+  });
+  return data.items?.map(v => v.snippet.title) || [];
 }
 
 function showSuggestions(list) {
-  const container = document.getElementById("suggestions");
-  if (!list || !list.length) {
-    container.style.display = "none";
-    container.innerHTML = "";
+  suggestionsEl.innerHTML = "";
+  if (!list.length) {
+    suggestionsEl.style.display = "none";
     return;
   }
-  container.style.display = "block";
-  container.innerHTML = "";
-  list.forEach((s) => {
+
+  list.forEach(text => {
     const item = document.createElement("div");
     item.className = "suggestion-item";
-    item.textContent = s;
-    item.addEventListener("click", () => {
-      searchInput.value = s;
-      triggerSearch(s);
-    });
-    container.appendChild(item);
+    item.textContent = text;
+    item.onclick = () => {
+      searchInput.value = text;
+      triggerSearch(text);
+    };
+    suggestionsEl.appendChild(item);
   });
+
+  suggestionsEl.style.display = "block";
+}
+
+function openKeyboard() {
+  searchPanelEl.style.display = "block";
+  keyboardEl.style.display = "block";
+  document.querySelector(".search-input-bar").style.display = "flex";
+
+  feedEl.style.display = "none";
 }
 
 function closeKeyboard() {
   keyboardEl.style.display = "none";
-  searchInputBar.style.display = "none";
-  document.getElementById("suggestions").style.display = "none";
+  searchPanelEl.style.display = "none";
+  suggestionsEl.style.display = "none";
+
+  feedEl.style.display = "block";
 }
 
-searchOpenBtn.addEventListener("click", () => {
-  keyboardEl.style.display = "block";
-  searchInputBar.style.display = "flex";
-  showHUD("Search Panel");
+searchTabEl.addEventListener("click", openKeyboard);
+searchBack.addEventListener("click", closeKeyboard);
+
+searchGo.addEventListener("click", () => {
+  const q = searchInput.value.trim() || "music";
+  triggerSearch(q);
 });
 
-searchGoBtn.addEventListener("click", () => {
+searchInput.addEventListener("input", async () => {
   const q = searchInput.value.trim();
-  if (!q) return;
-  triggerSearch(q);
+  const suggestions = await fetchSuggestions(q);
+  showSuggestions(suggestions);
 });
 
 keyboardEl.addEventListener("click", async (e) => {
@@ -852,7 +1859,7 @@ keyboardEl.addEventListener("click", async (e) => {
 });
 
 function triggerSearch(q) {
-  lastSearchQuery = q;
+  lastSearchQuery = q;   // ⭐ STORE THE QUERY FOR INFINITE SCROLL
 
   (async () => {
     const data = await fetchYouTube("search", {
@@ -867,82 +1874,15 @@ function triggerSearch(q) {
 
     renderFeed(data.items || []);
     closeKeyboard();
-    setActiveTab("search");
     showHUD("Search: " + q);
   })();
 }
 
-// tabs
-function setActiveTab(tab) {
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.id.toLowerCase().startsWith(tab));
-  });
-}
 
-document.getElementById("homeTab").addEventListener("click", async () => {
-  setActiveTab("home");
-  const data = await fetchYouTube("videos", {
-    part: "snippet,statistics,contentDetails",
-    chart: "mostPopular",
-    regionCode: "US",
-    maxResults: 50,
-    _: Date.now()
-  });
-  nextPageToken = data.nextPageToken || null;
-  renderFeed(data.items || []);
-  showHUD("Home");
-});
 
-document.getElementById("shortsTab").addEventListener("click", async () => {
-  setActiveTab("shorts");
-  const data = await fetchYouTube("search", {
-    part: "snippet",
-    q: "shorts",
-    type: "video",
-    maxResults: 50,
-    _: Date.now()
-  });
-  nextPageToken = data.nextPageToken || null;
-  renderFeed(data.items || []);
-  showHUD("Shorts");
-});
-
-document.getElementById("moviesTab").addEventListener("click", async () => {
-  setActiveTab("movies");
-  const data = await fetchYouTube("search", {
-    part: "snippet",
-    q: "full movie",
-    type: "video",
-    maxResults: 50,
-    _: Date.now()
-  });
-  nextPageToken = data.nextPageToken || null;
-  renderFeed(data.items || []);
-  showHUD("Movies");
-});
-
-document.getElementById("trendingTab").addEventListener("click", async () => {
-  setActiveTab("trending");
-  const data = await fetchYouTube("videos", {
-    part: "snippet,statistics,contentDetails",
-    chart: "mostPopular",
-    regionCode: "US",
-    maxResults: 50,
-    _: Date.now()
-  });
-  nextPageToken = data.nextPageToken || null;
-  renderFeed(data.items || []);
-  showHUD("Trending");
-});
-
-document.getElementById("searchTabBtn").addEventListener("click", () => {
-  setActiveTab("search");
-  keyboardEl.style.display = "block";
-  searchInputBar.style.display = "flex";
-  showHUD("Search");
-});
-
-// holographic / parallax
+/* -----------------------------------------------------------
+   HOLOGRAPHIC EFFECTS
+----------------------------------------------------------- */
 function applyChroma(xTilt, yTilt) {
   const intensity = Math.min(1, Math.abs(xTilt) + Math.abs(yTilt));
   const blur = 4 + intensity * 12;
@@ -952,15 +1892,44 @@ function applyChroma(xTilt, yTilt) {
   playerSection.style.setProperty("--chroma-opacity", opacity);
 }
 
+/* -----------------------------------------------------------
+   AUDIO GLOW (SIMULATED)
+----------------------------------------------------------- */
+let audioGlowActive = false;
+
+function initAudioGlow() {
+  if (audioGlowActive) return;
+  audioGlowActive = true;
+
+  function animateGlow() {
+    if (!audioGlowActive) return;
+
+    const pulse = 0.25 + Math.random() * 0.35;
+    const blur = 20 + Math.random() * 25;
+
+    playerSection.style.setProperty("--audio-glow-opacity", pulse);
+    playerSection.style.setProperty("--audio-glow-blur", `${blur}px`);
+
+    requestAnimationFrame(animateGlow);
+  }
+
+  animateGlow();
+}
+
+/* -----------------------------------------------------------
+   DEPTH‑REACTIVE GLOW ENGINE (defined ONCE)
+----------------------------------------------------------- */
 function applyDepthGlow(x, y, isFullscreen) {
   const strength = isFullscreen ? 0.75 : 0.35;
   const blur = isFullscreen ? 55 : 22;
 
   playerSection.style.setProperty("--glow-strength", strength);
   playerSection.style.setProperty("--glow-blur", `${blur}px`);
+
   playerSection.style.setProperty("--glow-shift-x", `${x * 12}px`);
   playerSection.style.setProperty("--glow-shift-y", `${y * 12}px`);
 }
+
 
 function applyBloom(x, y, isFullscreen) {
   const intensity = isFullscreen ? 0.85 : 0.35;
@@ -978,8 +1947,9 @@ function applyVolumetricShadow(x, y, isFullscreen) {
   playerSection.style.setProperty("--shadow-opacity", opacity);
 }
 
-function applyDepthFog(x, y, isFullscreen) {
+ function applyDepthFog(x, y, isFullscreen) {
   const fog = Math.min(1, Math.abs(x) + Math.abs(y));
+
   const opacity = isFullscreen ? fog * 0.55 : fog * 0.25;
   const blur = 85 + fog * 45;
 
@@ -987,10 +1957,15 @@ function applyDepthFog(x, y, isFullscreen) {
   playerSection.style.setProperty("--fog-blur", `${blur}px`);
 }
 
+   
+/* -----------------------------------------------------------
+   PARALLAX / DEPTH ENGINE
+----------------------------------------------------------- */
 document.addEventListener("mousemove", (e) => {
   const x = (e.clientX / window.innerWidth) * 2 - 1;
   const y = (e.clientY / window.innerHeight) * 2 - 1;
 
+  // existing parallax
   document.querySelectorAll(".parallax").forEach((el) => {
     const depth = 8;
     el.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
@@ -1001,12 +1976,18 @@ document.addEventListener("mousemove", (e) => {
     el.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
   });
 
+  // ⭐ Depth‑reactive glow (VisionOS)
   const isFullscreen = playerSection.classList.contains("player-fullscreen");
   applyDepthGlow(x, y, isFullscreen);
+
   applyBloom(x, y, isFullscreen);
   applyVolumetricShadow(x, y, isFullscreen);
   applyDepthFog(x, y, isFullscreen);
 
+
+
+
+  // ⭐ IMAX tilt + Hover Intensity Boost
   document.querySelectorAll(".video-card").forEach((card) => {
     const tiltX = y * -8;
     const tiltY = x * 8;
@@ -1027,9 +2008,11 @@ document.addEventListener("mousemove", (e) => {
     `;
   });
 
+  // ⭐ Depth‑reactive holographic shadow
   document.querySelectorAll(".video-card").forEach((card) => {
     const shadowX = x * 14;
     const shadowY = y * 14;
+
     const isHover = card.matches(":hover");
     const blur = isHover ? 28 : 18;
     const opacity = isHover ? 0.75 : 0.55;
@@ -1040,8 +2023,10 @@ document.addEventListener("mousemove", (e) => {
     card.style.setProperty("--shadow-opacity", opacity);
   });
 
+  // ⭐ Ambient Occlusion depth response
   document.querySelectorAll(".video-card").forEach((card) => {
     const isHover = card.matches(":hover");
+
     const aoOpacity = isHover ? 0.22 : 0.35;
     const aoBlur = isHover ? 32 : 22;
 
@@ -1052,34 +2037,25 @@ document.addEventListener("mousemove", (e) => {
   applyChroma(x, y);
 });
 
-// theme toggle
+
+
+
+/* -----------------------------------------------------------
+   THEME TOGGLE
+----------------------------------------------------------- */
 themeToggle.addEventListener("click", () => {
   isLight = !isLight;
   document.body.classList.toggle("light", isLight);
   showHUD(isLight ? "Light Mode" : "Dark Mode");
 });
 
-// startup
-function runStartupAnimation() {
-  document.body.classList.add("startup-hidden");
-  feedEl.classList.add("startup-slide");
-  topbarEl.classList.add("startup-fade");
-  tabsEl.classList.add("startup-fade");
 
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      document.body.classList.remove("startup-hidden");
-      document.body.classList.add("startup-visible");
-
-      feedEl.classList.add("show");
-      topbarEl.classList.add("show");
-      tabsEl.classList.add("show");
-    });
-  });
-}
-
+/* -----------------------------------------------------------
+   INITIAL PLAYER LIGHTING STATE
+----------------------------------------------------------- */
 function initPlayerLighting() {
   const isFullscreen = false;
+
   applyDepthGlow(0, 0, isFullscreen);
   applyBloom(0, 0, isFullscreen);
   applyVolumetricShadow(0, 0, isFullscreen);
@@ -1087,6 +2063,9 @@ function initPlayerLighting() {
   applyChroma(0, 0);
 }
 
+/* -----------------------------------------------------------
+   INITIAL PARALLAX + GLOW STATE
+----------------------------------------------------------- */
 function initParallaxState() {
   const event = new MouseEvent("mousemove", {
     clientX: window.innerWidth / 2,
@@ -1095,89 +2074,17 @@ function initParallaxState() {
   document.dispatchEvent(event);
 }
 
-function runStartupLogo() {
-  const logo = document.getElementById("startup-logo");
-  logo.classList.add("show");
+   
 
-  setTimeout(() => {
-    logo.classList.add("hide");
-  }, 2200);
-
-  setTimeout(() => {
-    logo.remove();
-  }, 3200);
-}
-
-function playStartupSound() {
-  const audio = document.getElementById("startup-sound");
-  if (!audio) return;
-
-  audio.volume = 0.65;
-  audio.currentTime = 0;
-  audio.play().catch(() => {});
-}
-
-function runParticleBurst() {
-  const container = document.getElementById("particle-burst");
-  if (!container) return;
-
-  for (let i = 0; i < 18; i++) {
-    const p = document.createElement("div");
-    p.className = "particle";
-
-    const angle = (Math.PI * 2 * i) / 18;
-    const dist = 40 + Math.random() * 40;
-
-    const x = Math.cos(angle) * dist;
-    const y = Math.sin(angle) * dist;
-
-    container.appendChild(p);
-
-    requestAnimationFrame(() => {
-      p.style.opacity = 1;
-      p.style.transform = `translate(${x}px, ${y}px) scale(1)`;
-    });
-
-    setTimeout(() => {
-      p.style.opacity = 0;
-      p.style.transform = `translate(${x}px, ${y}px) scale(0.6)`;
-    }, 900);
-
-    setTimeout(() => p.remove(), 1600);
-  }
-}
-
-function runStartupRipple() {
-  const ripple = document.getElementById("startup-ripple");
-  if (!ripple) return;
-
-  ripple.classList.add("show");
-  setTimeout(() => ripple.classList.add("hide"), 900);
-  setTimeout(() => ripple.remove(), 1600);
-}
-
-function runCinematicFade() {
-  const fade = document.getElementById("cinematic-fade");
-  if (!fade) return;
-
-  setTimeout(() => fade.classList.add("hide"), 200);
-  setTimeout(() => fade.remove(), 1800);
-}
-
-// init
+/* -----------------------------------------------------------
+   INITIAL LOAD
+----------------------------------------------------------- */
 (async function init() {
-  runCinematicFade();
-  runStartupLogo();
-  playStartupSound();
-  runParticleBurst();
-  runStartupRipple();
-  runStartupAnimation();
-  buildKeyboard();
-
+  // Force UI into Home mode
   setActiveTab("home");
-  playerSection.style.display = "none";
-  document.body.classList.remove("player-active", "fullscreen-active");
+  showUIWithMiniPlayer();
 
+  // Load Home feed immediately
   const data = await fetchYouTube("videos", {
     part: "snippet,statistics,contentDetails",
     chart: "mostPopular",
@@ -1191,6 +2098,7 @@ function runCinematicFade() {
   renderFeed(data.items || []);
   showHUD("Home");
 
+  // ⭐ Initialize holographic state
   initPlayerLighting();
   initParallaxState();
 })();
