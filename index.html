@@ -2053,14 +2053,23 @@ themeToggle.addEventListener("click", () => {
    INITIAL LOAD
 ----------------------------------------------------------- */
 (async function init() {
+  // Make Home tab active on startup
+  setActiveTab("home");
+
   const data = await fetchYouTube("videos", {
-    part: "snippet,statistics",
+    part: "snippet,statistics,contentDetails",
     chart: "mostPopular",
-    maxResults: 25
+    regionCode: "US",
+    maxResults: 50,
+    _: Date.now()
   });
 
+  nextPageToken = data.nextPageToken || null;
+
   renderFeed(data.items || []);
+  showHUD("Home");
 })();
+
 </script>
 
 </body>
