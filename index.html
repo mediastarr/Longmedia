@@ -893,11 +893,186 @@ body.fullscreen-active .exit-full-btn {
   display: block;
 }
 
+
+/* -----------------------------------------------------------
+   STARTUP ANIMATION
+----------------------------------------------------------- */
+body.startup-hidden {
+  opacity: 0;
+  transform: scale(1.05);
+  filter: blur(18px);
+  transition: opacity 0.9s ease-out, transform 1.1s ease-out, filter 1.1s ease-out;
+}
+
+body.startup-visible {
+  opacity: 1;
+  transform: scale(1);
+  filter: blur(0px);
+}
+
+#feed.startup-slide {
+  opacity: 0;
+  transform: translateY(35px);
+  transition: opacity 0.9s ease-out 0.25s, transform 1s ease-out 0.25s;
+}
+
+#feed.startup-slide.show {
+  opacity: 1;
+  transform: translateY(0px);
+}
+
+#topbar.startup-fade,
+#tabs.startup-fade {
+  opacity: 0;
+  transition: opacity 0.8s ease-out 0.45s;
+}
+
+#topbar.startup-fade.show,
+#tabs.startup-fade.show {
+  opacity: 1;
+}
+
+
+/* -----------------------------------------------------------
+   FLOATING STARTUP LOGO
+----------------------------------------------------------- */
+.startup-logo {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(1.2);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 999999999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+
+  transition: opacity 0.8s ease-out, transform 1.2s ease-out;
+}
+
+.startup-logo.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.startup-logo.hide {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.85);
+}
+
+.startup-logo .logo-icon {
+  width: 90px;
+  height: 90px;
+  border-radius: 22px;
+  background: radial-gradient(circle at 30% 30%, #ff2d2d, #8b0000);
+  box-shadow: 0 0 35px rgba(255, 60, 60, 0.55),
+              0 0 65px rgba(255, 60, 60, 0.35);
+}
+
+.startup-logo .logo-text {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: white;
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.55);
+}
+
+
+/* -----------------------------------------------------------
+   SUBTLE VISIONOS PARTICLE BURST
+----------------------------------------------------------- */
+#particle-burst {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 220px;
+  height: 220px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 999999998;
+  opacity: 0;
+}
+
+.particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.55);
+  filter: blur(4px);
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.8s ease-out, transform 1.2s ease-out;
+}
+
+/* -----------------------------------------------------------
+   SUBTLE DEPTH RIPPLE
+----------------------------------------------------------- */
+#startup-ripple {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0.6);
+  background: radial-gradient(circle, rgba(255,255,255,0.25), transparent 70%);
+  filter: blur(22px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 999999997;
+  transition: opacity 0.8s ease-out, transform 1.2s ease-out;
+}
+
+#startup-ripple.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
+#startup-ripple.hide {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(1.4);
+}
+
+
+ /* -----------------------------------------------------------
+   CINEMATIC BLACK FADE
+----------------------------------------------------------- */
+#cinematic-fade {
+  position: fixed;
+  inset: 0;
+  background: black;
+  opacity: 1;
+  z-index: 9999999999;
+  pointer-events: none;
+  transition: opacity 1.4s ease-out;
+}
+
+#cinematic-fade.hide {
+  opacity: 0;
+}
   
+   
 </style>
 </head>
 <body>
 
+<div id="cinematic-fade"></div>
+   
+<div id="startup-logo" class="startup-logo">
+  <div class="logo-icon"></div>
+  <div class="logo-text">ViewTube</div>
+</div>
+
+<div id="particle-burst"></div>
+
+<div id="startup-ripple"></div>
+   
+<audio id="startup-sound" src="startup.mp3" preload="auto"></audio>
+
+   
 <!-- ⭐ MOVE PLAYER HERE (OUTSIDE app-shell) -->
 <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
 
@@ -2038,8 +2213,6 @@ document.addEventListener("mousemove", (e) => {
 });
 
 
-
-
 /* -----------------------------------------------------------
    THEME TOGGLE
 ----------------------------------------------------------- */
@@ -2049,12 +2222,197 @@ themeToggle.addEventListener("click", () => {
   showHUD(isLight ? "Light Mode" : "Dark Mode");
 });
 
+
+/* -----------------------------------------------------------
+   STARTUP ANIMATION ENGINE
+----------------------------------------------------------- */
+function runStartupAnimation() {
+  // Hide everything at first
+  document.body.classList.add("startup-hidden");
+
+  // Prepare feed + UI
+  feedEl.classList.add("startup-slide");
+  topbarEl.classList.add("startup-fade");
+  tabsEl.classList.add("startup-fade");
+
+  // Let browser render initial hidden state
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      // Fade in OS
+      document.body.classList.remove("startup-hidden");
+      document.body.classList.add("startup-visible");
+
+      // Slide feed + fade UI
+      feedEl.classList.add("show");
+      topbarEl.classList.add("show");
+      tabsEl.classList.add("show");
+    });
+  });
+}
+
+
+   
+/* -----------------------------------------------------------
+   INITIAL PLAYER LIGHTING STATE
+----------------------------------------------------------- */
+function initPlayerLighting() {
+  const isFullscreen = false;
+
+  applyDepthGlow(0, 0, isFullscreen);
+  applyBloom(0, 0, isFullscreen);
+  applyVolumetricShadow(0, 0, isFullscreen);
+  applyDepthFog(0, 0, isFullscreen);
+  applyChroma(0, 0);
+}
+
+/* -----------------------------------------------------------
+   INITIAL PARALLAX + GLOW STATE
+----------------------------------------------------------- */
+function initParallaxState() {
+  const event = new MouseEvent("mousemove", {
+    clientX: window.innerWidth / 2,
+    clientY: window.innerHeight / 2
+  });
+  document.dispatchEvent(event);
+}
+
+/* -----------------------------------------------------------
+   STARTUP LOGO ANIMATION
+----------------------------------------------------------- */
+function runStartupLogo() {
+  const logo = document.getElementById("startup-logo");
+
+  // Show logo
+  logo.classList.add("show");
+
+  // Hide after 2.2 seconds
+  setTimeout(() => {
+    logo.classList.add("hide");
+  }, 2200);
+
+  // Remove from DOM after fade-out
+  setTimeout(() => {
+    logo.remove();
+  }, 3200);
+}
+   
+/* -----------------------------------------------------------
+   STARTUP SOUND SYNCED TO GLOW
+----------------------------------------------------------- */
+function playStartupSound() {
+  const audio = document.getElementById("startup-sound");
+  if (!audio) return;
+
+  audio.volume = 0.65;
+  audio.currentTime = 0;
+  audio.play();
+
+  // Sync glow pulse with sound
+  let t = 0;
+  const pulse = () => {
+    t += 0.05;
+    const glow = 0.25 + Math.sin(t * 6) * 0.35;
+    const blur = 20 + Math.sin(t * 6) * 25;
+
+    playerSection.style.setProperty("--audio-glow-opacity", glow);
+    playerSection.style.setProperty("--audio-glow-blur", `${blur}px`);
+
+    if (t < 1.2) requestAnimationFrame(pulse);
+  };
+
+  pulse();
+}
+
+/* -----------------------------------------------------------
+   PARTICLE BURST (SUBTLE VISIONOS STYLE)
+----------------------------------------------------------- */
+function runParticleBurst() {
+  const container = document.getElementById("particle-burst");
+  if (!container) return;
+
+  // Create 18 soft particles
+  for (let i = 0; i < 18; i++) {
+    const p = document.createElement("div");
+    p.className = "particle";
+
+    const angle = (Math.PI * 2 * i) / 18;
+    const dist = 40 + Math.random() * 40;
+
+    const x = Math.cos(angle) * dist;
+    const y = Math.sin(angle) * dist;
+
+    container.appendChild(p);
+
+    requestAnimationFrame(() => {
+      p.style.opacity = 1;
+      p.style.transform = `translate(${x}px, ${y}px) scale(1)`;
+    });
+
+    // Fade out
+    setTimeout(() => {
+      p.style.opacity = 0;
+      p.style.transform = `translate(${x}px, ${y}px) scale(0.6)`;
+    }, 900);
+
+    // Remove
+    setTimeout(() => p.remove(), 1600);
+  }
+}
+
+
+/* -----------------------------------------------------------
+   DEPTH-REACTIVE RIPPLE (VISIONOS STYLE)
+----------------------------------------------------------- */
+function runStartupRipple() {
+  const ripple = document.getElementById("startup-ripple");
+  if (!ripple) return;
+
+  ripple.classList.add("show");
+
+  setTimeout(() => ripple.classList.add("hide"), 900);
+  setTimeout(() => ripple.remove(), 1600);
+}
+
+
+   
+/* -----------------------------------------------------------
+   CINEMATIC FADE (VISIONOS)
+----------------------------------------------------------- */
+function runCinematicFade() {
+  const fade = document.getElementById("cinematic-fade");
+  if (!fade) return;
+
+  // Fade to transparent after a short delay
+  setTimeout(() => fade.classList.add("hide"), 200);
+
+  // Remove after fade-out
+  setTimeout(() => fade.remove(), 1800);
+}
+
+
+   
 /* -----------------------------------------------------------
    INITIAL LOAD
 ----------------------------------------------------------- */
 (async function init() {
-  // Make Home tab active on startup
+
+  // ⭐ Cinematic fade first
+  runCinematicFade();
+
+  // ⭐ Logo + sound
+  runStartupLogo();
+  playStartupSound();
+
+  // ⭐ Subtle VisionOS effects
+  runParticleBurst();
+  runStartupRipple();
+
+  // ⭐ OS fade + feed slide
+  runStartupAnimation();
+
+  // Force UI into Home mode
   setActiveTab("home");
+  showUIWithMiniPlayer();
 
   const data = await fetchYouTube("videos", {
     part: "snippet,statistics,contentDetails",
@@ -2068,9 +2426,13 @@ themeToggle.addEventListener("click", () => {
 
   renderFeed(data.items || []);
   showHUD("Home");
+
+  // ⭐ Initialize holographic state
+  initPlayerLighting();
+  initParallaxState();
 })();
 
-</script>
 
+</script>
 </body>
 </html>
