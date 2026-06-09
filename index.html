@@ -970,14 +970,40 @@ body.fullscreen-active .exit-full-btn {
   </div>
 
   <!-- FEED -->
-  <div id="feed"></div>
+<div id="feed"></div>
 
-  <!-- CHANNEL PAGE -->
-  <div id="channelPage"></div>
+<!-- CHANNEL PAGE -->
+<div id="channelPage"></div>
 
-  <!-- SUBSCRIPTIONS PAGE -->
-  <div id="subsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
-  <div id="playlistsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
+<!-- SUBSCRIPTIONS PAGE -->
+<div id="subsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
+
+  <div class="channel-banner">
+    <div class="banner-logo"></div>
+    <div class="banner-text">SUBSCRIPTIONS</div>
+  </div>
+
+  <div id="subsLoginPanel" style="margin-top:12px; padding:12px; border-radius:16px;
+       background:linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));">
+
+    <div style="font-size:13px; opacity:0.85; margin-bottom:6px;">
+      Sign in to load your YouTube subscriptions
+    </div>
+
+    <button id="startLoginBtn" class="topbar-btn" style="margin-bottom:8px;">
+      Login to YouTube
+    </button>
+
+    <div id="deviceUserCode" style="font-size:12px; margin-top:6px; opacity:0.8;"></div>
+    <div id="deviceLoginStatus" style="font-size:12px; margin-top:4px; opacity:0.8;"></div>
+  </div>
+
+  <div id="subsFeed" style="margin-top:16px;"></div>
+</div>
+
+
+<!-- PLAYLISTS PAGE -->
+<div id="playlistsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
 
   <div class="channel-banner">
     <div class="banner-logo"></div>
@@ -987,31 +1013,6 @@ body.fullscreen-active .exit-full-btn {
   <div id="playlistsFeed" style="margin-top:16px;"></div>
 </div>
 
-
-    <div class="channel-banner">
-      <div class="banner-logo"></div>
-      <div class="banner-text">SUBSCRIPTIONS</div>
-    </div>
-
-    <div id="subsLoginPanel" style="margin-top:12px; padding:12px; border-radius:16px;
-         background:linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));">
-
-      <div style="font-size:13px; opacity:0.85; margin-bottom:6px;">
-        Sign in to load your YouTube subscriptions
-      </div>
-
-      <button id="startLoginBtn" class="topbar-btn" style="margin-bottom:8px;">
-        Login to YouTube
-      </button>
-
-      <div id="deviceUserCode" style="font-size:12px; margin-top:6px; opacity:0.8;"></div>
-      <div id="deviceLoginStatus" style="font-size:12px; margin-top:4px; opacity:0.8;"></div>
-    </div>
-
-    <div id="subsFeed" style="margin-top:16px;"></div>
-  </div>
-
-</div>
 
 <script>
 /* -----------------------------------------------------------
