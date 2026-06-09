@@ -49,6 +49,11 @@ body.light {
   padding: 16px 18px 24px;
 }
 
+/* hide UI when player is active (medium or mini) */
+body.player-active .app-shell {
+  display: none;
+}
+
 /* -----------------------------------------------------------
    TOPBAR
 ----------------------------------------------------------- */
@@ -203,13 +208,27 @@ body.light #searchTab {
   --fog-blur: 85px;
 }
 
+/* medium player = floating cinema card */
+#playerSection.player-medium {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 70vw;
+  height: 40vh;
+  max-width: 960px;
+  max-height: 540px;
+  z-index: 9990;
+}
+
+/* mini player bottom-right */
 #playerSection.player-mini {
   position: fixed;
   right: 16px;
   bottom: 16px;
   width: 260px;
   height: 150px;
-  z-index: 40;
+  z-index: 9990;
 }
 
 /* FULLSCREEN PLAYER + VisionOS transform */
@@ -234,6 +253,15 @@ body.light #searchTab {
     transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
     filter 0.55s ease,
     box-shadow 0.55s ease;
+}
+
+/* lock scroll + hide UI in fullscreen */
+body.fullscreen-active {
+  overflow: hidden;
+}
+
+body.fullscreen-active .app-shell {
+  display: none !important;
 }
 
 #playerSection.player-fullscreen.settled {
@@ -555,7 +583,6 @@ body.light #searchTab {
   font-size: 13px;
   padding-left: 6px;
   width: 100%;
-  overflow-x: auto;
 }
 
 .search-input-bar button {
@@ -676,13 +703,6 @@ body.light #searchTab {
   z-index: -3;
 }
 
-/* DEPTH MODE */
-body.search-depth-mode #feed,
-body.search-depth-mode #channelPage {
-  filter: blur(4px) brightness(0.7);
-  pointer-events: none;
-}
-
 /* CINEMA MODE OVERLAY */
 body.cinema-mode::before {
   content: "";
@@ -712,53 +732,6 @@ body.cinema-mode #playerSection {
     0 0 120px rgba(60,242,255,0.55),
     0 0 180px rgba(0,200,255,0.45),
     0 0 260px rgba(0,255,180,0.35);
-  transition: box-shadow 0.35s ease, filter 0.35s ease;
-}
-
-/* CINEMA TRANSITIONS */
-#playerSection {
-  transition:
-    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    border-radius 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.45s ease,
-    filter 0.45s ease;
-}
-
-body.cinema-mode::before {
-  transition:
-    background 0.45s ease,
-    backdrop-filter 0.45s ease;
-}
-
-body.cinema-mode #playerSection {
-  transition:
-    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
-    border-radius 0.55s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.55s ease,
-    filter 0.55s ease;
-}
-
-/* CINEMA ZOOM INTRO */
-@keyframes cinemaZoomIntro {
-  0% {
-    transform: scale(0.88) perspective(900px) rotateX(0deg);
-    opacity: 0.6;
-    filter: brightness(0.7);
-  }
-  60% {
-    transform: scale(1.03) perspective(900px) rotateX(4deg);
-    opacity: 1;
-    filter: brightness(1);
-  }
-  100% {
-    transform: scale(1) perspective(900px) rotateX(6deg);
-    opacity: 1;
-    filter: brightness(1);
-  }
-}
-
-#playerSection.player-fullscreen.cinema.zoom-intro {
-  animation: cinemaZoomIntro 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 /* FULLSCREEN BACK BUTTON */
@@ -776,13 +749,6 @@ body.cinema-mode #playerSection {
   z-index: 999999999 !important;
   pointer-events: auto;
   display: none;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
-}
-
-.exit-full-btn:hover {
-  box-shadow: 0 0 18px rgba(60,242,255,0.9),
-              0 0 30px rgba(60,242,255,0.5);
-  transform: scale(1.08);
 }
 
 body.fullscreen-active .exit-full-btn {
@@ -1072,7 +1038,7 @@ let nextPageToken = null;
 let isLoadingMore = false;
 let lastSearchQuery = "";
 let historyList = [];
-let currentChannelId = "UCoLDGQ7a81ep9SJqPlDs2sg"; // your channel ID
+let currentChannelId = null;
 let channelUploadsId = null;
 
 /* -----------------------------------------------------------
@@ -1201,6 +1167,7 @@ function createVideoCard(item) {
 
   card.onclick = () => {
     setPlayerVideo(videoId, snippet);
+    historyList.unshift({ id: videoId, snippet });
   };
 
   return card;
@@ -1230,21 +1197,23 @@ function appendFeed(items) {
 function setPlayerVideo(videoId, snippet) {
   currentVideoId = videoId;
   currentChannelId = snippet.channelId || currentChannelId;
-  historyList.unshift({ id: videoId, snippet });
 
   playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
 
   playerSection.style.display = "block";
-  playerSection.classList.remove("player-mini", "player-fullscreen");
+  playerSection.classList.remove("player-mini", "player-fullscreen", "cinema", "zoom-intro");
   playerSection.classList.add("player-medium");
 
+  document.body.classList.add("player-active");
   document.body.classList.remove("fullscreen-active", "cinema-mode");
 }
 
 function showUIWithMiniPlayer() {
   playerSection.style.display = "block";
+  playerSection.classList.remove("player-medium", "player-fullscreen", "cinema", "zoom-intro");
   playerSection.classList.add("player-mini");
-  playerSection.classList.remove("player-fullscreen", "cinema", "zoom-intro");
+
+  document.body.classList.add("player-active");
   document.body.classList.remove("fullscreen-active", "cinema-mode");
   miniActive = true;
 }
@@ -1253,7 +1222,7 @@ function closeMini() {
   playerSection.style.display = "none";
   playerFrame.src = "";
   miniActive = false;
-  document.body.classList.remove("fullscreen-active", "cinema-mode");
+  document.body.classList.remove("fullscreen-active", "cinema-mode", "player-active");
 }
 
 /* PLAYER BUTTONS */
@@ -1263,7 +1232,7 @@ fullBtn.addEventListener("click", () => {
   playerSection.classList.remove("player-mini", "player-medium");
   playerSection.classList.add("player-fullscreen", "cinema", "zoom-intro");
 
-  document.body.classList.add("fullscreen-active", "cinema-mode");
+  document.body.classList.add("fullscreen-active", "cinema-mode", "player-active");
 });
 
 exitFullBtn.addEventListener("click", () => {
@@ -1271,13 +1240,20 @@ exitFullBtn.addEventListener("click", () => {
     playerSection.classList.remove("player-fullscreen", "cinema", "zoom-intro");
     playerSection.classList.add("player-medium");
     document.body.classList.remove("fullscreen-active", "cinema-mode");
+    document.body.classList.add("player-active");
   }
 });
 
 backBtn.addEventListener("click", () => {
+  if (!currentVideoId) return;
+
   if (playerSection.classList.contains("player-medium")) {
-    playerSection.classList.remove("player-medium");
+    playerSection.classList.remove("player-medium", "player-fullscreen", "cinema", "zoom-intro");
     playerSection.classList.add("player-mini");
+    playerSection.style.display = "block";
+
+    document.body.classList.remove("fullscreen-active", "cinema-mode");
+    document.body.classList.add("player-active");
   }
 });
 
@@ -1544,6 +1520,7 @@ async function loadChannelPage(channelId) {
 
     card.onclick = () => {
       setPlayerVideo(videoId, snippet);
+      historyList.unshift({ id: videoId, snippet });
     };
 
     channelPageEl.appendChild(card);
@@ -1588,12 +1565,13 @@ function showSuggestions(list) {
 }
 
 function openKeyboard() {
+  // Option 2: keyboard allowed even if video was active → hide player and return to UI
+  playerSection.style.display = "none";
+  document.body.classList.remove("player-active", "fullscreen-active", "cinema-mode");
+
   searchPanelEl.style.display = "block";
   keyboardEl.style.display = "block";
   document.querySelector(".search-input-bar").style.display = "flex";
-
-  playerSection.classList.remove("player-mini");
-  playerSection.style.display = "none";
 
   feedEl.style.display = "none";
   channelPageEl.style.display = "none";
@@ -1909,6 +1887,7 @@ function runCinematicFade() {
    14. INITIAL LOAD (INIT MUST BE LAST)
 ----------------------------------------------------------- */
 (async function init() {
+  // cinematic fade + logo + sound
   runCinematicFade();
   runStartupLogo();
   playStartupSound();
@@ -1916,8 +1895,10 @@ function runCinematicFade() {
   runStartupRipple();
   runStartupAnimation();
 
+  // start in Home, no player visible
   setActiveTab("home");
-  showUIWithMiniPlayer();
+  playerSection.style.display = "none";
+  document.body.classList.remove("player-active", "fullscreen-active", "cinema-mode");
 
   const data = await fetchYouTube("videos", {
     part: "snippet,statistics,contentDetails",
