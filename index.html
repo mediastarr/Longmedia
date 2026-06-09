@@ -211,7 +211,20 @@ body.light #searchTab {
   top: 0;
   left: 0;
   z-index: 9999;
+
+  /* VisionOS transform */
+  transform:
+    perspective(1200px)
+    translateZ(45px)
+    scale(1.08)
+    rotateX(4deg);
+
+  transition:
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.55s ease,
+    box-shadow 0.55s ease;
 }
+
 
 #playerSection.player-fullscreen iframe {
   width: 100%;
@@ -225,6 +238,44 @@ body.light #searchTab {
   height: 100%;
 }
 
+/* -----------------------------------------------------------
+   DEPTH‑REACTIVE HOLOGRAPHIC GLOW
+----------------------------------------------------------- */
+#playerSection {
+  --glow-strength: 0.35;
+  --glow-blur: 22px;
+  --glow-shift-x: 0px;
+  --glow-shift-y: 0px;
+}
+
+#playerSection::after {
+  content: "";
+  position: absolute;
+  inset: -20px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(60,242,255,0.55), transparent 70%);
+  filter: blur(var(--glow-blur));
+  opacity: var(--glow-strength);
+  transform: translate(var(--glow-shift-x), var(--glow-shift-y));
+  transition:
+    opacity 0.25s ease,
+    filter 0.25s ease,
+    transform 0.25s ease;
+  z-index: -1;
+}
+
+
+
+#playerSection.player-fullscreen.settled {
+  transform:
+    perspective(1200px)
+    translateZ(0px)
+    scale(1)
+    rotateX(0deg);
+}
+
+
    
 #playerFrame {
   width: 100%;
@@ -236,12 +287,6 @@ body.light #searchTab {
   position: relative;
   z-index: 1;
 }
-
-
-
-
-
-
 
    
 /* -----------------------------------------------------------
@@ -1221,6 +1266,12 @@ fullBtn.addEventListener("click", () => {
   enableCinemaMode();
   playCinemaZoomIntro();
 
+
+  setTimeout(() => {
+  playerSection.classList.add("settled");
+}, 550);
+
+
   hideUIForVideo();
   showHUD("Fullscreen");
 });
@@ -1241,10 +1292,52 @@ exitFullBtn.addEventListener("click", () => {
     playerSection.classList.add("player-mini");
   }
 
+   playerSection.classList.remove("settled");
+
+
   showUIWithMiniPlayer();
   showHUD("Exited Fullscreen");
 });
 
+
+/* -----------------------------------------------------------
+   FULLSCREEN FAILSAFE (Never get stuck again)
+----------------------------------------------------------- */
+setInterval(() => {
+  const isFullscreen = playerSection.classList.contains("player-fullscreen");
+  const isCinema = document.body.classList.contains("cinema-mode");
+  const isFSBody = document.body.classList.contains("fullscreen-active");
+  const isHidden = playerSection.style.display === "none";
+  const isBlank = !playerFrame.src || playerFrame.src === "about:blank";
+
+  // ❌ Case 1: Player closed but fullscreen still active
+  if (isHidden && (isFullscreen || isCinema || isFSBody)) {
+    playerSection.classList.remove("player-fullscreen");
+    document.body.classList.remove("fullscreen-active");
+    disableCinemaMode();
+    return;
+  }
+
+  // ❌ Case 2: Cinema mode active without fullscreen
+  if (!isFullscreen && isCinema) {
+    disableCinemaMode();
+  }
+
+  // ❌ Case 3: Body fullscreen flag stuck
+  if (!isFullscreen && isFSBody) {
+    document.body.classList.remove("fullscreen-active");
+  }
+
+  // ❌ Case 4: Blank iframe but fullscreen active
+  if (isFullscreen && isBlank) {
+    playerSection.classList.remove("player-fullscreen");
+    document.body.classList.remove("fullscreen-active");
+    disableCinemaMode();
+  }
+}, 150);
+
+
+   
 /* -----------------------------------------------------------
    ESC / RAY‑BAN EMG EXIT FULLSCREEN
 ----------------------------------------------------------- */
@@ -1816,6 +1909,21 @@ function initAudioGlow() {
 }
 
 /* -----------------------------------------------------------
+   DEPTH‑REACTIVE GLOW ENGINE (defined ONCE)
+----------------------------------------------------------- */
+function applyDepthGlow(x, y, isFullscreen) {
+  const strength = isFullscreen ? 0.75 : 0.35;
+  const blur = isFullscreen ? 55 : 22;
+
+  playerSection.style.setProperty("--glow-strength", strength);
+  playerSection.style.setProperty("--glow-blur", `${blur}px`);
+
+  playerSection.style.setProperty("--glow-shift-x", `${x * 12}px`);
+  playerSection.style.setProperty("--glow-shift-y", `${y * 12}px`);
+}
+
+
+/* -----------------------------------------------------------
    PARALLAX / DEPTH ENGINE
 ----------------------------------------------------------- */
 document.addEventListener("mousemove", (e) => {
@@ -1832,6 +1940,10 @@ document.addEventListener("mousemove", (e) => {
     const depth = 4;
     el.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
   });
+
+  // ⭐ Depth‑reactive glow (VisionOS)
+  const isFullscreen = playerSection.classList.contains("player-fullscreen");
+  applyDepthGlow(x, y, isFullscreen);
 
   // ⭐ IMAX tilt + Hover Intensity Boost
   document.querySelectorAll(".video-card").forEach((card) => {
@@ -1882,6 +1994,7 @@ document.addEventListener("mousemove", (e) => {
 
   applyChroma(x, y);
 });
+
 
 
 
