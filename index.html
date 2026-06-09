@@ -153,11 +153,17 @@ body.light #searchTab {
   margin-top: 12px;
   display: flex;
   gap: 8px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
+  flex-wrap: nowrap;      /* keep tabs on one line */
+  overflow-x: auto;       /* allow horizontal scroll */
+  white-space: nowrap;    /* prevent wrapping */
   padding-bottom: 4px;
   position: relative;
   z-index: 16;
+  scrollbar-width: none;  /* hide scrollbar (Firefox) */
+}
+
+#tabs::-webkit-scrollbar {
+  display: none;          /* hide scrollbar (Chrome/Safari) */
 }
 
 .tab-btn {
@@ -175,6 +181,7 @@ body.light #searchTab {
   border-color: var(--accent);
   box-shadow: 0 0 18px rgba(60,242,255,0.7);
 }
+
 
 /* -----------------------------------------------------------
    PLAYER
