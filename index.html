@@ -204,15 +204,38 @@ body.light #searchTab {
   --fog-blur: 85px;
 }
 
-/* medium player inline above feed */
+/* ============================
+   MEDIUM MODE — FLOATING PLAYER
+   ============================ */
 #playerSection.player-medium {
-  position: relative;
-  width: 100%;
-  height: 260px;
-  margin-top: 16px;
-  z-index: 20;
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 70vw;
+  height: 40vh;
+  max-width: 960px;
+  max-height: 540px;
+  z-index: 9990;
 }
 
+/* ============================
+   HIDE UI BEHIND MEDIUM PLAYER
+   ============================ */
+body.medium-active #feed,
+body.medium-active #tabs,
+body.medium-active #topbar,
+body.medium-active #searchTab,
+body.medium-active #channelPage {
+  display: none !important;
+}
+
+/* ============================
+   NO SCROLL WHILE MEDIUM ACTIVE
+   ============================ */
+body.medium-active {
+  overflow: hidden;
+}
 
 /* mini player bottom-right */
 #playerSection.player-mini {
@@ -248,6 +271,7 @@ body.light #searchTab {
     box-shadow 0.55s ease;
 }
 
+   
 /* lock scroll + hide UI in fullscreen */
 body.fullscreen-active {
   overflow: hidden;
@@ -1194,10 +1218,10 @@ function setPlayerVideo(videoId, snippet) {
   playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
 
   playerSection.style.display = "block";
-  playerSection.classList.remove("player-mini", "player-fullscreen", "cinema", "zoom-intro");
+  playerSection.classList.remove("player-mini", "player-fullscreen");
   playerSection.classList.add("player-medium");
 
-  document.body.classList.add("player-active");
+  document.body.classList.add("medium-active");
   document.body.classList.remove("fullscreen-active", "cinema-mode");
 }
 
@@ -1228,26 +1252,28 @@ fullBtn.addEventListener("click", () => {
   document.body.classList.add("fullscreen-active", "cinema-mode", "player-active");
 });
 
+/* ⭐ Correct single copy */
+function restoreInlineMedium() {
+  playerSection.classList.remove("player-mini", "player-fullscreen");
+  playerSection.classList.add("player-medium");
+
+  document.body.classList.remove("fullscreen-active", "cinema-mode", "medium-active");
+}
+
+function goMini() {
+  playerSection.classList.remove("player-medium", "player-fullscreen");
+  playerSection.classList.add("player-mini");
+
+  document.body.classList.remove("medium-active", "fullscreen-active", "cinema-mode");
+}
+
 exitFullBtn.addEventListener("click", () => {
-  if (playerSection.classList.contains("player-fullscreen")) {
-    playerSection.classList.remove("player-fullscreen", "cinema", "zoom-intro");
-    playerSection.classList.add("player-medium");
-    document.body.classList.remove("fullscreen-active", "cinema-mode");
-    document.body.classList.add("player-active");
-  }
+  restoreInlineMedium();
 });
 
 backBtn.addEventListener("click", () => {
   if (!currentVideoId) return;
-
-  if (playerSection.classList.contains("player-medium")) {
-    playerSection.classList.remove("player-medium", "player-fullscreen", "cinema", "zoom-intro");
-    playerSection.classList.add("player-mini");
-    playerSection.style.display = "block";
-
-    document.body.classList.remove("fullscreen-active", "cinema-mode");
-    document.body.classList.add("player-active");
-  }
+  goMini();
 });
 
 closeMiniBtn.addEventListener("click", () => {
@@ -1266,13 +1292,9 @@ playPauseBtn.addEventListener("click", () => {
   }
 });
 
-rewindBtn.addEventListener("click", () => {
-  // placeholder for YouTube IFrame API
-});
+rewindBtn.addEventListener("click", () => {});
+forwardBtn.addEventListener("click", () => {});
 
-forwardBtn.addEventListener("click", () => {
-  // placeholder for YouTube IFrame API
-});
 
 /* -----------------------------------------------------------
    7. TAB HANDLING
