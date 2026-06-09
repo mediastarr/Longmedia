@@ -868,19 +868,31 @@ body.fullscreen-active .exit-full-btn {
   </div>
 
   <!-- TABS -->
-  <div id="tabs">
-    <button id="homeTab" class="tab-btn parallax-tab active">Home</button>
-    <button id="shortsTab" class="tab-btn parallax-tab">Shorts</button>
-    <button id="moviesTab" class="tab-btn parallax-tab">Movies</button>
-    <button id="historyTab" class="tab-btn parallax-tab">History</button>
-    <button id="trendingTab" class="tab-btn parallax-tab">Trending</button>
-    <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
-     <button id="subsTab" class="tab-btn parallax-tab">Subscriptions</button>
+<div id="tabs">
+  ... all your tab buttons ...
+  <button id="accountTab" class="tab-btn parallax-tab">Account</button>
+</div>
+
+<!-- ⭐ INSERT ACCOUNT PAGE HERE -->
+<div id="accountPage" style="display:none">
+  <div id="accountLoginSection">
+    <button id="startLoginBtn">Sign In</button>
+    <div id="deviceUserCode"></div>
+    <div id="deviceLoginStatus"></div>
   </div>
 
-  
-  <!-- PLAYER -->
+  <div id="accountInfoSection" style="display:none">
+    <img id="accountAvatar">
+    <div id="accountName"></div>
+    <div id="accountEmail"></div>
+    <button id="logoutBtn">Logout</button>
+  </div>
+</div>
+<!-- ⭐ END ACCOUNT PAGE -->
+
+<!-- PLAYER -->
 <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
+
 
     <iframe id="playerFrame"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -980,8 +992,9 @@ body.fullscreen-active .exit-full-btn {
 ----------------------------------------------------------- */
 const API_KEYS = [
   "AIzaSyCx0wjIv9VdzaI3oyz34zwkkFgTDj7LgEw",
-   "AIzaSyCNKebUdj8bTiRvLoSv28YqGdNoDn53Tk4",
-   "AIzaSyCJY-gccqPtgmqSnPRoo4W2vQp1chFCLHY",
+  "AIzaSyBcW3TMMFe7x9sIxGeB-Ykeh_9lG9TGwi4",
+  "AIzaSyCNKebUdj8bTiRvLoSv28YqGdNoDn53Tk4",
+  "AIzaSyCJY-gccqPtgmqSnPRoo4W2vQp1chFCLHY",
   "AIzaSyD4tP4THh9ZeDcVW041l_JCjJztZA2zJCA",
   "AIzaSyBKcKeVWaq_AVca-W3iEGnoQCVb7u0bvUk",
   "AIzaSyDLl8aAik8w2a9CqoQDUcN6rv_cfckDSYg",
@@ -991,7 +1004,7 @@ const API_KEYS = [
   "AIzaSyAxFZPU9JU9pVBUYat0Emidq1T-halZl7g",
   "AIzaSyDwIOQ1vUPiSSdnXDsCLSSpKw0iJhNSq2Q",
   "AIzaSyA8C0Zvavj5NvS8DG4mWiznxmlR1knfWDY",
-   "AIzaSyBR_sU9r1Mo54Mu14jINl8mucfdGmUah4g",
+  "AIzaSyBR_sU9r1Mo54Mu14jINl8mucfdGmUah4g",
   "AIzaSyAH0tTfPpID0ZZCwMb_MYBAcIyfzzCSNGk",
   "AIzaSyDp1vo7FcVtv8jwucExrjhlmmCoqvcjzZo",
   "AIzaSyCUEZU2myLSXROR8y07aVSGfTA3rXfBc2w",
@@ -2163,4 +2176,8 @@ themeToggle.addEventListener("click", () => {
     loadYouTubeProfile(savedToken);
   }
 })();
+   </script>
+</body>
+</html>
+
 
