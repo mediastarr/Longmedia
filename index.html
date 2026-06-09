@@ -1476,7 +1476,8 @@ function appendFeed(items) {
 function setActiveTab(tab) {
   currentTab = tab;
 
-  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab]
+  // FIXED: include subsTab
+  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab, subsTab]
     .forEach(btn => btn.classList.remove("active"));
 
   if (tab === "home") homeTab.classList.add("active");
@@ -1487,7 +1488,6 @@ function setActiveTab(tab) {
   if (tab === "channel") channelTab.classList.add("active");
   if (tab === "subs") subsTab.classList.add("active");
 
-
   if (tab === "channel") {
     feedEl.style.display = "none";
     channelPageEl.style.display = "block";
@@ -1496,6 +1496,7 @@ function setActiveTab(tab) {
     channelPageEl.style.display = "none";
   }
 }
+
 
 /* -----------------------------------------------------------
    HOME TAB — 50 fresh videos
