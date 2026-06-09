@@ -1034,6 +1034,7 @@ const feedEl = document.getElementById("feed");
 const topbarEl = document.getElementById("topbar");
 const tabsEl = document.getElementById("tabs");
 const playerSection = document.getElementById("playerSection");
+const searchPanelEl = document.getElementById("searchPanel");   // ⭐ REQUIRED   
 const searchPanelEl = document.getElementById("searchPanel");
 const searchInput = document.getElementById("searchInput");
 const searchGo = document.getElementById("searchGo");
@@ -1041,6 +1042,9 @@ const searchBack = document.getElementById("searchBack");
 const keyboardEl = document.getElementById("keyboard");
 const suggestionsEl = document.getElementById("suggestions");
 const channelPageEl = document.getElementById("channelPage");
+// ⭐ Enable keyboard opening from both Search Tab and Open Keyboard button
+document.querySelector(".search-open-btn").addEventListener("click", openKeyboard);
+searchTabEl.addEventListener("click", openKeyboard);
 const hudEl = document.getElementById("hud");
 const playerFrame = document.getElementById("playerFrame");
 
@@ -1229,17 +1233,20 @@ function appendFeed(items) {
    6. PLAYER CONTROL
 ----------------------------------------------------------- */
 function setPlayerVideo(videoId, snippet) {
-  if (!videoId) return;
   currentVideoId = videoId;
-  const url = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
-  playerFrame.src = url;
+  currentChannelId = snippet.channelId;   // ⭐ FIXED
+  historyList.unshift({ id: videoId, snippet }); // ⭐ FIXED
 
+  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+
+  // MEDIUM PLAYER
   playerSection.style.display = "block";
-  playerSection.classList.remove("player-mini");
-  playerSection.classList.add("player-fullscreen", "cinema", "settled", "zoom-intro");
-  document.body.classList.add("fullscreen-active", "cinema-mode");
-  miniActive = false;
+  playerSection.classList.remove("player-mini", "player-fullscreen");
+  playerSection.classList.add("player-medium");
+
+  document.body.classList.remove("fullscreen-active", "cinema-mode");
 }
+
 
 function showUIWithMiniPlayer() {
   playerSection.style.display = "block";
@@ -1268,22 +1275,36 @@ function closeMini() {
 /* PLAYER BUTTONS */
 fullBtn.addEventListener("click", () => {
   if (!currentVideoId) return;
-  playerSection.classList.remove("player-mini");
-  playerSection.classList.add("player-fullscreen", "cinema", "zoom-intro");
+
+  playerSection.classList.remove("player-mini", "player-medium");
+  playerSection.classList.add("player-fullscreen", "cinema");
+
   document.body.classList.add("fullscreen-active", "cinema-mode");
 });
 
+
 exitFullBtn.addEventListener("click", () => {
-  exitFullscreen();
+  if (playerSection.classList.contains("player-fullscreen")) {
+    playerSection.classList.remove("player-fullscreen", "cinema");
+    playerSection.classList.add("player-medium");
+    document.body.classList.remove("fullscreen-active", "cinema-mode");
+  }
 });
+
 
 backBtn.addEventListener("click", () => {
-  showUIWithMiniPlayer();
+  if (playerSection.classList.contains("player-medium")) {
+    playerSection.classList.remove("player-medium");
+    playerSection.classList.add("player-mini");
+  }
 });
 
+
 closeMiniBtn.addEventListener("click", () => {
-  closeMini();
+  playerSection.style.display = "none";
+  playerFrame.src = "";
 });
+
 
 playPauseBtn.addEventListener("click", () => {
   const src = playerFrame.src;
@@ -1397,12 +1418,13 @@ trendingTab.addEventListener("click", async () => {
 
 /* CHANNEL TAB */
 channelTab.addEventListener("click", () => {
-  if (currentChannelId) {
-    loadChannelPage(currentChannelId);
-  } else {
-    showHUD("No channel selected");
+  if (!currentChannelId) {
+    showHUD("Open a video first");
+    return;
   }
+  loadChannelPage(currentChannelId);
 });
+
 
 /* -----------------------------------------------------------
    8. LOAD MORE (INFINITE SCROLL)
@@ -1487,7 +1509,7 @@ window.addEventListener("scroll", async () => {
 ----------------------------------------------------------- */
 async function loadChannelPage(channelId) {
   setActiveTab("channel");
-  currentChannelId = channelId;
+  currentChannelId = UCoLDGQ7a81ep9SJqPlDs2sg;
 
   const info = await fetchYouTube("channels", {
     part: "snippet,statistics,contentDetails",
@@ -1593,10 +1615,15 @@ function openKeyboard() {
   searchPanelEl.style.display = "block";
   keyboardEl.style.display = "block";
   document.querySelector(".search-input-bar").style.display = "flex";
+
+  // hide mini player
+  playerSection.classList.remove("player-mini");
+  playerSection.style.display = "none";
+
   feedEl.style.display = "none";
   channelPageEl.style.display = "none";
-  document.body.classList.add("search-depth-mode");
 }
+
 
 function closeKeyboard() {
   keyboardEl.style.display = "none";
