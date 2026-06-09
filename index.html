@@ -187,6 +187,21 @@ body.light #searchTab {
   background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.18), rgba(5,6,12,0.98));
   height: 260px;
   display: none;
+
+  /* Lighting variables */
+  --glow-strength: 0.35;
+  --glow-blur: 22px;
+  --glow-shift-x: 0px;
+  --glow-shift-y: 0px;
+
+  --bloom-intensity: 0.35;
+  --bloom-radius: 32px;
+
+  --shadow-opacity: 0.45;
+  --shadow-blur: 55px;
+
+  --fog-opacity: 0.0;
+  --fog-blur: 85px;
 }
 
 #playerSection.player-mini {
@@ -199,7 +214,7 @@ body.light #searchTab {
 }
 
 /* -----------------------------------------------------------
-   FULLSCREEN PLAYER FIX
+   FULLSCREEN PLAYER FIX + VisionOS Transform
 ----------------------------------------------------------- */
 #playerSection.player-fullscreen {
   width: 100vw;
@@ -212,7 +227,6 @@ body.light #searchTab {
   left: 0;
   z-index: 9999;
 
-  /* VisionOS transform */
   transform:
     perspective(1200px)
     translateZ(45px)
@@ -225,48 +239,6 @@ body.light #searchTab {
     box-shadow 0.55s ease;
 }
 
-
-#playerSection.player-fullscreen iframe {
-  width: 100%;
-  height: 100%;
-  object-fit: contain; /* ⭐ makes video FIT instead of crop */
-  background: black;
-}
-
-#playerSection.player-fullscreen #playerFrame {
-  width: 100%;
-  height: 100%;
-}
-
-/* -----------------------------------------------------------
-   DEPTH‑REACTIVE HOLOGRAPHIC GLOW
------------------------------------------------------------ */
-#playerSection {
-  --glow-strength: 0.35;
-  --glow-blur: 22px;
-  --glow-shift-x: 0px;
-  --glow-shift-y: 0px;
-}
-
-#playerSection::after {
-  content: "";
-  position: absolute;
-  inset: -20px;
-  border-radius: inherit;
-  pointer-events: none;
-  background: radial-gradient(circle, rgba(60,242,255,0.55), transparent 70%);
-  filter: blur(var(--glow-blur));
-  opacity: var(--glow-strength);
-  transform: translate(var(--glow-shift-x), var(--glow-shift-y));
-  transition:
-    opacity 0.25s ease,
-    filter 0.25s ease,
-    transform 0.25s ease;
-  z-index: -1;
-}
-
-
-
 #playerSection.player-fullscreen.settled {
   transform:
     perspective(1200px)
@@ -275,18 +247,96 @@ body.light #searchTab {
     rotateX(0deg);
 }
 
+#playerSection.player-fullscreen iframe,
+#playerSection.player-fullscreen #playerFrame {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: black;
+}
 
-   
+/* -----------------------------------------------------------
+   AR‑GRADE BLOOM (Layer 1)
+----------------------------------------------------------- */
+#playerSection::before {
+  content: "";
+  position: absolute;
+  inset: -40px;
+  pointer-events: none;
+  border-radius: inherit;
+
+  background: radial-gradient(circle, rgba(60,242,255,0.85), transparent 70%);
+  filter: blur(var(--bloom-radius));
+  opacity: var(--bloom-intensity);
+
+  z-index: -2;
+}
+
+/* -----------------------------------------------------------
+   DEPTH‑REACTIVE HOLOGRAPHIC GLOW (Layer 2)
+----------------------------------------------------------- */
+#playerSection::after {
+  content: "";
+  position: absolute;
+  inset: -20px;
+  pointer-events: none;
+  border-radius: inherit;
+
+  background: radial-gradient(circle, rgba(60,242,255,0.55), transparent 70%);
+  filter: blur(var(--glow-blur));
+  opacity: var(--glow-strength);
+  transform: translate(var(--glow-shift-x), var(--glow-shift-y));
+
+  z-index: -1;
+}
+
+/* -----------------------------------------------------------
+   VOLUMETRIC SHADOW (Layer 3)
+----------------------------------------------------------- */
+#playerSection .fx-layers::before {
+  content: "";
+  position: absolute;
+  inset: -60px;
+  pointer-events: none;
+  border-radius: inherit;
+
+  background: radial-gradient(circle, rgba(0,0,0,0.45), transparent 70%);
+  filter: blur(var(--shadow-blur));
+  opacity: var(--shadow-opacity);
+
+  z-index: -3;
+  transform: translateY(40px) scale(1.2);
+}
+
+/* -----------------------------------------------------------
+   VISIONOS DEPTH FOG (Layer 4)
+----------------------------------------------------------- */
+#playerSection .fx-layers::after {
+  content: "";
+  position: absolute;
+  inset: -80px;
+  pointer-events: none;
+  border-radius: inherit;
+
+  background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 80%);
+  filter: blur(var(--fog-blur));
+  opacity: var(--fog-opacity);
+
+  z-index: -4;
+}
+
+/* -----------------------------------------------------------
+   IFRAME FIX
+----------------------------------------------------------- */
 #playerFrame {
   width: 100%;
   height: 100%;
   border: none;
   display: block;
-
-  /* ⭐ Add this line ⭐ */
   position: relative;
   z-index: 1;
 }
+
 
    
 /* -----------------------------------------------------------
@@ -847,6 +897,35 @@ body.fullscreen-active .exit-full-btn {
 </style>
 </head>
 <body>
+
+<!-- ⭐ MOVE PLAYER HERE (OUTSIDE app-shell) -->
+<div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
+
+    <!-- ⭐ REQUIRED for volumetric shadow + fog layers -->
+    <div class="fx-layers"></div>
+
+    <iframe id="playerFrame"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowfullscreen>
+    </iframe>
+
+    <div class="player-controls">
+      <button id="playPauseBtn">Pause</button>
+      <button id="rewindBtn">-10s</button>
+      <button id="forwardBtn">+10s</button>
+      <button id="fullBtn">Full</button>
+    </div>
+
+    <button id="closeMini">✕</button>
+</div>
+
+
+<!-- ⭐ Back button stays outside too -->
+<button id="exitFullBtn" class="exit-full-btn">Back</button>
+
+
+
+<!-- ⭐ NOW START app-shell -->
 <div class="app-shell">
 
   <!-- TOPBAR -->
@@ -877,93 +956,12 @@ body.fullscreen-active .exit-full-btn {
     <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
   </div>
 
-  
-  <!-- PLAYER -->
-<div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
-
-    <iframe id="playerFrame"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowfullscreen>
-    </iframe>
-
-    <div class="player-controls">
-      <button id="playPauseBtn">Pause</button>
-      <button id="rewindBtn">-10s</button>
-      <button id="forwardBtn">+10s</button>
-      <button id="fullBtn">Full</button>
-    </div>
-
-    <button id="closeMini">✕</button>
-</div>
-
-<!-- ⭐ Move Back button OUTSIDE the player -->
-<button id="exitFullBtn" class="exit-full-btn">Back</button>
-
   <!-- HUD -->
   <div id="hud"></div>
 
   <!-- SEARCH PANEL -->
   <div id="searchPanel">
-
-    <div class="search-input-bar">
-      <input id="searchInput" type="text" placeholder="Search videos..." />
-      <button id="searchBack">Back</button>
-      <button id="searchGo">Go</button>
-    </div>
-
-    <!-- FULL-WIDTH QWERTY KEYBOARD -->
-    <div id="keyboard">
-
-      <!-- ROW 1 -->
-      <div class="keyboard-row">
-        <div class="key-btn" data-key="Q">Q</div>
-        <div class="key-btn" data-key="W">W</div>
-        <div class="key-btn" data-key="E">E</div>
-        <div class="key-btn" data-key="R">R</div>
-        <div class="key-btn" data-key="T">T</div>
-        <div class="key-btn" data-key="Y">Y</div>
-        <div class="key-btn" data-key="U">U</div>
-        <div class="key-btn" data-key="I">I</div>
-        <div class="key-btn" data-key="O">O</div>
-        <div class="key-btn" data-key="P">P</div>
-      </div>
-
-      <!-- ROW 2 -->
-      <div class="keyboard-row">
-        <div class="key-btn" data-key="A">A</div>
-        <div class="key-btn" data-key="S">S</div>
-        <div class="key-btn" data-key="D">D</div>
-        <div class="key-btn" data-key="F">F</div>
-        <div class="key-btn" data-key="G">G</div>
-        <div class="key-btn" data-key="H">H</div>
-        <div class="key-btn" data-key="J">J</div>
-        <div class="key-btn" data-key="K">K</div>
-        <div class="key-btn" data-key="L">L</div>
-      </div>
-
-      <!-- ROW 3 -->
-      <div class="keyboard-row">
-        <div class="key-btn" data-key="Z">Z</div>
-        <div class="key-btn" data-key="X">X</div>
-        <div class="key-btn" data-key="C">C</div>
-        <div class="key-btn" data-key="V">V</div>
-        <div class="key-btn" data-key="B">B</div>
-        <div class="key-btn" data-key="N">N</div>
-        <div class="key-btn" data-key="M">M</div>
-      </div>
-
-      <!-- ROW 4 -->
-      <div class="keyboard-row">
-        <div class="key-btn" data-key="SPACE">SPACE</div>
-        <div class="key-btn" data-key="DELETE">DELETE</div>
-        <div class="key-btn" data-key="ENTER">ENTER</div>
-      </div>
-
-    </div>
-
-    <!-- SUGGESTIONS -->
-    <div id="suggestions"></div>
-
+    ...
   </div>
 
   <!-- FEED -->
@@ -972,15 +970,17 @@ body.fullscreen-active .exit-full-btn {
   <!-- CHANNEL PAGE -->
   <div id="channelPage"></div>
 
-</div>
+</div> <!-- end app-shell -->
+
 <script>
+
 /* -----------------------------------------------------------
    YOUTUBE API KEY ROTATION
 ----------------------------------------------------------- */
 const API_KEYS = [
   "AIzaSyCx0wjIv9VdzaI3oyz34zwkkFgTDj7LgEw",
-   "AIzaSyCNKebUdj8bTiRvLoSv28YqGdNoDn53Tk4",
-   "AIzaSyCJY-gccqPtgmqSnPRoo4W2vQp1chFCLHY",
+  "AIzaSyCNKebUdj8bTiRvLoSv28YqGdNoDn53Tk4",
+  "AIzaSyCJY-gccqPtgmqSnPRoo4W2vQp1chFCLHY",
   "AIzaSyD4tP4THh9ZeDcVW041l_JCjJztZA2zJCA",
   "AIzaSyBKcKeVWaq_AVca-W3iEGnoQCVb7u0bvUk",
   "AIzaSyDLl8aAik8w2a9CqoQDUcN6rv_cfckDSYg",
@@ -990,7 +990,7 @@ const API_KEYS = [
   "AIzaSyAxFZPU9JU9pVBUYat0Emidq1T-halZl7g",
   "AIzaSyDwIOQ1vUPiSSdnXDsCLSSpKw0iJhNSq2Q",
   "AIzaSyA8C0Zvavj5NvS8DG4mWiznxmlR1knfWDY",
-   "AIzaSyBR_sU9r1Mo54Mu14jINl8mucfdGmUah4g",
+  "AIzaSyBR_sU9r1Mo54Mu14jINl8mucfdGmUah4g",
   "AIzaSyAH0tTfPpID0ZZCwMb_MYBAcIyfzzCSNGk",
   "AIzaSyDp1vo7FcVtv8jwucExrjhlmmCoqvcjzZo",
   "AIzaSyCUEZU2myLSXROR8y07aVSGfTA3rXfBc2w",
@@ -1343,14 +1343,21 @@ setInterval(() => {
 ----------------------------------------------------------- */
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
+    // Exit fullscreen flags
     playerSection.classList.remove("player-fullscreen");
     document.body.classList.remove("fullscreen-active");
     disableCinemaMode();
+    playerSection.classList.remove("settled");
+
+    // Restore mini if it was active
+    if (miniActive) {
+      playerSection.classList.add("player-mini");
+    }
+
     showUIWithMiniPlayer();
     showHUD("Exited Fullscreen (Ray‑Ban EMG)");
   }
 });
-
 
 
 /* -----------------------------------------------------------
@@ -1604,7 +1611,8 @@ channelTab.addEventListener("click", () => {
    ⭐ LOAD MORE VIDEOS (STEP 4)
 ----------------------------------------------------------- */
 async function loadMoreVideos() {
-  if (!nextPageToken) return;
+  if (!nextPageToken || isLoadingMore) return;
+  isLoadingMore = true;
 
   let data;
 
@@ -1678,11 +1686,11 @@ async function loadMoreVideos() {
   }
 
   nextPageToken = data.nextPageToken || null;
-
   appendFeed(data.items || []);
+
+  isLoadingMore = false;
 }
 
- 
 /* -----------------------------------------------------------
    ⭐ INFINITE SCROLL LISTENER (STEP 3)
 ----------------------------------------------------------- */
@@ -1923,6 +1931,33 @@ function applyDepthGlow(x, y, isFullscreen) {
 }
 
 
+function applyBloom(x, y, isFullscreen) {
+  const intensity = isFullscreen ? 0.85 : 0.35;
+  const radius = isFullscreen ? 65 : 32;
+
+  playerSection.style.setProperty("--bloom-intensity", intensity);
+  playerSection.style.setProperty("--bloom-radius", `${radius}px`);
+}
+
+function applyVolumetricShadow(x, y, isFullscreen) {
+  const blur = isFullscreen ? 85 : 55;
+  const opacity = isFullscreen ? 0.55 : 0.35;
+
+  playerSection.style.setProperty("--shadow-blur", `${blur}px`);
+  playerSection.style.setProperty("--shadow-opacity", opacity);
+}
+
+ function applyDepthFog(x, y, isFullscreen) {
+  const fog = Math.min(1, Math.abs(x) + Math.abs(y));
+
+  const opacity = isFullscreen ? fog * 0.55 : fog * 0.25;
+  const blur = 85 + fog * 45;
+
+  playerSection.style.setProperty("--fog-opacity", opacity);
+  playerSection.style.setProperty("--fog-blur", `${blur}px`);
+}
+
+   
 /* -----------------------------------------------------------
    PARALLAX / DEPTH ENGINE
 ----------------------------------------------------------- */
@@ -1944,6 +1979,13 @@ document.addEventListener("mousemove", (e) => {
   // ⭐ Depth‑reactive glow (VisionOS)
   const isFullscreen = playerSection.classList.contains("player-fullscreen");
   applyDepthGlow(x, y, isFullscreen);
+
+  applyBloom(x, y, isFullscreen);
+  applyVolumetricShadow(x, y, isFullscreen);
+  applyDepthFog(x, y, isFullscreen);
+
+
+
 
   // ⭐ IMAX tilt + Hover Intensity Boost
   document.querySelectorAll(".video-card").forEach((card) => {
@@ -2007,18 +2049,61 @@ themeToggle.addEventListener("click", () => {
   showHUD(isLight ? "Light Mode" : "Dark Mode");
 });
 
+
+/* -----------------------------------------------------------
+   INITIAL PLAYER LIGHTING STATE
+----------------------------------------------------------- */
+function initPlayerLighting() {
+  const isFullscreen = false;
+
+  applyDepthGlow(0, 0, isFullscreen);
+  applyBloom(0, 0, isFullscreen);
+  applyVolumetricShadow(0, 0, isFullscreen);
+  applyDepthFog(0, 0, isFullscreen);
+  applyChroma(0, 0);
+}
+
+/* -----------------------------------------------------------
+   INITIAL PARALLAX + GLOW STATE
+----------------------------------------------------------- */
+function initParallaxState() {
+  const event = new MouseEvent("mousemove", {
+    clientX: window.innerWidth / 2,
+    clientY: window.innerHeight / 2
+  });
+  document.dispatchEvent(event);
+}
+
+   
+
 /* -----------------------------------------------------------
    INITIAL LOAD
 ----------------------------------------------------------- */
 (async function init() {
+  // Force UI into Home mode
+  setActiveTab("home");
+  showUIWithMiniPlayer();
+
+  // Load Home feed immediately
   const data = await fetchYouTube("videos", {
-    part: "snippet,statistics",
+    part: "snippet,statistics,contentDetails",
     chart: "mostPopular",
-    maxResults: 25
+    regionCode: "US",
+    maxResults: 50,
+    _: Date.now()
   });
 
+  nextPageToken = data.nextPageToken || null;
+
   renderFeed(data.items || []);
+  showHUD("Home");
+
+  // ⭐ Initialize holographic state
+  initPlayerLighting();
+  initParallaxState();
 })();
+
+
 </script>
 
 </body>
