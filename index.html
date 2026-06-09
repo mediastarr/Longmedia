@@ -1034,17 +1034,14 @@ const feedEl = document.getElementById("feed");
 const topbarEl = document.getElementById("topbar");
 const tabsEl = document.getElementById("tabs");
 const playerSection = document.getElementById("playerSection");
-const searchPanelEl = document.getElementById("searchPanel");   // ⭐ REQUIRED   
-const searchPanelEl = document.getElementById("searchPanel");
+
+const searchPanelEl = document.getElementById("searchPanel");   // ⭐ FIXED (only once)
 const searchInput = document.getElementById("searchInput");
 const searchGo = document.getElementById("searchGo");
 const searchBack = document.getElementById("searchBack");
 const keyboardEl = document.getElementById("keyboard");
 const suggestionsEl = document.getElementById("suggestions");
 const channelPageEl = document.getElementById("channelPage");
-// ⭐ Enable keyboard opening from both Search Tab and Open Keyboard button
-document.querySelector(".search-open-btn").addEventListener("click", openKeyboard);
-searchTabEl.addEventListener("click", openKeyboard);
 const hudEl = document.getElementById("hud");
 const playerFrame = document.getElementById("playerFrame");
 
@@ -1054,7 +1051,8 @@ const moviesTab = document.getElementById("moviesTab");
 const historyTab = document.getElementById("historyTab");
 const trendingTab = document.getElementById("trendingTab");
 const channelTab = document.getElementById("channelTab");
-const searchTabEl = document.getElementById("searchTab");
+const searchTabEl = document.getElementById("searchTab");   // ⭐ MUST BE BEFORE LISTENERS
+
 const themeToggle = document.getElementById("themeToggle");
 const backBtn = document.getElementById("backBtn");
 const exitFullBtn = document.getElementById("exitFullBtn");
@@ -1075,7 +1073,7 @@ let nextPageToken = null;
 let isLoadingMore = false;
 let lastSearchQuery = "";
 let historyList = [];
-let currentChannelId = null;
+let currentChannelId = "UCoLDGQ7a81ep9SJqPlDs2sg";   // ⭐ YOUR CHANNEL ID HERE
 let channelUploadsId = null;
 
 /* -----------------------------------------------------------
@@ -1203,11 +1201,6 @@ function createVideoCard(item) {
     </div>
   `;
 
-  card.onclick = () => {
-    setPlayerVideo(videoId, snippet);
-    historyList.unshift({ id: videoId, snippet });
-  };
-
   return card;
 }
 
@@ -1228,7 +1221,6 @@ function appendFeed(items) {
     feedEl.appendChild(card);
   });
 }
-
 /* -----------------------------------------------------------
    6. PLAYER CONTROL
 ----------------------------------------------------------- */
@@ -1509,7 +1501,7 @@ window.addEventListener("scroll", async () => {
 ----------------------------------------------------------- */
 async function loadChannelPage(channelId) {
   setActiveTab("channel");
-  currentChannelId = UCoLDGQ7a81ep9SJqPlDs2sg;
+  currentChannelId = channelId;   // ⭐ FIXED
 
   const info = await fetchYouTube("channels", {
     part: "snippet,statistics,contentDetails",
@@ -1566,8 +1558,7 @@ async function loadChannelPage(channelId) {
     `;
 
     card.onclick = () => {
-      setPlayerVideo(videoId, snippet);
-      historyList.unshift({ id: videoId, snippet });
+      setPlayerVideo(videoId, snippet);   // ⭐ FIXED (removed duplicate history push)
     };
 
     channelPageEl.appendChild(card);
@@ -1623,7 +1614,6 @@ function openKeyboard() {
   feedEl.style.display = "none";
   channelPageEl.style.display = "none";
 }
-
 
 function closeKeyboard() {
   keyboardEl.style.display = "none";
@@ -1688,6 +1678,7 @@ function triggerSearch(q) {
     showHUD("Search: " + q);
   })();
 }
+
 
 /* -----------------------------------------------------------
    11. HOLOGRAPHIC / PARALLAX / GLOW ENGINE
