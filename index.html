@@ -1787,7 +1787,6 @@ async function loadSubscriptions() {
         currentTab = "channel";
         currentChannelId = channelId;
         showHUD("Channel: " + title);
-        // reuse channel loader if desired
       };
 
       subsFeedEl.appendChild(card);
@@ -1799,49 +1798,6 @@ async function loadSubscriptions() {
   }
 }
 
-   async function loadUserPlaylists() {
-  const token = localStorage.getItem("yt_access_token");
-  if (!token) return;
-
-  playlistsFeedEl.innerHTML = "";
-  showHUD("Loading playlists…");
-
-  const res = await fetch(
-    "https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=25",
-    { headers: { Authorization: "Bearer " + token } }
-  );
-
-  const data = await res.json();
-
-  if (!data.items || !data.items.length) {
-    playlistsFeedEl.innerHTML = `<div style="opacity:0.8;">No playlists found.</div>`;
-    return;
-  }
-
-  data.items.forEach(pl => {
-    const snippet = pl.snippet;
-    const thumb = snippet.thumbnails?.medium?.url || "";
-    const title = snippet.title;
-    const playlistId = pl.id;
-
-    const card = document.createElement("div");
-    card.className = "video-card parallax";
-
-    card.innerHTML = `
-      <div class="video-thumb">
-        <img src="${thumb}">
-      </div>
-      <div class="video-info">
-        <div class="video-title">${title}</div>
-        <div class="video-meta">${pl.contentDetails.itemCount} videos</div>
-      </div>
-    `;
-
-    card.onclick = () => loadPlaylistVideos(playlistId, title);
-
-    playlistsFeedEl.appendChild(card);
-  });
-}
 
   async function loadUserPlaylists() {
   const token = localStorage.getItem("yt_access_token");
@@ -1886,7 +1842,46 @@ async function loadSubscriptions() {
     playlistsFeedEl.appendChild(card);
   });
 }
- 
+
+
+  async function loadPlaylistVideos(playlistId, title) {
+  showHUD("Loading playlist…");
+
+  const token = localStorage.getItem("yt_access_token");
+
+  const res = await fetch(
+    `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50`,
+    { headers: { Authorization: "Bearer " + token } }
+  );
+
+  const data = await res.json();
+
+  playlistsFeedEl.innerHTML = `
+    <div style="font-size:14px; margin-bottom:10px; opacity:0.85;">${title}</div>
+  `;
+
+  data.items.forEach(item => {
+    const snippet = item.snippet;
+    const videoId = snippet.resourceId.videoId;
+
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
+
+    card.innerHTML = `
+      <div class="video-thumb">
+        <img src="${snippet.thumbnails?.medium?.url || ""}">
+      </div>
+      <div class="video-info">
+        <div class="video-title">${snippet.title}</div>
+        <div class="video-channel">${snippet.videoOwnerChannelTitle}</div>
+      </div>
+    `;
+
+    card.onclick = () => setPlayerVideo(videoId, snippet);
+
+    playlistsFeedEl.appendChild(card);
+  });
+}
 
 
 /* -----------------------------------------------------------
