@@ -877,6 +877,7 @@ body.fullscreen-active .exit-full-btn {
     <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
     <!-- NEW: Subscriptions tab -->
     <button id="subsTab" class="tab-btn parallax-tab">Subscriptions</button>
+    <button id="playlistsTab" class="tab-btn parallax-tab">Playlists</button>
   </div>
 
   
@@ -976,6 +977,16 @@ body.fullscreen-active .exit-full-btn {
 
   <!-- SUBSCRIPTIONS PAGE -->
   <div id="subsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
+  <div id="playlistsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
+
+  <div class="channel-banner">
+    <div class="banner-logo"></div>
+    <div class="banner-text">PLAYLISTS</div>
+  </div>
+
+  <div id="playlistsFeed" style="margin-top:16px;"></div>
+</div>
+
 
     <div class="channel-banner">
       <div class="banner-logo"></div>
@@ -1007,7 +1018,7 @@ body.fullscreen-active .exit-full-btn {
    YOUTUBE API KEY ROTATION
 ----------------------------------------------------------- */
 const API_KEYS = [
-  "AIzaSyCx0wjIv9VdzaI3oyz34zwkkFgTDj7LgEw",
+  "AIzaSyBcW3TMMFe7x9sIxGeB-Ykeh_9lG9TGwi4",
   "AIzaSyCNKebUdj8bTiRvLoSv28YqGdNoDn53Tk4",
   "AIzaSyCJY-gccqPtgmqSnPRoo4W2vQp1chFCLHY",
   "AIzaSyD4tP4THh9ZeDcVW041l_JCjJztZA2zJCA",
@@ -1173,6 +1184,9 @@ const searchBack = document.getElementById("searchBack");
 const subsTab = document.getElementById("subsTab");
 const subsPageEl = document.getElementById("subsPage");
 const subsFeedEl = document.getElementById("subsFeed");
+const playlistsTab = document.getElementById("playlistsTab");
+const playlistsPageEl = document.getElementById("playlistsPage");
+const playlistsFeedEl = document.getElementById("playlistsFeed");
 const startLoginBtn = document.getElementById("startLoginBtn");
 const deviceUserCodeEl = document.getElementById("deviceUserCode");
 const deviceLoginStatusEl = document.getElementById("deviceLoginStatus");
@@ -1634,6 +1648,28 @@ subsTab.addEventListener("click", () => {
   }
 });
 
+   playlistsTab.addEventListener("click", () => {
+  currentTab = "playlists";
+
+  document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+  playlistsTab.classList.add("active");
+
+  feedEl.style.display = "none";
+  channelPageEl.style.display = "none";
+  subsPageEl.style.display = "none";
+  playlistsPageEl.style.display = "block";
+
+  const token = localStorage.getItem("yt_access_token");
+  if (token) {
+    loadUserPlaylists();
+  } else {
+    playlistsFeedEl.innerHTML = `<div style="opacity:0.8;">Login required to load playlists.</div>`;
+  }
+
+  showHUD("Playlists");
+});
+
+
 /* -----------------------------------------------------------
    OAUTH 2.0 DEVICE LOGIN
 ----------------------------------------------------------- */
@@ -1762,6 +1798,96 @@ async function loadSubscriptions() {
     showHUD("Subs error");
   }
 }
+
+   async function loadUserPlaylists() {
+  const token = localStorage.getItem("yt_access_token");
+  if (!token) return;
+
+  playlistsFeedEl.innerHTML = "";
+  showHUD("Loading playlists…");
+
+  const res = await fetch(
+    "https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=25",
+    { headers: { Authorization: "Bearer " + token } }
+  );
+
+  const data = await res.json();
+
+  if (!data.items || !data.items.length) {
+    playlistsFeedEl.innerHTML = `<div style="opacity:0.8;">No playlists found.</div>`;
+    return;
+  }
+
+  data.items.forEach(pl => {
+    const snippet = pl.snippet;
+    const thumb = snippet.thumbnails?.medium?.url || "";
+    const title = snippet.title;
+    const playlistId = pl.id;
+
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
+
+    card.innerHTML = `
+      <div class="video-thumb">
+        <img src="${thumb}">
+      </div>
+      <div class="video-info">
+        <div class="video-title">${title}</div>
+        <div class="video-meta">${pl.contentDetails.itemCount} videos</div>
+      </div>
+    `;
+
+    card.onclick = () => loadPlaylistVideos(playlistId, title);
+
+    playlistsFeedEl.appendChild(card);
+  });
+}
+
+  async function loadUserPlaylists() {
+  const token = localStorage.getItem("yt_access_token");
+  if (!token) return;
+
+  playlistsFeedEl.innerHTML = "";
+  showHUD("Loading playlists…");
+
+  const res = await fetch(
+    "https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=25",
+    { headers: { Authorization: "Bearer " + token } }
+  );
+
+  const data = await res.json();
+
+  if (!data.items || !data.items.length) {
+    playlistsFeedEl.innerHTML = `<div style="opacity:0.8;">No playlists found.</div>`;
+    return;
+  }
+
+  data.items.forEach(pl => {
+    const snippet = pl.snippet;
+    const thumb = snippet.thumbnails?.medium?.url || "";
+    const title = snippet.title;
+    const playlistId = pl.id;
+
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
+
+    card.innerHTML = `
+      <div class="video-thumb">
+        <img src="${thumb}">
+      </div>
+      <div class="video-info">
+        <div class="video-title">${title}</div>
+        <div class="video-meta">${pl.contentDetails.itemCount} videos</div>
+      </div>
+    `;
+
+    card.onclick = () => loadPlaylistVideos(playlistId, title);
+
+    playlistsFeedEl.appendChild(card);
+  });
+}
+ 
+
 
 /* -----------------------------------------------------------
    HISTORY TAB — watched videos
