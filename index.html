@@ -49,10 +49,6 @@ body.light {
   padding: 16px 18px 24px;
 }
 
-/* hide UI when player is active (medium or mini) */
-body.player-active .app-shell {
-  display: none;
-}
 
 /* -----------------------------------------------------------
    TOPBAR
@@ -208,18 +204,15 @@ body.light #searchTab {
   --fog-blur: 85px;
 }
 
-/* medium player = floating cinema card */
+/* medium player inline above feed */
 #playerSection.player-medium {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 70vw;
-  height: 40vh;
-  max-width: 960px;
-  max-height: 540px;
-  z-index: 9990;
+  position: relative;
+  width: 100%;
+  height: 260px;
+  margin-top: 16px;
+  z-index: 20;
 }
+
 
 /* mini player bottom-right */
 #playerSection.player-mini {
@@ -1532,6 +1525,34 @@ async function loadChannelPage(channelId) {
 /* -----------------------------------------------------------
    10. SEARCH + SUGGESTIONS + KEYBOARD
 ----------------------------------------------------------- */
+
+function buildKeyboard() {
+  keyboardEl.innerHTML = "";
+
+  const rows = [
+    ["Q","W","E","R","T","Y","U","I","O","P"],
+    ["A","S","D","F","G","H","J","K","L"],
+    ["Z","X","C","V","B","N","M"],
+    ["SPACE","DELETE","ENTER"]
+  ];
+
+  rows.forEach(row => {
+    const rowEl = document.createElement("div");
+    rowEl.className = "keyboard-row";
+
+    row.forEach(key => {
+      const btn = document.createElement("div");
+      btn.className = "key-btn";
+      btn.dataset.key = key;
+      btn.textContent = key === "SPACE" ? "␣" : key;
+      rowEl.appendChild(btn);
+    });
+
+    keyboardEl.appendChild(rowEl);
+  });
+}
+
+   
 async function fetchSuggestions(q) {
   if (!q.trim()) return [];
   const data = await fetchYouTube("search", {
@@ -1894,6 +1915,8 @@ function runCinematicFade() {
   runParticleBurst();
   runStartupRipple();
   runStartupAnimation();
+  buildKeyboard();
+
 
   // start in Home, no player visible
   setActiveTab("home");
