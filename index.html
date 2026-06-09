@@ -6,9 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <style>
-/* -----------------------------------------------------------
-   GLOBAL THEME
------------------------------------------------------------ */
 :root {
   --bg-dark: #05060a;
   --bg-light: #f4f5fb;
@@ -34,9 +31,6 @@ body {
   min-height: 100vh;
 }
 
-/* -----------------------------------------------------------
-   LAYOUT
------------------------------------------------------------ */
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -44,9 +38,7 @@ body {
   padding: 16px 18px 24px;
 }
 
-/* -----------------------------------------------------------
-   TOPBAR
------------------------------------------------------------ */
+/* TOPBAR */
 #topbar {
   display: flex;
   align-items: center;
@@ -96,20 +88,16 @@ body {
   cursor: pointer;
 }
 
-/* -----------------------------------------------------------
-   SEARCH BAR — FLOAT ABOVE TABS
------------------------------------------------------------ */
+/* SEARCH BAR (floating) */
 #searchTab {
   position: absolute;
   top: 72px;
   left: 18px;
   right: 18px;
   width: auto;
-
   display: flex;
   align-items: center;
   gap: 10px;
-
   padding: 10px 14px;
   border-radius: 18px;
   background: linear-gradient(135deg, rgba(8,10,18,0.9), rgba(16,20,32,0.9));
@@ -132,9 +120,7 @@ body {
   cursor: pointer;
 }
 
-/* -----------------------------------------------------------
-   TABS — BELOW SEARCH BAR
------------------------------------------------------------ */
+/* TABS BELOW SEARCH */
 #tabs {
   margin-top: 120px;
   display: flex;
@@ -142,10 +128,8 @@ body {
   flex-wrap: nowrap;
   overflow-x: auto;
   padding: 8px 10px;
-
   border-radius: 18px;
   background: linear-gradient(135deg, rgba(10,12,20,0.85), rgba(20,24,40,0.85));
-
   position: relative;
   z-index: 50;
 }
@@ -166,9 +150,7 @@ body {
   box-shadow: 0 0 18px rgba(60,242,255,0.7);
 }
 
-/* -----------------------------------------------------------
-   PLAYER SHELL
------------------------------------------------------------ */
+/* PLAYER SHELL */
 #playerSection {
   margin-top: 16px;
   border-radius: 22px;
@@ -258,10 +240,7 @@ body {
   cursor: pointer;
   z-index: 12;
 }
-
-/* -----------------------------------------------------------
-   HUD
------------------------------------------------------------ */
+/* HUD */
 #hud {
   position: fixed;
   left: 50%;
@@ -279,9 +258,7 @@ body {
   z-index: 60;
 }
 
-/* -----------------------------------------------------------
-   FEED
------------------------------------------------------------ */
+/* FEED */
 #feed {
   margin-top: 16px;
   display: grid;
@@ -308,44 +285,6 @@ body {
   transform: translateZ(22px) scale(1.03);
   box-shadow: 0 0 28px rgba(60,242,255,0.35),
               0 0 55px rgba(60,242,255,0.18);
-  transition: transform 0.15s ease-out, box-shadow 0.2s ease-out;
-}
-
-.video-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 18px;
-  z-index: -1;
-  transform: translate(var(--shadow-x, 0px), var(--shadow-y, 0px));
-  filter: blur(var(--shadow-blur, 18px));
-  opacity: var(--shadow-opacity, 0.55);
-  box-shadow:
-    0 12px 28px rgba(0,0,0,0.45),
-    0 0 22px rgba(60,242,255,0.12),
-    0 0 40px rgba(120,60,255,0.10);
-  transition:
-    transform 0.15s ease-out,
-    opacity 0.15s ease-out,
-    filter 0.15s ease-out;
-}
-
-.video-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 18px;
-  z-index: -2;
-  background: radial-gradient(
-    circle at 50% 60%,
-    rgba(0,0,0,0.35),
-    rgba(0,0,0,0.0) 70%
-  );
-  opacity: var(--ao-opacity, 0.35);
-  filter: blur(var(--ao-blur, 22px));
-  transition:
-    opacity 0.2s ease-out,
-    filter 0.2s ease-out;
 }
 
 .video-thumb {
@@ -389,9 +328,7 @@ body {
   pointer-events: none;
 }
 
-/* -----------------------------------------------------------
-   CHANNEL PAGE
------------------------------------------------------------ */
+/* CHANNEL PAGE */
 #channelPage {
   margin-top: 16px;
   display: none;
@@ -399,64 +336,7 @@ body {
   z-index: 10;
 }
 
-.channel-banner {
-  height: 90px;
-  border-radius: 18px;
-  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.25), rgba(8,10,16,0.96));
-  display: flex;
-  align-items: center;
-  padding: 14px;
-  gap: 10px;
-}
-
-.banner-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(60,242,255,0.9), transparent 70%);
-  box-shadow: 0 0 26px rgba(60,242,255,0.9);
-}
-
-.banner-text {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.channel-header {
-  margin-top: 10px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.channel-pic {
-  width: 46px;
-  height: 46px;
-  border-radius: 999px;
-  object-fit: cover;
-}
-
-.channel-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.channel-name {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.channel-subs {
-  font-size: 11px;
-  opacity: 0.8;
-}
-
-/* -----------------------------------------------------------
-   SEARCH PANEL + KEYBOARD
------------------------------------------------------------ */
+/* SEARCH PANEL + KEYBOARD */
 #searchPanel {
   margin-top: 12px;
   display: none;
@@ -553,9 +433,6 @@ body {
   background: rgba(60,242,255,0.16);
 }
 
-/* -----------------------------------------------------------
-   DEPTH MODE / CINEMA (simplified)
------------------------------------------------------------ */
 body.search-depth-mode #feed,
 body.search-depth-mode #channelPage {
   filter: blur(4px) brightness(0.7);
@@ -567,7 +444,7 @@ body.search-depth-mode #channelPage {
 <div class="app-shell">
 
   <!-- TOPBAR -->
-  <div id="topbar" class="parallax">
+  <div id="topbar">
     <div class="topbar-left">
       <div class="logo-orb"></div>
       <div class="topbar-title">VIEWTUBE AR OS</div>
@@ -579,25 +456,25 @@ body.search-depth-mode #channelPage {
   </div>
 
   <!-- SEARCH BAR -->
-  <div id="searchTab" class="parallax-tab">
+  <div id="searchTab">
     <div class="search-label">Search holographic feed</div>
     <button class="search-open-btn" id="openKeyboardBtn">Open Keyboard</button>
   </div>
 
   <!-- TABS -->
   <div id="tabs">
-    <button id="homeTab" class="tab-btn parallax-tab active">Home</button>
-    <button id="shortsTab" class="tab-btn parallax-tab">Shorts</button>
-    <button id="moviesTab" class="tab-btn parallax-tab">Movies</button>
-    <button id="historyTab" class="tab-btn parallax-tab">History</button>
-    <button id="trendingTab" class="tab-btn parallax-tab">Trending</button>
-    <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
-    <button id="subsTab" class="tab-btn parallax-tab">Subscriptions</button>
-    <button id="accountTab" class="tab-btn parallax-tab">Account</button>
+    <button id="homeTab" class="tab-btn active">Home</button>
+    <button id="shortsTab" class="tab-btn">Shorts</button>
+    <button id="moviesTab" class="tab-btn">Movies</button>
+    <button id="historyTab" class="tab-btn">History</button>
+    <button id="trendingTab" class="tab-btn">Trending</button>
+    <button id="channelTab" class="tab-btn">Channel</button>
+    <button id="subsTab" class="tab-btn">Subscriptions</button>
+    <button id="accountTab" class="tab-btn">Account</button>
   </div>
 
   <!-- PLAYER -->
-  <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
+  <div id="playerSection">
     <iframe id="playerFrame"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
       allowfullscreen>
@@ -673,11 +550,16 @@ body.search-depth-mode #channelPage {
   <!-- CHANNEL PAGE -->
   <div id="channelPage"></div>
 
+  <!-- OAUTH STATUS (simple text area) -->
+  <div id="oauthStatus" style="margin-top:12px; font-size:11px; opacity:0.8;">
+    <div id="deviceUserCode"></div>
+    <div id="deviceLoginStatus"></div>
+    <button id="startLoginBtn" class="topbar-btn" style="margin-top:6px;">Login to YouTube</button>
+  </div>
+
 </div>
 <script>
-/* -----------------------------------------------------------
-   SAMPLE DATA (replace with YouTube API later)
------------------------------------------------------------ */
+/* SAMPLE DATA */
 const sampleVideos = [
   {
     id: "ckan_toma_todo",
@@ -694,28 +576,9 @@ const sampleVideos = [
     views: "844,747 views",
     thumb: "https://i.ytimg.com/vi/VIDEO_ID2/hqdefault.jpg",
     url: "https://www.youtube.com/embed/VIDEO_ID2"
-  },
-  {
-    id: "nintendo_direct",
-    title: "Nintendo Direct 6.9.2026 + Nintendo Treehouse: Live | June 2026",
-    channel: "Nintendo of America",
-    views: "40,117,682 views",
-    thumb: "https://i.ytimg.com/vi/VIDEO_ID3/hqdefault.jpg",
-    url: "https://www.youtube.com/embed/VIDEO_ID3"
-  },
-  {
-    id: "madonna_confessions",
-    title: "Madonna - 'Confessions II - The Film'",
-    channel: "Madonna",
-    views: "1,521,574 views",
-    thumb: "https://i.ytimg.com/vi/VIDEO_ID4/hqdefault.jpg",
-    url: "https://www.youtube.com/embed/VIDEO_ID4"
   }
 ];
 
-/* -----------------------------------------------------------
-   DOM REFS
------------------------------------------------------------ */
 const feedEl = document.getElementById("feed");
 const playerSection = document.getElementById("playerSection");
 const playerFrame = document.getElementById("playerFrame");
@@ -726,16 +589,12 @@ const searchInput = document.getElementById("searchInput");
 const tabsEl = document.getElementById("tabs");
 const tabButtons = Array.from(document.querySelectorAll(".tab-btn"));
 
-/* -----------------------------------------------------------
-   FEED RENDER
------------------------------------------------------------ */
 function renderFeed(videos) {
   feedEl.innerHTML = "";
   videos.forEach(video => {
     const card = document.createElement("div");
     card.className = "video-card";
     card.dataset.videoId = video.id;
-
     card.innerHTML = `
       <div class="video-thumb">
         <img src="${video.thumb}" alt="${video.title}" />
@@ -746,18 +605,11 @@ function renderFeed(videos) {
         <div class="video-meta">${video.views}</div>
       </div>
     `;
-
-    card.addEventListener("click", () => {
-      openPlayer(video);
-    });
-
+    card.addEventListener("click", () => openPlayer(video));
     feedEl.appendChild(card);
   });
 }
 
-/* -----------------------------------------------------------
-   PLAYER CONTROL
------------------------------------------------------------ */
 function openPlayer(video) {
   playerFrame.src = video.url + "?autoplay=1";
   playerSection.style.display = "block";
@@ -780,9 +632,6 @@ document.getElementById("fullBtn").addEventListener("click", () => {
   }, 400);
 });
 
-/* -----------------------------------------------------------
-   HUD
------------------------------------------------------------ */
 function showHUD(message) {
   hudEl.textContent = message;
   hudEl.style.opacity = "1";
@@ -791,18 +640,14 @@ function showHUD(message) {
   }, 1200);
 }
 
-/* -----------------------------------------------------------
-   TABS SWITCHING (basic)
------------------------------------------------------------ */
+/* TABS */
 tabsEl.addEventListener("click", (e) => {
   const btn = e.target.closest(".tab-btn");
   if (!btn) return;
-
   tabButtons.forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
 
   const id = btn.id;
-
   if (id === "homeTab") {
     renderFeed(sampleVideos);
     showHUD("Home");
@@ -823,18 +668,10 @@ tabsEl.addEventListener("click", (e) => {
   }
 });
 
-/* -----------------------------------------------------------
-   INITIALIZE
------------------------------------------------------------ */
-renderFeed(sampleVideos);
-showHUD("ViewTube AR OS Ready");
-/* -----------------------------------------------------------
-   KEYBOARD + SEARCH PANEL
------------------------------------------------------------ */
+/* KEYBOARD + SEARCH */
 const openKeyboardBtn = document.getElementById("openKeyboardBtn");
 const searchBackBtn = document.getElementById("searchBack");
 const searchGoBtn = document.getElementById("searchGo");
-const suggestionEl = document.getElementById("suggestions");
 
 openKeyboardBtn.addEventListener("click", () => {
   searchPanel.style.display = "block";
@@ -858,12 +695,10 @@ searchGoBtn.addEventListener("click", () => {
   showHUD("Search: " + q);
 });
 
-/* KEYBOARD INPUT */
 keyboardEl.addEventListener("click", (e) => {
   const keyBtn = e.target.closest(".key-btn");
   if (!keyBtn) return;
   const key = keyBtn.dataset.key;
-
   if (key === "SPACE") {
     searchInput.value += " ";
   } else if (key === "DELETE") {
@@ -875,20 +710,15 @@ keyboardEl.addEventListener("click", (e) => {
   }
 });
 
-/* -----------------------------------------------------------
-   SIMPLE "SWIPE LAYER" EMULATION (keyboard <-> tabs <-> feed)
-   (You can replace this with Ray-Ban EMG swipe logic)
------------------------------------------------------------ */
-let currentLayer = "feed"; // "feed" | "tabs" | "keyboard"
+/* SIMPLE LAYER FLOW */
+let currentLayer = "feed";
 
 function goLayerUp() {
   if (currentLayer === "feed") {
-    // feed -> tabs
     tabsEl.scrollIntoView({ behavior: "smooth", block: "center" });
     showHUD("Tabs");
     currentLayer = "tabs";
   } else if (currentLayer === "tabs") {
-    // tabs -> keyboard
     openKeyboardBtn.click();
     currentLayer = "keyboard";
   }
@@ -896,30 +726,122 @@ function goLayerUp() {
 
 function goLayerDown() {
   if (currentLayer === "keyboard") {
-    // keyboard -> tabs
     searchBackBtn.click();
     tabsEl.scrollIntoView({ behavior: "smooth", block: "center" });
     showHUD("Tabs");
     currentLayer = "tabs";
   } else if (currentLayer === "tabs") {
-    // tabs -> feed
     feedEl.scrollIntoView({ behavior: "smooth", block: "start" });
     showHUD("Feed");
     currentLayer = "feed";
   }
 }
 
-/* For now, bind to keyboard shortcuts to simulate swipe:
-   ArrowUp = layer up, ArrowDown = layer down
-*/
 window.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowUp") {
-    goLayerUp();
-  } else if (e.key === "ArrowDown") {
-    goLayerDown();
-  }
+  if (e.key === "ArrowUp") goLayerUp();
+  else if (e.key === "ArrowDown") goLayerDown();
 });
+
+/* INIT */
+renderFeed(sampleVideos);
+showHUD("ViewTube AR OS Ready");
+/* API KEY ROTATION ARRAY (MASKED EXAMPLE — PASTE YOUR REAL KEYS HERE) */
+const API_KEYS = [
+  "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+  // 👉 continue adding the rest of your 59+ keys here, one per line
+];
+
+let currentKeyIndex = 0;
+
+function getCurrentApiKey() {
+  return API_KEYS[currentKeyIndex];
+}
+
+function rotateApiKey() {
+  currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
+}
+
+/* YOUTUBE FETCH USING ROTATION */
+async function ytFetch(endpoint, params = {}) {
+  const url = new URL("https://www.googleapis.com/youtube/v3/" + endpoint);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  url.searchParams.set("key", getCurrentApiKey());
+
+  let res = await fetch(url.toString());
+  if (res.status === 403 || res.status === 429) {
+    rotateApiKey();
+    url.searchParams.set("key", getCurrentApiKey());
+    res = await fetch(url.toString());
+  }
+  return res.json();
+}
+
+/* OAUTH 2.0 DEVICE LOGIN */
+async function startDeviceLogin() {
+  showHUD("Requesting login code…");
+
+  const res = await fetch("https://oauth2.googleapis.com/device/code", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: "YOUR_CLIENT_ID_HERE",
+      scope: "https://www.googleapis.com/auth/youtube.readonly"
+    })
+  });
+
+  const data = await res.json();
+
+  document.getElementById("deviceUserCode").textContent =
+    "Code: " + data.user_code;
+  document.getElementById("deviceLoginStatus").textContent =
+    "Go to: " + data.verification_url;
+
+  pollForToken(data.device_code);
+}
+
+async function pollForToken(deviceCode) {
+  let authorized = false;
+
+  while (!authorized) {
+    await new Promise(r => setTimeout(r, 5000));
+
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: "433136699735-guoa9ppvn132n8qecaukvoh336id7eg4.apps.googleusercontent.com",
+        client_secret: "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",
+        device_code: deviceCode,
+        grant_type: "urn:ietf:params:oauth:grant-type:device_code"
+      })
+    });
+
+    const tokenData = await tokenRes.json();
+
+    if (tokenData.access_token) {
+      localStorage.setItem("yt_access_token", tokenData.access_token);
+      showHUD("Login Successful");
+      authorized = true;
+      break;
+    }
+
+    if (tokenData.error !== "authorization_pending") {
+      showHUD("Login Failed");
+      break;
+    }
+  }
+}
+
+document.getElementById("startLoginBtn").addEventListener("click", startDeviceLogin);
 </script>
 </body>
 </html>
-   
