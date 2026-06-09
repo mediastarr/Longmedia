@@ -1025,7 +1025,6 @@ body.startup-visible {
 
 </div> <!-- end app-shell -->
 
-
 <script>
 /* -----------------------------------------------------------
    1. DOM ELEMENTS FIRST
@@ -1035,7 +1034,7 @@ const topbarEl = document.getElementById("topbar");
 const tabsEl = document.getElementById("tabs");
 const playerSection = document.getElementById("playerSection");
 
-const searchPanelEl = document.getElementById("searchPanel");   // ⭐ FIXED (only once)
+const searchPanelEl = document.getElementById("searchPanel");
 const searchInput = document.getElementById("searchInput");
 const searchGo = document.getElementById("searchGo");
 const searchBack = document.getElementById("searchBack");
@@ -1051,7 +1050,7 @@ const moviesTab = document.getElementById("moviesTab");
 const historyTab = document.getElementById("historyTab");
 const trendingTab = document.getElementById("trendingTab");
 const channelTab = document.getElementById("channelTab");
-const searchTabEl = document.getElementById("searchTab");   // ⭐ MUST BE BEFORE LISTENERS
+const searchTabEl = document.getElementById("searchTab");
 
 const themeToggle = document.getElementById("themeToggle");
 const backBtn = document.getElementById("backBtn");
@@ -1073,7 +1072,7 @@ let nextPageToken = null;
 let isLoadingMore = false;
 let lastSearchQuery = "";
 let historyList = [];
-let currentChannelId = "UCoLDGQ7a81ep9SJqPlDs2sg";   // ⭐ YOUR CHANNEL ID HERE
+let currentChannelId = "UCoLDGQ7a81ep9SJqPlDs2sg"; // your channel ID
 let channelUploadsId = null;
 
 /* -----------------------------------------------------------
@@ -1115,7 +1114,7 @@ const API_KEYS = [
   "AIzaSyBlDHyLe6pdlAieC4KMXR5X5OkAoZfFv98",
   "AIzaSyA7iqN8H1R3b15urhl8Z_ywLw5_PvRaqfs",
   "AIzaSyAX3Zhid-j1yC82-eY-kOY7n717sBTNoxs",
-  "AIzaSyCpWPsXdc9V9whBM09cMuiR3dSUzD4oj9w",
+  "AIzaSyCpWPsXdc9V9whBM09cMuiR3dSUd4oj9w",
   "AIzaSyCREh_Jkfelq-xhs74eDEKMX0UmSANCmgc",
   "AIzaSyCfezvfQdwcIal-J95kTadI_C3l_8DPNyQ",
   "AIzaSyBzMfP7pb8ElXOKw15Bkq_UZl70IGOyW60",
@@ -1145,7 +1144,6 @@ const API_KEYS = [
   "AIzaSyAsC6kZKAUhW4KMN04s8JJS9Hu4fFsgy04",
   "AIzaSyBCBZCfKfVg5kMUPjxmRq41uqrbrnmpu-I",
   "AIzaSyBk_q3XUQyI3rtUVCc46kjKJPh5Pm7u9QQ"
-
 ];
 let keyIndex = 0;
 
@@ -1201,6 +1199,10 @@ function createVideoCard(item) {
     </div>
   `;
 
+  card.onclick = () => {
+    setPlayerVideo(videoId, snippet);
+  };
+
   return card;
 }
 
@@ -1221,17 +1223,17 @@ function appendFeed(items) {
     feedEl.appendChild(card);
   });
 }
+
 /* -----------------------------------------------------------
    6. PLAYER CONTROL
 ----------------------------------------------------------- */
 function setPlayerVideo(videoId, snippet) {
   currentVideoId = videoId;
-  currentChannelId = snippet.channelId;   // ⭐ FIXED
-  historyList.unshift({ id: videoId, snippet }); // ⭐ FIXED
+  currentChannelId = snippet.channelId || currentChannelId;
+  historyList.unshift({ id: videoId, snippet });
 
   playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
 
-  // MEDIUM PLAYER
   playerSection.style.display = "block";
   playerSection.classList.remove("player-mini", "player-fullscreen");
   playerSection.classList.add("player-medium");
@@ -1239,22 +1241,12 @@ function setPlayerVideo(videoId, snippet) {
   document.body.classList.remove("fullscreen-active", "cinema-mode");
 }
 
-
 function showUIWithMiniPlayer() {
   playerSection.style.display = "block";
   playerSection.classList.add("player-mini");
   playerSection.classList.remove("player-fullscreen", "cinema", "zoom-intro");
   document.body.classList.remove("fullscreen-active", "cinema-mode");
   miniActive = true;
-}
-
-function exitFullscreen() {
-  if (!currentVideoId) {
-    playerSection.style.display = "none";
-    document.body.classList.remove("fullscreen-active", "cinema-mode");
-    return;
-  }
-  showUIWithMiniPlayer();
 }
 
 function closeMini() {
@@ -1269,20 +1261,18 @@ fullBtn.addEventListener("click", () => {
   if (!currentVideoId) return;
 
   playerSection.classList.remove("player-mini", "player-medium");
-  playerSection.classList.add("player-fullscreen", "cinema");
+  playerSection.classList.add("player-fullscreen", "cinema", "zoom-intro");
 
   document.body.classList.add("fullscreen-active", "cinema-mode");
 });
 
-
 exitFullBtn.addEventListener("click", () => {
   if (playerSection.classList.contains("player-fullscreen")) {
-    playerSection.classList.remove("player-fullscreen", "cinema");
+    playerSection.classList.remove("player-fullscreen", "cinema", "zoom-intro");
     playerSection.classList.add("player-medium");
     document.body.classList.remove("fullscreen-active", "cinema-mode");
   }
 });
-
 
 backBtn.addEventListener("click", () => {
   if (playerSection.classList.contains("player-medium")) {
@@ -1291,17 +1281,13 @@ backBtn.addEventListener("click", () => {
   }
 });
 
-
 closeMiniBtn.addEventListener("click", () => {
-  playerSection.style.display = "none";
-  playerFrame.src = "";
+  closeMini();
 });
-
 
 playPauseBtn.addEventListener("click", () => {
   const src = playerFrame.src;
   if (!src) return;
-  // Simple toggle: reload with autoplay=0 (not perfect but avoids JS API)
   if (src.includes("autoplay=1")) {
     playerFrame.src = src.replace("autoplay=1", "autoplay=0");
     playPauseBtn.textContent = "Play";
@@ -1312,11 +1298,11 @@ playPauseBtn.addEventListener("click", () => {
 });
 
 rewindBtn.addEventListener("click", () => {
-  // Without JS API, we can't seek; you can later wire YouTube IFrame API here.
+  // placeholder for YouTube IFrame API
 });
 
 forwardBtn.addEventListener("click", () => {
-  // Same as above; placeholder for future IFrame API.
+  // placeholder for YouTube IFrame API
 });
 
 /* -----------------------------------------------------------
@@ -1417,7 +1403,6 @@ channelTab.addEventListener("click", () => {
   loadChannelPage(currentChannelId);
 });
 
-
 /* -----------------------------------------------------------
    8. LOAD MORE (INFINITE SCROLL)
 ----------------------------------------------------------- */
@@ -1501,7 +1486,7 @@ window.addEventListener("scroll", async () => {
 ----------------------------------------------------------- */
 async function loadChannelPage(channelId) {
   setActiveTab("channel");
-  currentChannelId = channelId;   // ⭐ FIXED
+  currentChannelId = channelId;
 
   const info = await fetchYouTube("channels", {
     part: "snippet,statistics,contentDetails",
@@ -1558,7 +1543,7 @@ async function loadChannelPage(channelId) {
     `;
 
     card.onclick = () => {
-      setPlayerVideo(videoId, snippet);   // ⭐ FIXED (removed duplicate history push)
+      setPlayerVideo(videoId, snippet);
     };
 
     channelPageEl.appendChild(card);
@@ -1607,7 +1592,6 @@ function openKeyboard() {
   keyboardEl.style.display = "block";
   document.querySelector(".search-input-bar").style.display = "flex";
 
-  // hide mini player
   playerSection.classList.remove("player-mini");
   playerSection.style.display = "none";
 
@@ -1678,7 +1662,6 @@ function triggerSearch(q) {
     showHUD("Search: " + q);
   })();
 }
-
 
 /* -----------------------------------------------------------
    11. HOLOGRAPHIC / PARALLAX / GLOW ENGINE
@@ -1926,21 +1909,13 @@ function runCinematicFade() {
    14. INITIAL LOAD (INIT MUST BE LAST)
 ----------------------------------------------------------- */
 (async function init() {
-  // Cinematic fade first
   runCinematicFade();
-
-  // Logo + sound
   runStartupLogo();
   playStartupSound();
-
-  // VisionOS effects
   runParticleBurst();
   runStartupRipple();
-
-  // OS fade + feed slide
   runStartupAnimation();
 
-  // Force UI into Home mode
   setActiveTab("home");
   showUIWithMiniPlayer();
 
@@ -1957,7 +1932,6 @@ function runCinematicFade() {
   renderFeed(data.items || []);
   showHUD("Home");
 
-  // Initialize holographic state
   initPlayerLighting();
   initParallaxState();
 })();
