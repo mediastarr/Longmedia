@@ -1034,6 +1034,7 @@ const feedEl = document.getElementById("feed");
 const topbarEl = document.getElementById("topbar");
 const tabsEl = document.getElementById("tabs");
 const playerSection = document.getElementById("playerSection");
+const searchPanelEl = document.getElementById("searchPanel");
 const searchInput = document.getElementById("searchInput");
 const searchGo = document.getElementById("searchGo");
 const searchBack = document.getElementById("searchBack");
@@ -1072,9 +1073,9 @@ let lastSearchQuery = "";
 let historyList = [];
 let currentChannelId = null;
 let channelUploadsId = null;
-   
+
 /* -----------------------------------------------------------
-   YOUTUBE API KEY ROTATION
+   3. YOUTUBE API KEY ROTATION
 ----------------------------------------------------------- */
 const API_KEYS = [
   "AIzaSyCx0wjIv9VdzaI3oyz34zwkkFgTDj7LgEw",
@@ -1174,58 +1175,52 @@ function showHUD(text) {
 /* -----------------------------------------------------------
    5. FEED RENDERING
 ----------------------------------------------------------- */
+function createVideoCard(item) {
+  const snippet = item.snippet;
+  const videoId = item.id?.videoId || item.id || snippet.resourceId?.videoId;
+
+  const card = document.createElement("div");
+  card.className = "video-card parallax";
+
+  const thumb =
+    snippet.thumbnails?.medium?.url ||
+    snippet.thumbnails?.high?.url ||
+    snippet.thumbnails?.default?.url ||
+    "";
+
+  card.innerHTML = `
+    <div class="video-thumb">
+      <img src="${thumb}">
+    </div>
+    <div class="video-info">
+      <div class="video-title">${snippet.title}</div>
+      <div class="video-channel">${snippet.channelTitle || ""}</div>
+      <div class="video-meta">${item.statistics?.viewCount || ""}</div>
+    </div>
+  `;
+
+  card.onclick = () => {
+    setPlayerVideo(videoId, snippet);
+    historyList.unshift({ id: videoId, snippet });
+  };
+
+  return card;
+}
+
 function renderFeed(items) {
   channelPageEl.style.display = "none";
   feedEl.style.display = "grid";
   feedEl.innerHTML = "";
 
   items.forEach(item => {
-    const snippet = item.snippet;
-    const videoId = item.id?.videoId || item.id;
-    const card = document.createElement("div");
-    card.className = "video-card parallax";
-
-    card.innerHTML = `
-      <div class="video-thumb">
-        <img src="${snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || ""}">
-      </div>
-      <div class="video-info">
-        <div class="video-title">${snippet.title}</div>
-        <div class="video-channel">${snippet.channelTitle || ""}</div>
-        <div class="video-meta">${item.statistics?.viewCount || ""}</div>
-      </div>
-    `;
-
-    card.onclick = () => {
-      setPlayerVideo(videoId, snippet);
-    };
-
+    const card = createVideoCard(item);
     feedEl.appendChild(card);
   });
 }
 
 function appendFeed(items) {
   items.forEach(item => {
-    const snippet = item.snippet;
-    const videoId = item.id?.videoId || item.id;
-    const card = document.createElement("div");
-    card.className = "video-card parallax";
-
-    card.innerHTML = `
-      <div class="video-thumb">
-        <img src="${snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || ""}">
-      </div>
-      <div class="video-info">
-        <div class="video-title">${snippet.title}</div>
-        <div class="video-channel">${snippet.channelTitle || ""}</div>
-        <div class="video-meta">${item.statistics?.viewCount || ""}</div>
-      </div>
-    `;
-
-    card.onclick = () => {
-      setPlayerVideo(videoId, snippet);
-    };
-
+    const card = createVideoCard(item);
     feedEl.appendChild(card);
   });
 }
@@ -1234,23 +1229,82 @@ function appendFeed(items) {
    6. PLAYER CONTROL
 ----------------------------------------------------------- */
 function setPlayerVideo(videoId, snippet) {
+  if (!videoId) return;
   currentVideoId = videoId;
   const url = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
   playerFrame.src = url;
 
   playerSection.style.display = "block";
-  miniActive = true;
-  document.body.classList.add("fullscreen-active");
+  playerSection.classList.remove("player-mini");
+  playerSection.classList.add("player-fullscreen", "cinema", "settled", "zoom-intro");
+  document.body.classList.add("fullscreen-active", "cinema-mode");
+  miniActive = false;
 }
 
 function showUIWithMiniPlayer() {
-  playerSection.classList.add("player-mini");
   playerSection.style.display = "block";
+  playerSection.classList.add("player-mini");
+  playerSection.classList.remove("player-fullscreen", "cinema", "zoom-intro");
+  document.body.classList.remove("fullscreen-active", "cinema-mode");
+  miniActive = true;
 }
 
-function hideUIForVideo() {
-  playerSection.classList.remove("player-mini");
+function exitFullscreen() {
+  if (!currentVideoId) {
+    playerSection.style.display = "none";
+    document.body.classList.remove("fullscreen-active", "cinema-mode");
+    return;
+  }
+  showUIWithMiniPlayer();
 }
+
+function closeMini() {
+  playerSection.style.display = "none";
+  playerFrame.src = "";
+  miniActive = false;
+  document.body.classList.remove("fullscreen-active", "cinema-mode");
+}
+
+/* PLAYER BUTTONS */
+fullBtn.addEventListener("click", () => {
+  if (!currentVideoId) return;
+  playerSection.classList.remove("player-mini");
+  playerSection.classList.add("player-fullscreen", "cinema", "zoom-intro");
+  document.body.classList.add("fullscreen-active", "cinema-mode");
+});
+
+exitFullBtn.addEventListener("click", () => {
+  exitFullscreen();
+});
+
+backBtn.addEventListener("click", () => {
+  showUIWithMiniPlayer();
+});
+
+closeMiniBtn.addEventListener("click", () => {
+  closeMini();
+});
+
+playPauseBtn.addEventListener("click", () => {
+  const src = playerFrame.src;
+  if (!src) return;
+  // Simple toggle: reload with autoplay=0 (not perfect but avoids JS API)
+  if (src.includes("autoplay=1")) {
+    playerFrame.src = src.replace("autoplay=1", "autoplay=0");
+    playPauseBtn.textContent = "Play";
+  } else {
+    playerFrame.src = src.replace("autoplay=0", "autoplay=1");
+    playPauseBtn.textContent = "Pause";
+  }
+});
+
+rewindBtn.addEventListener("click", () => {
+  // Without JS API, we can't seek; you can later wire YouTube IFrame API here.
+});
+
+forwardBtn.addEventListener("click", () => {
+  // Same as above; placeholder for future IFrame API.
+});
 
 /* -----------------------------------------------------------
    7. TAB HANDLING
@@ -1345,6 +1399,8 @@ trendingTab.addEventListener("click", async () => {
 channelTab.addEventListener("click", () => {
   if (currentChannelId) {
     loadChannelPage(currentChannelId);
+  } else {
+    showHUD("No channel selected");
   }
 });
 
@@ -1487,7 +1543,11 @@ async function loadChannelPage(channelId) {
       </div>
     `;
 
-    card.onclick = () => setPlayerVideo(videoId, snippet);
+    card.onclick = () => {
+      setPlayerVideo(videoId, snippet);
+      historyList.unshift({ id: videoId, snippet });
+    };
+
     channelPageEl.appendChild(card);
   });
 
@@ -1503,7 +1563,7 @@ async function fetchSuggestions(q) {
     part: "snippet",
     q,
     type: "video",
-    maxResults: 50
+    maxResults: 20
   });
   return data.items?.map(v => v.snippet.title) || [];
 }
@@ -1534,16 +1594,20 @@ function openKeyboard() {
   keyboardEl.style.display = "block";
   document.querySelector(".search-input-bar").style.display = "flex";
   feedEl.style.display = "none";
+  channelPageEl.style.display = "none";
+  document.body.classList.add("search-depth-mode");
 }
 
 function closeKeyboard() {
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
   suggestionsEl.style.display = "none";
-  feedEl.style.display = "block";
+  feedEl.style.display = "grid";
+  document.body.classList.remove("search-depth-mode");
 }
 
 searchTabEl.addEventListener("click", openKeyboard);
+document.querySelector(".search-open-btn").addEventListener("click", openKeyboard);
 searchBack.addEventListener("click", closeKeyboard);
 
 searchGo.addEventListener("click", () => {
@@ -1593,6 +1657,7 @@ function triggerSearch(q) {
 
     renderFeed(data.items || []);
     closeKeyboard();
+    setActiveTab("search");
     showHUD("Search: " + q);
   })();
 }
@@ -1607,27 +1672,6 @@ function applyChroma(xTilt, yTilt) {
 
   playerSection.style.setProperty("--chroma-blur", `${blur}px`);
   playerSection.style.setProperty("--chroma-opacity", opacity);
-}
-
-let audioGlowActive = false;
-
-function initAudioGlow() {
-  if (audioGlowActive) return;
-  audioGlowActive = true;
-
-  function animateGlow() {
-    if (!audioGlowActive) return;
-
-    const pulse = 0.25 + Math.random() * 0.35;
-    const blur = 20 + Math.random() * 25;
-
-    playerSection.style.setProperty("--audio-glow-opacity", pulse);
-    playerSection.style.setProperty("--audio-glow-blur", `${blur}px`);
-
-    requestAnimationFrame(animateGlow);
-  }
-
-  animateGlow();
 }
 
 function applyDepthGlow(x, y, isFullscreen) {
@@ -1903,4 +1947,3 @@ function runCinematicFade() {
 
 </body>
 </html>
-   
