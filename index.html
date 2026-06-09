@@ -34,14 +34,28 @@ body {
   min-height: 100vh;
 }
 
+/* Prevent medium player cut-off */
 html, body {
   overflow: hidden;
 }
 
-/* Allow scrolling ONLY when NOT in medium or fullscreen */
+/* Allow scrolling ONLY when not in medium or fullscreen */
 body:not(.medium-active):not(.fullscreen-active) {
   overflow-y: auto;
 }
+
+/* Inline medium mode (after exiting fullscreen) */
+#playerSection.player-medium-inline {
+  position: relative;
+  width: 100%;
+  height: 260px;
+  transform: none;
+  top: auto;
+  left: auto;
+  margin-top: 16px;
+  z-index: 10;
+}
+
    
 
 body.light {
@@ -1224,7 +1238,7 @@ function appendFeed(items) {
 }
 
 /* -----------------------------------------------------------
-   6. PLAYER CONTROL
+   6. PLAYER CONTROL — FINAL FIXED VERSION
 ----------------------------------------------------------- */
 function setPlayerVideo(videoId, snippet) {
   currentVideoId = videoId;
@@ -1232,27 +1246,36 @@ function setPlayerVideo(videoId, snippet) {
 
   playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
 
-  console.log("MEDIUM MODE ACTIVE:", document.body.classList.contains("medium-active"));
-
   playerSection.style.display = "block";
-  playerSection.classList.remove("player-fullscreen", "cinema", "zoom-intro");
-  playerSection.classList.remove("player-mini", "player-fullscreen");
+  playerSection.classList.remove(
+    "player-mini",
+    "player-fullscreen",
+    "cinema",
+    "zoom-intro",
+    "player-medium-inline"
+  );
   playerSection.classList.add("player-medium");
 
   document.body.classList.add("medium-active");
   document.body.classList.remove("fullscreen-active", "cinema-mode");
 }
 
-function showUIWithMiniPlayer() {
+/* Mini mode */
+function goMini() {
   playerSection.style.display = "block";
-  playerSection.classList.remove("player-medium", "player-fullscreen", "cinema", "zoom-intro");
+  playerSection.classList.remove(
+    "player-medium",
+    "player-fullscreen",
+    "cinema",
+    "zoom-intro",
+    "player-medium-inline"
+  );
   playerSection.classList.add("player-mini");
 
-  document.body.classList.add("player-active");
-  document.body.classList.remove("fullscreen-active", "cinema-mode");
-  miniActive = true;
+  document.body.classList.remove("medium-active", "fullscreen-active", "cinema-mode");
 }
 
+/* Close mini */
 function closeMini() {
   playerSection.style.display = "none";
   playerFrame.src = "";
@@ -1260,47 +1283,57 @@ function closeMini() {
   document.body.classList.remove("fullscreen-active", "cinema-mode", "player-active");
 }
 
-/* PLAYER BUTTONS */
+/* Fullscreen */
 fullBtn.addEventListener("click", () => {
   if (!currentVideoId) return;
 
-  playerSection.classList.remove("player-mini", "player-medium");
+  playerSection.classList.remove(
+    "player-mini",
+    "player-medium",
+    "player-medium-inline"
+  );
   playerSection.classList.add("player-fullscreen", "cinema", "zoom-intro");
 
   document.body.classList.add("fullscreen-active", "cinema-mode", "player-active");
 });
 
-/* ⭐ Correct single copy */
+/* Restore inline medium after fullscreen */
 function restoreInlineMedium() {
-  playerSection.classList.remove("player-mini", "player-fullscreen");
-  playerSection.classList.add("player-medium");
+  playerSection.style.display = "block";
+
+  playerSection.classList.remove(
+    "player-mini",
+    "player-fullscreen",
+    "cinema",
+    "zoom-intro",
+    "player-medium"
+  );
+  playerSection.classList.add("player-medium-inline");
 
   document.body.classList.remove("fullscreen-active", "cinema-mode", "medium-active");
 }
 
-function goMini() {
-  playerSection.classList.remove("player-medium", "player-fullscreen");
-  playerSection.classList.add("player-mini");
-
-  document.body.classList.remove("medium-active", "fullscreen-active", "cinema-mode");
-}
-
+/* Fullscreen exit button */
 exitFullBtn.addEventListener("click", () => {
   restoreInlineMedium();
 });
 
+/* Mini button */
 backBtn.addEventListener("click", () => {
   if (!currentVideoId) return;
   goMini();
 });
 
+/* Close mini button */
 closeMiniBtn.addEventListener("click", () => {
   closeMini();
 });
 
+/* Play / Pause */
 playPauseBtn.addEventListener("click", () => {
   const src = playerFrame.src;
   if (!src) return;
+
   if (src.includes("autoplay=1")) {
     playerFrame.src = src.replace("autoplay=1", "autoplay=0");
     playPauseBtn.textContent = "Play";
@@ -1312,6 +1345,7 @@ playPauseBtn.addEventListener("click", () => {
 
 rewindBtn.addEventListener("click", () => {});
 forwardBtn.addEventListener("click", () => {});
+
 
 
 /* -----------------------------------------------------------
