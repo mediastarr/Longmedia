@@ -111,20 +111,7 @@ body.light .topbar-btn {
   color: #05060a;
 }
 
-/* -----------------------------------------------------------
-   SEARCH BAR
------------------------------------------------------------ */
-#searchTab {
-  margin-top: 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, rgba(8,10,18,0.9), rgba(16,20,32,0.9));
-  position: relative;
-  z-index: 18;
-}
+
 
 body.light #searchTab {
   background: linear-gradient(135deg, rgba(238,240,255,0.95), rgba(224,228,255,0.95));
@@ -158,11 +145,28 @@ body.light #searchTab {
   white-space: nowrap;
   padding-bottom: 4px;
   position: relative;
-  z-index: 9999;
-
+  z-index: 99999 !important;
+  pointer-events: auto !important;
 }
 
- /* -----------------------------------------------------------
+/* -----------------------------------------------------------
+   SEARCH BAR
+----------------------------------------------------------- */
+#searchTab {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(8,10,18,0.9), rgba(16,20,32,0.9));
+  position: relative;
+  z-index: 0 !important; /* ⭐ FIX */
+  pointer-events: none;
+}
+
+
+   /* -----------------------------------------------------------
    FIX — Prevent hidden panels from blocking tab clicks
 ----------------------------------------------------------- */
 #searchPanel,
@@ -398,8 +402,10 @@ body.light #searchTab {
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   position: relative;
-  z-index: 10;
+  z-index: 1 !important;
+  pointer-events: auto;
 }
+
 
 .video-card {
   display: flex;
@@ -1021,9 +1027,7 @@ body.fullscreen-active .exit-full-btn {
 <div id="channelPage" class="tab-fade"></div>
 
 
-<!-- SUBSCRIPTIONS PAGE -->
-<div id="subsPage" class="tab-fade" style="display:none; ..."></div>
-
+<div id="subsPage" class="tab-fade" style="display:none; ...">
 
   <div class="channel-banner">
     <div class="banner-logo"></div>
@@ -1046,12 +1050,13 @@ body.fullscreen-active .exit-full-btn {
   </div>
 
   <div id="subsFeed" style="margin-top:16px;"></div>
+
 </div>
 
 
-<!-- PLAYLISTS PAGE -->
-<div id="playlistsPage" class="tab-fade" style="display:none; ..."></div>
 
+<!-- PLAYLISTS PAGE -->
+<div id="playlistsPage" class="tab-fade" style="display:none; ...">
 
   <div class="channel-banner">
     <div class="banner-logo"></div>
@@ -1059,7 +1064,8 @@ body.fullscreen-active .exit-full-btn {
   </div>
 
   <div id="playlistsFeed" style="margin-top:16px;"></div>
-</div>
+
+</div> <!-- ✅ CORRECT -->
 
 
 <script>
