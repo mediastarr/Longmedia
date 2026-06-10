@@ -162,6 +162,22 @@ body.light #searchTab {
 
 }
 
+ /* -----------------------------------------------------------
+   FIX — Prevent hidden panels from blocking tab clicks
+----------------------------------------------------------- */
+#searchPanel,
+#keyboard,
+#suggestions {
+  pointer-events: none;
+}
+
+#searchPanel.active,
+#keyboard.active,
+#suggestions.active {
+  pointer-events: auto;
+}
+  
+
 .tab-btn {
   flex: 1;
   min-width: 80px;
