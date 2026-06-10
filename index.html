@@ -1515,6 +1515,7 @@ function setActiveTab(tab) {
    HOME TAB — 50 fresh videos
 ----------------------------------------------------------- */
 homeTab.addEventListener("click", async () => {
+  nextPageToken = null;   // ⭐ FIX
   setActiveTab("home");
 
   const data = await fetchYouTube("videos", {
@@ -1538,7 +1539,7 @@ homeTab.addEventListener("click", async () => {
    TRENDING TAB — 50 trending videos
 ----------------------------------------------------------- */
 trendingTab.addEventListener("click", async () => {
-  currentTab = "";            // ⭐ FORCE REFRESH
+  nextPageToken = null;   // ⭐ FIX
   setActiveTab("trending");
 
   const data = await fetchYouTube("videos", {
@@ -1560,7 +1561,7 @@ trendingTab.addEventListener("click", async () => {
    SHORTS TAB — real Shorts feed (fixed)
 ----------------------------------------------------------- */
 shortsTab.addEventListener("click", async () => {
-  currentTab = "";            // ⭐ FORCE REFRESH
+  nextPageToken = null;   // ⭐ FIX
   setActiveTab("shorts");
 
   const data = await fetchYouTube("search", {
@@ -1591,7 +1592,7 @@ shortsTab.addEventListener("click", async () => {
    MOVIES TAB — real long-form movies
 ----------------------------------------------------------- */
 moviesTab.addEventListener("click", async () => {
-  currentTab = "";            // ⭐ FORCE REFRESH
+  nextPageToken = null;   // ⭐ FIX
   setActiveTab("movies");
 
   const data = await fetchYouTube("search", {
