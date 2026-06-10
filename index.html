@@ -2054,6 +2054,8 @@ function triggerSearch(q) {
 
     nextPageToken = data.nextPageToken || null;
 
+    currentTab = "search";   // ⭐ ADD THIS LINE
+
     renderFeed(data.items || []);
     closeKeyboard();
     showHUD("Search: " + q);
