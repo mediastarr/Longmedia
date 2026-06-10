@@ -59,41 +59,41 @@
 
   <!-- HUD -->
   <div id="hud">Ready</div>
-  <script>
-    // ELEMENTS
-    const feedEl = document.getElementById("feed");
-    const channelPageEl = document.getElementById("channelPage");
-    const channelContentEl = document.getElementById("channelContent");
-    const subsPageEl = document.getElementById("subsPage");
-    const subsFeedEl = document.getElementById("subsFeed");
-    const deviceLoginStatusEl = document.getElementById("deviceLoginStatus");
-    const deviceUserCodeEl = document.getElementById("deviceUserCode");
-    const startLoginBtn = document.getElementById("startLoginBtn");
-    const hudEl = document.getElementById("hud");
+<script>
+  // ELEMENTS
+  const feedEl = document.getElementById("feed");
+  const channelPageEl = document.getElementById("channelPage");
+  const channelContentEl = document.getElementById("channelContent");
+  const subsPageEl = document.getElementById("subsPage");
+  const subsFeedEl = document.getElementById("subsFeed");
+  const deviceLoginStatusEl = document.getElementById("deviceLoginStatus");
+  const deviceUserCodeEl = document.getElementById("deviceUserCode");
+  const startLoginBtn = document.getElementById("startLoginBtn");
+  const hudEl = document.getElementById("hud");
 
-    const homeTab = document.getElementById("homeTab");
-    const shortsTab = document.getElementById("shortsTab");
-    const moviesTab = document.getElementById("moviesTab");
-    const trendingTab = document.getElementById("trendingTab");
-    const historyTab = document.getElementById("historyTab");
-    const channelTab = document.getElementById("channelTab");
-    const subsTab = document.getElementById("subsTab");
-    const backToSubsBtn = document.getElementById("backToSubsBtn");
+  const homeTab = document.getElementById("homeTab");
+  const shortsTab = document.getElementById("shortsTab");
+  const moviesTab = document.getElementById("moviesTab");
+  const trendingTab = document.getElementById("trendingTab");
+  const historyTab = document.getElementById("historyTab");
+  const channelTab = document.getElementById("channelTab");
+  const subsTab = document.getElementById("subsTab");
+  const backToSubsBtn = document.getElementById("backToSubsBtn");
 
-    let currentTab = "home";
-    let nextPageToken = null;
-    let shortsItems = [];
-    let shortsIndex = 0;
-    let historyList = [];
-    let currentChannelId = null;
+  let currentTab = "home";
+  let nextPageToken = null;
+  let shortsItems = [];
+  let shortsIndex = 0;
+  let historyList = [];
+  let currentChannelId = null;
 
-    function showHUD(msg) {
-      hudEl.textContent = msg;
-    }
+  function showHUD(msg) {
+    hudEl.textContent = msg;
+  }
 
-    // ROTATING YOUTUBE API KEYS (MASKED)
-    const API_KEYS = [
-      "AIzaSyBcW3TMMFe7x9sIxGeB-Ykeh_9lG9TGwi4",
+  // ROTATING API KEYS (MASKED)
+  const API_KEYS = [
+    "AIzaSyBcW3TMMFe7x9sIxGeB-Ykeh_9lG9TGwi4",
   "AIzaSyCNKebUdj8bTiRvLoSv28YqGdNoDn53Tk4",
   "AIzaSyCJY-gccqPtgmqSnPRoo4W2vQp1chFCLHY",
   "AIzaSyD4tP4THh9ZeDcVW041l_JCjJztZA2zJCA",
@@ -158,41 +158,431 @@
   "AIzaSyAsC6kZKAUhW4KMN04s8JJS9Hu4fFsgy04",
   "AIzaSyBCBZCfKfVg5kMUPjxmRq41uqrbrnmpu-I",
   "AIzaSyBk_q3XUQyI3rtUVCc46kjKJPh5Pm7u9QQ"
-    ];
+  ];
 
-    let apiKeyIndex = 0;
+  let apiKeyIndex = 0;
+  function getApiKey() {
+    const key = API_KEYS[apiKeyIndex % API_KEYS.length];
+    apiKeyIndex++;
+    return key;
+  }
 
-    function getApiKey() {
-      const key = API_KEYS[apiKeyIndex % API_KEYS.length];
-      apiKeyIndex++;
-      return key;
+  async function fetchYouTube(endpoint, params) {
+    const base =
+      endpoint === "videos"
+        ? "https://www.googleapis.com/youtube/v3/videos"
+        : endpoint === "search"
+        ? "https://www.googleapis.com/youtube/v3/search"
+        : "https://www.googleapis.com/youtube/v3/" + endpoint;
+
+    const url = new URL(base);
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    url.searchParams.set("key", getApiKey());
+
+    const res = await fetch(url.toString());
+    return await res.json();
+  }
+
+  /* -----------------------------------------------------------
+     FEED RENDERING (with videoId fix)
+  ----------------------------------------------------------- */
+  function renderFeed(items) {
+    feedEl.innerHTML = "";
+
+    items.forEach((item) => {
+      const snippet = item.snippet || {};
+
+      const videoId =
+        item.id?.videoId ||
+        item.id ||
+        item.snippet?.resourceId?.videoId ||
+        null;
+
+      const card = document.createElement("div");
+      card.className = "video-card";
+
+      const thumb = document.createElement("div");
+      thumb.className = "video-thumb";
+
+      const img = new Image();
+      img.src = snippet.thumbnails?.high?.url || "";
+      img.loading = "lazy";
+      thumb.appendChild(img);
+
+      const info = document.createElement("div");
+      info.className = "video-info";
+      info.innerHTML = `
+        <div class="video-title">${snippet.title}</div>
+        <div class="video-channel">${snippet.channelTitle}</div>
+        <div class="video-meta">${snippet.publishedAt || ""}</div>
+      `;
+
+      card.appendChild(thumb);
+      card.appendChild(info);
+
+      card.onclick = () => {
+        if (!videoId) {
+          showHUD("Video unavailable");
+          return;
+        }
+        showHUD("Playing: " + snippet.title);
+        historyList.unshift({ id: videoId, snippet });
+      };
+
+      feedEl.appendChild(card);
+    });
+  }
+  /* -----------------------------------------------------------
+     TABS
+  ----------------------------------------------------------- */
+  function setActiveTab(tab) {
+    currentTab = tab;
+
+    [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab, subsTab]
+      .forEach(btn => btn.classList.remove("active"));
+
+    if (tab === "home") homeTab.classList.add("active");
+    if (tab === "shorts") shortsTab.classList.add("active");
+    if (tab === "movies") moviesTab.classList.add("active");
+    if (tab === "history") historyTab.classList.add("active");
+    if (tab === "trending") trendingTab.classList.add("active");
+    if (tab === "channel") channelTab.classList.add("active");
+    if (tab === "subs") subsTab.classList.add("active");
+
+    feedEl.style.display =
+      (tab === "home" || tab === "shorts" || tab === "movies" || tab === "history" || tab === "trending")
+        ? "block"
+        : "none";
+
+    channelPageEl.style.display = (tab === "channel") ? "block" : "none";
+    subsPageEl.style.display = (tab === "subs") ? "block" : "none";
+
+    if (tab !== "channel") backToSubsBtn.style.display = "none";
+  }
+
+  /* HOME */
+  homeTab.addEventListener("click", async () => {
+    nextPageToken = null;
+    setActiveTab("home");
+    feedEl.innerHTML = "";
+
+    const data = await fetchYouTube("videos", {
+      part: "snippet",
+      chart: "mostPopular",
+      regionCode: "US",
+      maxResults: 20,
+      _: Date.now()
+    });
+
+    nextPageToken = data.nextPageToken || null;
+    renderFeed(data.items || []);
+    showHUD("Home");
+  });
+
+  /* TRENDING */
+  trendingTab.addEventListener("click", async () => {
+    nextPageToken = null;
+    setActiveTab("trending");
+    feedEl.innerHTML = "";
+
+    const data = await fetchYouTube("videos", {
+      part: "snippet",
+      chart: "mostPopular",
+      regionCode: "US",
+      maxResults: 20,
+      _: Date.now()
+    });
+
+    nextPageToken = data.nextPageToken || null;
+    renderFeed(data.items || []);
+    showHUD("Trending");
+  });
+
+  /* SHORTS */
+  shortsTab.addEventListener("click", async () => {
+    nextPageToken = null;
+    setActiveTab("shorts");
+    feedEl.innerHTML = "";
+
+    const data = await fetchYouTube("search", {
+      part: "snippet",
+      q: "shorts",
+      type: "video",
+      videoDuration: "short",
+      videoEmbeddable: "true",
+      regionCode: "US",
+      maxResults: 20,
+      _: Date.now()
+    });
+
+    shortsItems = data.items.map(v => ({
+      id:
+        v.id?.videoId ||
+        v.id ||
+        v.snippet?.resourceId?.videoId ||
+        null,
+      snippet: v.snippet
+    }));
+
+    shortsIndex = 0;
+    nextPageToken = data.nextPageToken || null;
+
+    renderFeed(shortsItems);
+    showHUD("Shorts");
+  });
+
+  /* MOVIES */
+  moviesTab.addEventListener("click", async () => {
+    nextPageToken = null;
+    setActiveTab("movies");
+    feedEl.innerHTML = "";
+
+    const data = await fetchYouTube("search", {
+      part: "snippet",
+      q: "full movie",
+      type: "video",
+      videoDuration: "long",
+      videoEmbeddable: "true",
+      regionCode: "US",
+      maxResults: 20,
+      _: Date.now()
+    });
+
+    const items = data.items.map(v => ({
+      id:
+        v.id?.videoId ||
+        v.id ||
+        v.snippet?.resourceId?.videoId ||
+        null,
+      snippet: v.snippet
+    }));
+
+    nextPageToken = data.nextPageToken || null;
+
+    renderFeed(items);
+    showHUD("Movies");
+  });
+
+  /* HISTORY */
+  historyTab.addEventListener("click", () => {
+    setActiveTab("history");
+
+    const items = historyList.slice(0, 50).map(h => ({
+      id: h.id,
+      snippet: h.snippet
+    }));
+
+    nextPageToken = null;
+    renderFeed(items);
+    showHUD("History");
+  });
+
+  /* CHANNEL TAB */
+  channelTab.addEventListener("click", () => {
+    if (!currentChannelId) {
+      showHUD("No channel selected");
+      return;
+    }
+    setActiveTab("channel");
+    loadChannelPage(currentChannelId);
+  });
+  /* -----------------------------------------------------------
+     SUBSCRIPTIONS TAB
+  ----------------------------------------------------------- */
+  subsTab.addEventListener("click", () => {
+    setActiveTab("subs");
+    showHUD("Subscriptions");
+
+    const token = localStorage.getItem("yt_access_token");
+    if (token) {
+      loadSubscriptions();
+    } else {
+      deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
+    }
+  });
+
+  /* -----------------------------------------------------------
+     OAUTH 2.0 DEVICE LOGIN
+  ----------------------------------------------------------- */
+  const OAUTH_CLIENT_ID = "153049037088-10qnschnsie4mqpdsdscd0uk2auqogdt.apps.googleusercontent.com";
+  const OAUTH_CLIENT_SECRET = "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";
+
+  startLoginBtn.addEventListener("click", startDeviceLogin);
+
+  async function startDeviceLogin() {
+    showHUD("Requesting login code…");
+
+    const res = await fetch("https://oauth2.googleapis.com/device/code", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: OAUTH_CLIENT_ID,
+        scope: "https://www.googleapis.com/auth/youtube.readonly"
+      })
+    });
+
+    const data = await res.json();
+
+    deviceUserCodeEl.textContent = "Code: " + data.user_code;
+    deviceLoginStatusEl.textContent = "Go to: " + data.verification_url;
+
+    pollForToken(data.device_code, data.interval || 5);
+  }
+
+  async function pollForToken(deviceCode, intervalSeconds) {
+    let authorized = false;
+
+    while (!authorized) {
+      await new Promise(r => setTimeout(r, intervalSeconds * 1000));
+
+      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: OAUTH_CLIENT_ID,
+          client_secret: OAUTH_CLIENT_SECRET,
+          device_code: deviceCode,
+          grant_type: "urn:ietf:params:oauth:grant-type:device_code"
+        })
+      });
+
+      const tokenData = await tokenRes.json();
+
+      if (tokenData.error) {
+        if (tokenData.error === "authorization_pending") {
+          deviceLoginStatusEl.textContent = "Waiting for authorization…";
+          continue;
+        } else {
+          deviceLoginStatusEl.textContent = "Error: " + tokenData.error;
+          showHUD("Login error");
+          break;
+        }
+      }
+
+      authorized = true;
+      localStorage.setItem("yt_access_token", tokenData.access_token);
+      deviceLoginStatusEl.textContent = "Logged in. Loading subscriptions…";
+      showHUD("YouTube logged in");
+
+      loadSubscriptions();
+    }
+  }
+
+  /* -----------------------------------------------------------
+     REAL YOUTUBE SUBSCRIPTIONS FEED (with videoId fix)
+  ----------------------------------------------------------- */
+  async function loadSubscriptions() {
+    const token = localStorage.getItem("yt_access_token");
+    if (!token) {
+      deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
+      return;
     }
 
-    async function fetchYouTube(endpoint, params) {
-      const base =
-        endpoint === "videos"
-          ? "https://www.googleapis.com/youtube/v3/videos"
-          : endpoint === "search"
-          ? "https://www.googleapis.com/youtube/v3/search"
-          : "https://www.googleapis.com/youtube/v3/" + endpoint;
+    subsFeedEl.innerHTML = "";
+    showHUD("Loading subscriptions…");
 
-      const url = new URL(base);
-      Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-      url.searchParams.set("key", getApiKey());
+    try {
+      const res = await fetch(
+        "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20",
+        { headers: { Authorization: "Bearer " + token } }
+      );
 
-      const res = await fetch(url.toString());
-      return await res.json();
+      const data = await res.json();
+
+      if (!data.items || !data.items.length) {
+        subsFeedEl.innerHTML = `<div style="font-size:12px; opacity:0.8;">No subscriptions found.</div>`;
+        return;
+      }
+
+      data.items.forEach(item => {
+        const ch = item.snippet;
+
+        const videoId =
+          ch.resourceId?.videoId ||
+          item.id?.videoId ||
+          item.id ||
+          null;
+
+        const thumb = ch.thumbnails?.medium?.url || "";
+        const title = ch.title;
+
+        const card = document.createElement("div");
+        card.className = "video-card";
+
+        const thumbDiv = document.createElement("div");
+        thumbDiv.className = "video-thumb";
+
+        const img = new Image();
+        img.src = thumb;
+        img.loading = "lazy";
+        thumbDiv.appendChild(img);
+
+        const info = document.createElement("div");
+        info.className = "video-info";
+        info.innerHTML = `
+          <div class="video-title">${title}</div>
+          <div class="video-channel">${ch.channelTitle || "Channel"}</div>
+          <div class="video-meta">Tap to open channel</div>
+        `;
+
+        card.appendChild(thumbDiv);
+        card.appendChild(info);
+
+        card.onclick = () => {
+          currentChannelId = ch.resourceId.channelId;
+
+          backToSubsBtn.style.display = "inline-block";
+          backToSubsBtn.style.display = "inline-block";
+          subsPageEl.style.display = "none";
+
+          setActiveTab("channel");
+          loadChannelPage(ch.resourceId.channelId);
+        };
+
+        subsFeedEl.appendChild(card);
+      });
+
+    } catch (e) {
+      subsFeedEl.innerHTML = `<div style="font-size:12px; opacity:0.8;">Error loading subscriptions.</div>`;
+      showHUD("Subs error");
     }
+  }
 
-    /* -----------------------------------------------------------
-       FEED RENDERING (lazy 1280×720 thumbnails)
-    ----------------------------------------------------------- */
-    function renderFeed(items) {
-      feedEl.innerHTML = "";
+  /* BACK TO SUBSCRIPTIONS BUTTON */
+  backToSubsBtn.addEventListener("click", () => {
+    setActiveTab("subs");
+    backToSubsBtn.style.display = "none";
+    subsPageEl.style.display = "block";
+    channelPageEl.style.display = "none";
+    showHUD("Subscriptions");
+  });
+  /* -----------------------------------------------------------
+     CHANNEL PAGE LOADER (20 videos, 1280×720, lazy, videoId fix)
+  ----------------------------------------------------------- */
+  async function loadChannelPage(channelId) {
+    showHUD("Loading channel…");
+    channelContentEl.innerHTML = "";
 
-      items.forEach((item) => {
+    try {
+      const res = await fetchYouTube("search", {
+        part: "snippet",
+        channelId,
+        order: "date",
+        maxResults: 20,
+        type: "video",
+        _: Date.now()
+      });
+
+      const items = res.items || [];
+
+      items.forEach(item => {
         const snippet = item.snippet || {};
-        const videoId = item.id?.videoId || item.id;
+
+        const videoId =
+          item.id?.videoId ||
+          item.id ||
+          item.snippet?.resourceId?.videoId ||
+          null;
 
         const card = document.createElement("div");
         card.className = "video-card";
@@ -203,7 +593,6 @@
         const img = new Image();
         img.src = snippet.thumbnails?.high?.url || "";
         img.loading = "lazy";
-
         thumb.appendChild(img);
 
         const info = document.createElement("div");
@@ -211,392 +600,34 @@
         info.innerHTML = `
           <div class="video-title">${snippet.title}</div>
           <div class="video-channel">${snippet.channelTitle}</div>
-          <div class="video-meta">${snippet.publishedAt || ""}</div>
+          <div class="video-meta">${snippet.publishedAt}</div>
         `;
 
         card.appendChild(thumb);
         card.appendChild(info);
 
         card.onclick = () => {
+          if (!videoId) {
+            showHUD("Video unavailable");
+            return;
+          }
           showHUD("Playing: " + snippet.title);
           historyList.unshift({ id: videoId, snippet });
         };
 
-        feedEl.appendChild(card);
-      });
-    }
-    /* -----------------------------------------------------------
-       TABS
-    ----------------------------------------------------------- */
-    function setActiveTab(tab) {
-      currentTab = tab;
-
-      [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab, subsTab]
-        .forEach(btn => btn.classList.remove("active"));
-
-      if (tab === "home") homeTab.classList.add("active");
-      if (tab === "shorts") shortsTab.classList.add("active");
-      if (tab === "movies") moviesTab.classList.add("active");
-      if (tab === "history") historyTab.classList.add("active");
-      if (tab === "trending") trendingTab.classList.add("active");
-      if (tab === "channel") channelTab.classList.add("active");
-      if (tab === "subs") subsTab.classList.add("active");
-
-      feedEl.style.display =
-        (tab === "home" || tab === "shorts" || tab === "movies" || tab === "history" || tab === "trending")
-          ? "block"
-          : "none";
-
-      channelPageEl.style.display = (tab === "channel") ? "block" : "none";
-      subsPageEl.style.display = (tab === "subs") ? "block" : "none";
-
-      if (tab !== "channel") backToSubsBtn.style.display = "none";
-    }
-
-    /* HOME — 20 videos, fast */
-    homeTab.addEventListener("click", async () => {
-      nextPageToken = null;
-      setActiveTab("home");
-      feedEl.innerHTML = "";
-
-      const data = await fetchYouTube("videos", {
-        part: "snippet",
-        chart: "mostPopular",
-        regionCode: "US",
-        maxResults: 20,
-        _: Date.now()
+        channelContentEl.appendChild(card);
       });
 
-      nextPageToken = data.nextPageToken || null;
-      renderFeed(data.items || []);
-      showHUD("Home");
-    });
-
-    /* TRENDING — 20 videos, fast */
-    trendingTab.addEventListener("click", async () => {
-      nextPageToken = null;
-      setActiveTab("trending");
-      feedEl.innerHTML = "";
-
-      const data = await fetchYouTube("videos", {
-        part: "snippet",
-        chart: "mostPopular",
-        regionCode: "US",
-        maxResults: 20,
-        _: Date.now()
-      });
-
-      nextPageToken = data.nextPageToken || null;
-      renderFeed(data.items || []);
-      showHUD("Trending");
-    });
-
-    /* SHORTS — 20 short videos */
-    shortsTab.addEventListener("click", async () => {
-      nextPageToken = null;
-      setActiveTab("shorts");
-      feedEl.innerHTML = "";
-
-      const data = await fetchYouTube("search", {
-        part: "snippet",
-        q: "shorts",
-        type: "video",
-        videoDuration: "short",
-        videoEmbeddable: "true",
-        regionCode: "US",
-        maxResults: 20,
-        _: Date.now()
-      });
-
-      shortsItems = data.items.map(v => ({
-        id: v.id.videoId,
-        snippet: v.snippet
-      }));
-
-      shortsIndex = 0;
-      nextPageToken = data.nextPageToken || null;
-
-      renderFeed(shortsItems);
-      showHUD("Shorts");
-    });
-
-    /* MOVIES — 20 long videos */
-    moviesTab.addEventListener("click", async () => {
-      nextPageToken = null;
-      setActiveTab("movies");
-      feedEl.innerHTML = "";
-
-      const data = await fetchYouTube("search", {
-        part: "snippet",
-        q: "full movie",
-        type: "video",
-        videoDuration: "long",
-        videoEmbeddable: "true",
-        regionCode: "US",
-        maxResults: 20,
-        _: Date.now()
-      });
-
-      const items = data.items.map(v => ({
-        id: v.id.videoId,
-        snippet: v.snippet
-      }));
-
-      nextPageToken = data.nextPageToken || null;
-
-      renderFeed(items);
-      showHUD("Movies");
-    });
-
-    /* HISTORY */
-    historyTab.addEventListener("click", () => {
-      setActiveTab("history");
-
-      const items = historyList.slice(0, 50).map(h => ({
-        id: h.id,
-        snippet: h.snippet
-      }));
-
-      nextPageToken = null;
-      renderFeed(items);
-      showHUD("History");
-    });
-
-    /* CHANNEL TAB */
-    channelTab.addEventListener("click", () => {
-      if (!currentChannelId) {
-        showHUD("No channel selected");
-        return;
-      }
-      setActiveTab("channel");
-      loadChannelPage(currentChannelId);
-    });
-    /* -----------------------------------------------------------
-       SUBSCRIPTIONS TAB
-    ----------------------------------------------------------- */
-    subsTab.addEventListener("click", () => {
-      setActiveTab("subs");
-      showHUD("Subscriptions");
-
-      const token = localStorage.getItem("yt_access_token");
-      if (token) {
-        loadSubscriptions();
-      } else {
-        deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
-      }
-    });
-
-    /* -----------------------------------------------------------
-       OAUTH 2.0 DEVICE LOGIN
-    ----------------------------------------------------------- */
-    const OAUTH_CLIENT_ID = "153049037088-10qnschnsie4mqpdsdscd0uk2auqogdt.apps.googleusercontent.com";
-    const OAUTH_CLIENT_SECRET = "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";
-
-    startLoginBtn.addEventListener("click", startDeviceLogin);
-
-    async function startDeviceLogin() {
-      showHUD("Requesting login code…");
-
-      const res = await fetch("https://oauth2.googleapis.com/device/code", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: OAUTH_CLIENT_ID,
-          scope: "https://www.googleapis.com/auth/youtube.readonly"
-        })
-      });
-
-      const data = await res.json();
-
-      deviceUserCodeEl.textContent = "Code: " + data.user_code;
-      deviceLoginStatusEl.textContent = "Go to: " + data.verification_url;
-
-      pollForToken(data.device_code, data.interval || 5);
+      showHUD("Channel loaded");
+    } catch (e) {
+      channelContentEl.innerHTML = `<div style="font-size:12px; opacity:0.8;">Error loading channel.</div>`;
+      showHUD("Channel error");
     }
-
-    async function pollForToken(deviceCode, intervalSeconds) {
-      let authorized = false;
-
-      while (!authorized) {
-        await new Promise(r => setTimeout(r, intervalSeconds * 1000));
-
-        const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            client_id: OAUTH_CLIENT_ID,
-            client_secret: OAUTH_CLIENT_SECRET,
-            device_code: deviceCode,
-            grant_type: "urn:ietf:params:oauth:grant-type:device_code"
-          })
-        });
-
-        const tokenData = await tokenRes.json();
-
-        if (tokenData.error) {
-          if (tokenData.error === "authorization_pending") {
-            deviceLoginStatusEl.textContent = "Waiting for authorization…";
-            continue;
-          } else {
-            deviceLoginStatusEl.textContent = "Error: " + tokenData.error;
-            showHUD("Login error");
-            break;
-          }
-        }
-
-        authorized = true;
-        localStorage.setItem("yt_access_token", tokenData.access_token);
-        deviceLoginStatusEl.textContent = "Logged in. Loading subscriptions…";
-        showHUD("YouTube logged in");
-
-        loadSubscriptions();
-      }
-    }
-
-    /* -----------------------------------------------------------
-       REAL YOUTUBE SUBSCRIPTIONS FEED
-    ----------------------------------------------------------- */
-    async function loadSubscriptions() {
-      const token = localStorage.getItem("yt_access_token");
-      if (!token) {
-        deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
-        return;
-      }
-
-      subsFeedEl.innerHTML = "";
-      showHUD("Loading subscriptions…");
-
-      try {
-        const res = await fetch(
-          "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20",
-          { headers: { Authorization: "Bearer " + token } }
-        );
-
-        const data = await res.json();
-
-        if (!data.items || !data.items.length) {
-          subsFeedEl.innerHTML = `<div style="font-size:12px; opacity:0.8;">No subscriptions found.</div>`;
-          return;
-        }
-
-        data.items.forEach(item => {
-          const ch = item.snippet;
-          const channelId = ch.resourceId.channelId;
-          const thumb = ch.thumbnails?.medium?.url || "";
-          const title = ch.title;
-
-          const card = document.createElement("div");
-          card.className = "video-card";
-
-          const thumbDiv = document.createElement("div");
-          thumbDiv.className = "video-thumb";
-
-          const img = new Image();
-          img.src = thumb;
-          img.loading = "lazy";
-          thumbDiv.appendChild(img);
-
-          const info = document.createElement("div");
-          info.className = "video-info";
-          info.innerHTML = `
-            <div class="video-title">${title}</div>
-            <div class="video-channel">${ch.channelTitle || "Channel"}</div>
-            <div class="video-meta">Tap to open channel</div>
-          `;
-
-          card.appendChild(thumbDiv);
-          card.appendChild(info);
-
-          card.onclick = () => {
-            currentChannelId = channelId;
-
-            backToSubsBtn.style.display = "inline-block";
-            subsPageEl.style.display = "none";
-
-            setActiveTab("channel");
-            loadChannelPage(channelId);
-          };
-
-          subsFeedEl.appendChild(card);
-        });
-
-      } catch (e) {
-        subsFeedEl.innerHTML = `<div style="font-size:12px; opacity:0.8;">Error loading subscriptions.</div>`;
-        showHUD("Subs error");
-      }
-    }
-
-    /* BACK TO SUBSCRIPTIONS BUTTON */
-    backToSubsBtn.addEventListener("click", () => {
-      setActiveTab("subs");
-      backToSubsBtn.style.display = "none";
-      subsPageEl.style.display = "block";
-      channelPageEl.style.display = "none";
-      showHUD("Subscriptions");
-    });
-    /* -----------------------------------------------------------
-       CHANNEL PAGE LOADER
-    ----------------------------------------------------------- */
-    async function loadChannelPage(channelId) {
-      showHUD("Loading channel…");
-      channelContentEl.innerHTML = "";
-
-      try {
-        const res = await fetchYouTube("search", {
-          part: "snippet",
-          channelId,
-          order: "date",
-          maxResults: 20,
-          type: "video",
-          _: Date.now()
-        });
-
-        const items = res.items || [];
-
-        items.forEach(item => {
-          const snippet = item.snippet || {};
-          const videoId = item.id?.videoId || item.id;
-
-          const card = document.createElement("div");
-          card.className = "video-card";
-
-          const thumb = document.createElement("div");
-          thumb.className = "video-thumb";
-
-          const img = new Image();
-          img.src = snippet.thumbnails?.high?.url || "";
-          img.loading = "lazy";
-          thumb.appendChild(img);
-
-          const info = document.createElement("div");
-          info.className = "video-info";
-          info.innerHTML = `
-            <div class="video-title">${snippet.title}</div>
-            <div class="video-channel">${snippet.channelTitle}</div>
-            <div class="video-meta">${snippet.publishedAt}</div>
-          `;
-
-          card.appendChild(thumb);
-          card.appendChild(info);
-
-          card.onclick = () => {
-            showHUD("Playing: " + snippet.title);
-            historyList.unshift({ id: videoId, snippet });
-          };
-
-          channelContentEl.appendChild(card);
-        });
-
-        showHUD("Channel loaded");
-      } catch (e) {
-        channelContentEl.innerHTML = `<div style="font-size:12px; opacity:0.8;">Error loading channel.</div>`;
-        showHUD("Channel error");
-      }
-    }
-    // INITIAL LOAD
-    (async () => {
-      homeTab.click();
-    })();
-  </script>
+  }
+  // INITIAL LOAD
+  (async () => {
+    homeTab.click();
+  })();
+</script>
 </body>
 </html>
