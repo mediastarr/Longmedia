@@ -134,6 +134,7 @@ body.light #searchTab {
   pointer-events: auto !important;
 }
 
+
 /* -----------------------------------------------------------
    TABS
 ----------------------------------------------------------- */
@@ -148,7 +149,17 @@ body.light #searchTab {
   position: relative;
   z-index: 99999 !important;
   pointer-events: auto !important;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
+
+/* ⭐ Make parallax-tab focusable for swipe navigation */
+.parallax-tab {
+  pointer-events: auto !important;
+  
+}
+
 
 /* -----------------------------------------------------------
    SEARCH BAR
@@ -926,7 +937,7 @@ body.fullscreen-active .exit-full-btn {
   </div>
 
   <!-- TABS -->
-  <div id="tabs">
+  <div id="tabs" tabindex="0">
     <button id="homeTab" class="tab-btn parallax-tab active">Home</button>
     <button id="shortsTab" class="tab-btn parallax-tab">Shorts</button>
     <button id="moviesTab" class="tab-btn parallax-tab">Movies</button>
