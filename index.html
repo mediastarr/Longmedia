@@ -185,29 +185,37 @@
     }
 
     /* -----------------------------------------------------------
-       FEED RENDERING
+       FEED RENDERING (lazy 1280×720 thumbnails)
     ----------------------------------------------------------- */
     function renderFeed(items) {
       feedEl.innerHTML = "";
 
       items.forEach((item) => {
         const snippet = item.snippet || {};
-        const stats = item.statistics || {};
         const videoId = item.id?.videoId || item.id;
 
         const card = document.createElement("div");
         card.className = "video-card";
 
-        card.innerHTML = `
-          <div class="video-thumb">
-            <img src="${snippet.thumbnails?.high?.url || ""}">
-          </div>
-          <div class="video-info">
-            <div class="video-title">${snippet.title}</div>
-            <div class="video-channel">${snippet.channelTitle}</div>
-            <div class="video-meta">${stats.viewCount || 0} views</div>
-          </div>
+        const thumb = document.createElement("div");
+        thumb.className = "video-thumb";
+
+        const img = new Image();
+        img.src = snippet.thumbnails?.high?.url || "";
+        img.loading = "lazy";
+
+        thumb.appendChild(img);
+
+        const info = document.createElement("div");
+        info.className = "video-info";
+        info.innerHTML = `
+          <div class="video-title">${snippet.title}</div>
+          <div class="video-channel">${snippet.channelTitle}</div>
+          <div class="video-meta">${snippet.publishedAt || ""}</div>
         `;
+
+        card.appendChild(thumb);
+        card.appendChild(info);
 
         card.onclick = () => {
           showHUD("Playing: " + snippet.title);
@@ -245,16 +253,17 @@
       if (tab !== "channel") backToSubsBtn.style.display = "none";
     }
 
-    /* HOME */
+    /* HOME — 20 videos, fast */
     homeTab.addEventListener("click", async () => {
       nextPageToken = null;
       setActiveTab("home");
+      feedEl.innerHTML = "";
 
       const data = await fetchYouTube("videos", {
-        part: "snippet,statistics,contentDetails",
+        part: "snippet",
         chart: "mostPopular",
         regionCode: "US",
-        maxResults: 50,
+        maxResults: 20,
         _: Date.now()
       });
 
@@ -263,16 +272,17 @@
       showHUD("Home");
     });
 
-    /* TRENDING */
+    /* TRENDING — 20 videos, fast */
     trendingTab.addEventListener("click", async () => {
       nextPageToken = null;
       setActiveTab("trending");
+      feedEl.innerHTML = "";
 
       const data = await fetchYouTube("videos", {
-        part: "snippet,statistics,contentDetails",
+        part: "snippet",
         chart: "mostPopular",
         regionCode: "US",
-        maxResults: 50,
+        maxResults: 20,
         _: Date.now()
       });
 
@@ -281,10 +291,11 @@
       showHUD("Trending");
     });
 
-    /* SHORTS */
+    /* SHORTS — 20 short videos */
     shortsTab.addEventListener("click", async () => {
       nextPageToken = null;
       setActiveTab("shorts");
+      feedEl.innerHTML = "";
 
       const data = await fetchYouTube("search", {
         part: "snippet",
@@ -293,7 +304,7 @@
         videoDuration: "short",
         videoEmbeddable: "true",
         regionCode: "US",
-        maxResults: 50,
+        maxResults: 20,
         _: Date.now()
       });
 
@@ -309,10 +320,11 @@
       showHUD("Shorts");
     });
 
-    /* MOVIES */
+    /* MOVIES — 20 long videos */
     moviesTab.addEventListener("click", async () => {
       nextPageToken = null;
       setActiveTab("movies");
+      feedEl.innerHTML = "";
 
       const data = await fetchYouTube("search", {
         part: "snippet",
@@ -321,7 +333,7 @@
         videoDuration: "long",
         videoEmbeddable: "true",
         regionCode: "US",
-        maxResults: 50,
+        maxResults: 20,
         _: Date.now()
       });
 
@@ -342,8 +354,7 @@
 
       const items = historyList.slice(0, 50).map(h => ({
         id: h.id,
-        snippet: h.snippet,
-        statistics: { viewCount: "watched" }
+        snippet: h.snippet
       }));
 
       nextPageToken = null;
@@ -477,16 +488,24 @@
           const card = document.createElement("div");
           card.className = "video-card";
 
-          card.innerHTML = `
-            <div class="video-thumb">
-              <img src="${thumb}">
-            </div>
-            <div class="video-info">
-              <div class="video-title">${title}</div>
-              <div class="video-channel">${ch.channelTitle || "Channel"}</div>
-              <div class="video-meta">Tap to open channel</div>
-            </div>
+          const thumbDiv = document.createElement("div");
+          thumbDiv.className = "video-thumb";
+
+          const img = new Image();
+          img.src = thumb;
+          img.loading = "lazy";
+          thumbDiv.appendChild(img);
+
+          const info = document.createElement("div");
+          info.className = "video-info";
+          info.innerHTML = `
+            <div class="video-title">${title}</div>
+            <div class="video-channel">${ch.channelTitle || "Channel"}</div>
+            <div class="video-meta">Tap to open channel</div>
           `;
+
+          card.appendChild(thumbDiv);
+          card.appendChild(info);
 
           card.onclick = () => {
             currentChannelId = channelId;
@@ -541,16 +560,24 @@
           const card = document.createElement("div");
           card.className = "video-card";
 
-          card.innerHTML = `
-            <div class="video-thumb">
-              <img src="${snippet.thumbnails?.high?.url || ""}">
-            </div>
-            <div class="video-info">
-              <div class="video-title">${snippet.title}</div>
-              <div class="video-channel">${snippet.channelTitle}</div>
-              <div class="video-meta">${snippet.publishedAt}</div>
-            </div>
+          const thumb = document.createElement("div");
+          thumb.className = "video-thumb";
+
+          const img = new Image();
+          img.src = snippet.thumbnails?.high?.url || "";
+          img.loading = "lazy";
+          thumb.appendChild(img);
+
+          const info = document.createElement("div");
+          info.className = "video-info";
+          info.innerHTML = `
+            <div class="video-title">${snippet.title}</div>
+            <div class="video-channel">${snippet.channelTitle}</div>
+            <div class="video-meta">${snippet.publishedAt}</div>
           `;
+
+          card.appendChild(thumb);
+          card.appendChild(info);
 
           card.onclick = () => {
             showHUD("Playing: " + snippet.title);
