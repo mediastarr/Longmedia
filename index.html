@@ -2122,16 +2122,26 @@ function openKeyboard() {
   keyboardEl.style.display = "block";
   document.querySelector(".search-input-bar").style.display = "flex";
 
+  // ⭐ Hide all other pages so nothing shows behind the keyboard
   feedEl.style.display = "none";
+  subsPageEl.style.display = "none";
+  playlistsPageEl.style.display = "none";
+  channelPageEl.style.display = "none";
 }
+
 
 function closeKeyboard() {
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
   suggestionsEl.style.display = "none";
 
-  feedEl.style.display = "block";
+  // ⭐ Restore the correct page based on currentTab
+  if (currentTab === "home") feedEl.style.display = "block";
+  if (currentTab === "subs") subsPageEl.style.display = "block";
+  if (currentTab === "playlists") playlistsPageEl.style.display = "block";
+  if (currentTab === "channel") channelPageEl.style.display = "block";
 }
+
 
 searchTabEl.addEventListener("click", openKeyboard);
 searchBack.addEventListener("click", closeKeyboard);
