@@ -1516,12 +1516,10 @@ function setActiveTab(tab) {
    HOME TAB — 50 fresh videos
 ----------------------------------------------------------- */
 homeTab.addEventListener("click", async () => {
-  nextPageToken = null;   // ⭐ FIX
+  nextPageToken = null;
   setActiveTab("home");
 
   const data = await fetchYouTube("videos", {
-     currentTab = ""; // force refresh even if already on Home
-
     part: "snippet,statistics,contentDetails",
     chart: "mostPopular",
     regionCode: "US",
@@ -1622,15 +1620,7 @@ moviesTab.addEventListener("click", async () => {
    SUBSCRIPTIONS TAB — OAuth + real subs
 ----------------------------------------------------------- */
 subsTab.addEventListener("click", () => {
-  currentTab = "subs";
-
-  document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
-  subsTab.classList.add("active");
-
-  feedEl.style.display = "none";
-  channelPageEl.style.display = "none";
-  subsPageEl.style.display = "block";
-
+  setActiveTab("subs");
   showHUD("Subscriptions");
 
   const token = localStorage.getItem("yt_access_token");
@@ -1640,6 +1630,7 @@ subsTab.addEventListener("click", () => {
     deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
   }
 });
+
 
 /* -----------------------------------------------------------
    OAUTH 2.0 DEVICE LOGIN
