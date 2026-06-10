@@ -1726,34 +1726,34 @@ async function loadSubscriptions() {
     }
 
     data.items.forEach(item => {
-      const ch = item.snippet;
-      const channelId = ch.resourceId.channelId;
-      const thumb = ch.thumbnails?.medium?.url || "";
-      const title = ch.title;
+  const ch = item.snippet;
+  const channelId = ch.resourceId.channelId;
+  const thumb = ch.thumbnails?.medium?.url || "";
+  const title = ch.title;
 
-      const card = document.createElement("div");
-      card.className = "video-card parallax";
+  const card = document.createElement("div");
+  card.className = "video-card parallax";
 
-      card.innerHTML = `
-        <div class="video-thumb">
-          <img src="${thumb}">
-        </div>
-        <div class="video-info">
-          <div class="video-title">${title}</div>
-          <div class="video-channel">${ch.channelTitle || "Channel"}</div>
-          <div class="video-meta">Tap to open channel</div>
-        </div>
-      `;
+  card.innerHTML = `
+    <div class="video-thumb">
+      <img src="${thumb}">
+    </div>
+    <div class="video-info">
+      <div class="video-title">${title}</div>
+      <div class="video-channel">${ch.channelTitle || "Channel"}</div>
+      <div class="video-meta">Tap to open channel</div>
+    </div>
+  `;
 
-      card.onclick = () => {
-        currentTab = "channel";
-        currentChannelId = channelId;
-        showHUD("Channel: " + title);
-        // reuse channel loader if desired
-      };
+  card.onclick = () => {
+    currentChannelId = channelId;
+    subsPageEl.style.display = "none";   // ⭐ FIX
+    setActiveTab("channel");
+    loadChannelPage(channelId);
+  };
 
-      subsFeedEl.appendChild(card);
-    });
+  subsFeedEl.appendChild(card);
+});
 
   } catch (e) {
     subsFeedEl.innerHTML = `<div style="font-size:12px; opacity:0.8;">Error loading subscriptions.</div>`;
