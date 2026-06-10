@@ -1492,24 +1492,25 @@ function appendFeed(items) {
 function setActiveTab(tab) {
   currentTab = tab;
 
-  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab]
+  // Reset active state
+  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab, subsTab]
     .forEach(btn => btn.classList.remove("active"));
 
+  // Highlight active tab
   if (tab === "home") homeTab.classList.add("active");
   if (tab === "shorts") shortsTab.classList.add("active");
   if (tab === "movies") moviesTab.classList.add("active");
   if (tab === "history") historyTab.classList.add("active");
   if (tab === "trending") trendingTab.classList.add("active");
   if (tab === "channel") channelTab.classList.add("active");
+  if (tab === "subs") subsTab.classList.add("active");
 
-  if (tab === "channel") {
-    feedEl.style.display = "none";
-    channelPageEl.style.display = "block";
-  } else {
-    feedEl.style.display = "block";
-    channelPageEl.style.display = "none";
-  }
+  // Show/hide pages
+  feedEl.style.display = (tab === "home" || tab === "shorts" || tab === "movies" || tab === "history" || tab === "trending" || tab === "search") ? "block" : "none";
+  channelPageEl.style.display = (tab === "channel") ? "block" : "none";
+  subsPageEl.style.display = (tab === "subs") ? "block" : "none";
 }
+
 
 /* -----------------------------------------------------------
    HOME TAB — 50 fresh videos
