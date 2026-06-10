@@ -1053,13 +1053,11 @@ body.fullscreen-active .exit-full-btn {
   <!-- FEED -->
 <div id="feed" class="tab-fade"></div>
 
-
-
 <!-- CHANNEL PAGE -->
-<div id="channelPage" class="tab-fade"></div>
+<div id="channelPage" class="tab-fade" style="display:none;"></div>
 
-
-<div id="subsPage" class="tab-fade">
+<!-- SUBSCRIPTIONS PAGE -->
+<div id="subsPage" class="tab-fade" style="display:none;">
 
   <div class="channel-banner">
     <div class="banner-logo"></div>
@@ -1085,11 +1083,8 @@ body.fullscreen-active .exit-full-btn {
 
 </div>
 
-
-
 <!-- PLAYLISTS PAGE -->
-<div id="playlistsPage" class="tab-fade">
-
+<div id="playlistsPage" class="tab-fade" style="display:none;">
 
   <div class="channel-banner">
     <div class="banner-logo"></div>
@@ -1098,7 +1093,8 @@ body.fullscreen-active .exit-full-btn {
 
   <div id="playlistsFeed" style="margin-top:16px;"></div>
 
-</div> <!-- ✅ CORRECT -->
+</div>
+
 
 
 <script>
@@ -1588,12 +1584,18 @@ function appendFeed(items) {
 
 
    
+/* -----------------------------------------------------------
+   TAB SYSTEM — Centralized Controller
+----------------------------------------------------------- */
+
 function setActiveTab(tab) {
   currentTab = tab;
 
+  // Remove active state from all buttons
   [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab, subsTab, playlistsTab]
     .forEach(btn => btn.classList.remove("active"));
 
+  // Add active state to the selected tab
   if (tab === "home") homeTab.classList.add("active");
   if (tab === "shorts") shortsTab.classList.add("active");
   if (tab === "movies") moviesTab.classList.add("active");
@@ -1603,19 +1605,19 @@ function setActiveTab(tab) {
   if (tab === "subs") subsTab.classList.add("active");
   if (tab === "playlists") playlistsTab.classList.add("active");
 
-  // ⭐ Fade: hide all pages
+  // Fade out all pages
   feedEl.classList.remove("show");
   channelPageEl.classList.remove("show");
   subsPageEl.classList.remove("show");
   playlistsPageEl.classList.remove("show");
 
-  // ⭐ Fade: show the correct one
+  // Fade in the correct page
   if (tab === "home") feedEl.classList.add("show");
   if (tab === "channel") channelPageEl.classList.add("show");
   if (tab === "subs") subsPageEl.classList.add("show");
   if (tab === "playlists") playlistsPageEl.classList.add("show");
 
-  // ⭐ FIX: Proper display logic for ALL tabs
+  // Display logic
   feedEl.style.display = (tab === "home") ? "block" : "none";
   channelPageEl.style.display = (tab === "channel") ? "block" : "none";
   subsPageEl.style.display = (tab === "subs") ? "block" : "none";
@@ -1623,118 +1625,51 @@ function setActiveTab(tab) {
 }
 
 /* -----------------------------------------------------------
-   HOME TAB — 50 fresh videos
+   TAB CLICK HANDLERS — Now using setActiveTab()
 ----------------------------------------------------------- */
-homeTab.addEventListener("click", async () => {
+
+homeTab.addEventListener("click", () => {
   setActiveTab("home");
-
-  const data = await fetchYouTube("videos", {
-    part: "snippet,statistics,contentDetails",
-    chart: "mostPopular",
-    regionCode: "US",
-    maxResults: 50,
-    _: Date.now()
-  });
-
-  nextPageToken = data.nextPageToken || null;
-
-  renderFeed(data.items || []);
   showHUD("Home");
+  loadHomeFeed(); // if you have this function
 });
 
-
-/* -----------------------------------------------------------
-   TRENDING TAB — 50 trending videos
------------------------------------------------------------ */
-trendingTab.addEventListener("click", async () => {
-  setActiveTab("trending");
-
-  const data = await fetchYouTube("videos", {
-    part: "snippet,statistics,contentDetails",
-    chart: "mostPopular",
-    regionCode: "US",
-    maxResults: 50,
-    _: Date.now()
-  });
-
-  nextPageToken = data.nextPageToken || null;
-
-  renderFeed(data.items || []);
-  showHUD("Trending");
-});
-
-
-/* -----------------------------------------------------------
-   SHORTS TAB — real Shorts feed (fixed)
------------------------------------------------------------ */
-shortsTab.addEventListener("click", async () => {
+shortsTab.addEventListener("click", () => {
   setActiveTab("shorts");
-
-  const data = await fetchYouTube("search", {
-    part: "snippet",
-    q: "shorts",                 // ⭐ REQUIRED or API returns nothing
-    type: "video",
-    videoDuration: "short",
-    videoEmbeddable: "true",
-    regionCode: "US",
-    maxResults: 50,
-    _: Date.now()
-  });
-
-  shortsItems = data.items.map(v => ({
-    id: v.id.videoId,
-    snippet: v.snippet
-  }));
-
-  shortsIndex = 0;
-  nextPageToken = data.nextPageToken || null;
-
-  renderFeed(shortsItems);
   showHUD("Shorts");
+  loadShortsFeed(); // if you have this function
 });
 
-
-/* -----------------------------------------------------------
-   MOVIES TAB — real long-form movies
------------------------------------------------------------ */
-moviesTab.addEventListener("click", async () => {
+moviesTab.addEventListener("click", () => {
   setActiveTab("movies");
-
-  const data = await fetchYouTube("search", {
-    part: "snippet",
-    q: "full movie",
-    type: "video",
-    videoDuration: "long",
-    videoEmbeddable: "true",
-    regionCode: "US",
-    maxResults: 50,
-    _: Date.now()
-  });
-
-  const items = data.items.map(v => ({
-    id: v.id.videoId,
-    snippet: v.snippet
-  }));
-
-  nextPageToken = data.nextPageToken || null;
-
-  renderFeed(items);
   showHUD("Movies");
+  loadMoviesFeed(); // if you have this function
+});
+
+historyTab.addEventListener("click", () => {
+  setActiveTab("history");
+  showHUD("History");
+  loadHistoryFeed(); // if you have this function
+});
+
+trendingTab.addEventListener("click", () => {
+  setActiveTab("trending");
+  showHUD("Trending");
+  loadTrendingFeed(); // if you have this function
+});
+
+channelTab.addEventListener("click", () => {
+  setActiveTab("channel");
+  showHUD("Channel");
+  loadChannelPage(); // if you have this function
 });
 
 /* -----------------------------------------------------------
-   SUBSCRIPTIONS TAB — OAuth + real subs
+   SUBSCRIPTIONS TAB — OAuth + Real Subscriptions
 ----------------------------------------------------------- */
+
 subsTab.addEventListener("click", () => {
-  currentTab = "subs";
-
-  document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
-  subsTab.classList.add("active");
-
-  feedEl.style.display = "none";
-  channelPageEl.style.display = "none";
-  subsPageEl.style.display = "block";
-
+  setActiveTab("subs");
   showHUD("Subscriptions");
 
   const token = localStorage.getItem("yt_access_token");
@@ -1745,16 +1680,13 @@ subsTab.addEventListener("click", () => {
   }
 });
 
-   playlistsTab.addEventListener("click", () => {
-  currentTab = "playlists";
+/* -----------------------------------------------------------
+   PLAYLISTS TAB — User Playlists
+----------------------------------------------------------- */
 
-  document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
-  playlistsTab.classList.add("active");
-
-  feedEl.style.display = "none";
-  channelPageEl.style.display = "none";
-  subsPageEl.style.display = "none";
-  playlistsPageEl.style.display = "block";
+playlistsTab.addEventListener("click", () => {
+  setActiveTab("playlists");
+  showHUD("Playlists");
 
   const token = localStorage.getItem("yt_access_token");
   if (token) {
@@ -1762,8 +1694,6 @@ subsTab.addEventListener("click", () => {
   } else {
     playlistsFeedEl.innerHTML = `<div style="opacity:0.8;">Login required to load playlists.</div>`;
   }
-
-  showHUD("Playlists");
 });
 
 
@@ -1999,13 +1929,6 @@ historyTab.addEventListener("click", () => {
   showHUD("History");
 });
 
-
-/* -----------------------------------------------------------
-   CHANNEL TAB — channel uploads
------------------------------------------------------------ */
-channelTab.addEventListener("click", () => {
-  loadChannelPage(currentChannelId);
-});
 
 
 /* -----------------------------------------------------------
