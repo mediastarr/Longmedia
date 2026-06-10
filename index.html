@@ -152,7 +152,13 @@ body.light #searchTab {
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
+  scroll-snap-type: x mandatory;
 }
+
+#tabs:focus {
+  outline: none;
+}
+   
 
 /* ⭐ Make parallax-tab focusable for swipe navigation */
 .parallax-tab {
@@ -181,8 +187,6 @@ body.light #searchTab {
 #searchTab * {
   pointer-events: auto !important;
 }
-
-
 
    /* -----------------------------------------------------------
    FIX — Prevent hidden panels from blocking tab clicks
@@ -938,6 +942,7 @@ body.fullscreen-active .exit-full-btn {
 
   <!-- TABS -->
   <div id="tabs" tabindex="0">
+    <div class="tabs-focus-anchor" tabindex="0"></div>
     <button id="homeTab" class="tab-btn parallax-tab active">Home</button>
     <button id="shortsTab" class="tab-btn parallax-tab">Shorts</button>
     <button id="moviesTab" class="tab-btn parallax-tab">Movies</button>
