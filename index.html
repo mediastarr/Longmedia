@@ -147,23 +147,23 @@ body.light #searchTab {
 }
 
 /* -----------------------------------------------------------
-   TABS — All visible on one line, auto-fit width
+   TABS
 ----------------------------------------------------------- */
 #tabs {
   margin-top: 12px;
   display: flex;
   gap: 8px;
-  flex-wrap: nowrap;      /* keep tabs on one line */
-  overflow-x: auto;       /* allow horizontal scroll */
-  white-space: nowrap;    /* prevent wrapping */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  white-space: nowrap;
   padding-bottom: 4px;
   position: relative;
   z-index: 16;
 }
 
 .tab-btn {
-  flex: 1;                /* ⭐ auto-shrink so all tabs fit */
-  min-width: 80px;        /* prevents tabs from becoming too tiny */
+  flex: 1;
+  min-width: 80px;
   padding: 7px 12px;
   border-radius: 999px;
   border: 1px solid rgba(120,130,160,0.6);
@@ -171,14 +171,36 @@ body.light #searchTab {
   background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.12), rgba(10,12,20,0.9));
   color: #f5f7ff;
   cursor: pointer;
-  text-align: center;     /* keeps text centered */
+  text-align: center;
 }
 
+/* ⭐ Glow Pulse */
 .tab-btn.active {
+  position: relative;
+  z-index: 20;
   border-color: var(--accent);
   box-shadow: 0 0 18px rgba(60,242,255,0.7);
+  animation: tabPulse 2.2s ease-in-out infinite;
 }
 
+@keyframes tabPulse {
+  0% { box-shadow: 0 0 10px rgba(60,242,255,0.4); }
+  50% { box-shadow: 0 0 22px rgba(60,242,255,0.9); }
+  100% { box-shadow: 0 0 10px rgba(60,242,255,0.4); }
+}
+
+
+/* -----------------------------------------------------------
+   TAB FADE ANIMATION
+----------------------------------------------------------- */
+.tab-fade {
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.tab-fade.show {
+  opacity: 1;
+}
 
 
 /* -----------------------------------------------------------
@@ -975,13 +997,16 @@ body.fullscreen-active .exit-full-btn {
   </div>
 
   <!-- FEED -->
-<div id="feed"></div>
+<div id="feed" class="tab-fade show"></div>
+
 
 <!-- CHANNEL PAGE -->
-<div id="channelPage"></div>
+<div id="channelPage" class="tab-fade"></div>
+
 
 <!-- SUBSCRIPTIONS PAGE -->
-<div id="subsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
+<div id="subsPage" class="tab-fade" style="display:none; ..."></div>
+
 
   <div class="channel-banner">
     <div class="banner-logo"></div>
@@ -1008,7 +1033,8 @@ body.fullscreen-active .exit-full-btn {
 
 
 <!-- PLAYLISTS PAGE -->
-<div id="playlistsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
+<div id="playlistsPage" class="tab-fade" style="display:none; ..."></div>
+
 
   <div class="channel-banner">
     <div class="banner-logo"></div>
@@ -1512,7 +1538,7 @@ function appendFeed(items) {
 function setActiveTab(tab) {
   currentTab = tab;
 
-  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab]
+  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab, subsTab, playlistsTab]
     .forEach(btn => btn.classList.remove("active"));
 
   if (tab === "home") homeTab.classList.add("active");
@@ -1521,7 +1547,22 @@ function setActiveTab(tab) {
   if (tab === "history") historyTab.classList.add("active");
   if (tab === "trending") trendingTab.classList.add("active");
   if (tab === "channel") channelTab.classList.add("active");
+  if (tab === "subs") subsTab.classList.add("active");
+  if (tab === "playlists") playlistsTab.classList.add("active");
 
+  // ⭐ Fade: hide all pages
+  feedEl.classList.remove("show");
+  channelPageEl.classList.remove("show");
+  subsPageEl.classList.remove("show");
+  playlistsPageEl.classList.remove("show");
+
+  // ⭐ Fade: show the correct one
+  if (tab === "home") feedEl.classList.add("show");
+  if (tab === "channel") channelPageEl.classList.add("show");
+  if (tab === "subs") subsPageEl.classList.add("show");
+  if (tab === "playlists") playlistsPageEl.classList.add("show");
+
+  // ⭐ Keep your original display logic INSIDE the function
   if (tab === "channel") {
     feedEl.style.display = "none";
     channelPageEl.style.display = "block";
