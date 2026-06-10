@@ -1532,9 +1532,6 @@ function appendFeed(items) {
 
 
    
-/* -----------------------------------------------------------
-   TABS
------------------------------------------------------------ */
 function setActiveTab(tab) {
   currentTab = tab;
 
@@ -1562,14 +1559,11 @@ function setActiveTab(tab) {
   if (tab === "subs") subsPageEl.classList.add("show");
   if (tab === "playlists") playlistsPageEl.classList.add("show");
 
-  // ⭐ Keep your original display logic INSIDE the function
-  if (tab === "channel") {
-    feedEl.style.display = "none";
-    channelPageEl.style.display = "block";
-  } else {
-    feedEl.style.display = "block";
-    channelPageEl.style.display = "none";
-  }
+  // ⭐ FIX: Proper display logic for ALL tabs
+  feedEl.style.display = (tab === "home") ? "block" : "none";
+  channelPageEl.style.display = (tab === "channel") ? "block" : "none";
+  subsPageEl.style.display = (tab === "subs") ? "block" : "none";
+  playlistsPageEl.style.display = (tab === "playlists") ? "block" : "none";
 }
 
 /* -----------------------------------------------------------
