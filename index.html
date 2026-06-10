@@ -1516,73 +1516,6 @@ rewindBtn.addEventListener("click", () => {
   postToPlayer({ event: "command", func: "seekBy", args: [-10] });
 });
 
-/* -----------------------------------------------------------
-   FEED RENDERING
------------------------------------------------------------ */
-function renderFeed(items) {
-  feedEl.innerHTML = "";
-
-  items.forEach((item) => {
-    const snippet = item.snippet || {};
-    const stats = item.statistics || {};
-    const videoId = item.id?.videoId || item.id;
-
-    const card = document.createElement("div");
-    card.className = "video-card parallax";
-
-    card.innerHTML = `
-      <div class="video-thumb">
-        <img src="${snippet.thumbnails?.high?.url || ""}">
-      </div>
-      <div class="video-info">
-        <div class="video-title">${snippet.title}</div>
-        <div class="video-channel">${snippet.channelTitle}</div>
-        <div class="video-meta">${stats.viewCount || 0} views</div>
-      </div>
-    `;
-
-    card.onclick = () => {
-      setPlayerVideo(videoId, snippet);
-      showHUD("Playing: " + snippet.title);
-    };
-
-    feedEl.appendChild(card);
-  });
-}
-
-/* -----------------------------------------------------------
-   ⭐ APPEND FEED (STEP 5)
------------------------------------------------------------ */
-function appendFeed(items) {
-  items.forEach((item) => {
-    const snippet = item.snippet || {};
-    const stats = item.statistics || {};
-    const videoId = item.id?.videoId || item.id;
-
-    const card = document.createElement("div");
-    card.className = "video-card parallax";
-
-    card.innerHTML = `
-      <div class="video-thumb">
-        <img src="${snippet.thumbnails?.high?.url || ""}">
-      </div>
-      <div class="video-info">
-        <div class="video-title">${snippet.title}</div>
-        <div class="video-channel">${snippet.channelTitle}</div>
-        <div class="video-meta">${stats.viewCount || 0} views</div>
-      </div>
-    `;
-
-    card.onclick = () => {
-      setPlayerVideo(videoId, snippet);
-      showHUD("Playing: " + snippet.title);
-    };
-
-    feedEl.appendChild(card);
-  });
-}
-
-
    
 /* -----------------------------------------------------------
    TAB SYSTEM — Centralized Controller
@@ -1929,6 +1862,154 @@ historyTab.addEventListener("click", () => {
   showHUD("History");
 });
 
+/* -----------------------------------------------------------
+   FEED SYSTEM — REQUIRED FOR ALL TABS
+----------------------------------------------------------- */
+
+function renderFeed(items) {
+  feedEl.innerHTML = "";
+
+  items.forEach(item => {
+    const snippet = item.snippet || {};
+    const stats = item.statistics || {};
+    const videoId = item.id?.videoId || item.id;
+
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
+
+    card.innerHTML = `
+      <div class="video-thumb">
+        <img src="${snippet.thumbnails?.medium?.url || ""}">
+      </div>
+      <div class="video-info">
+        <div class="video-title">${snippet.title || "Untitled"}</div>
+        <div class="video-channel">${snippet.channelTitle || "Unknown"}</div>
+        <div class="video-meta">${stats.viewCount || 0} views</div>
+      </div>
+    `;
+
+    card.onclick = () => setPlayerVideo(videoId, snippet);
+
+    feedEl.appendChild(card);
+  });
+}
+
+function appendFeed(items) {
+  items.forEach(item => {
+    const snippet = item.snippet || {};
+    const stats = item.statistics || {};
+    const videoId = item.id?.videoId || item.id;
+
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
+
+    card.innerHTML = `
+      <div class="video-thumb">
+        <img src="${snippet.thumbnails?.medium?.url || ""}">
+      </div>
+      <div class="video-info">
+        <div class="video-title">${snippet.title || "Untitled"}</div>
+        <div class="video-channel">${snippet.channelTitle || "Unknown"}</div>
+        <div class="video-meta">${stats.viewCount || 0} views</div>
+      </div>
+    `;
+
+    card.onclick = () => setPlayerVideo(videoId, snippet);
+
+    feedEl.appendChild(card);
+  });
+}
+
+/* -----------------------------------------------------------
+   HOME FEED
+----------------------------------------------------------- */
+async function loadHomeFeed() {
+  showHUD("Loading Home…");
+
+  const data = await fetchYouTube("videos", {
+    part: "snippet,statistics,contentDetails",
+    chart: "mostPopular",
+    regionCode: "US",
+    maxResults: 50
+  });
+
+  nextPageToken = data.nextPageToken || null;
+
+  renderFeed(data.items || []);
+}
+
+/* -----------------------------------------------------------
+   SHORTS FEED
+----------------------------------------------------------- */
+async function loadShortsFeed() {
+  showHUD("Loading Shorts…");
+
+  const data = await fetchYouTube("search", {
+    part: "snippet",
+    q: "shorts",
+    type: "video",
+    videoDuration: "short",
+    maxResults: 50
+  });
+
+  nextPageToken = data.nextPageToken || null;
+
+  renderFeed(data.items || []);
+}
+
+/* -----------------------------------------------------------
+   MOVIES FEED
+----------------------------------------------------------- */
+async function loadMoviesFeed() {
+  showHUD("Loading Movies…");
+
+  const data = await fetchYouTube("search", {
+    part: "snippet",
+    q: "full movie",
+    type: "video",
+    videoDuration: "long",
+    maxResults: 50
+  });
+
+  nextPageToken = data.nextPageToken || null;
+
+  renderFeed(data.items || []);
+}
+
+/* -----------------------------------------------------------
+   TRENDING FEED
+----------------------------------------------------------- */
+async function loadTrendingFeed() {
+  showHUD("Loading Trending…");
+
+  const data = await fetchYouTube("videos", {
+    part: "snippet,statistics,contentDetails",
+    chart: "mostPopular",
+    regionCode: "US",
+    maxResults: 50
+  });
+
+  nextPageToken = data.nextPageToken || null;
+
+  renderFeed(data.items || []);
+}
+
+/* -----------------------------------------------------------
+   HISTORY FEED
+----------------------------------------------------------- */
+function loadHistoryFeed() {
+  showHUD("History");
+
+  const items = historyList.slice(0, 50).map(h => ({
+    id: h.id,
+    snippet: h.snippet,
+    statistics: { viewCount: "watched" }
+  }));
+
+  nextPageToken = null;
+
+  renderFeed(items);
+}
 
 
 /* -----------------------------------------------------------
