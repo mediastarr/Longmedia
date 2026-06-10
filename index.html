@@ -2174,6 +2174,10 @@ function openKeyboard() {
   keyboardEl.style.display = "block";
   document.querySelector(".search-input-bar").style.display = "flex";
 
+  // ⭐ Enable pointer events so keyboard/search panel can be clicked
+  searchPanelEl.classList.add("active");
+  keyboardEl.classList.add("active");
+
   // ⭐ Hide all other pages so nothing shows behind the keyboard
   feedEl.style.display = "none";
   subsPageEl.style.display = "none";
@@ -2182,10 +2186,15 @@ function openKeyboard() {
 }
 
 
+
 function closeKeyboard() {
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
   suggestionsEl.style.display = "none";
+
+  // ⭐ Disable pointer events so tabs become clickable again
+  searchPanelEl.classList.remove("active");
+  keyboardEl.classList.remove("active");
 
   // ⭐ Restore the correct page based on currentTab
   if (currentTab === "home") feedEl.style.display = "block";
@@ -2193,6 +2202,7 @@ function closeKeyboard() {
   if (currentTab === "playlists") playlistsPageEl.style.display = "block";
   if (currentTab === "channel") channelPageEl.style.display = "block";
 }
+
 
 
 searchTabEl.addEventListener("click", openKeyboard);
