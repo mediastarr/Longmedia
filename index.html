@@ -1518,6 +1518,8 @@ homeTab.addEventListener("click", async () => {
   setActiveTab("home");
 
   const data = await fetchYouTube("videos", {
+     currentTab = ""; // force refresh even if already on Home
+
     part: "snippet,statistics,contentDetails",
     chart: "mostPopular",
     regionCode: "US",
@@ -1536,6 +1538,7 @@ homeTab.addEventListener("click", async () => {
    TRENDING TAB — 50 trending videos
 ----------------------------------------------------------- */
 trendingTab.addEventListener("click", async () => {
+  currentTab = "";            // ⭐ FORCE REFRESH
   setActiveTab("trending");
 
   const data = await fetchYouTube("videos", {
@@ -1557,6 +1560,7 @@ trendingTab.addEventListener("click", async () => {
    SHORTS TAB — real Shorts feed (fixed)
 ----------------------------------------------------------- */
 shortsTab.addEventListener("click", async () => {
+  currentTab = "";            // ⭐ FORCE REFRESH
   setActiveTab("shorts");
 
   const data = await fetchYouTube("search", {
@@ -1587,6 +1591,7 @@ shortsTab.addEventListener("click", async () => {
    MOVIES TAB — real long-form movies
 ----------------------------------------------------------- */
 moviesTab.addEventListener("click", async () => {
+  currentTab = "";            // ⭐ FORCE REFRESH
   setActiveTab("movies");
 
   const data = await fetchYouTube("search", {
