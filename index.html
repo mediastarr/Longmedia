@@ -1991,24 +1991,28 @@ function openKeyboard() {
   searchPanelEl.style.pointerEvents = "auto";
 
   keyboardEl.style.display = "block";
+  keyboardEl.style.pointerEvents = "auto";   // ⭐ ENABLE
 
   const inputBar = document.querySelector(".search-input-bar");
   inputBar.style.display = "flex";
   inputBar.style.pointerEvents = "auto";
 
-  suggestionsEl.style.pointerEvents = "auto";   // ⭐ ENABLE
+  suggestionsEl.style.pointerEvents = "auto";
 
   feedEl.style.display = "none";
 }
-   
+
 function closeKeyboard() {
   keyboardEl.style.display = "none";
-  searchPanelEl.style.display = "none";
-  suggestionsEl.style.display = "none";
+  keyboardEl.style.pointerEvents = "none";   // ⭐ DISABLE
 
+  searchPanelEl.style.display = "none";
   searchPanelEl.style.pointerEvents = "none";
+
+  suggestionsEl.style.display = "none";
+  suggestionsEl.style.pointerEvents = "none";
+
   document.querySelector(".search-input-bar").style.pointerEvents = "none";
-  suggestionsEl.style.pointerEvents = "none";   // ⭐ DISABLE
 
   feedEl.style.display = "block";
 }
