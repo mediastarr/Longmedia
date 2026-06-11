@@ -4,6 +4,11 @@
 <meta charset="UTF-8" />
 <title>ViewTube AR OS</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://www.youtube.com">
+<link rel="preconnect" href="https://www.youtube-nocookie.com">
+<link rel="preconnect" href="https://i.ytimg.com">
+<link rel="dns-prefetch" href="https://www.youtube.com">
+<link rel="dns-prefetch" href="https://s.ytimg.com">
 <style>
 :root {
   --bg-dark: #05060a;
@@ -718,7 +723,7 @@ function setPlayerVideo(videoId, snippet) {
   currentVideoId = videoId;
   playerSection.style.display = "block";
   playerSection.classList.remove("player-mini", "player-fullscreen");
-  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
+  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&rel=0&playsinline=1&origin=${location.origin}`;
   saveToHistory({ id: videoId, snippet });
   hideUIForVideo();
   playPauseBtn.textContent = "Pause";
