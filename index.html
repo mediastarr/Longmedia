@@ -153,31 +153,24 @@ body.light #searchTab {
   margin-top: 12px;
   display: flex;
   gap: 8px;
-  flex-wrap: nowrap;      /* keep tabs on one line */
+  flex-wrap: nowrap;
   overflow-x: auto;        /* ⭐ allow horizontal scroll */
-  white-space: nowrap;    /* prevent wrapping */
+  white-space: nowrap;
   padding-bottom: 4px;
   scrollbar-width: none;   /* Firefox */
   position: relative;
   z-index: 16;
 }
-  
+
 #tabs::-webkit-scrollbar {
   display: none;           /* Chrome/Safari */
 }
-  
+
 .tab-btn {
   flex-shrink: 0;          /* ⭐ prevents shrinking */
   min-width: fit-content;  /* ⭐ ensures full text visible */
-  padding: 7px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(120,130,160,0.6);
-  font-size: 12px;
-  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.12), rgba(10,12,20,0.9));
-  color: #f5f7ff;
-  cursor: pointer;
-  text-align: center;     /* keeps text centered */
 }
+
 
 .tab-btn.active {
   border-color: var(--accent);
@@ -1196,7 +1189,6 @@ const subsTab = document.getElementById("subsTab");
 const playlistsTab = document.getElementById("playlistsTab");
 const subsPageEl = document.getElementById("subsPage");
 const subsFeedEl = document.getElementById("subsFeed");
-const playlistsTab = document.getElementById("playlistsTab");
 const playlistsPageEl = document.getElementById("playlistsPage");
 const playlistsFeedEl = document.getElementById("playlistsFeed");
 const startLoginBtn = document.getElementById("startLoginBtn");
@@ -1250,18 +1242,19 @@ function showUIWithMiniPlayer() {
   searchTabEl.style.display = "flex";
   tabsEl.style.display = "flex";
 
+  feedEl.style.display = "none";
+  channelPageEl.style.display = "none";
+  subsPageEl.style.display = "none";
+  playlistsPageEl.style.display = "none";
+
   if (currentTab === "channel") {
     channelPageEl.style.display = "block";
-    feedEl.style.display = "none";
-    subsPageEl.style.display = "none";
   } else if (currentTab === "subs") {
     subsPageEl.style.display = "block";
-    feedEl.style.display = "none";
-    channelPageEl.style.display = "none";
+  } else if (currentTab === "playlists") {
+    playlistsPageEl.style.display = "block";
   } else {
     feedEl.style.display = "block";
-    channelPageEl.style.display = "none";
-    subsPageEl.style.display = "none";
   }
 }
 
@@ -1518,25 +1511,36 @@ function appendFeed(items) {
 function setActiveTab(tab) {
   currentTab = tab;
 
-  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab]
-    .forEach(btn => btn.classList.remove("active"));
+  // remove active from ALL tabs
+  [
+    homeTab, shortsTab, moviesTab, historyTab,
+    trendingTab, channelTab, subsTab, playlistsTab
+  ].forEach(btn => btn.classList.remove("active"));
 
+  // activate correct tab
   if (tab === "home") homeTab.classList.add("active");
   if (tab === "shorts") shortsTab.classList.add("active");
   if (tab === "movies") moviesTab.classList.add("active");
   if (tab === "history") historyTab.classList.add("active");
   if (tab === "trending") trendingTab.classList.add("active");
   if (tab === "channel") channelTab.classList.add("active");
+  if (tab === "subs") subsTab.classList.add("active");
+  if (tab === "playlists") playlistsTab.classList.add("active");
 
-  if (tab === "channel") {
-    feedEl.style.display = "none";
-    channelPageEl.style.display = "block";
-  } else {
+  // hide all pages
+  feedEl.style.display = "none";
+  channelPageEl.style.display = "none";
+  subsPageEl.style.display = "none";
+  playlistsPageEl.style.display = "none";
+
+  // show correct page
+  if (["home","shorts","movies","history","trending"].includes(tab)) {
     feedEl.style.display = "block";
-    channelPageEl.style.display = "none";
   }
+  if (tab === "channel") channelPageEl.style.display = "block";
+  if (tab === "subs") subsPageEl.style.display = "block";
+  if (tab === "playlists") playlistsPageEl.style.display = "block";
 }
-
 /* -----------------------------------------------------------
    HOME TAB — 20 fresh videos
 ----------------------------------------------------------- */
@@ -1661,7 +1665,7 @@ subsTab.addEventListener("click", () => {
 });
 
    playlistsTab.addEventListener("click", () => {
-      currentTab = "playlists";
+  currentTab = "playlists";
 
   document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
   playlistsTab.classList.add("active");
@@ -2144,6 +2148,7 @@ function closeKeyboard() {
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
   suggestionsEl.style.display = "none";
+  tabsEl.style.display = "flex";   /* ⭐ restore tabs */ 
 
   // ⭐ Restore the correct page based on currentTab
   if (currentTab === "home") feedEl.style.display = "block";
@@ -2347,11 +2352,14 @@ themeToggle.addEventListener("click", () => {
 ----------------------------------------------------------- */
 (async function init() {
   const data = await fetchYouTube("videos", {
-    part: "snippet,statistics",
+    part: "snippet",
     chart: "mostPopular",
-    maxResults: 25
+    regionCode: "US",
+    maxResults: 20,
+    _: Date.now()
   });
 
+  nextPageToken = data.nextPageToken || null;
   renderFeed(data.items || []);
 })();
 </script>
