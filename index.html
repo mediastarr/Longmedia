@@ -1988,18 +1988,24 @@ function showSuggestions(list) {
 
 function openKeyboard() {
   searchPanelEl.style.display = "block";
+  searchPanelEl.style.pointerEvents = "auto";
+
   keyboardEl.style.display = "block";
   document.querySelector(".search-input-bar").style.display = "flex";
-  feedEl.style.display = "none";
-  searchPanelEl.style.pointerEvents = "auto";
-}
+  document.querySelector(".search-input-bar").style.pointerEvents = "auto";  // ⭐ ENABLE
 
+  feedEl.style.display = "none";
+}
+   
 function closeKeyboard() {
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
   suggestionsEl.style.display = "none";
+
+  searchPanelEl.style.pointerEvents = "none";               // ⭐ DISABLE
+  document.querySelector(".search-input-bar").style.pointerEvents = "none"; // ⭐ DISABLE
+
   feedEl.style.display = "block";
-  searchPanelEl.style.pointerEvents = "none";
 }
 
 searchTabEl.addEventListener("click", openKeyboard);
