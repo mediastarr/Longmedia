@@ -878,16 +878,15 @@ body.fullscreen-active .exit-full-btn {
 
   <!-- TABS -->
   <div id="tabs">
-    <button id="homeTab" class="tab-btn parallax-tab active">Home</button>
-    <button id="shortsTab" class="tab-btn parallax-tab active">Shorts</button>
-    <button id="moviesTab" class="tab-btn parallax-tab active">Movies</button>
-    <button id="historyTab" class="tab-btn parallax-tab active">History</button>
-    <button id="trendingTab" class="tab-btn parallax-tab active">Trending</button>
-    <button id="channelTab" class="tab-btn parallax-tab active">Channel</button>
-    <!-- NEW: Subscriptions tab -->
-    <button id="subsTab" class="tab-btn parallax-tab active">Subscriptions</button>
-    <button id="playlistsTab" class="tab-btn parallax-tab active">Playlists</button>
-  </div>
+  <button id="homeTab" class="tab-btn parallax-tab active" tabindex="0">Home</button>
+  <button id="shortsTab" class="tab-btn parallax-tab" tabindex="0">Shorts</button>
+  <button id="moviesTab" class="tab-btn parallax-tab" tabindex="0">Movies</button>
+  <button id="historyTab" class="tab-btn parallax-tab" tabindex="0">History</button>
+  <button id="trendingTab" class="tab-btn parallax-tab" tabindex="0">Trending</button>
+  <button id="channelTab" class="tab-btn parallax-tab" tabindex="0">Channel</button>
+  <button id="subsTab" class="tab-btn parallax-tab" tabindex="0">Subscriptions</button>
+  <button id="playlistsTab" class="tab-btn parallax-tab" tabindex="0">Playlists</button>
+</div>
 
   
   <!-- PLAYER -->
@@ -1200,6 +1199,20 @@ const playlistsFeedEl = document.getElementById("playlistsFeed");
 const startLoginBtn = document.getElementById("startLoginBtn");
 const deviceUserCodeEl = document.getElementById("deviceUserCode");
 const deviceLoginStatusEl = document.getElementById("deviceLoginStatus");
+
+/* -----------------------------------------------------------
+   ⭐ AUTO‑SCROLL TABS INTO VIEW (Required for swipe)
+----------------------------------------------------------- */
+function scrollTabIntoView(btn) {
+  const tabsRect = tabsEl.getBoundingClientRect();
+  const btnRect = btn.getBoundingClientRect();
+
+  if (btnRect.left < tabsRect.left) {
+    tabsEl.scrollBy({ left: btnRect.left - tabsRect.left - 20, behavior: "smooth" });
+  } else if (btnRect.right > tabsRect.right) {
+    tabsEl.scrollBy({ left: btnRect.right - tabsRect.right + 20, behavior: "smooth" });
+  }
+}   
 
 /* -----------------------------------------------------------
    HUD
@@ -2161,6 +2174,9 @@ function openKeyboard() {
   searchPanelEl.style.display = "block";
   keyboardEl.style.display = "block";
   document.querySelector(".search-input-bar").style.display = "flex";
+
+  // ⭐ Hide tabs so swipe goes Theme → Open Keyboard
+  tabsEl.style.display = "none";
 
   // ⭐ Hide all other pages so nothing shows behind the keyboard
   feedEl.style.display = "none";
