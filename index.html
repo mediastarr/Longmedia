@@ -147,23 +147,21 @@ body.light #searchTab {
 }
 
 /* -----------------------------------------------------------
-   TABS — All visible on one line, auto-fit width
+   TABS
 ----------------------------------------------------------- */
 #tabs {
   margin-top: 12px;
   display: flex;
   gap: 8px;
-  flex-wrap: nowrap;      /* keep tabs on one line */
-  overflow: hidden;       /* no scrolling */
-  white-space: nowrap;    /* prevent wrapping */
+  flex-wrap: nowrap;
+  overflow-x: auto;
   padding-bottom: 4px;
   position: relative;
   z-index: 16;
 }
 
 .tab-btn {
-  flex: 1;                /* ⭐ auto-shrink so all tabs fit */
-  min-width: 80px;        /* prevents tabs from becoming too tiny */
+  flex: 0 0 auto;
   padding: 7px 12px;
   border-radius: 999px;
   border: 1px solid rgba(120,130,160,0.6);
@@ -171,15 +169,12 @@ body.light #searchTab {
   background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.12), rgba(10,12,20,0.9));
   color: #f5f7ff;
   cursor: pointer;
-  text-align: center;     /* keeps text centered */
 }
 
 .tab-btn.active {
   border-color: var(--accent);
   box-shadow: 0 0 18px rgba(60,242,255,0.7);
 }
-
-
 
 /* -----------------------------------------------------------
    PLAYER
@@ -882,7 +877,6 @@ body.fullscreen-active .exit-full-btn {
     <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
     <!-- NEW: Subscriptions tab -->
     <button id="subsTab" class="tab-btn parallax-tab">Subscriptions</button>
-    <button id="playlistsTab" class="tab-btn parallax-tab">Playlists</button>
   </div>
 
   
@@ -975,56 +969,45 @@ body.fullscreen-active .exit-full-btn {
   </div>
 
   <!-- FEED -->
-<div id="feed"></div>
+  <div id="feed"></div>
 
-<!-- CHANNEL PAGE -->
-<div id="channelPage"></div>
+  <!-- CHANNEL PAGE -->
+  <div id="channelPage"></div>
 
-<!-- SUBSCRIPTIONS PAGE -->
-<div id="subsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
+  <!-- SUBSCRIPTIONS PAGE -->
+  <div id="subsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
 
-  <div class="channel-banner">
-    <div class="banner-logo"></div>
-    <div class="banner-text">SUBSCRIPTIONS</div>
-  </div>
-
-  <div id="subsLoginPanel" style="margin-top:12px; padding:12px; border-radius:16px;
-       background:linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));">
-
-    <div style="font-size:13px; opacity:0.85; margin-bottom:6px;">
-      Sign in to load your YouTube subscriptions
+    <div class="channel-banner">
+      <div class="banner-logo"></div>
+      <div class="banner-text">SUBSCRIPTIONS</div>
     </div>
 
-    <button id="startLoginBtn" class="topbar-btn" style="margin-bottom:8px;">
-      Login to YouTube
-    </button>
+    <div id="subsLoginPanel" style="margin-top:12px; padding:12px; border-radius:16px;
+         background:linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));">
 
-    <div id="deviceUserCode" style="font-size:12px; margin-top:6px; opacity:0.8;"></div>
-    <div id="deviceLoginStatus" style="font-size:12px; margin-top:4px; opacity:0.8;"></div>
+      <div style="font-size:13px; opacity:0.85; margin-bottom:6px;">
+        Sign in to load your YouTube subscriptions
+      </div>
+
+      <button id="startLoginBtn" class="topbar-btn" style="margin-bottom:8px;">
+        Login to YouTube
+      </button>
+
+      <div id="deviceUserCode" style="font-size:12px; margin-top:6px; opacity:0.8;"></div>
+      <div id="deviceLoginStatus" style="font-size:12px; margin-top:4px; opacity:0.8;"></div>
+    </div>
+
+    <div id="subsFeed" style="margin-top:16px;"></div>
   </div>
 
-  <div id="subsFeed" style="margin-top:16px;"></div>
 </div>
-
-
-<!-- PLAYLISTS PAGE -->
-<div id="playlistsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
-
-  <div class="channel-banner">
-    <div class="banner-logo"></div>
-    <div class="banner-text">PLAYLISTS</div>
-  </div>
-
-  <div id="playlistsFeed" style="margin-top:16px;"></div>
-</div>
-
 
 <script>
 /* -----------------------------------------------------------
    YOUTUBE API KEY ROTATION
 ----------------------------------------------------------- */
 const API_KEYS = [
-  "AIzaSyBcW3TMMFe7x9sIxGeB-Ykeh_9lG9TGwi4",
+  "AIzaSyCx0wjIv9VdzaI3oyz34zwkkFgTDj7LgEw",
   "AIzaSyCNKebUdj8bTiRvLoSv28YqGdNoDn53Tk4",
   "AIzaSyCJY-gccqPtgmqSnPRoo4W2vQp1chFCLHY",
   "AIzaSyD4tP4THh9ZeDcVW041l_JCjJztZA2zJCA",
@@ -1190,9 +1173,6 @@ const searchBack = document.getElementById("searchBack");
 const subsTab = document.getElementById("subsTab");
 const subsPageEl = document.getElementById("subsPage");
 const subsFeedEl = document.getElementById("subsFeed");
-const playlistsTab = document.getElementById("playlistsTab");
-const playlistsPageEl = document.getElementById("playlistsPage");
-const playlistsFeedEl = document.getElementById("playlistsFeed");
 const startLoginBtn = document.getElementById("startLoginBtn");
 const deviceUserCodeEl = document.getElementById("deviceUserCode");
 const deviceLoginStatusEl = document.getElementById("deviceLoginStatus");
@@ -1512,29 +1492,31 @@ function appendFeed(items) {
 function setActiveTab(tab) {
   currentTab = tab;
 
-  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab]
+  // Reset active state
+  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab, subsTab]
     .forEach(btn => btn.classList.remove("active"));
 
+  // Highlight active tab
   if (tab === "home") homeTab.classList.add("active");
   if (tab === "shorts") shortsTab.classList.add("active");
   if (tab === "movies") moviesTab.classList.add("active");
   if (tab === "history") historyTab.classList.add("active");
   if (tab === "trending") trendingTab.classList.add("active");
   if (tab === "channel") channelTab.classList.add("active");
+  if (tab === "subs") subsTab.classList.add("active");
 
-  if (tab === "channel") {
-    feedEl.style.display = "none";
-    channelPageEl.style.display = "block";
-  } else {
-    feedEl.style.display = "block";
-    channelPageEl.style.display = "none";
-  }
+  // Show/hide pages
+  feedEl.style.display = (tab === "home" || tab === "shorts" || tab === "movies" || tab === "history" || tab === "trending" || tab === "search") ? "block" : "none";
+  channelPageEl.style.display = (tab === "channel") ? "block" : "none";
+  subsPageEl.style.display = (tab === "subs") ? "block" : "none";
 }
+
 
 /* -----------------------------------------------------------
    HOME TAB — 50 fresh videos
 ----------------------------------------------------------- */
 homeTab.addEventListener("click", async () => {
+  nextPageToken = null;
   setActiveTab("home");
 
   const data = await fetchYouTube("videos", {
@@ -1556,6 +1538,7 @@ homeTab.addEventListener("click", async () => {
    TRENDING TAB — 50 trending videos
 ----------------------------------------------------------- */
 trendingTab.addEventListener("click", async () => {
+  nextPageToken = null;   // ⭐ FIX
   setActiveTab("trending");
 
   const data = await fetchYouTube("videos", {
@@ -1577,11 +1560,12 @@ trendingTab.addEventListener("click", async () => {
    SHORTS TAB — real Shorts feed (fixed)
 ----------------------------------------------------------- */
 shortsTab.addEventListener("click", async () => {
+  nextPageToken = null;   // ⭐ FIX
   setActiveTab("shorts");
 
   const data = await fetchYouTube("search", {
     part: "snippet",
-    q: "shorts",                 // ⭐ REQUIRED or API returns nothing
+    q: "shorts",
     type: "video",
     videoDuration: "short",
     videoEmbeddable: "true",
@@ -1607,6 +1591,7 @@ shortsTab.addEventListener("click", async () => {
    MOVIES TAB — real long-form movies
 ----------------------------------------------------------- */
 moviesTab.addEventListener("click", async () => {
+  nextPageToken = null;   // ⭐ FIX
   setActiveTab("movies");
 
   const data = await fetchYouTube("search", {
@@ -1635,15 +1620,7 @@ moviesTab.addEventListener("click", async () => {
    SUBSCRIPTIONS TAB — OAuth + real subs
 ----------------------------------------------------------- */
 subsTab.addEventListener("click", () => {
-  currentTab = "subs";
-
-  document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
-  subsTab.classList.add("active");
-
-  feedEl.style.display = "none";
-  channelPageEl.style.display = "none";
-  subsPageEl.style.display = "block";
-
+  setActiveTab("subs");
   showHUD("Subscriptions");
 
   const token = localStorage.getItem("yt_access_token");
@@ -1652,27 +1629,6 @@ subsTab.addEventListener("click", () => {
   } else {
     deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
   }
-});
-
-   playlistsTab.addEventListener("click", () => {
-  currentTab = "playlists";
-
-  document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
-  playlistsTab.classList.add("active");
-
-  feedEl.style.display = "none";
-  channelPageEl.style.display = "none";
-  subsPageEl.style.display = "none";
-  playlistsPageEl.style.display = "block";
-
-  const token = localStorage.getItem("yt_access_token");
-  if (token) {
-    loadUserPlaylists();
-  } else {
-    playlistsFeedEl.innerHTML = `<div style="opacity:0.8;">Login required to load playlists.</div>`;
-  }
-
-  showHUD("Playlists");
 });
 
 
@@ -1770,125 +1726,40 @@ async function loadSubscriptions() {
     }
 
     data.items.forEach(item => {
-      const ch = item.snippet;
-      const channelId = ch.resourceId.channelId;
-      const thumb = ch.thumbnails?.medium?.url || "";
-      const title = ch.title;
+  const ch = item.snippet;
+  const channelId = ch.resourceId.channelId;
+  const thumb = ch.thumbnails?.medium?.url || "";
+  const title = ch.title;
 
-      const card = document.createElement("div");
-      card.className = "video-card parallax";
+  const card = document.createElement("div");
+  card.className = "video-card parallax";
 
-      card.innerHTML = `
-        <div class="video-thumb">
-          <img src="${thumb}">
-        </div>
-        <div class="video-info">
-          <div class="video-title">${title}</div>
-          <div class="video-channel">${ch.channelTitle || "Channel"}</div>
-          <div class="video-meta">Tap to open channel</div>
-        </div>
-      `;
+  card.innerHTML = `
+    <div class="video-thumb">
+      <img src="${thumb}">
+    </div>
+    <div class="video-info">
+      <div class="video-title">${title}</div>
+      <div class="video-channel">${ch.channelTitle || "Channel"}</div>
+      <div class="video-meta">Tap to open channel</div>
+    </div>
+  `;
 
-      card.onclick = () => {
-        currentTab = "channel";
-        currentChannelId = channelId;
-        showHUD("Channel: " + title);
-      };
+  card.onclick = () => {
+    currentChannelId = channelId;
+    subsPageEl.style.display = "none";   // ⭐ FIX
+    setActiveTab("channel");
+    loadChannelPage(channelId);
+  };
 
-      subsFeedEl.appendChild(card);
-    });
+  subsFeedEl.appendChild(card);
+});
 
   } catch (e) {
     subsFeedEl.innerHTML = `<div style="font-size:12px; opacity:0.8;">Error loading subscriptions.</div>`;
     showHUD("Subs error");
   }
 }
-
-
-  async function loadUserPlaylists() {
-  const token = localStorage.getItem("yt_access_token");
-  if (!token) return;
-
-  playlistsFeedEl.innerHTML = "";
-  showHUD("Loading playlists…");
-
-  const res = await fetch(
-    "https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=25",
-    { headers: { Authorization: "Bearer " + token } }
-  );
-
-  const data = await res.json();
-
-  if (!data.items || !data.items.length) {
-    playlistsFeedEl.innerHTML = `<div style="opacity:0.8;">No playlists found.</div>`;
-    return;
-  }
-
-  data.items.forEach(pl => {
-    const snippet = pl.snippet;
-    const thumb = snippet.thumbnails?.medium?.url || "";
-    const title = snippet.title;
-    const playlistId = pl.id;
-
-    const card = document.createElement("div");
-    card.className = "video-card parallax";
-
-    card.innerHTML = `
-      <div class="video-thumb">
-        <img src="${thumb}">
-      </div>
-      <div class="video-info">
-        <div class="video-title">${title}</div>
-        <div class="video-meta">${pl.contentDetails.itemCount} videos</div>
-      </div>
-    `;
-
-    card.onclick = () => loadPlaylistVideos(playlistId, title);
-
-    playlistsFeedEl.appendChild(card);
-  });
-}
-
-
-  async function loadPlaylistVideos(playlistId, title) {
-  showHUD("Loading playlist…");
-
-  const token = localStorage.getItem("yt_access_token");
-
-  const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50`,
-    { headers: { Authorization: "Bearer " + token } }
-  );
-
-  const data = await res.json();
-
-  playlistsFeedEl.innerHTML = `
-    <div style="font-size:14px; margin-bottom:10px; opacity:0.85;">${title}</div>
-  `;
-
-  data.items.forEach(item => {
-    const snippet = item.snippet;
-    const videoId = snippet.resourceId.videoId;
-
-    const card = document.createElement("div");
-    card.className = "video-card parallax";
-
-    card.innerHTML = `
-      <div class="video-thumb">
-        <img src="${snippet.thumbnails?.medium?.url || ""}">
-      </div>
-      <div class="video-info">
-        <div class="video-title">${snippet.title}</div>
-        <div class="video-channel">${snippet.videoOwnerChannelTitle}</div>
-      </div>
-    `;
-
-    card.onclick = () => setPlayerVideo(videoId, snippet);
-
-    playlistsFeedEl.appendChild(card);
-  });
-}
-
 
 /* -----------------------------------------------------------
    HISTORY TAB — watched videos
@@ -2122,26 +1993,16 @@ function openKeyboard() {
   keyboardEl.style.display = "block";
   document.querySelector(".search-input-bar").style.display = "flex";
 
-  // ⭐ Hide all other pages so nothing shows behind the keyboard
   feedEl.style.display = "none";
-  subsPageEl.style.display = "none";
-  playlistsPageEl.style.display = "none";
-  channelPageEl.style.display = "none";
 }
-
 
 function closeKeyboard() {
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
   suggestionsEl.style.display = "none";
 
-  // ⭐ Restore the correct page based on currentTab
-  if (currentTab === "home") feedEl.style.display = "block";
-  if (currentTab === "subs") subsPageEl.style.display = "block";
-  if (currentTab === "playlists") playlistsPageEl.style.display = "block";
-  if (currentTab === "channel") channelPageEl.style.display = "block";
+  feedEl.style.display = "block";
 }
-
 
 searchTabEl.addEventListener("click", openKeyboard);
 searchBack.addEventListener("click", closeKeyboard);
@@ -2190,6 +2051,8 @@ function triggerSearch(q) {
     });
 
     nextPageToken = data.nextPageToken || null;
+
+    currentTab = "search";   // ⭐ ADD THIS LINE
 
     renderFeed(data.items || []);
     closeKeyboard();
