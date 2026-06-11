@@ -1,99 +1,1035 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>ViewTube AR OS</title>
-  <style>
-    body { margin:0; font-family:system-ui, sans-serif; background:#000; color:#fff; }
-    .topbar { display:flex; gap:8px; padding:8px; background:#111; position:sticky; top:0; z-index:10; }
-    .tab-btn, .topbar-btn {
-      padding:6px 10px;
-      border-radius:999px;
-      border:none;
-      background:#222;
-      color:#fff;
-      font-size:12px;
-      cursor:pointer;
-    }
-    .tab-btn.active { background:#f00; }
-    #feed, #channelPage, #subsPage { padding:8px; }
-    .video-card { display:flex; gap:8px; margin-bottom:10px; background:#111; padding:8px; border-radius:8px; cursor:pointer; }
-    .video-thumb img { width:120px; height:68px; object-fit:cover; border-radius:6px; }
-    .video-title { font-size:13px; font-weight:600; }
-    .video-channel { font-size:11px; opacity:0.8; }
-    .video-meta { font-size:10px; opacity:0.6; }
-    #hud { position:fixed; bottom:10px; left:50%; transform:translateX(-50%); background:#222; padding:6px 10px; border-radius:999px; font-size:11px; opacity:0.9; }
-  </style>
-</head>
-<body>
+<meta charset="UTF-8" />
+<title>ViewTube AR OS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- TOP BAR -->
-  <div class="topbar">
-    <button id="homeTab" class="tab-btn active">Home</button>
-    <button id="shortsTab" class="tab-btn">Shorts</button>
-    <button id="moviesTab" class="tab-btn">Movies</button>
-    <button id="trendingTab" class="tab-btn">Trending</button>
-    <button id="historyTab" class="tab-btn">History</button>
-    <button id="channelTab" class="tab-btn">Channel</button>
-    <button id="subsTab" class="tab-btn">Subscriptions</button>
-  </div>
+<style>
+/* -----------------------------------------------------------
+   GLOBAL THEME
+----------------------------------------------------------- */
+:root {
+  --bg-dark: #05060a;
+  --bg-light: #f4f5fb;
+  --accent: #3cf2ff;
+  --accent-soft: rgba(60, 242, 255, 0.35);
+  --accent-strong: rgba(60, 242, 255, 0.85);
+  --shadow-soft: 0 18px 40px rgba(0,0,0,0.45);
+  --shadow-strong: 0 26px 70px rgba(0,0,0,0.75);
+  --shadow-glow: 0 0 40px rgba(60,242,255,0.65);
+}
 
-  <!-- FEED PAGE -->
-  <div id="feed"></div>
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
-  <!-- CHANNEL PAGE -->
-  <div id="channelPage" style="display:none;">
-    <button id="backToSubsBtn" class="topbar-btn" style="margin-bottom:12px; display:none;">
-      ← Back to Subscriptions
-    </button>
-    <div id="channelContent"></div>
-  </div>
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  background: radial-gradient(circle at 10% 0%, #05060a 0%, #020308 40%, #000000 100%);
+  color: #f5f7ff;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
 
-  <!-- SUBSCRIPTIONS PAGE -->
-  <div id="subsPage" style="display:none;">
-    <div id="subsFeed"></div>
-    <div id="deviceLoginStatus" style="font-size:11px; opacity:0.8; margin-top:8px;"></div>
-    <button id="startLoginBtn" class="topbar-btn" style="margin-top:8px;">Login to YouTube</button>
-    <div id="deviceUserCode" style="font-size:11px; opacity:0.8; margin-top:4px;"></div>
-  </div>
+body.light {
+  background: radial-gradient(circle at 0% 0%, #fdfdff 0%, #e4e7ff 40%, #cfd3ff 100%);
+  color: #05060a;
+}
 
-  <!-- HUD -->
-  <div id="hud">Ready</div>
-<script>
-  // ELEMENTS
-  const feedEl = document.getElementById("feed");
-  const channelPageEl = document.getElementById("channelPage");
-  const channelContentEl = document.getElementById("channelContent");
-  const subsPageEl = document.getElementById("subsPage");
-  const subsFeedEl = document.getElementById("subsFeed");
-  const deviceLoginStatusEl = document.getElementById("deviceLoginStatus");
-  const deviceUserCodeEl = document.getElementById("deviceUserCode");
-  const startLoginBtn = document.getElementById("startLoginBtn");
-  const hudEl = document.getElementById("hud");
+/* -----------------------------------------------------------
+   LAYOUT
+----------------------------------------------------------- */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 16px 18px 24px;
+}
 
-  const homeTab = document.getElementById("homeTab");
-  const shortsTab = document.getElementById("shortsTab");
-  const moviesTab = document.getElementById("moviesTab");
-  const trendingTab = document.getElementById("trendingTab");
-  const historyTab = document.getElementById("historyTab");
-  const channelTab = document.getElementById("channelTab");
-  const subsTab = document.getElementById("subsTab");
-  const backToSubsBtn = document.getElementById("backToSubsBtn");
+/* -----------------------------------------------------------
+   TOPBAR
+----------------------------------------------------------- */
+#topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(10,12,20,0.9), rgba(20,24,40,0.9));
+  color: #f5f7ff;
+  position: relative;
+  z-index: 20;
+}
 
-  let currentTab = "home";
-  let nextPageToken = null;
-  let shortsItems = [];
-  let shortsIndex = 0;
-  let historyList = [];
-  let currentChannelId = null;
+body.light #topbar {
+  background: linear-gradient(135deg, rgba(240,242,255,0.95), rgba(220,224,255,0.95));
+  color: #05060a;
+}
 
-  function showHUD(msg) {
-    hudEl.textContent = msg;
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-orb {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: radial-gradient(circle, var(--accent-strong), transparent 70%);
+  box-shadow: 0 0 24px rgba(60,242,255,0.9);
+}
+
+.topbar-title {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-size: 14px;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-btn {
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.6);
+  padding: 6px 10px;
+  font-size: 12px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
+  color: #f5f7ff;
+  cursor: pointer;
+}
+
+body.light .topbar-btn {
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.12), rgba(240,242,255,0.95));
+  color: #05060a;
+}
+
+/* -----------------------------------------------------------
+   SEARCH BAR
+----------------------------------------------------------- */
+#searchTab {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(8,10,18,0.9), rgba(16,20,32,0.9));
+  position: relative;
+  z-index: 18;
+}
+
+body.light #searchTab {
+  background: linear-gradient(135deg, rgba(238,240,255,0.95), rgba(224,228,255,0.95));
+}
+
+.search-label {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.search-open-btn {
+  margin-left: auto;
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.6);
+  padding: 6px 10px;
+  font-size: 12px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
+  color: #f5f7ff;
+  cursor: pointer;
+}
+
+/* -----------------------------------------------------------
+   TABS — All visible on one line, auto-fit width
+----------------------------------------------------------- */
+#tabs {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;      /* keep tabs on one line */
+  overflow-x: auto;        /* ⭐ allow horizontal scroll */
+  white-space: nowrap;    /* prevent wrapping */
+  padding-bottom: 4px;
+  scrollbar-width: none;   /* Firefox */
+  position: relative;
+  z-index: 16;
+}
+  
+#tabs::-webkit-scrollbar {
+  display: none;           /* Chrome/Safari */
+}
+  
+.tab-btn {
+  flex-shrink: 0;          /* ⭐ prevents shrinking */
+  min-width: fit-content;  /* ⭐ ensures full text visible */
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.6);
+  font-size: 12px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.12), rgba(10,12,20,0.9));
+  color: #f5f7ff;
+  cursor: pointer;
+  text-align: center;     /* keeps text centered */
+}
+
+.tab-btn.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 18px rgba(60,242,255,0.7);
+}
+
+
+
+/* -----------------------------------------------------------
+   PLAYER
+----------------------------------------------------------- */
+#playerSection {
+  margin-top: 16px;
+  border-radius: 22px;
+  overflow: hidden;
+  position: relative;
+  background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.18), rgba(5,6,12,0.98));
+  height: 260px;
+  display: none;
+}
+
+#playerSection.player-mini {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 260px;
+  height: 150px;
+  z-index: 40;
+}
+
+/* -----------------------------------------------------------
+   FULLSCREEN PLAYER FIX
+----------------------------------------------------------- */
+#playerSection.player-fullscreen {
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  background: black;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+
+  /* VisionOS transform */
+  transform:
+    perspective(1200px)
+    translateZ(45px)
+    scale(1.08)
+    rotateX(4deg);
+
+  transition:
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.55s ease,
+    box-shadow 0.55s ease;
+}
+
+
+#playerSection.player-fullscreen iframe {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* ⭐ makes video FIT instead of crop */
+  background: black;
+}
+
+#playerSection.player-fullscreen #playerFrame {
+  width: 100%;
+  height: 100%;
+}
+
+/* -----------------------------------------------------------
+   DEPTH‑REACTIVE HOLOGRAPHIC GLOW
+----------------------------------------------------------- */
+#playerSection {
+  --glow-strength: 0.35;
+  --glow-blur: 22px;
+  --glow-shift-x: 0px;
+  --glow-shift-y: 0px;
+}
+
+#playerSection::after {
+  content: "";
+  position: absolute;
+  inset: -20px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(60,242,255,0.55), transparent 70%);
+  filter: blur(var(--glow-blur));
+  opacity: var(--glow-strength);
+  transform: translate(var(--glow-shift-x), var(--glow-shift-y));
+  transition:
+    opacity 0.25s ease,
+    filter 0.25s ease,
+    transform 0.25s ease;
+  z-index: -1;
+}
+
+
+
+#playerSection.player-fullscreen.settled {
+  transform:
+    perspective(1200px)
+    translateZ(0px)
+    scale(1)
+    rotateX(0deg);
+}
+
+
+   
+#playerFrame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+
+  /* ⭐ Add this line ⭐ */
+  position: relative;
+  z-index: 1;
+}
+
+   
+/* -----------------------------------------------------------
+   PLAYER CONTROLS
+----------------------------------------------------------- */
+.player-controls {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+}
+
+.player-controls button {
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.7);
+  padding: 5px 9px;
+  font-size: 11px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
+  color: #f5f7ff;
+  cursor: pointer;
+}
+
+#closeMini {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.7);
+  padding: 4px 8px;
+  font-size: 11px;
+  background: radial-gradient(circle at 0% 0%, rgba(255,80,80,0.35), rgba(10,12,20,0.9));
+  color: #f5f7ff;
+  cursor: pointer;
+  z-index: 12;
+}
+
+/* -----------------------------------------------------------
+   HUD
+----------------------------------------------------------- */
+#hud {
+  position: fixed;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(60,242,255,0.22), rgba(10,12,20,0.95));
+  color: #f5f7ff;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 60;
+}
+
+/* -----------------------------------------------------------
+   FEED
+----------------------------------------------------------- */
+#feed {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  position: relative;
+  z-index: 10;
+}
+
+.video-card {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 18px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.08), rgba(8,10,16,0.96));
+  cursor: pointer;
+  position: relative;
+}
+
+.video-card {
+  transform-style: preserve-3d;
+  perspective: 1100px;
+  transition: transform 0.15s ease-out;
+}
+
+/* ⭐ Hover Intensity Boost */
+.video-card:hover {
+  transform: translateZ(22px) scale(1.03);
+  box-shadow: 0 0 28px rgba(60,242,255,0.35),
+              0 0 55px rgba(60,242,255,0.18);
+  transition: transform 0.15s ease-out, box-shadow 0.2s ease-out;
+}
+   
+
+/* ⭐ Depth‑Layered Holographic Shadow */
+.video-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  z-index: -1;
+
+  transform: translate(
+    var(--shadow-x, 0px),
+    var(--shadow-y, 0px)
+  );
+
+  filter: blur(var(--shadow-blur, 18px));
+  opacity: var(--shadow-opacity, 0.55);
+
+  box-shadow:
+    0 12px 28px rgba(0,0,0,0.45),
+    0 0 22px rgba(60,242,255,0.12),
+    0 0 40px rgba(120,60,255,0.10);
+
+  transition:
+    transform 0.15s ease-out,
+    opacity 0.15s ease-out,
+    filter 0.15s ease-out;
+}
+
+/* ⭐ Ambient Occlusion Layer */
+.video-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  z-index: -2;
+
+  background: radial-gradient(
+    circle at 50% 60%,
+    rgba(0,0,0,0.35),
+    rgba(0,0,0,0.0) 70%
+  );
+
+  opacity: var(--ao-opacity, 0.35);
+  filter: blur(var(--ao-blur, 22px));
+
+  transition:
+    opacity 0.2s ease-out,
+    filter 0.2s ease-out;
+}
+
+   
+.video-thumb {
+  flex: 0 0 140px;
+  height: 80px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #11131c;
+}
+
+.video-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.video-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.video-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.video-channel {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.video-meta {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* -----------------------------------------------------------
+   CHANNEL PAGE
+----------------------------------------------------------- */
+#channelPage {
+  margin-top: 16px;
+  display: none;
+  position: relative;
+  z-index: 10;
+}
+
+.channel-banner {
+  height: 90px;
+  border-radius: 18px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.25), rgba(8,10,16,0.96));
+  display: flex;
+  align-items: center;
+  padding: 14px;
+  gap: 10px;
+}
+
+.banner-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(60,242,255,0.9), transparent 70%);
+  box-shadow: 0 0 26px rgba(60,242,255,0.9);
+}
+
+.banner-text {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.channel-header {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.channel-pic {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.channel-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.channel-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.channel-subs {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+/* -----------------------------------------------------------
+   SEARCH PANEL + KEYBOARD
+----------------------------------------------------------- */
+#searchPanel {
+  margin-top: 12px;
+  display: none;
+  position: relative;
+  z-index: 30;
+}
+
+.search-input-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));
+  overflow: hidden;
+}
+
+.search-input-bar input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #f5f7ff;
+  font-size: 13px;
+  padding-left: 6px;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.search-input-bar button {
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.7);
+  padding: 5px 9px;
+  font-size: 11px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
+  color: #f5f7ff;
+  cursor: pointer;
+}
+
+/* -----------------------------------------------------------
+   FULL-WIDTH QWERTY KEYBOARD (AUTO-FLEX)
+----------------------------------------------------------- */
+#keyboard {
+  margin-top: 10px;
+  display: none;
+  padding: 10px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));
+  width: 100%;
+}
+
+.keyboard-row {
+  display: flex;
+  width: 100%;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.key-btn {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 12px;
+  border: 1px solid rgba(120,130,160,0.7);
+  font-size: 14px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
+  color: #f5f7ff;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.key-btn[data-key="SPACE"] {
+  flex: 4;
+}
+
+.key-btn[data-key="DELETE"],
+.key-btn[data-key="ENTER"] {
+  flex: 2;
+}
+
+/* -----------------------------------------------------------
+   SUGGESTIONS
+----------------------------------------------------------- */
+#suggestions {
+  margin-top: 8px;
+  display: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));
+  padding: 6px 8px;
+}
+
+.suggestion-item {
+  padding: 5px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+.suggestion-item:hover {
+  background: rgba(60,242,255,0.16);
+}
+
+/* -----------------------------------------------------------
+   HOLOGRAPHIC EFFECTS (PLAYER ONLY)
+----------------------------------------------------------- */
+#playerSection.fx-bloom {
+  box-shadow: 0 0 40px rgba(60,242,255,0.65), 0 26px 70px rgba(0,0,0,0.85);
+}
+
+#playerSection.fx-ambient {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(60,242,255,0.25), transparent 60%),
+    radial-gradient(circle at 0% 100%, rgba(120,80,255,0.18), transparent 70%),
+    radial-gradient(circle at 100% 100%, rgba(0,255,180,0.18), transparent 70%),
+    radial-gradient(circle at 50% 50%, rgba(5,6,12,0.98), rgba(2,3,8,1));
+}
+
+#playerSection.fx-glass {
+  backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid rgba(120,130,160,0.7);
+}
+
+#playerSection.fx-chroma::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: var(--chroma-opacity, 0.25);
+  filter: blur(var(--chroma-blur, 4px));
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255,0,80,0.35), transparent 60%),
+    radial-gradient(circle at 80% 20%, rgba(0,200,255,0.35), transparent 60%),
+    radial-gradient(circle at 50% 80%, rgba(0,255,180,0.35), transparent 60%);
+  transition: opacity 0.15s ease-out, filter 0.15s ease-out;
+  z-index: -2;
+}
+
+#playerSection.fx-audio::after {
+  content: "";
+  position: absolute;
+  inset: -40px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255,255,255,0.35), transparent 70%);
+  mix-blend-mode: screen;
+  opacity: var(--audio-glow-opacity, 0.25);
+  filter: blur(var(--audio-glow-blur, 20px));
+  transition: opacity 0.12s ease-out, filter 0.12s ease-out;
+  z-index: -3;
+}
+
+/* -----------------------------------------------------------
+   DEPTH MODE
+----------------------------------------------------------- */
+body.search-depth-mode #feed,
+body.search-depth-mode #channelPage {
+  filter: blur(4px) brightness(0.7);
+  pointer-events: none;
+}
+
+   /* -----------------------------------------------------------
+   CINEMA MODE (Curved Screen + Darkened Environment)
+----------------------------------------------------------- */
+/* CINEMA MODE */
+body.cinema-mode::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(6px);
+  z-index: 9998;
+  pointer-events: none;
+}
+
+#playerSection.player-fullscreen.cinema {
+  border-radius: 40px;
+  overflow: hidden;
+  transform: perspective(900px) rotateX(6deg); /* ⭐ REMOVE translate(-50%, -50%) */
+  box-shadow: 0 0 80px rgba(0,0,0,0.6);
+}
+
+
+/* -----------------------------------------------------------
+   CINEMA MODE — AMBIENT GLOW BOOST
+----------------------------------------------------------- */
+body.cinema-mode #playerSection {
+  --audio-glow-opacity: 0.55 !important;
+  --audio-glow-blur: 55px !important;
+
+  --chroma-opacity: 0.45 !important;
+  --chroma-blur: 18px !important;
+
+  box-shadow:
+    0 0 120px rgba(60,242,255,0.55),
+    0 0 180px rgba(0,200,255,0.45),
+    0 0 260px rgba(0,255,180,0.35);
+  transition: box-shadow 0.35s ease, filter 0.35s ease;
+}
+
+/* -----------------------------------------------------------
+   CINEMA MODE — TRANSITIONS
+----------------------------------------------------------- */
+#playerSection {
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.45s ease,
+    filter 0.45s ease;
+}
+
+body.cinema-mode::before {
+  transition:
+    background 0.45s ease,
+    backdrop-filter 0.45s ease;
+}
+
+body.cinema-mode #playerSection {
+  transition:
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.55s ease,
+    filter 0.55s ease;
+}
+   
+/* -----------------------------------------------------------
+   CINEMA MODE — ZOOM INTRO ANIMATION
+----------------------------------------------------------- */
+@keyframes cinemaZoomIntro {
+  0% {
+    transform:
+      scale(0.88)
+      perspective(900px)
+      rotateX(0deg);
+    opacity: 0.6;
+    filter: brightness(0.7);
   }
 
-  // ROTATING API KEYS (MASKED)
-  const API_KEYS = [
-    "AIzaSyBcW3TMMFe7x9sIxGeB-Ykeh_9lG9TGwi4",
+  60% {
+    transform:
+      scale(1.03)
+      perspective(900px)
+      rotateX(4deg);
+    opacity: 1;
+    filter: brightness(1);
+  }
+
+  100% {
+    transform:
+      scale(1)
+      perspective(900px)
+      rotateX(6deg);
+    opacity: 1;
+    filter: brightness(1);
+  }
+}
+
+
+/* Apply animation ONLY when Cinema Mode activates */
+#playerSection.player-fullscreen.cinema.zoom-intro {
+  animation: cinemaZoomIntro 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+   
+/* BACK BUTTON VISIBILITY */
+body.fullscreen-active .exit-full-btn {
+  display: block;
+}
+
+
+
+/* -----------------------------------------------------------
+   FULLSCREEN BACK BUTTON
+----------------------------------------------------------- */
+.exit-full-btn {
+  position: fixed;
+  left: 20px;
+  top: 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.7);
+  padding: 8px 14px;
+  font-size: 14px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.35), rgba(10,12,20,0.9));
+  color: #f5f7ff;
+  cursor: pointer;
+  z-index: 999999999 !important;
+  pointer-events: auto;
+  display: none;
+
+  /* ⭐ Add this line if not already present */
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+/* ⭐ HOVER GLOW — AR Visibility Boost */
+.exit-full-btn:hover {
+  box-shadow: 0 0 18px rgba(60,242,255,0.9),
+              0 0 30px rgba(60,242,255,0.5);
+  transform: scale(1.08);
+}
+
+
+body.fullscreen-active .exit-full-btn {
+  display: block;
+}
+
+  
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- TOPBAR -->
+  <div id="topbar" class="parallax">
+    <div class="topbar-left">
+      <div class="logo-orb"></div>
+      <div class="topbar-title">VIEWTUBE AR OS</div>
+    </div>
+    <div class="topbar-right">
+      <button id="themeToggle" class="topbar-btn">Theme</button>
+      <button id="backBtn" class="topbar-btn">Mini</button>
+    </div>
+  </div>
+
+  <!-- SEARCH BAR -->
+  <div id="searchTab" class="parallax-tab">
+    <div class="search-label">Search holographic feed</div>
+    <button class="search-open-btn">Open Keyboard</button>
+  </div>
+
+  <!-- TABS -->
+  <div id="tabs">
+    <button id="homeTab" class="tab-btn parallax-tab active">Home</button>
+    <button id="shortsTab" class="tab-btn parallax-tab">Shorts</button>
+    <button id="moviesTab" class="tab-btn parallax-tab">Movies</button>
+    <button id="historyTab" class="tab-btn parallax-tab">History</button>
+    <button id="trendingTab" class="tab-btn parallax-tab">Trending</button>
+    <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
+    <!-- NEW: Subscriptions tab -->
+    <button id="subsTab" class="tab-btn parallax-tab">Subscriptions</button>
+    <button id="playlistsTab" class="tab-btn parallax-tab">Playlists</button>
+  </div>
+
+  
+  <!-- PLAYER -->
+<div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
+
+    <iframe id="playerFrame"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowfullscreen>
+    </iframe>
+
+    <div class="player-controls">
+      <button id="playPauseBtn">Pause</button>
+      <button id="rewindBtn">-10s</button>
+      <button id="forwardBtn">+10s</button>
+      <button id="fullBtn">Full</button>
+    </div>
+
+    <button id="closeMini">✕</button>
+</div>
+
+<!-- ⭐ Move Back button OUTSIDE the player -->
+<button id="exitFullBtn" class="exit-full-btn">Back</button>
+
+  <!-- HUD -->
+  <div id="hud"></div>
+
+  <!-- SEARCH PANEL -->
+  <div id="searchPanel">
+
+    <div class="search-input-bar">
+      <input id="searchInput" type="text" placeholder="Search videos..." />
+      <button id="searchBack">Back</button>
+      <button id="searchGo">Go</button>
+    </div>
+
+    <!-- FULL-WIDTH QWERTY KEYBOARD -->
+    <div id="keyboard">
+
+      <!-- ROW 1 -->
+      <div class="keyboard-row">
+        <div class="key-btn" data-key="Q">Q</div>
+        <div class="key-btn" data-key="W">W</div>
+        <div class="key-btn" data-key="E">E</div>
+        <div class="key-btn" data-key="R">R</div>
+        <div class="key-btn" data-key="T">T</div>
+        <div class="key-btn" data-key="Y">Y</div>
+        <div class="key-btn" data-key="U">U</div>
+        <div class="key-btn" data-key="I">I</div>
+        <div class="key-btn" data-key="O">O</div>
+        <div class="key-btn" data-key="P">P</div>
+      </div>
+
+      <!-- ROW 2 -->
+      <div class="keyboard-row">
+        <div class="key-btn" data-key="A">A</div>
+        <div class="key-btn" data-key="S">S</div>
+        <div class="key-btn" data-key="D">D</div>
+        <div class="key-btn" data-key="F">F</div>
+        <div class="key-btn" data-key="G">G</div>
+        <div class="key-btn" data-key="H">H</div>
+        <div class="key-btn" data-key="J">J</div>
+        <div class="key-btn" data-key="K">K</div>
+        <div class="key-btn" data-key="L">L</div>
+      </div>
+
+      <!-- ROW 3 -->
+      <div class="keyboard-row">
+        <div class="key-btn" data-key="Z">Z</div>
+        <div class="key-btn" data-key="X">X</div>
+        <div class="key-btn" data-key="C">C</div>
+        <div class="key-btn" data-key="V">V</div>
+        <div class="key-btn" data-key="B">B</div>
+        <div class="key-btn" data-key="N">N</div>
+        <div class="key-btn" data-key="M">M</div>
+      </div>
+
+      <!-- ROW 4 -->
+      <div class="keyboard-row">
+        <div class="key-btn" data-key="SPACE">SPACE</div>
+        <div class="key-btn" data-key="DELETE">DELETE</div>
+        <div class="key-btn" data-key="ENTER">ENTER</div>
+      </div>
+
+    </div>
+
+    <!-- SUGGESTIONS -->
+    <div id="suggestions"></div>
+
+  </div>
+
+  <!-- FEED -->
+<div id="feed"></div>
+
+<!-- CHANNEL PAGE -->
+<div id="channelPage"></div>
+
+<!-- SUBSCRIPTIONS PAGE -->
+<div id="subsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
+
+  <div class="channel-banner">
+    <div class="banner-logo"></div>
+    <div class="banner-text">SUBSCRIPTIONS</div>
+  </div>
+
+  <div id="subsLoginPanel" style="margin-top:12px; padding:12px; border-radius:16px;
+       background:linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));">
+
+    <div style="font-size:13px; opacity:0.85; margin-bottom:6px;">
+      Sign in to load your YouTube subscriptions
+    </div>
+
+    <button id="startLoginBtn" class="topbar-btn" style="margin-bottom:8px;">
+      Login to YouTube
+    </button>
+
+    <div id="deviceUserCode" style="font-size:12px; margin-top:6px; opacity:0.8;"></div>
+    <div id="deviceLoginStatus" style="font-size:12px; margin-top:4px; opacity:0.8;"></div>
+  </div>
+
+  <div id="subsFeed" style="margin-top:16px;"></div>
+</div>
+
+
+<!-- PLAYLISTS PAGE -->
+<div id="playlistsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
+
+  <div class="channel-banner">
+    <div class="banner-logo"></div>
+    <div class="banner-text">PLAYLISTS</div>
+  </div>
+
+  <div id="playlistsFeed" style="margin-top:16px;"></div>
+</div>
+
+
+<script>
+/* -----------------------------------------------------------
+   YOUTUBE API KEY ROTATION
+----------------------------------------------------------- */
+const API_KEYS = [
+  "AIzaSyBcW3TMMFe7x9sIxGeB-Ykeh_9lG9TGwi4",
   "AIzaSyCNKebUdj8bTiRvLoSv28YqGdNoDn53Tk4",
   "AIzaSyCJY-gccqPtgmqSnPRoo4W2vQp1chFCLHY",
   "AIzaSyD4tP4THh9ZeDcVW041l_JCjJztZA2zJCA",
@@ -158,476 +1094,1267 @@
   "AIzaSyAsC6kZKAUhW4KMN04s8JJS9Hu4fFsgy04",
   "AIzaSyBCBZCfKfVg5kMUPjxmRq41uqrbrnmpu-I",
   "AIzaSyBk_q3XUQyI3rtUVCc46kjKJPh5Pm7u9QQ"
-  ];
+];
 
-  let apiKeyIndex = 0;
-  function getApiKey() {
-    const key = API_KEYS[apiKeyIndex % API_KEYS.length];
-    apiKeyIndex++;
-    return key;
-  }
+let keyIndex = 0;
 
-  async function fetchYouTube(endpoint, params) {
-    const base =
-      endpoint === "videos"
-        ? "https://www.googleapis.com/youtube/v3/videos"
-        : endpoint === "search"
-        ? "https://www.googleapis.com/youtube/v3/search"
-        : "https://www.googleapis.com/youtube/v3/" + endpoint;
+async function fetchYouTube(endpoint, params = {}) {
+  const key = API_KEYS[keyIndex];
+  keyIndex = (keyIndex + 1) % API_KEYS.length;
 
-    const url = new URL(base);
-    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-    url.searchParams.set("key", getApiKey());
+  const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
+  params.key = key;
 
-    const res = await fetch(url.toString());
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) url.searchParams.append(k, v);
+  });
+
+  url.searchParams.append("_", Date.now());
+
+  try {
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) return fetchYouTube(endpoint, params);
     return await res.json();
+  } catch (err) {
+    return fetchYouTube(endpoint, params);
   }
+}
+
+/* -----------------------------------------------------------
+   GLOBAL STATE
+----------------------------------------------------------- */
+let currentTab = "home";
+let currentVideoId = null;
+let miniActive = false;
+let isLight = false;
+
+let currentChannelId = "UCoLDGQ7a81ep9SJqPlDs2sg";
+let channelNextPageToken = null;
+let channelUploadsId = null;
+
+let historyList = JSON.parse(localStorage.getItem("historyList") || "[]");
+
+let shortsItems = [];
+let shortsIndex = 0;
+let lastSearchQuery = "";
+
+
+/* ⭐ INFINITE SCROLL STATE ⭐ */
+let nextPageToken = null;     // pagination token for all tabs
+let isLoadingMore = false;    // prevents double-loading
+
+
+   
+/* -----------------------------------------------------------
+   HISTORY SAVE FUNCTION (PATCH 3)
+----------------------------------------------------------- */
+function saveToHistory(video) {
+  historyList = historyList.filter(v => v.id !== video.id); // remove duplicates
+  historyList.unshift(video);                               // add to top
+  localStorage.setItem("historyList", JSON.stringify(historyList));
+}
+   
+
+/* -----------------------------------------------------------
+   ELEMENTS
+----------------------------------------------------------- */
+const feedEl = document.getElementById("feed");
+const playerFrame = document.getElementById("playerFrame");
+const playerSection = document.getElementById("playerSection");
+const hudEl = document.getElementById("hud");
+const channelPageEl = document.getElementById("channelPage");
+
+const topbarEl = document.getElementById("topbar");
+const tabsEl = document.getElementById("tabs");
+const searchTabEl = document.getElementById("searchTab");
+const searchPanelEl = document.getElementById("searchPanel");
+const keyboardEl = document.getElementById("keyboard");
+const suggestionsEl = document.getElementById("suggestions");
+
+const homeTab = document.getElementById("homeTab");
+const shortsTab = document.getElementById("shortsTab");
+const moviesTab = document.getElementById("moviesTab");
+const historyTab = document.getElementById("historyTab");
+const trendingTab = document.getElementById("trendingTab");
+const channelTab = document.getElementById("channelTab");  
+
+const themeToggle = document.getElementById("themeToggle");
+const backBtn = document.getElementById("backBtn");
+
+const playPauseBtn = document.getElementById("playPauseBtn");
+const forwardBtn = document.getElementById("forwardBtn");
+const rewindBtn = document.getElementById("rewindBtn");
+const fullBtn = document.getElementById("fullBtn");
+const closeMini = document.getElementById("closeMini");
+
+const searchInput = document.getElementById("searchInput");
+const searchGo = document.getElementById("searchGo");
+const searchBack = document.getElementById("searchBack");
+
+/* NEW: Subscriptions elements */
+const subsTab = document.getElementById("subsTab");
+const playlistsTab = document.getElementById("playlistsTab");
+const subsPageEl = document.getElementById("subsPage");
+const subsFeedEl = document.getElementById("subsFeed");
+const playlistsTab = document.getElementById("playlistsTab");
+const playlistsPageEl = document.getElementById("playlistsPage");
+const playlistsFeedEl = document.getElementById("playlistsFeed");
+const startLoginBtn = document.getElementById("startLoginBtn");
+const deviceUserCodeEl = document.getElementById("deviceUserCode");
+const deviceLoginStatusEl = document.getElementById("deviceLoginStatus");
+
+/* -----------------------------------------------------------
+   HUD
+----------------------------------------------------------- */
+function showHUD(text) {
+  hudEl.textContent = text;
+  hudEl.style.opacity = 1;
+  setTimeout(() => (hudEl.style.opacity = 0), 1200);
+}
+
+/* -----------------------------------------------------------
+   PLAYER
+----------------------------------------------------------- */
+function setPlayerVideo(videoId, snippet) {
+  currentVideoId = videoId;
+  playerSection.style.display = "block";
+  playerSection.classList.remove("player-mini", "player-fullscreen");
+
+  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
+
+  saveToHistory({ id: videoId, snippet });
+
+
+  hideUIForVideo();
+  playPauseBtn.textContent = "Pause";
+
+  initAudioGlow();
+}
+
+/* -----------------------------------------------------------
+   UI HIDE/SHOW
+----------------------------------------------------------- */
+function hideUIForVideo() {
+  topbarEl.style.display = "flex";   // FIXED
+  searchTabEl.style.display = "none";
+  searchPanelEl.style.display = "none";
+  tabsEl.style.display = "none";
+  feedEl.style.display = "none";
+  channelPageEl.style.display = "none";
+  keyboardEl.style.display = "none";
+  suggestionsEl.style.display = "none";
+}
+
+function showUIWithMiniPlayer() {
+  topbarEl.style.display = "flex";
+  searchTabEl.style.display = "flex";
+  tabsEl.style.display = "flex";
+
+  if (currentTab === "channel") {
+    channelPageEl.style.display = "block";
+    feedEl.style.display = "none";
+    subsPageEl.style.display = "none";
+  } else if (currentTab === "subs") {
+    subsPageEl.style.display = "block";
+    feedEl.style.display = "none";
+    channelPageEl.style.display = "none";
+  } else {
+    feedEl.style.display = "block";
+    channelPageEl.style.display = "none";
+    subsPageEl.style.display = "none";
+  }
+}
+
+/* -----------------------------------------------------------
+   MINI PLAYER
+----------------------------------------------------------- */
+backBtn.addEventListener("click", () => {
+  if (playerSection.style.display === "none") return;
+
+  playerSection.classList.remove("player-fullscreen");
+  playerSection.classList.add("player-mini");
+
+  miniActive = true;
+  showUIWithMiniPlayer();
+  showHUD("Mini-player");
+});
+
+closeMini.addEventListener("click", () => {
+  // ALWAYS exit fullscreen if active
+  playerSection.classList.remove("player-fullscreen");
+  document.body.classList.remove("fullscreen-active");
+  disableCinemaMode();   // removes blur + cinema curve
+
+  // Hide player
+  playerSection.style.display = "none";
+  playerFrame.src = "";
+
+  // Restore UI
+  showUIWithMiniPlayer();
+  showHUD("Player closed");
+});
+
+/* -----------------------------------------------------------
+   CINEMA MODE HELPERS
+----------------------------------------------------------- */
+function enableCinemaMode() {
+  document.body.classList.add("cinema-mode");
+  playerSection.classList.add("cinema");
+}
+
+function disableCinemaMode() {
+  document.body.classList.remove("cinema-mode");
+  playerSection.classList.remove("cinema");
+}
+
+function playCinemaZoomIntro() {
+  playerSection.classList.remove("zoom-intro"); // reset
+  void playerSection.offsetWidth;               // force reflow
+  playerSection.classList.add("zoom-intro");    // play animation
+}
+
+/* -----------------------------------------------------------
+   FULLSCREEN
+----------------------------------------------------------- */
+fullBtn.addEventListener("click", () => {
+  if (playerSection.style.display === "none") return;
+
+  // ⭐ PATCH 1 — REQUIRED
+  playerSection.style.display = "block";
+
+  miniActive = false;
+  playerSection.classList.remove("player-mini");
+  playerSection.classList.add("player-fullscreen");
+
+  document.body.classList.add("fullscreen-active");
+
+  enableCinemaMode();
+  playCinemaZoomIntro();
+
+
+  setTimeout(() => {
+  playerSection.classList.add("settled");
+}, 550);
+
+
+  hideUIForVideo();
+  showHUD("Fullscreen");
+});
+
+
 
   /* -----------------------------------------------------------
-     FEED RENDERING (with videoId fix)
-  ----------------------------------------------------------- */
-  function renderFeed(items) {
-    feedEl.innerHTML = "";
+   EXIT FULLSCREEN BUTTON
+----------------------------------------------------------- */
+const exitFullBtn = document.getElementById("exitFullBtn");
 
-    items.forEach((item) => {
-      const snippet = item.snippet || {};
+exitFullBtn.addEventListener("click", () => {
+  playerSection.classList.remove("player-fullscreen");
+  document.body.classList.remove("fullscreen-active");
+  disableCinemaMode();         // ⭐ turn Cinema Mode OFF
 
-      const videoId =
-        item.id?.videoId ||
-        item.id ||
-        item.snippet?.resourceId?.videoId ||
-        null;
+  if (miniActive) {
+    playerSection.classList.add("player-mini");
+  }
 
-      const card = document.createElement("div");
-      card.className = "video-card";
+   playerSection.classList.remove("settled");
 
-      const thumb = document.createElement("div");
-      thumb.className = "video-thumb";
 
-      const img = new Image();
-      img.src = snippet.thumbnails?.high?.url || "";
-      img.loading = "lazy";
-      thumb.appendChild(img);
+  showUIWithMiniPlayer();
+  showHUD("Exited Fullscreen");
+});
 
-      const info = document.createElement("div");
-      info.className = "video-info";
-      info.innerHTML = `
+
+/* -----------------------------------------------------------
+   FULLSCREEN FAILSAFE (Never get stuck again)
+----------------------------------------------------------- */
+setInterval(() => {
+  const isFullscreen = playerSection.classList.contains("player-fullscreen");
+  const isCinema = document.body.classList.contains("cinema-mode");
+  const isFSBody = document.body.classList.contains("fullscreen-active");
+  const isHidden = playerSection.style.display === "none";
+  const isBlank = !playerFrame.src || playerFrame.src === "about:blank";
+
+  // ❌ Case 1: Player closed but fullscreen still active
+  if (isHidden && (isFullscreen || isCinema || isFSBody)) {
+    playerSection.classList.remove("player-fullscreen");
+    document.body.classList.remove("fullscreen-active");
+    disableCinemaMode();
+    return;
+  }
+
+  // ❌ Case 2: Cinema mode active without fullscreen
+  if (!isFullscreen && isCinema) {
+    disableCinemaMode();
+  }
+
+  // ❌ Case 3: Body fullscreen flag stuck
+  if (!isFullscreen && isFSBody) {
+    document.body.classList.remove("fullscreen-active");
+  }
+
+  // ❌ Case 4: Blank iframe but fullscreen active
+  if (isFullscreen && isBlank) {
+    playerSection.classList.remove("player-fullscreen");
+    document.body.classList.remove("fullscreen-active");
+    disableCinemaMode();
+  }
+}, 150);
+
+
+   
+/* -----------------------------------------------------------
+   ESC / RAY‑BAN EMG EXIT FULLSCREEN
+----------------------------------------------------------- */
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    playerSection.classList.remove("player-fullscreen");
+    document.body.classList.remove("fullscreen-active");
+    disableCinemaMode();
+    showUIWithMiniPlayer();
+    showHUD("Exited Fullscreen (Ray‑Ban EMG)");
+  }
+});
+
+
+
+/* -----------------------------------------------------------
+   PLAYER COMMANDS
+----------------------------------------------------------- */
+function postToPlayer(cmd) {
+  if (!playerFrame.contentWindow) return;
+  playerFrame.contentWindow.postMessage(JSON.stringify(cmd), "*");
+}
+
+playPauseBtn.addEventListener("click", () => {
+  if (playPauseBtn.textContent === "Pause") {
+    playPauseBtn.textContent = "Play";
+    postToPlayer({ event: "command", func: "pauseVideo", args: [] });
+  } else {
+    playPauseBtn.textContent = "Pause";
+    postToPlayer({ event: "command", func: "playVideo", args: [] });
+  }
+});
+
+forwardBtn.addEventListener("click", () => {
+  postToPlayer({ event: "command", func: "seekBy", args: [10] });
+});
+
+rewindBtn.addEventListener("click", () => {
+  postToPlayer({ event: "command", func: "seekBy", args: [-10] });
+});
+
+/* -----------------------------------------------------------
+   FEED RENDERING
+----------------------------------------------------------- */
+function renderFeed(items) {
+  feedEl.innerHTML = "";
+
+  items.forEach((item) => {
+    const snippet = item.snippet || {};
+    const stats = item.statistics || {};
+    const videoId = item.id?.videoId || item.id;
+
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
+
+    card.innerHTML = `
+      <div class="video-thumb">
+        <img src="${snippet.thumbnails?.high?.url || ""}">
+      </div>
+      <div class="video-info">
         <div class="video-title">${snippet.title}</div>
         <div class="video-channel">${snippet.channelTitle}</div>
-        <div class="video-meta">${snippet.publishedAt || ""}</div>
+        <div class="video-meta">${stats.viewCount || 0} views</div>
+      </div>
+    `;
+
+    card.onclick = () => {
+      setPlayerVideo(videoId, snippet);
+      showHUD("Playing: " + snippet.title);
+    };
+
+    feedEl.appendChild(card);
+  });
+}
+
+/* -----------------------------------------------------------
+   ⭐ APPEND FEED (STEP 5)
+----------------------------------------------------------- */
+function appendFeed(items) {
+  items.forEach((item) => {
+    const snippet = item.snippet || {};
+    const stats = item.statistics || {};
+    const videoId = item.id?.videoId || item.id;
+
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
+
+    card.innerHTML = `
+      <div class="video-thumb">
+        <img src="${snippet.thumbnails?.high?.url || ""}">
+      </div>
+      <div class="video-info">
+        <div class="video-title">${snippet.title}</div>
+        <div class="video-channel">${snippet.channelTitle}</div>
+        <div class="video-meta">${stats.viewCount || 0} views</div>
+      </div>
+    `;
+
+    card.onclick = () => {
+      setPlayerVideo(videoId, snippet);
+      showHUD("Playing: " + snippet.title);
+    };
+
+    feedEl.appendChild(card);
+  });
+}
+
+
+   
+/* -----------------------------------------------------------
+   TABS
+----------------------------------------------------------- */
+function setActiveTab(tab) {
+  currentTab = tab;
+
+  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab]
+    .forEach(btn => btn.classList.remove("active"));
+
+  if (tab === "home") homeTab.classList.add("active");
+  if (tab === "shorts") shortsTab.classList.add("active");
+  if (tab === "movies") moviesTab.classList.add("active");
+  if (tab === "history") historyTab.classList.add("active");
+  if (tab === "trending") trendingTab.classList.add("active");
+  if (tab === "channel") channelTab.classList.add("active");
+
+  if (tab === "channel") {
+    feedEl.style.display = "none";
+    channelPageEl.style.display = "block";
+  } else {
+    feedEl.style.display = "block";
+    channelPageEl.style.display = "none";
+  }
+}
+
+/* -----------------------------------------------------------
+   HOME TAB — 20 fresh videos
+----------------------------------------------------------- */
+homeTab.addEventListener("click", async () => {
+  setActiveTab("home");
+
+  const data = await fetchYouTube("videos", {
+    part: "snippet",
+    chart: "mostPopular",
+    regionCode: "US",
+    maxResults: 20,
+    _: Date.now()
+  });
+
+  nextPageToken = data.nextPageToken || null;
+
+  renderFeed(data.items || []);
+  showHUD("Home");
+});
+
+
+/* -----------------------------------------------------------
+   TRENDING TAB — 50 trending videos
+----------------------------------------------------------- */
+trendingTab.addEventListener("click", async () => {
+  setActiveTab("trending");
+
+  const data = await fetchYouTube("videos", {
+    part: "snippet",
+    chart: "mostPopular",
+    regionCode: "US",
+    maxResults: 20,
+    _: Date.now()
+  });
+
+  nextPageToken = data.nextPageToken || null;
+
+  renderFeed(data.items || []);
+  showHUD("Trending");
+});
+
+
+/* -----------------------------------------------------------
+   SHORTS TAB — real Shorts feed (fixed)
+----------------------------------------------------------- */
+shortsTab.addEventListener("click", async () => {
+  setActiveTab("shorts");
+
+  const data = await fetchYouTube("search", {
+    part: "snippet",
+    q: "shorts",                 // ⭐ REQUIRED or API returns nothing
+    type: "video",
+    videoDuration: "short",
+    videoEmbeddable: "true",
+    regionCode: "US",
+    maxResults: 20,
+    _: Date.now()
+  });
+
+  shortsItems = data.items.map(v => ({
+    id: v.id.videoId,
+    snippet: v.snippet
+  }));
+
+  shortsIndex = 0;
+  nextPageToken = data.nextPageToken || null;
+
+  renderFeed(shortsItems);
+  showHUD("Shorts");
+});
+
+
+/* -----------------------------------------------------------
+   MOVIES TAB — real long-form movies
+----------------------------------------------------------- */
+moviesTab.addEventListener("click", async () => {
+  setActiveTab("movies");
+
+  const data = await fetchYouTube("search", {
+    part: "snippet",
+    q: "full movie",
+    type: "video",
+    videoDuration: "long",
+    videoEmbeddable: "true",
+    regionCode: "US",
+    maxResults: 20,
+    _: Date.now()
+  });
+
+  const items = data.items.map(v => ({
+    id: v.id.videoId,
+    snippet: v.snippet
+  }));
+
+  nextPageToken = data.nextPageToken || null;
+
+  renderFeed(items);
+  showHUD("Movies");
+});
+
+/* -----------------------------------------------------------
+   SUBSCRIPTIONS TAB — OAuth + real subs
+----------------------------------------------------------- */
+subsTab.addEventListener("click", () => {
+  currentTab = "subs";
+
+  document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+  subsTab.classList.add("active");
+
+  feedEl.style.display = "none";
+  channelPageEl.style.display = "none";
+  subsPageEl.style.display = "block";
+
+  showHUD("Subscriptions");
+
+  const token = localStorage.getItem("yt_access_token");
+  if (token) {
+    loadSubscriptions();
+  } else {
+    deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
+  }
+});
+
+   playlistsTab.addEventListener("click", () => {
+      currentTab = "playlists";
+
+  document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+  playlistsTab.classList.add("active");
+
+  feedEl.style.display = "none";
+  channelPageEl.style.display = "none";
+  subsPageEl.style.display = "none";
+  playlistsPageEl.style.display = "block";
+
+  const token = localStorage.getItem("yt_access_token");
+  if (token) {
+    loadUserPlaylists();
+  } else {
+    playlistsFeedEl.innerHTML = `<div style="opacity:0.8;">Login required to load playlists.</div>`;
+  }
+
+  showHUD("Playlists");
+});
+
+
+/* -----------------------------------------------------------
+   OAUTH 2.0 DEVICE LOGIN
+----------------------------------------------------------- */
+const OAUTH_CLIENT_ID = "433136699735-guoa9ppvn132n8qecaukvoh336id7eg4.apps.googleusercontent.com";
+const OAUTH_CLIENT_SECRET = "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";
+
+startLoginBtn.addEventListener("click", startDeviceLogin);
+
+async function startDeviceLogin() {
+  showHUD("Requesting login code…");
+
+  const res = await fetch("https://oauth2.googleapis.com/device/code", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: OAUTH_CLIENT_ID,
+      scope: "https://www.googleapis.com/auth/youtube.readonly"
+    })
+  });
+
+  const data = await res.json();
+
+  deviceUserCodeEl.textContent = "Code: " + data.user_code;
+  deviceLoginStatusEl.textContent = "Go to: " + data.verification_url;
+
+  pollForToken(data.device_code, data.interval || 5);
+}
+
+async function pollForToken(deviceCode, intervalSeconds) {
+  let authorized = false;
+
+  while (!authorized) {
+    await new Promise(r => setTimeout(r, intervalSeconds * 1000));
+
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: OAUTH_CLIENT_ID,
+        client_secret: OAUTH_CLIENT_SECRET,
+        device_code: deviceCode,
+        grant_type: "urn:ietf:params:oauth:grant-type:device_code"
+      })
+    });
+
+    const tokenData = await tokenRes.json();
+
+    if (tokenData.error) {
+      if (tokenData.error === "authorization_pending") {
+        deviceLoginStatusEl.textContent = "Waiting for authorization…";
+        continue;
+      } else {
+        deviceLoginStatusEl.textContent = "Error: " + tokenData.error;
+        showHUD("Login error");
+        break;
+      }
+    }
+
+    authorized = true;
+    localStorage.setItem("yt_access_token", tokenData.access_token);
+    deviceLoginStatusEl.textContent = "Logged in. Loading subscriptions…";
+    showHUD("YouTube logged in");
+
+    loadSubscriptions();
+  }
+}
+
+/* -----------------------------------------------------------
+   REAL YOUTUBE SUBSCRIPTIONS FEED
+----------------------------------------------------------- */
+async function loadSubscriptions() {
+  const token = localStorage.getItem("yt_access_token");
+  if (!token) {
+    deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
+    return;
+  }
+
+  subsFeedEl.innerHTML = "";
+  showHUD("Loading subscriptions…");
+
+  try {
+    const res = await fetch(
+      "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20",
+      { headers: { Authorization: "Bearer " + token } }
+    );
+
+    const data = await res.json();
+
+    if (!data.items || !data.items.length) {
+      subsFeedEl.innerHTML = `<div style="font-size:12px; opacity:0.8;">No subscriptions found.</div>`;
+      return;
+    }
+
+    data.items.forEach(item => {
+      const ch = item.snippet;
+      const channelId = ch.resourceId.channelId;
+      const thumb = ch.thumbnails?.medium?.url || "";
+      const title = ch.title;
+
+      const card = document.createElement("div");
+      card.className = "video-card parallax";
+
+      card.innerHTML = `
+        <div class="video-thumb">
+          <img src="${thumb}">
+        </div>
+        <div class="video-info">
+          <div class="video-title">${title}</div>
+          <div class="video-channel">${ch.channelTitle || "Channel"}</div>
+          <div class="video-meta">Tap to open channel</div>
+        </div>
       `;
 
-      card.appendChild(thumb);
-      card.appendChild(info);
-
       card.onclick = () => {
-        if (!videoId) {
-          showHUD("Video unavailable");
-          return;
-        }
-        showHUD("Playing: " + snippet.title);
-        historyList.unshift({ id: videoId, snippet });
+        currentTab = "channel";
+        currentChannelId = channelId;
+        showHUD("Channel: " + title);
       };
 
-      feedEl.appendChild(card);
+      subsFeedEl.appendChild(card);
     });
+
+  } catch (e) {
+    subsFeedEl.innerHTML = `<div style="font-size:12px; opacity:0.8;">Error loading subscriptions.</div>`;
+    showHUD("Subs error");
   }
-  /* -----------------------------------------------------------
-     TABS
-  ----------------------------------------------------------- */
-  function setActiveTab(tab) {
-    currentTab = tab;
+}
 
-    [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab, subsTab]
-      .forEach(btn => btn.classList.remove("active"));
 
-    if (tab === "home") homeTab.classList.add("active");
-    if (tab === "shorts") shortsTab.classList.add("active");
-    if (tab === "movies") moviesTab.classList.add("active");
-    if (tab === "history") historyTab.classList.add("active");
-    if (tab === "trending") trendingTab.classList.add("active");
-    if (tab === "channel") channelTab.classList.add("active");
-    if (tab === "subs") subsTab.classList.add("active");
+  async function loadUserPlaylists() {
+  const token = localStorage.getItem("yt_access_token");
+  if (!token) return;
 
-    feedEl.style.display =
-      (tab === "home" || tab === "shorts" || tab === "movies" || tab === "history" || tab === "trending")
-        ? "block"
-        : "none";
+  playlistsFeedEl.innerHTML = "";
+  showHUD("Loading playlists…");
 
-    channelPageEl.style.display = (tab === "channel") ? "block" : "none";
-    subsPageEl.style.display = (tab === "subs") ? "block" : "none";
+  const res = await fetch(
+    "https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=20",
+    { headers: { Authorization: "Bearer " + token } }
+  );
 
-    if (tab !== "channel") backToSubsBtn.style.display = "none";
+  const data = await res.json();
+
+  if (!data.items || !data.items.length) {
+    playlistsFeedEl.innerHTML = `<div style="opacity:0.8;">No playlists found.</div>`;
+    return;
   }
 
-  /* HOME */
-  homeTab.addEventListener("click", async () => {
-    nextPageToken = null;
-    setActiveTab("home");
-    feedEl.innerHTML = "";
+  nextPageToken = data.nextPageToken || null;
 
-    const data = await fetchYouTube("videos", {
-      part: "snippet",
+  data.items.forEach(pl => {
+    const snippet = pl.snippet;
+    const thumb = snippet.thumbnails?.medium?.url || "";
+    const title = snippet.title;
+    const playlistId = pl.id;
+
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
+
+    card.innerHTML = `
+      <div class="video-thumb">
+        <img src="${thumb}">
+      </div>
+      <div class="video-info">
+        <div class="video-title">${title}</div>
+        <div class="video-meta">${pl.contentDetails.itemCount} videos</div>
+      </div>
+    `;
+
+    card.onclick = () => loadPlaylistVideos(playlistId, title);
+
+    playlistsFeedEl.appendChild(card);
+  });
+}
+
+
+  async function loadPlaylistVideos(playlistId, title) {
+  showHUD("Loading playlist…");
+
+  const token = localStorage.getItem("yt_access_token");
+
+  const res = await fetch(
+    `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=20`,
+    { headers: { Authorization: "Bearer " + token } }
+  );
+
+  const data = await res.json();
+
+  playlistsFeedEl.innerHTML = `
+    <div style="font-size:14px; margin-bottom:10px; opacity:0.85;">${title}</div>
+  `;
+
+  nextPageToken = data.nextPageToken || null;
+
+  data.items.forEach(item => {
+    const snippet = item.snippet;
+    const videoId = snippet.resourceId.videoId;
+
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
+
+    card.innerHTML = `
+      <div class="video-thumb">
+        <img src="${snippet.thumbnails?.medium?.url || ""}">
+      </div>
+      <div class="video-info">
+        <div class="video-title">${snippet.title}</div>
+        <div class="video-channel">${snippet.videoOwnerChannelTitle}</div>
+      </div>
+    `;
+
+    card.onclick = () => setPlayerVideo(videoId, snippet);
+
+    playlistsFeedEl.appendChild(card);
+  });
+}
+
+
+/* -----------------------------------------------------------
+   HISTORY TAB — watched videos
+----------------------------------------------------------- */
+historyTab.addEventListener("click", () => {
+  setActiveTab("history");
+
+  const items = historyList.slice(0, 20).map(h => ({
+    id: h.id,
+    snippet: h.snippet,
+    statistics: { viewCount: "watched" }
+  }));
+
+  nextPageToken = null; // no infinite scroll for history
+
+  renderFeed(items);
+  showHUD("History");
+});
+
+
+/* -----------------------------------------------------------
+   CHANNEL TAB — channel uploads
+----------------------------------------------------------- */
+channelTab.addEventListener("click", () => {
+  loadChannelPage(currentChannelId);
+});
+
+
+/* -----------------------------------------------------------
+   ⭐ LOAD MORE VIDEOS (STEP 4)
+----------------------------------------------------------- */
+async function loadMoreVideos() {
+  if (!nextPageToken) return;
+
+  let data;
+
+  if (currentTab === "home") {
+    data = await fetchYouTube("videos", {
+      part: "snippet,statistics,contentDetails",
       chart: "mostPopular",
       regionCode: "US",
       maxResults: 20,
+      pageToken: nextPageToken,
       _: Date.now()
     });
+  }
 
-    nextPageToken = data.nextPageToken || null;
-    renderFeed(data.items || []);
-    showHUD("Home");
-  });
-
-  /* TRENDING */
-  trendingTab.addEventListener("click", async () => {
-    nextPageToken = null;
-    setActiveTab("trending");
-    feedEl.innerHTML = "";
-
-    const data = await fetchYouTube("videos", {
-      part: "snippet",
-      chart: "mostPopular",
-      regionCode: "US",
-      maxResults: 20,
-      _: Date.now()
-    });
-
-    nextPageToken = data.nextPageToken || null;
-    renderFeed(data.items || []);
-    showHUD("Trending");
-  });
-
-  /* SHORTS */
-  shortsTab.addEventListener("click", async () => {
-    nextPageToken = null;
-    setActiveTab("shorts");
-    feedEl.innerHTML = "";
-
-    const data = await fetchYouTube("search", {
+  if (currentTab === "shorts") {
+    data = await fetchYouTube("search", {
       part: "snippet",
       q: "shorts",
       type: "video",
       videoDuration: "short",
       videoEmbeddable: "true",
-      regionCode: "US",
       maxResults: 20,
+      pageToken: nextPageToken,
       _: Date.now()
     });
+  }
 
-    shortsItems = data.items.map(v => ({
-      id:
-        v.id?.videoId ||
-        v.id ||
-        v.snippet?.resourceId?.videoId ||
-        null,
-      snippet: v.snippet
-    }));
-
-    shortsIndex = 0;
-    nextPageToken = data.nextPageToken || null;
-
-    renderFeed(shortsItems);
-    showHUD("Shorts");
-  });
-
-  /* MOVIES */
-  moviesTab.addEventListener("click", async () => {
-    nextPageToken = null;
-    setActiveTab("movies");
-    feedEl.innerHTML = "";
-
-    const data = await fetchYouTube("search", {
+  if (currentTab === "movies") {
+    data = await fetchYouTube("search", {
       part: "snippet",
       q: "full movie",
       type: "video",
       videoDuration: "long",
       videoEmbeddable: "true",
+      maxResults: 20,
+      pageToken: nextPageToken,
+      _: Date.now()
+    });
+  }
+
+  if (currentTab === "trending") {
+    data = await fetchYouTube("videos", {
+      part: "snippet,statistics,contentDetails",
+      chart: "mostPopular",
       regionCode: "US",
+      maxResults: 20,
+      pageToken: nextPageToken,
+      _: Date.now()
+    });
+  }
+
+  if (currentTab === "search") {
+    data = await fetchYouTube("search", {
+      part: "snippet",
+      q: lastSearchQuery,
+      type: "video",
+      maxResults: 20,
+      pageToken: nextPageToken,
+      _: Date.now()
+    });
+  }
+
+  if (currentTab === "channel") {
+    data = await fetchYouTube("playlistItems", {
+      part: "snippet",
+      playlistId: channelUploadsId,
+      maxResults: 20,
+      pageToken: nextPageToken,
+      _: Date.now()
+    });
+  }
+
+  nextPageToken = data.nextPageToken || null;
+
+  appendFeed(data.items || []);
+}
+
+ 
+/* -----------------------------------------------------------
+   ⭐ INFINITE SCROLL LISTENER (STEP 3)
+----------------------------------------------------------- */
+window.addEventListener("scroll", async () => {
+  if (isLoadingMore) return;
+  if (!nextPageToken) return;
+
+  const scrollPos = window.innerHeight + window.scrollY;
+  const bottom = document.body.offsetHeight - 200;
+
+  if (scrollPos >= bottom) {
+    isLoadingMore = true;
+    await loadMoreVideos();
+    isLoadingMore = false;
+  }
+});
+   
+async function loadChannelPage(channelId) {
+  setActiveTab("channel");
+  currentChannelId = channelId;
+
+  const info = await fetchYouTube("channels", {
+    part: "snippet,statistics,contentDetails",
+    id: channelId
+  });
+
+  const channelInfo = info.items?.[0];
+  if (!channelInfo) return;
+
+  channelPageEl.innerHTML = `
+    <div class="channel-banner parallax">
+      <div class="banner-logo"></div>
+      <div class="banner-text">ViewTube</div>
+    </div>
+
+    <div class="channel-header parallax">
+      <img class="channel-pic" src="${channelInfo.snippet.thumbnails?.default?.url}">
+      <div class="channel-meta">
+        <div class="channel-name">${channelInfo.snippet.title}</div>
+        <div class="channel-subs">${channelInfo.statistics?.subscriberCount} subscribers</div>
+      </div>
+    </div>
+  `;
+
+  channelUploadsId = channelInfo.contentDetails.relatedPlaylists.uploads;
+
+  const uploads = await fetchYouTube("playlistItems", {
+  part: "snippet",
+  playlistId: channelUploadsId,
+  maxResults: 20,
+  _: Date.now()
+});
+
+
+  channelNextPageToken = uploads.nextPageToken || null;
+  nextPageToken = uploads.nextPageToken || null;
+
+
+  uploads.items.forEach(item => {
+    const snippet = item.snippet;
+    const videoId = snippet.resourceId.videoId;
+
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
+
+    card.innerHTML = `
+      <div class="video-thumb">
+        <img src="${snippet.thumbnails.medium.url}">
+      </div>
+      <div class="video-info">
+        <div class="video-title">${snippet.title}</div>
+        <div class="video-channel">${snippet.channelTitle}</div>
+      </div>
+    `;
+
+    card.onclick = () => setPlayerVideo(videoId, snippet);
+    channelPageEl.appendChild(card);
+  });
+
+  showHUD("Channel Loaded");
+}
+
+/* -----------------------------------------------------------
+   SEARCH + SUGGESTIONS
+----------------------------------------------------------- */
+async function fetchSuggestions(q) {
+  if (!q.trim()) return [];
+  const data = await fetchYouTube("search", {
+    part: "snippet",
+    q,
+    type: "video",
+    maxResults: 20
+  });
+  return data.items?.map(v => v.snippet.title) || [];
+}
+
+function showSuggestions(list) {
+  suggestionsEl.innerHTML = "";
+  if (!list.length) {
+    suggestionsEl.style.display = "none";
+    return;
+  }
+
+  list.forEach(text => {
+    const item = document.createElement("div");
+    item.className = "suggestion-item";
+    item.textContent = text;
+    item.onclick = () => {
+      searchInput.value = text;
+      triggerSearch(text);
+    };
+    suggestionsEl.appendChild(item);
+  });
+
+  suggestionsEl.style.display = "block";
+}
+
+function openKeyboard() {
+  searchPanelEl.style.display = "block";
+  keyboardEl.style.display = "block";
+  document.querySelector(".search-input-bar").style.display = "flex";
+
+  // ⭐ Hide all other pages so nothing shows behind the keyboard
+  feedEl.style.display = "none";
+  subsPageEl.style.display = "none";
+  playlistsPageEl.style.display = "none";
+  channelPageEl.style.display = "none";
+}
+
+
+function closeKeyboard() {
+  keyboardEl.style.display = "none";
+  searchPanelEl.style.display = "none";
+  suggestionsEl.style.display = "none";
+
+  // ⭐ Restore the correct page based on currentTab
+  if (currentTab === "home") feedEl.style.display = "block";
+  if (currentTab === "subs") subsPageEl.style.display = "block";
+  if (currentTab === "playlists") playlistsPageEl.style.display = "block";
+  if (currentTab === "channel") channelPageEl.style.display = "block";
+}
+
+
+searchTabEl.addEventListener("click", openKeyboard);
+searchBack.addEventListener("click", closeKeyboard);
+
+searchGo.addEventListener("click", () => {
+  const q = searchInput.value.trim() || "music";
+  triggerSearch(q);
+});
+
+searchInput.addEventListener("input", async () => {
+  const q = searchInput.value.trim();
+  const suggestions = await fetchSuggestions(q);
+  showSuggestions(suggestions);
+});
+
+keyboardEl.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".key-btn");
+  if (!btn) return;
+
+  const key = btn.dataset.key;
+
+  if (key === "SPACE") searchInput.value += " ";
+  else if (key === "DELETE") searchInput.value = searchInput.value.slice(0, -1);
+  else if (key === "ENTER") {
+    triggerSearch(searchInput.value.trim());
+    return;
+  } else {
+    searchInput.value += key;
+  }
+
+  const q = searchInput.value.trim();
+  const suggestions = await fetchSuggestions(q);
+  showSuggestions(suggestions);
+});
+
+function triggerSearch(q) {
+  lastSearchQuery = q;   // ⭐ STORE THE QUERY FOR INFINITE SCROLL
+
+  (async () => {
+    const data = await fetchYouTube("search", {
+      part: "snippet",
+      q,
+      type: "video",
       maxResults: 20,
       _: Date.now()
     });
 
-    const items = data.items.map(v => ({
-      id:
-        v.id?.videoId ||
-        v.id ||
-        v.snippet?.resourceId?.videoId ||
-        null,
-      snippet: v.snippet
-    }));
-
     nextPageToken = data.nextPageToken || null;
 
-    renderFeed(items);
-    showHUD("Movies");
-  });
-
-  /* HISTORY */
-  historyTab.addEventListener("click", () => {
-    setActiveTab("history");
-
-    const items = historyList.slice(0, 50).map(h => ({
-      id: h.id,
-      snippet: h.snippet
-    }));
-
-    nextPageToken = null;
-    renderFeed(items);
-    showHUD("History");
-  });
-
-  /* CHANNEL TAB */
-  channelTab.addEventListener("click", () => {
-    if (!currentChannelId) {
-      showHUD("No channel selected");
-      return;
-    }
-    setActiveTab("channel");
-    loadChannelPage(currentChannelId);
-  });
-  /* -----------------------------------------------------------
-     SUBSCRIPTIONS TAB
-  ----------------------------------------------------------- */
-  subsTab.addEventListener("click", () => {
-    setActiveTab("subs");
-    showHUD("Subscriptions");
-
-    const token = localStorage.getItem("yt_access_token");
-    if (token) {
-      loadSubscriptions();
-    } else {
-      deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
-    }
-  });
-
-  /* -----------------------------------------------------------
-     OAUTH 2.0 DEVICE LOGIN
-  ----------------------------------------------------------- */
-  const OAUTH_CLIENT_ID = "153049037088-10qnschnsie4mqpdsdscd0uk2auqogdt.apps.googleusercontent.com";
-  const OAUTH_CLIENT_SECRET = "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";
-
-  startLoginBtn.addEventListener("click", startDeviceLogin);
-
-  async function startDeviceLogin() {
-    showHUD("Requesting login code…");
-
-    const res = await fetch("https://oauth2.googleapis.com/device/code", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: OAUTH_CLIENT_ID,
-        scope: "https://www.googleapis.com/auth/youtube.readonly"
-      })
-    });
-
-    const data = await res.json();
-
-    deviceUserCodeEl.textContent = "Code: " + data.user_code;
-    deviceLoginStatusEl.textContent = "Go to: " + data.verification_url;
-
-    pollForToken(data.device_code, data.interval || 5);
-  }
-
-  async function pollForToken(deviceCode, intervalSeconds) {
-    let authorized = false;
-
-    while (!authorized) {
-      await new Promise(r => setTimeout(r, intervalSeconds * 1000));
-
-      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: OAUTH_CLIENT_ID,
-          client_secret: OAUTH_CLIENT_SECRET,
-          device_code: deviceCode,
-          grant_type: "urn:ietf:params:oauth:grant-type:device_code"
-        })
-      });
-
-      const tokenData = await tokenRes.json();
-
-      if (tokenData.error) {
-        if (tokenData.error === "authorization_pending") {
-          deviceLoginStatusEl.textContent = "Waiting for authorization…";
-          continue;
-        } else {
-          deviceLoginStatusEl.textContent = "Error: " + tokenData.error;
-          showHUD("Login error");
-          break;
-        }
-      }
-
-      authorized = true;
-      localStorage.setItem("yt_access_token", tokenData.access_token);
-      deviceLoginStatusEl.textContent = "Logged in. Loading subscriptions…";
-      showHUD("YouTube logged in");
-
-      loadSubscriptions();
-    }
-  }
-
-  /* -----------------------------------------------------------
-     REAL YOUTUBE SUBSCRIPTIONS FEED (with videoId fix)
-  ----------------------------------------------------------- */
-  async function loadSubscriptions() {
-    const token = localStorage.getItem("yt_access_token");
-    if (!token) {
-      deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
-      return;
-    }
-
-    subsFeedEl.innerHTML = "";
-    showHUD("Loading subscriptions…");
-
-    try {
-      const res = await fetch(
-        "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20",
-        { headers: { Authorization: "Bearer " + token } }
-      );
-
-      const data = await res.json();
-
-      if (!data.items || !data.items.length) {
-        subsFeedEl.innerHTML = `<div style="font-size:12px; opacity:0.8;">No subscriptions found.</div>`;
-        return;
-      }
-
-      data.items.forEach(item => {
-        const ch = item.snippet;
-
-        const videoId =
-          ch.resourceId?.videoId ||
-          item.id?.videoId ||
-          item.id ||
-          null;
-
-        const thumb = ch.thumbnails?.medium?.url || "";
-        const title = ch.title;
-
-        const card = document.createElement("div");
-        card.className = "video-card";
-
-        const thumbDiv = document.createElement("div");
-        thumbDiv.className = "video-thumb";
-
-        const img = new Image();
-        img.src = thumb;
-        img.loading = "lazy";
-        thumbDiv.appendChild(img);
-
-        const info = document.createElement("div");
-        info.className = "video-info";
-        info.innerHTML = `
-          <div class="video-title">${title}</div>
-          <div class="video-channel">${ch.channelTitle || "Channel"}</div>
-          <div class="video-meta">Tap to open channel</div>
-        `;
-
-        card.appendChild(thumbDiv);
-        card.appendChild(info);
-
-        card.onclick = () => {
-          currentChannelId = ch.resourceId.channelId;
-
-          backToSubsBtn.style.display = "inline-block";
-          backToSubsBtn.style.display = "inline-block";
-          subsPageEl.style.display = "none";
-
-          setActiveTab("channel");
-          loadChannelPage(ch.resourceId.channelId);
-        };
-
-        subsFeedEl.appendChild(card);
-      });
-
-    } catch (e) {
-      subsFeedEl.innerHTML = `<div style="font-size:12px; opacity:0.8;">Error loading subscriptions.</div>`;
-      showHUD("Subs error");
-    }
-  }
-
-  /* BACK TO SUBSCRIPTIONS BUTTON */
-  backToSubsBtn.addEventListener("click", () => {
-    setActiveTab("subs");
-    backToSubsBtn.style.display = "none";
-    subsPageEl.style.display = "block";
-    channelPageEl.style.display = "none";
-    showHUD("Subscriptions");
-  });
-  /* -----------------------------------------------------------
-     CHANNEL PAGE LOADER (20 videos, 1280×720, lazy, videoId fix)
-  ----------------------------------------------------------- */
-  async function loadChannelPage(channelId) {
-    showHUD("Loading channel…");
-    channelContentEl.innerHTML = "";
-
-    try {
-      const res = await fetchYouTube("search", {
-        part: "snippet",
-        channelId,
-        order: "date",
-        maxResults: 20,
-        type: "video",
-        _: Date.now()
-      });
-
-      const items = res.items || [];
-
-      items.forEach(item => {
-        const snippet = item.snippet || {};
-
-        const videoId =
-          item.id?.videoId ||
-          item.id ||
-          item.snippet?.resourceId?.videoId ||
-          null;
-
-        const card = document.createElement("div");
-        card.className = "video-card";
-
-        const thumb = document.createElement("div");
-        thumb.className = "video-thumb";
-
-        const img = new Image();
-        img.src = snippet.thumbnails?.high?.url || "";
-        img.loading = "lazy";
-        thumb.appendChild(img);
-
-        const info = document.createElement("div");
-        info.className = "video-info";
-        info.innerHTML = `
-          <div class="video-title">${snippet.title}</div>
-          <div class="video-channel">${snippet.channelTitle}</div>
-          <div class="video-meta">${snippet.publishedAt}</div>
-        `;
-
-        card.appendChild(thumb);
-        card.appendChild(info);
-
-        card.onclick = () => {
-          if (!videoId) {
-            showHUD("Video unavailable");
-            return;
-          }
-          showHUD("Playing: " + snippet.title);
-          historyList.unshift({ id: videoId, snippet });
-        };
-
-        channelContentEl.appendChild(card);
-      });
-
-      showHUD("Channel loaded");
-    } catch (e) {
-      channelContentEl.innerHTML = `<div style="font-size:12px; opacity:0.8;">Error loading channel.</div>`;
-      showHUD("Channel error");
-    }
-  }
-  // INITIAL LOAD
-  (async () => {
-    homeTab.click();
+    renderFeed(data.items || []);
+    closeKeyboard();
+    showHUD("Search: " + q);
   })();
+}
+
+/* -----------------------------------------------------------
+   HOLOGRAPHIC EFFECTS
+----------------------------------------------------------- */
+function applyChroma(xTilt, yTilt) {
+  const intensity = Math.min(1, Math.abs(xTilt) + Math.abs(yTilt));
+  const blur = 4 + intensity * 12;
+  const opacity = 0.25 + intensity * 0.45;
+
+  playerSection.style.setProperty("--chroma-blur", `${blur}px`);
+  playerSection.style.setProperty("--chroma-opacity", opacity);
+}
+
+/* -----------------------------------------------------------
+   AUDIO GLOW (SIMULATED)
+----------------------------------------------------------- */
+let audioGlowActive = false;
+
+function initAudioGlow() {
+  if (audioGlowActive) return;
+  audioGlowActive = true;
+
+  function animateGlow() {
+    if (!audioGlowActive) return;
+
+    const pulse = 0.25 + Math.random() * 0.35;
+    const blur = 20 + Math.random() * 25;
+
+    playerSection.style.setProperty("--audio-glow-opacity", pulse);
+    playerSection.style.setProperty("--audio-glow-blur", `${blur}px`);
+
+    requestAnimationFrame(animateGlow);
+  }
+
+  animateGlow();
+}
+
+/* -----------------------------------------------------------
+   DEPTH‑REACTIVE GLOW ENGINE (defined ONCE)
+----------------------------------------------------------- */
+function applyDepthGlow(x, y, isFullscreen) {
+  const strength = isFullscreen ? 0.75 : 0.35;
+  const blur = isFullscreen ? 55 : 22;
+
+  playerSection.style.setProperty("--glow-strength", strength);
+  playerSection.style.setProperty("--glow-blur", `${blur}px`);
+
+  playerSection.style.setProperty("--glow-shift-x", `${x * 12}px`);
+  playerSection.style.setProperty("--glow-shift-y", `${y * 12}px`);
+}
+
+
+/* -----------------------------------------------------------
+   PARALLAX / DEPTH ENGINE
+----------------------------------------------------------- */
+document.addEventListener("mousemove", (e) => {
+  const x = (e.clientX / window.innerWidth) * 2 - 1;
+  const y = (e.clientY / window.innerHeight) * 2 - 1;
+
+  // existing parallax
+  document.querySelectorAll(".parallax").forEach((el) => {
+    const depth = 8;
+    el.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
+  });
+
+  document.querySelectorAll(".parallax-tab").forEach((el) => {
+    const depth = 4;
+    el.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
+  });
+
+  // ⭐ Depth‑reactive glow (VisionOS)
+  const isFullscreen = playerSection.classList.contains("player-fullscreen");
+  applyDepthGlow(x, y, isFullscreen);
+
+  // ⭐ IMAX tilt + Hover Intensity Boost
+  document.querySelectorAll(".video-card").forEach((card) => {
+    const tiltX = y * -8;
+    const tiltY = x * 8;
+    const shiftX = x * 12;
+    const shiftY = y * 12;
+
+    const isHover = card.matches(":hover");
+    const boost = isHover ? 1.6 : 1;
+    const lift = isHover ? 18 : 0;
+
+    card.style.transform = `
+      perspective(1100px)
+      rotateX(${tiltX * boost}deg)
+      rotateY(${tiltY * boost}deg)
+      translateX(${shiftX}px)
+      translateY(${shiftY}px)
+      translateZ(${lift}px)
+    `;
+  });
+
+  // ⭐ Depth‑reactive holographic shadow
+  document.querySelectorAll(".video-card").forEach((card) => {
+    const shadowX = x * 14;
+    const shadowY = y * 14;
+
+    const isHover = card.matches(":hover");
+    const blur = isHover ? 28 : 18;
+    const opacity = isHover ? 0.75 : 0.55;
+
+    card.style.setProperty("--shadow-x", `${shadowX}px`);
+    card.style.setProperty("--shadow-y", `${shadowY}px`);
+    card.style.setProperty("--shadow-blur", `${blur}px`);
+    card.style.setProperty("--shadow-opacity", opacity);
+  });
+
+  // ⭐ Ambient Occlusion depth response
+  document.querySelectorAll(".video-card").forEach((card) => {
+    const isHover = card.matches(":hover");
+
+    const aoOpacity = isHover ? 0.22 : 0.35;
+    const aoBlur = isHover ? 32 : 22;
+
+    card.style.setProperty("--ao-opacity", aoOpacity);
+    card.style.setProperty("--ao-blur", `${aoBlur}px`);
+  });
+
+  applyChroma(x, y);
+});
+
+
+
+
+/* -----------------------------------------------------------
+   THEME TOGGLE
+----------------------------------------------------------- */
+themeToggle.addEventListener("click", () => {
+  isLight = !isLight;
+  document.body.classList.toggle("light", isLight);
+  showHUD(isLight ? "Light Mode" : "Dark Mode");
+});
+
+/* -----------------------------------------------------------
+   INITIAL LOAD
+----------------------------------------------------------- */
+(async function init() {
+  const data = await fetchYouTube("videos", {
+    part: "snippet,statistics",
+    chart: "mostPopular",
+    maxResults: 25
+  });
+
+  renderFeed(data.items || []);
+})();
 </script>
+
 </body>
 </html>
