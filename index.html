@@ -154,23 +154,29 @@ body.light #searchTab {
   display: flex;
   gap: 8px;
   flex-wrap: nowrap;
-  overflow-x: auto;        /* ⭐ allow horizontal scroll */
+  overflow-x: auto;
   white-space: nowrap;
   padding-bottom: 4px;
-  scrollbar-width: none;   /* Firefox */
+  scrollbar-width: none;
   position: relative;
   z-index: 16;
 }
 
 #tabs::-webkit-scrollbar {
-  display: none;           /* Chrome/Safari */
+  display: none;
 }
 
 .tab-btn {
-  flex-shrink: 0;          /* ⭐ prevents shrinking */
-  min-width: fit-content;  /* ⭐ ensures full text visible */
+  background: transparent !important;     /* removes white background */
+  color: #f5f7ff;
+  border: 1px solid rgba(120,130,160,0.4);
+  padding: 12px 20px;                     /* increased size */
+  font-size: 14px;                        /* slightly larger text */
+  border-radius: 16px;                    /* smoother shape */
+  letter-spacing: 0.03em;                 /* AR readability */
+  flex-shrink: 0;                         /* prevents shrinking */
+  min-width: fit-content;                 /* ensures full text visible */
 }
-
 
 .tab-btn.active {
   border-color: var(--accent);
@@ -1212,7 +1218,7 @@ function setPlayerVideo(videoId, snippet) {
   playerSection.style.display = "block";
   playerSection.classList.remove("player-mini", "player-fullscreen");
 
-  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
+  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&rel=0&modestbranding=1&playsinline=1`;
 
   saveToHistory({ id: videoId, snippet });
 
@@ -2036,7 +2042,7 @@ async function loadChannelPage(channelId) {
   currentChannelId = channelId;
 
   const info = await fetchYouTube("channels", {
-    part: "snippet,statistics,contentDetails",
+    part: "snippet"
     id: channelId
   });
 
