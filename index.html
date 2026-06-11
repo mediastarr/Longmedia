@@ -153,29 +153,25 @@ body.light #searchTab {
   margin-top: 12px;
   display: flex;
   gap: 8px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  white-space: nowrap;
+  flex-wrap: nowrap;      /* keep tabs on one line */
+  overflow: hidden;       /* no scrolling */
+  white-space: nowrap;    /* prevent wrapping */
   padding-bottom: 4px;
-  scrollbar-width: none;
   position: relative;
   z-index: 16;
 }
 
-#tabs::-webkit-scrollbar {
-  display: none;
-}
-
 .tab-btn {
-  background: transparent !important;     /* removes white background */
+  flex: 1;                /* ⭐ auto-shrink so all tabs fit */
+  min-width: 80px;        /* prevents tabs from becoming too tiny */
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.6);
+  font-size: 12px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.12), rgba(10,12,20,0.9));
   color: #f5f7ff;
-  border: 1px solid rgba(120,130,160,0.4);
-  padding: 12px 20px;                     /* increased size */
-  font-size: 14px;                        /* slightly larger text */
-  border-radius: 16px;                    /* smoother shape */
-  letter-spacing: 0.03em;                 /* AR readability */
-  flex-shrink: 0;                         /* prevents shrinking */
-  min-width: fit-content;                 /* ensures full text visible */
+  cursor: pointer;
+  text-align: center;     /* keeps text centered */
 }
 
 .tab-btn.active {
@@ -878,15 +874,16 @@ body.fullscreen-active .exit-full-btn {
 
   <!-- TABS -->
   <div id="tabs">
-  <button id="homeTab" class="tab-btn parallax-tab active" tabindex="0">Home</button>
-  <button id="shortsTab" class="tab-btn parallax-tab" tabindex="0">Shorts</button>
-  <button id="moviesTab" class="tab-btn parallax-tab" tabindex="0">Movies</button>
-  <button id="historyTab" class="tab-btn parallax-tab" tabindex="0">History</button>
-  <button id="trendingTab" class="tab-btn parallax-tab" tabindex="0">Trending</button>
-  <button id="channelTab" class="tab-btn parallax-tab" tabindex="0">Channel</button>
-  <button id="subsTab" class="tab-btn parallax-tab" tabindex="0">Subscriptions</button>
-  <button id="playlistsTab" class="tab-btn parallax-tab" tabindex="0">Playlists</button>
-</div>
+    <button id="homeTab" class="tab-btn parallax-tab active">Home</button>
+    <button id="shortsTab" class="tab-btn parallax-tab">Shorts</button>
+    <button id="moviesTab" class="tab-btn parallax-tab">Movies</button>
+    <button id="historyTab" class="tab-btn parallax-tab">History</button>
+    <button id="trendingTab" class="tab-btn parallax-tab">Trending</button>
+    <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
+    <!-- NEW: Subscriptions tab -->
+    <button id="subsTab" class="tab-btn parallax-tab">Subscriptions</button>
+    <button id="playlistsTab" class="tab-btn parallax-tab">Playlists</button>
+  </div>
 
   
   <!-- PLAYER -->
@@ -1191,28 +1188,14 @@ const searchBack = document.getElementById("searchBack");
 
 /* NEW: Subscriptions elements */
 const subsTab = document.getElementById("subsTab");
-const playlistsTab = document.getElementById("playlistsTab");
 const subsPageEl = document.getElementById("subsPage");
 const subsFeedEl = document.getElementById("subsFeed");
+const playlistsTab = document.getElementById("playlistsTab");
 const playlistsPageEl = document.getElementById("playlistsPage");
 const playlistsFeedEl = document.getElementById("playlistsFeed");
 const startLoginBtn = document.getElementById("startLoginBtn");
 const deviceUserCodeEl = document.getElementById("deviceUserCode");
 const deviceLoginStatusEl = document.getElementById("deviceLoginStatus");
-
-/* -----------------------------------------------------------
-   ⭐ AUTO‑SCROLL TABS INTO VIEW (Required for swipe)
------------------------------------------------------------ */
-function scrollTabIntoView(btn) {
-  const tabsRect = tabsEl.getBoundingClientRect();
-  const btnRect = btn.getBoundingClientRect();
-
-  if (btnRect.left < tabsRect.left) {
-    tabsEl.scrollBy({ left: btnRect.left - tabsRect.left - 20, behavior: "smooth" });
-  } else if (btnRect.right > tabsRect.right) {
-    tabsEl.scrollBy({ left: btnRect.right - tabsRect.right + 20, behavior: "smooth" });
-  }
-}   
 
 /* -----------------------------------------------------------
    HUD
@@ -1231,7 +1214,7 @@ function setPlayerVideo(videoId, snippet) {
   playerSection.style.display = "block";
   playerSection.classList.remove("player-mini", "player-fullscreen");
 
-  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&rel=0&modestbranding=1&playsinline=1`;
+  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
 
   saveToHistory({ id: videoId, snippet });
 
@@ -1261,19 +1244,18 @@ function showUIWithMiniPlayer() {
   searchTabEl.style.display = "flex";
   tabsEl.style.display = "flex";
 
-  feedEl.style.display = "none";
-  channelPageEl.style.display = "none";
-  subsPageEl.style.display = "none";
-  playlistsPageEl.style.display = "none";
-
   if (currentTab === "channel") {
     channelPageEl.style.display = "block";
+    feedEl.style.display = "none";
+    subsPageEl.style.display = "none";
   } else if (currentTab === "subs") {
     subsPageEl.style.display = "block";
-  } else if (currentTab === "playlists") {
-    playlistsPageEl.style.display = "block";
+    feedEl.style.display = "none";
+    channelPageEl.style.display = "none";
   } else {
     feedEl.style.display = "block";
+    channelPageEl.style.display = "none";
+    subsPageEl.style.display = "none";
   }
 }
 
@@ -1530,60 +1512,36 @@ function appendFeed(items) {
 function setActiveTab(tab) {
   currentTab = tab;
 
-  // remove active from ALL tabs
-  [
-    homeTab, shortsTab, moviesTab, historyTab,
-    trendingTab, channelTab, subsTab, playlistsTab
-  ].forEach(btn => btn.classList.remove("active"));
+  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab]
+    .forEach(btn => btn.classList.remove("active"));
 
-  // activate correct tab
   if (tab === "home") homeTab.classList.add("active");
   if (tab === "shorts") shortsTab.classList.add("active");
   if (tab === "movies") moviesTab.classList.add("active");
   if (tab === "history") historyTab.classList.add("active");
   if (tab === "trending") trendingTab.classList.add("active");
   if (tab === "channel") channelTab.classList.add("active");
-  if (tab === "subs") subsTab.classList.add("active");
-  if (tab === "playlists") playlistsTab.classList.add("active");
 
-  // hide all pages
-  feedEl.style.display = "none";
-  channelPageEl.style.display = "none";
-  subsPageEl.style.display = "none";
-  playlistsPageEl.style.display = "none";
-
-  // show correct page
-  if (["home","shorts","movies","history","trending"].includes(tab)) {
+  if (tab === "channel") {
+    feedEl.style.display = "none";
+    channelPageEl.style.display = "block";
+  } else {
     feedEl.style.display = "block";
-  }
-  if (tab === "channel") channelPageEl.style.display = "block";
-  if (tab === "subs") subsPageEl.style.display = "block";
-  if (tab === "playlists") playlistsPageEl.style.display = "block";
-}
-
-function scrollTabIntoView(btn) {
-  const tabsRect = tabsEl.getBoundingClientRect();
-  const btnRect = btn.getBoundingClientRect();
-
-  if (btnRect.left < tabsRect.left) {
-    tabsEl.scrollBy({ left: btnRect.left - tabsRect.left - 20, behavior: "smooth" });
-  } else if (btnRect.right > tabsRect.right) {
-    tabsEl.scrollBy({ left: btnRect.right - tabsRect.right + 20, behavior: "smooth" });
+    channelPageEl.style.display = "none";
   }
 }
-   
+
 /* -----------------------------------------------------------
-   HOME TAB — 20 fresh videos
+   HOME TAB — 50 fresh videos
 ----------------------------------------------------------- */
 homeTab.addEventListener("click", async () => {
   setActiveTab("home");
-  scrollTabIntoView(homeTab);
 
   const data = await fetchYouTube("videos", {
-    part: "snippet",
+    part: "snippet,statistics,contentDetails",
     chart: "mostPopular",
     regionCode: "US",
-    maxResults: 20,
+    maxResults: 50,
     _: Date.now()
   });
 
@@ -1599,13 +1557,12 @@ homeTab.addEventListener("click", async () => {
 ----------------------------------------------------------- */
 trendingTab.addEventListener("click", async () => {
   setActiveTab("trending");
-  scrollTabIntoView(trendingTab);
 
   const data = await fetchYouTube("videos", {
-    part: "snippet",
+    part: "snippet,statistics,contentDetails",
     chart: "mostPopular",
     regionCode: "US",
-    maxResults: 20,
+    maxResults: 50,
     _: Date.now()
   });
 
@@ -1621,7 +1578,6 @@ trendingTab.addEventListener("click", async () => {
 ----------------------------------------------------------- */
 shortsTab.addEventListener("click", async () => {
   setActiveTab("shorts");
-  scrollTabIntoView(shortsTab);
 
   const data = await fetchYouTube("search", {
     part: "snippet",
@@ -1630,7 +1586,7 @@ shortsTab.addEventListener("click", async () => {
     videoDuration: "short",
     videoEmbeddable: "true",
     regionCode: "US",
-    maxResults: 20,
+    maxResults: 50,
     _: Date.now()
   });
 
@@ -1652,7 +1608,6 @@ shortsTab.addEventListener("click", async () => {
 ----------------------------------------------------------- */
 moviesTab.addEventListener("click", async () => {
   setActiveTab("movies");
-  scrollTabIntoView(moviesTab);
 
   const data = await fetchYouTube("search", {
     part: "snippet",
@@ -1661,7 +1616,7 @@ moviesTab.addEventListener("click", async () => {
     videoDuration: "long",
     videoEmbeddable: "true",
     regionCode: "US",
-    maxResults: 20,
+    maxResults: 50,
     _: Date.now()
   });
 
@@ -1681,7 +1636,6 @@ moviesTab.addEventListener("click", async () => {
 ----------------------------------------------------------- */
 subsTab.addEventListener("click", () => {
   currentTab = "subs";
-  scrollTabIntoView(subsTab);
 
   document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
   subsTab.classList.add("active");
@@ -1702,7 +1656,6 @@ subsTab.addEventListener("click", () => {
 
    playlistsTab.addEventListener("click", () => {
   currentTab = "playlists";
-  scrollTabIntoView(playlistsTab);
 
   document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
   playlistsTab.classList.add("active");
@@ -1860,7 +1813,7 @@ async function loadSubscriptions() {
   showHUD("Loading playlists…");
 
   const res = await fetch(
-    "https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=20",
+    "https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=25",
     { headers: { Authorization: "Bearer " + token } }
   );
 
@@ -1870,8 +1823,6 @@ async function loadSubscriptions() {
     playlistsFeedEl.innerHTML = `<div style="opacity:0.8;">No playlists found.</div>`;
     return;
   }
-
-  nextPageToken = data.nextPageToken || null;
 
   data.items.forEach(pl => {
     const snippet = pl.snippet;
@@ -1905,7 +1856,7 @@ async function loadSubscriptions() {
   const token = localStorage.getItem("yt_access_token");
 
   const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=20`,
+    `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50`,
     { headers: { Authorization: "Bearer " + token } }
   );
 
@@ -1914,8 +1865,6 @@ async function loadSubscriptions() {
   playlistsFeedEl.innerHTML = `
     <div style="font-size:14px; margin-bottom:10px; opacity:0.85;">${title}</div>
   `;
-
-  nextPageToken = data.nextPageToken || null;
 
   data.items.forEach(item => {
     const snippet = item.snippet;
@@ -1946,9 +1895,8 @@ async function loadSubscriptions() {
 ----------------------------------------------------------- */
 historyTab.addEventListener("click", () => {
   setActiveTab("history");
-  scrollTabIntoView(historyTab);
 
-  const items = historyList.slice(0, 20).map(h => ({
+  const items = historyList.slice(0, 50).map(h => ({
     id: h.id,
     snippet: h.snippet,
     statistics: { viewCount: "watched" }
@@ -1966,7 +1914,6 @@ historyTab.addEventListener("click", () => {
 ----------------------------------------------------------- */
 channelTab.addEventListener("click", () => {
   loadChannelPage(currentChannelId);
-  scrollTabIntoView(channelTab);
 });
 
 
@@ -1983,7 +1930,7 @@ async function loadMoreVideos() {
       part: "snippet,statistics,contentDetails",
       chart: "mostPopular",
       regionCode: "US",
-      maxResults: 20,
+      maxResults: 50,
       pageToken: nextPageToken,
       _: Date.now()
     });
@@ -1996,7 +1943,7 @@ async function loadMoreVideos() {
       type: "video",
       videoDuration: "short",
       videoEmbeddable: "true",
-      maxResults: 20,
+      maxResults: 50,
       pageToken: nextPageToken,
       _: Date.now()
     });
@@ -2009,7 +1956,7 @@ async function loadMoreVideos() {
       type: "video",
       videoDuration: "long",
       videoEmbeddable: "true",
-      maxResults: 20,
+      maxResults: 50,
       pageToken: nextPageToken,
       _: Date.now()
     });
@@ -2020,7 +1967,7 @@ async function loadMoreVideos() {
       part: "snippet,statistics,contentDetails",
       chart: "mostPopular",
       regionCode: "US",
-      maxResults: 20,
+      maxResults: 50,
       pageToken: nextPageToken,
       _: Date.now()
     });
@@ -2031,7 +1978,7 @@ async function loadMoreVideos() {
       part: "snippet",
       q: lastSearchQuery,
       type: "video",
-      maxResults: 20,
+      maxResults: 50,
       pageToken: nextPageToken,
       _: Date.now()
     });
@@ -2041,7 +1988,7 @@ async function loadMoreVideos() {
     data = await fetchYouTube("playlistItems", {
       part: "snippet",
       playlistId: channelUploadsId,
-      maxResults: 20,
+      maxResults: 50,
       pageToken: nextPageToken,
       _: Date.now()
     });
@@ -2075,7 +2022,7 @@ async function loadChannelPage(channelId) {
   currentChannelId = channelId;
 
   const info = await fetchYouTube("channels", {
-    part: "snippet"
+    part: "snippet,statistics,contentDetails",
     id: channelId
   });
 
@@ -2102,7 +2049,7 @@ async function loadChannelPage(channelId) {
   const uploads = await fetchYouTube("playlistItems", {
   part: "snippet",
   playlistId: channelUploadsId,
-  maxResults: 20,
+  maxResults: 50,
   _: Date.now()
 });
 
@@ -2144,7 +2091,7 @@ async function fetchSuggestions(q) {
     part: "snippet",
     q,
     type: "video",
-    maxResults: 20
+    maxResults: 50
   });
   return data.items?.map(v => v.snippet.title) || [];
 }
@@ -2175,9 +2122,6 @@ function openKeyboard() {
   keyboardEl.style.display = "block";
   document.querySelector(".search-input-bar").style.display = "flex";
 
-  // ⭐ Hide tabs so swipe goes Theme → Open Keyboard
-  tabsEl.style.display = "none";
-
   // ⭐ Hide all other pages so nothing shows behind the keyboard
   feedEl.style.display = "none";
   subsPageEl.style.display = "none";
@@ -2191,21 +2135,8 @@ function closeKeyboard() {
   searchPanelEl.style.display = "none";
   suggestionsEl.style.display = "none";
 
-  // ⭐ Restore tabs FIRST so swipe sees them
-  tabsEl.style.display = "flex";
-
-  // ⭐ Hide all pages first
-  feedEl.style.display = "none";
-  channelPageEl.style.display = "none";
-  subsPageEl.style.display = "none";
-  playlistsPageEl.style.display = "none";
-
-  // ⭐ Restore correct page
+  // ⭐ Restore the correct page based on currentTab
   if (currentTab === "home") feedEl.style.display = "block";
-  if (currentTab === "shorts") feedEl.style.display = "block";
-  if (currentTab === "movies") feedEl.style.display = "block";
-  if (currentTab === "history") feedEl.style.display = "block";
-  if (currentTab === "trending") feedEl.style.display = "block";
   if (currentTab === "subs") subsPageEl.style.display = "block";
   if (currentTab === "playlists") playlistsPageEl.style.display = "block";
   if (currentTab === "channel") channelPageEl.style.display = "block";
@@ -2254,7 +2185,7 @@ function triggerSearch(q) {
       part: "snippet",
       q,
       type: "video",
-      maxResults: 20,
+      maxResults: 50,
       _: Date.now()
     });
 
@@ -2389,72 +2320,8 @@ document.addEventListener("mousemove", (e) => {
   applyChroma(x, y);
 });
 
-/* -----------------------------------------------------------
-   ⭐ SWIPE NAVIGATION ENGINE — Focus Layers
------------------------------------------------------------ */
-let focusIndex = 0;
-
-function getFocusLayers() {
-  const layers = [];
-
-  // 1. Theme button
-  layers.push(themeToggle);
-
-  // 2. Open Keyboard button
-  layers.push(document.querySelector(".search-open-btn"));
-
-  // 3. Tabs container
-  layers.push(tabsEl);
-
-  // 4. Active page (feed, subs, playlists, channel)
-  if (currentTab === "subs") layers.push(subsPageEl);
-  else if (currentTab === "playlists") layers.push(playlistsPageEl);
-  else if (currentTab === "channel") layers.push(channelPageEl);
-  else layers.push(feedEl);
-
-  return layers;
-}
-
-/* -----------------------------------------------------------
-   ⭐ SWIPE HANDLERS
------------------------------------------------------------ */
-function focusNext() {
-  const layers = getFocusLayers();
-  focusIndex = Math.min(focusIndex + 1, layers.length - 1);
-  layers[focusIndex].scrollIntoView({ behavior: "smooth", block: "center" });
-}
-
-function focusPrev() {
-  const layers = getFocusLayers();
-  focusIndex = Math.max(focusIndex - 1, 0);
-  layers[focusIndex].scrollIntoView({ behavior: "smooth", block: "center" });
-}
-
-/* -----------------------------------------------------------
-   ⭐ TOUCH SWIPE DETECTION
------------------------------------------------------------ */
-let startY = 0;
-
-document.addEventListener("touchstart", e => {
-  startY = e.touches[0].clientY;
-});
-
-document.addEventListener("touchend", e => {
-  const dy = e.changedTouches[0].clientY - startY;
-  if (Math.abs(dy) < 40) return;
-
-  if (dy < 0) focusNext();  // swipe up
-  else focusPrev();         // swipe down
-});
 
 
-/* -----------------------------------------------------------
-   ⭐ RAY‑BAN EMG GESTURES (optional)
------------------------------------------------------------ */
-document.addEventListener("emg-flick-up", focusNext);
-document.addEventListener("emg-flick-down", focusPrev);
-
-   
 
 /* -----------------------------------------------------------
    THEME TOGGLE
@@ -2470,14 +2337,11 @@ themeToggle.addEventListener("click", () => {
 ----------------------------------------------------------- */
 (async function init() {
   const data = await fetchYouTube("videos", {
-    part: "snippet",
+    part: "snippet,statistics",
     chart: "mostPopular",
-    regionCode: "US",
-    maxResults: 20,
-    _: Date.now()
+    maxResults: 25
   });
 
-  nextPageToken = data.nextPageToken || null;
   renderFeed(data.items || []);
 })();
 </script>
