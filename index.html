@@ -1116,12 +1116,22 @@ async function openPlaylist(playlistId, title) {
   showHUD("Loading playlist…");
 
   try {
-    const data = await fetchYouTube("playlistItems", {
-      part: "snippet",
-      playlistId: playlistId,
-      maxResults: 50,
-      _: Date.now()
-    });
+    const token = localStorage.getItem("yt_access_token");
+    let data;
+
+    if (token) {
+      // Use OAuth so private/personal playlist items are visible
+      const url = new URL("https://www.googleapis.com/youtube/v3/playlistItems");
+      url.searchParams.set("part", "snippet,contentDetails");
+      url.searchParams.set("playlistId", playlistId);
+      url.searchParams.set("maxResults", "50");
+      const res = await fetch(url.toString(), { headers: { Authorization: "Bearer " + token } });
+      data = await res.json();
+      // If token expired, fall back to API key
+      if (data.error) data = await fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId, maxResults: 50, _: Date.now() });
+    } else {
+      data = await fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId, maxResults: 50, _: Date.now() });
+    }
 
     playlistItemsList.innerHTML = "";
 
@@ -1130,9 +1140,11 @@ async function openPlaylist(playlistId, title) {
       return;
     }
 
+    let rendered = 0;
     data.items.forEach((item, i) => {
       const snippet = item.snippet;
-      const videoId = snippet.resourceId?.videoId;
+      // videoId can live in resourceId OR contentDetails
+      const videoId = snippet.resourceId?.videoId || item.contentDetails?.videoId;
       if (!videoId) return;
 
       const thumb = snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || "";
@@ -1153,9 +1165,14 @@ async function openPlaylist(playlistId, title) {
       };
 
       playlistItemsList.appendChild(card);
+      rendered++;
     });
 
-    showHUD(data.items.length + " videos");
+    if (rendered === 0) {
+      playlistItemsList.innerHTML = `<div style="font-size:12px;opacity:0.6;padding:8px 0;">This playlist is empty.</div>`;
+    } else {
+      showHUD(rendered + " videos");
+    }
 
   } catch (e) {
     playlistItemsList.innerHTML = `<div style="font-size:12px;opacity:0.6;padding:8px 0;">Error loading playlist items.</div>`;
