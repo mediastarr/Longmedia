@@ -518,6 +518,158 @@ body.fullscreen-active.ui-hidden .exit-full-btn {
   top: 6px;
   right: 6px;
 }
+/* =============================================
+   SHORTS PAGE — fullscreen vertical player
+   ============================================= */
+#shortsPage {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background: #000;
+  overflow: hidden;
+  touch-action: none;
+}
+
+/* the iframe fills the whole screen */
+#shortsIframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+/* ambient glow behind the shorts iframe */
+#shortsPage::before {
+  content: "";
+  position: absolute;
+  inset: -40px;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 50% 0%,   rgba(60,242,255,0.28), transparent 55%),
+    radial-gradient(circle at 0%  100%, rgba(120,80,255,0.22), transparent 60%),
+    radial-gradient(circle at 100% 100%, rgba(0,255,180,0.22), transparent 60%);
+  filter: blur(30px);
+  opacity: 0.9;
+  animation: shortsAmbientPulse 3s ease-in-out infinite alternate;
+}
+@keyframes shortsAmbientPulse {
+  from { opacity: 0.6; }
+  to   { opacity: 1.0; }
+}
+
+/* chroma aberration overlay */
+#shortsPage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  mix-blend-mode: screen;
+  opacity: 0.18;
+  background:
+    radial-gradient(circle at 15% 15%, rgba(255,0,80,0.4),   transparent 55%),
+    radial-gradient(circle at 85% 15%, rgba(0,200,255,0.4),  transparent 55%),
+    radial-gradient(circle at 50% 90%, rgba(0,255,180,0.35), transparent 55%);
+  filter: blur(12px);
+}
+
+#shortsIframe { position: relative; z-index: 1; }
+
+/* bloom glow box-shadow ring */
+#shortsPage.shorts-bloom {
+  box-shadow:
+    inset 0 0 80px  rgba(60,242,255,0.35),
+    inset 0 0 160px rgba(120,60,255,0.2),
+    0 0 120px rgba(60,242,255,0.55),
+    0 0 260px rgba(0,200,255,0.3);
+}
+
+/* Back button */
+#shortsBackBtn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+  border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.7);
+  padding: 10px 16px;
+  font-size: 13px;
+  min-height: 44px;
+  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.35), rgba(10,12,20,0.88));
+  color: #f5f7ff;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(60,242,255,0.25);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+#shortsBackBtn:hover, #shortsBackBtn:active {
+  box-shadow: 0 0 18px rgba(60,242,255,0.9), 0 0 30px rgba(60,242,255,0.5);
+  transform: scale(1.06);
+}
+
+/* Video counter pill */
+#shortsCounter {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12px;
+  background: rgba(10,12,20,0.75);
+  color: rgba(255,255,255,0.85);
+  border: 1px solid rgba(60,242,255,0.35);
+  backdrop-filter: blur(8px);
+  letter-spacing: 0.04em;
+}
+
+/* Swipe hint arrows */
+#shortsHint {
+  position: absolute;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+#shortsHint.visible { opacity: 1; }
+.shorts-arrow {
+  font-size: 20px;
+  color: rgba(255,255,255,0.6);
+  animation: shortsArrowBounce 1.2s ease-in-out infinite;
+}
+.shorts-arrow.up { animation-delay: 0.2s; transform: rotate(180deg); display: block; margin-bottom: 2px; }
+.shorts-arrow.down { }
+.shorts-hint-text { font-size: 11px; color: rgba(255,255,255,0.5); letter-spacing: 0.05em; }
+@keyframes shortsArrowBounce {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(5px); }
+}
+.shorts-arrow.up { animation-name: shortsArrowBounceUp; }
+@keyframes shortsArrowBounceUp {
+  0%, 100% { transform: rotate(180deg) translateY(0); }
+  50%       { transform: rotate(180deg) translateY(5px); }
+}
+
+/* slide transition overlay */
+#shortsTransition {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+#shortsTransition.flash { opacity: 0.75; }
 </style>
 </head>
 <body>
@@ -620,6 +772,9 @@ body.fullscreen-active.ui-hidden .exit-full-btn {
     </div>
     <div id="subsFeed" style="margin-top:16px;"></div>
   </div>
+
+  <!-- SHORTS PAGE -->
+  <div id="shortsPage"></div>
 
   <!-- PLAYLISTS PAGE -->
   <div id="playlistPage">
@@ -769,6 +924,7 @@ const searchGo = document.getElementById("searchGo");
 const searchBack = document.getElementById("searchBack");
 const subsTab = document.getElementById("subsTab");
 const subsPageEl = document.getElementById("subsPage");
+const shortsPageEl = document.getElementById("shortsPage");
 const subsFeedEl = document.getElementById("subsFeed");
 const startLoginBtn = document.getElementById("startLoginBtn");
 const deviceUserCodeEl = document.getElementById("deviceUserCode");
@@ -840,6 +996,7 @@ function showUIWithMiniPlayer() {
   channelPageEl.style.display = "none";
   subsPageEl.style.display = "none";
   playlistPageEl.style.display = "none";
+  shortsPageEl.style.display = "none";
 
   if (currentTab === "channel") {
     channelPageEl.style.display = "block";
@@ -1021,10 +1178,11 @@ function setActiveTab(tab) {
   if (tab === "subs") subsTab.classList.add("active");
   if (tab === "playlists") playlistTab.classList.add("active");
 
-  feedEl.style.display = (["home","shorts","movies","history","trending","search"].includes(tab)) ? "block" : "none";
+  feedEl.style.display = (["home","movies","history","trending","search"].includes(tab)) ? "block" : "none";
   channelPageEl.style.display = (tab === "channel") ? "block" : "none";
   subsPageEl.style.display = (tab === "subs") ? "block" : "none";
   playlistPageEl.style.display = (tab === "playlists") ? "block" : "none";
+  shortsPageEl.style.display = (tab === "shorts") ? "block" : "none";
 }
 
 /* -----------------------------------------------------------
@@ -1045,11 +1203,147 @@ trendingTab.addEventListener("click", async () => {
 });
 
 shortsTab.addEventListener("click", async () => {
-  nextPageToken = null; setActiveTab("shorts");
-  showSkeletons(8);
-  const data = await fetchYouTube("search", { part: "snippet", q: "#shorts", type: "video", videoDuration: "short", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
-  shortsItems = data.items.map(v => ({ id: v.id.videoId, snippet: v.snippet })); shortsIndex = 0;
-  nextPageToken = data.nextPageToken || null; renderFeed(shortsItems); showHUD("Shorts");
+  nextPageToken = null;
+  setActiveTab("shorts");
+  showHUD("Shorts");
+
+  // Build the shorts page UI
+  shortsPageEl.innerHTML = `
+    <iframe id="shortsIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    <button id="shortsBackBtn">← Back</button>
+    <div id="shortsCounter">1 / …</div>
+    <div id="shortsHint">
+      <div class="shorts-arrow up">▼</div>
+      <div class="shorts-hint-text">swipe up/down</div>
+      <div class="shorts-arrow down">▼</div>
+    </div>
+    <div id="shortsTransition"></div>
+  `;
+  shortsPageEl.classList.add("shorts-bloom");
+
+  const shortsIframe  = document.getElementById("shortsIframe");
+  const shortsCounter = document.getElementById("shortsCounter");
+  const shortsHint    = document.getElementById("shortsHint");
+  const shortsTrans   = document.getElementById("shortsTransition");
+  const backBtn2      = document.getElementById("shortsBackBtn");
+
+  // Fetch first batch
+  const data = await fetchYouTube("search", {
+    part: "snippet", q: "#shorts", type: "video",
+    videoDuration: "short", videoEmbeddable: "true",
+    regionCode: "US", maxResults: 20, _: Date.now()
+  });
+  shortsItems = data.items.map(v => ({ id: v.id.videoId, snippet: v.snippet }));
+  shortsIndex = 0;
+  nextPageToken = data.nextPageToken || null;
+
+  function updateCounter() {
+    shortsCounter.textContent = `${shortsIndex + 1} / ${shortsItems.length}`;
+  }
+
+  function playShort(index) {
+    const item = shortsItems[index];
+    if (!item) return;
+    shortsIframe.src = `https://www.youtube.com/embed/${item.id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&origin=${location.origin}`;
+    updateCounter();
+    // Auto-load more when near end
+    if (index >= shortsItems.length - 4 && nextPageToken) loadMoreShorts();
+  }
+
+  async function loadMoreShorts() {
+    if (!nextPageToken) return;
+    const more = await fetchYouTube("search", {
+      part: "snippet", q: "#shorts", type: "video",
+      videoDuration: "short", videoEmbeddable: "true",
+      maxResults: 20, pageToken: nextPageToken, _: Date.now()
+    });
+    nextPageToken = more.nextPageToken || null;
+    shortsItems = shortsItems.concat(more.items.map(v => ({ id: v.id.videoId, snippet: v.snippet })));
+    updateCounter();
+  }
+
+  function goNext() {
+    if (shortsIndex >= shortsItems.length - 1) return;
+    shortsTrans.classList.add("flash");
+    setTimeout(() => {
+      shortsIndex++;
+      playShort(shortsIndex);
+      shortsTrans.classList.remove("flash");
+    }, 180);
+  }
+
+  function goPrev() {
+    if (shortsIndex <= 0) return;
+    shortsTrans.classList.add("flash");
+    setTimeout(() => {
+      shortsIndex--;
+      playShort(shortsIndex);
+      shortsTrans.classList.remove("flash");
+    }, 180);
+  }
+
+  // Autoplay first
+  playShort(0);
+
+  // Show hint briefly
+  shortsHint.classList.add("visible");
+  setTimeout(() => shortsHint.classList.remove("visible"), 2800);
+
+  // Back button
+  backBtn2.addEventListener("click", () => {
+    shortsIframe.src = "";
+    setActiveTab("home");
+    shortsPageEl.style.display = "none";
+    homeTab.click();
+    showHUD("Home");
+  });
+
+  // Swipe detection
+  let touchStartY = 0;
+  let touchStartX = 0;
+  let isSwiping = false;
+
+  shortsPageEl.addEventListener("touchstart", (e) => {
+    touchStartY = e.touches[0].clientY;
+    touchStartX = e.touches[0].clientX;
+    isSwiping = false;
+  }, { passive: true });
+
+  shortsPageEl.addEventListener("touchmove", (e) => {
+    const dy = Math.abs(e.touches[0].clientY - touchStartY);
+    const dx = Math.abs(e.touches[0].clientX - touchStartX);
+    if (dy > dx) isSwiping = true; // vertical swipe
+  }, { passive: true });
+
+  shortsPageEl.addEventListener("touchend", (e) => {
+    if (!isSwiping) return;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    const threshold = 60;
+    if (dy < -threshold) goNext();       // swipe up → next
+    else if (dy > threshold) goPrev();   // swipe down → prev
+  }, { passive: true });
+
+  // Mouse wheel / trackpad support
+  let wheelCooldown = false;
+  shortsPageEl.addEventListener("wheel", (e) => {
+    if (wheelCooldown) return;
+    wheelCooldown = true;
+    setTimeout(() => wheelCooldown = false, 600);
+    if (e.deltaY > 0) goNext();
+    else goPrev();
+  }, { passive: true });
+
+  // Keyboard arrow keys
+  function shortsKeyHandler(e) {
+    if (currentTab !== "shorts") return;
+    if (e.key === "ArrowDown") goNext();
+    if (e.key === "ArrowUp")   goPrev();
+  }
+  document.addEventListener("keydown", shortsKeyHandler);
+
+  // Cleanup key listener when leaving shorts
+  const origSetActive = setActiveTab;
+  shortsPageEl._cleanup = () => document.removeEventListener("keydown", shortsKeyHandler);
 });
 
 moviesTab.addEventListener("click", async () => {
@@ -1319,7 +1613,7 @@ async function loadMoreVideos() {
   if (!nextPageToken) return;
   let data;
   if (currentTab === "home")     data = await fetchYouTube("videos",         { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
-  if (currentTab === "shorts")   data = await fetchYouTube("search",         { part: "snippet", q: "#shorts", type: "video", videoDuration: "short", videoEmbeddable: "true", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+  // shorts handles its own infinite scroll inside the shorts page
   if (currentTab === "movies")   data = await fetchYouTube("search",         { part: "snippet", q: "full movie", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
   if (currentTab === "trending") data = await fetchYouTube("videos",         { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
   if (currentTab === "search")   data = await fetchYouTube("search",         { part: "snippet", q: lastSearchQuery, type: "video", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
