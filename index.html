@@ -1991,6 +1991,7 @@ function openKeyboard() {
   keyboardEl.style.display = "block";
   document.querySelector(".search-input-bar").style.display = "flex";
   feedEl.style.display = "none";
+  searchPanelEl.style.pointerEvents = "auto";
 }
 
 function closeKeyboard() {
@@ -1998,6 +1999,7 @@ function closeKeyboard() {
   searchPanelEl.style.display = "none";
   suggestionsEl.style.display = "none";
   feedEl.style.display = "block";
+  searchPanelEl.style.pointerEvents = "none";
 }
 
 searchTabEl.addEventListener("click", openKeyboard);
