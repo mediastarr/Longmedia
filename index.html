@@ -2113,6 +2113,7 @@ function openKeyboard() {
   document.querySelector(".search-input-bar").style.display = "flex";
 
   feedEl.style.display = "none";
+  tabsEl.style.display = "none";   // ⭐ FIX
 }
 
 function closeKeyboard() {
@@ -2121,6 +2122,7 @@ function closeKeyboard() {
   suggestionsEl.style.display = "none";
 
   feedEl.style.display = "block";
+  tabsEl.style.display = "flex";   // ⭐ FIX
 }
 
 searchTabEl.addEventListener("click", openKeyboard);
