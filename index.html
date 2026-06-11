@@ -1530,6 +1530,11 @@ function setActiveTab(tab) {
   channelPageEl.style.display = (tab === "channel") ? "block" : "none";
   subsPageEl.style.display = (tab === "subs") ? "block" : "none";
   playlistsPageEl.style.display = (tab === "playlists") ? "block" : "none";
+
+   // ⭐ ALWAYS hide search UI when switching tabs
+  searchPanelEl.style.display = "none";
+  keyboardEl.style.display = "none";
+  suggestionsEl.style.display = "none";
 }
 
 
