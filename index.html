@@ -617,17 +617,17 @@ async function fetchYouTube(endpoint, params = {}, retries = 2) {
   Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null) url.searchParams.append(k, v); });
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000); // 8s max
+  const timeout = setTimeout(() => controller.abort(), 5000);
 
   try {
-    const res = await fetch(url.toString(), { cache: "no-store", signal: controller.signal });
+    const res = await fetch(url.toString(), { signal: controller.signal });
     clearTimeout(timeout);
     if (!res.ok && retries > 0) return fetchYouTube(endpoint, params, retries - 1);
     return await res.json();
   } catch (err) {
     clearTimeout(timeout);
     if (retries > 0) return fetchYouTube(endpoint, params, retries - 1);
-    return { items: [] }; // graceful empty result instead of hanging
+    return { items: [] };
   }
 }
 
@@ -723,7 +723,7 @@ function setPlayerVideo(videoId, snippet) {
   currentVideoId = videoId;
   playerSection.style.display = "block";
   playerSection.classList.remove("player-mini", "player-fullscreen");
-  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&rel=0&playsinline=1&origin=${location.origin}`;
+  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&rel=0&playsinline=1&modestbranding=1&origin=${location.origin}`;
   saveToHistory({ id: videoId, snippet });
   hideUIForVideo();
   playPauseBtn.textContent = "Pause";
@@ -1010,17 +1010,21 @@ async function pollForToken(deviceCode, intervalSeconds, source) {
 async function loadSubscriptions() {
   const token = localStorage.getItem("yt_access_token");
   if (!token) { deviceLoginStatusEl.textContent = "Login required."; return; }
-  subsFeedEl.innerHTML = ""; showHUD("Loading subscriptions…");
+  subsFeedEl.innerHTML = ""; subsNextPageToken = null; showHUD("Loading subscriptions…");
   try {
-    const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20", { headers: { Authorization: "Bearer " + token } });
+    const res = await fetch(
+      "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20",
+      { headers: { Authorization: "Bearer " + token } }
+    );
     const data = await res.json();
+    subsNextPageToken = data.nextPageToken || null;
     if (!data.items || !data.items.length) { subsFeedEl.innerHTML = `<div style="font-size:12px;opacity:0.8;">No subscriptions found.</div>`; return; }
     data.items.forEach(item => {
       const ch = item.snippet;
       const channelId = ch.resourceId.channelId;
       const card = document.createElement("div");
       card.className = "video-card parallax";
-      card.innerHTML = `<div class="video-thumb"><img src="${ch.thumbnails?.medium?.url || ""}"></div><div class="video-info"><div class="video-title">${ch.title}</div><div class="video-channel">${ch.channelTitle || "Channel"}</div><div class="video-meta">Tap to open channel</div></div>`;
+      card.innerHTML = `<div class="video-thumb"><img src="${ch.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${ch.title}</div><div class="video-channel">${ch.channelTitle || "Channel"}</div><div class="video-meta">Tap to open channel</div></div>`;
       card.onclick = () => { currentChannelId = channelId; subsPageEl.style.display = "none"; setActiveTab("channel"); loadChannelPage(channelId); };
       subsFeedEl.appendChild(card);
     });
@@ -1193,23 +1197,68 @@ playlistBackBtn.addEventListener("click", () => {
 /* -----------------------------------------------------------
    INFINITE SCROLL
 ----------------------------------------------------------- */
+let subsNextPageToken = null;
+
 async function loadMoreVideos() {
   if (!nextPageToken) return;
   let data;
-  if (currentTab === "home") data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
-  if (currentTab === "shorts") data = await fetchYouTube("search", { part: "snippet", q: "#shorts", type: "video", videoDuration: "short", videoEmbeddable: "true", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
-  if (currentTab === "movies") data = await fetchYouTube("search", { part: "snippet", q: "full movie", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
-  if (currentTab === "trending") data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
-  if (currentTab === "search") data = await fetchYouTube("search", { part: "snippet", q: lastSearchQuery, type: "video", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
-  if (currentTab === "channel") data = await fetchYouTube("playlistItems", { part: "snippet", playlistId: channelUploadsId, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+  if (currentTab === "home")     data = await fetchYouTube("videos",         { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+  if (currentTab === "shorts")   data = await fetchYouTube("search",         { part: "snippet", q: "#shorts", type: "video", videoDuration: "short", videoEmbeddable: "true", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+  if (currentTab === "movies")   data = await fetchYouTube("search",         { part: "snippet", q: "full movie", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+  if (currentTab === "trending") data = await fetchYouTube("videos",         { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+  if (currentTab === "search")   data = await fetchYouTube("search",         { part: "snippet", q: lastSearchQuery, type: "video", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+  if (currentTab === "channel")  data = await fetchYouTube("playlistItems",  { part: "snippet", playlistId: channelUploadsId, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
   if (!data) return;
   nextPageToken = data.nextPageToken || null;
-  appendFeed(data.items || []);
+
+  if (currentTab === "channel") {
+    // append into channelPageEl
+    (data.items || []).forEach(item => {
+      const snippet = item.snippet;
+      const videoId = snippet.resourceId?.videoId; if (!videoId) return;
+      const card = document.createElement("div");
+      card.className = "video-card parallax";
+      card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle || ""}</div></div>`;
+      card.onclick = () => setPlayerVideo(videoId, snippet);
+      channelPageEl.appendChild(card);
+    });
+  } else {
+    appendFeed(data.items || []);
+  }
+}
+
+async function loadMoreSubs() {
+  if (!subsNextPageToken) return;
+  const token = localStorage.getItem("yt_access_token");
+  if (!token) return;
+  const res = await fetch(
+    `https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20&pageToken=${subsNextPageToken}`,
+    { headers: { Authorization: "Bearer " + token } }
+  );
+  const data = await res.json();
+  subsNextPageToken = data.nextPageToken || null;
+  (data.items || []).forEach(item => {
+    const ch = item.snippet;
+    const channelId = ch.resourceId.channelId;
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
+    card.innerHTML = `<div class="video-thumb"><img src="${ch.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${ch.title}</div><div class="video-channel">${ch.channelTitle || "Channel"}</div><div class="video-meta">Tap to open channel</div></div>`;
+    card.onclick = () => { currentChannelId = channelId; subsPageEl.style.display = "none"; setActiveTab("channel"); loadChannelPage(channelId); };
+    subsFeedEl.appendChild(card);
+  });
 }
 
 window.addEventListener("scroll", async () => {
-  if (isLoadingMore || !nextPageToken) return;
-  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+  if (isLoadingMore) return;
+  const scrollPos = window.innerHeight + window.scrollY;
+  const bottom = document.body.offsetHeight - 500; // trigger 500px before end
+  if (scrollPos < bottom) return;
+
+  if (currentTab === "subs" && subsNextPageToken) {
+    isLoadingMore = true; await loadMoreSubs(); isLoadingMore = false;
+    return;
+  }
+  if (nextPageToken) {
     isLoadingMore = true; await loadMoreVideos(); isLoadingMore = false;
   }
 });
