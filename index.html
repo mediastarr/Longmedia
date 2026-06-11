@@ -453,6 +453,27 @@ body.fullscreen-active.ui-hidden .exit-full-btn {
 #playerSection.ui-hidden #hideUIBtn:active {
   opacity: 1;
 }
+
+/* Mini player — shrink controls so all 5 buttons fit */
+#playerSection.player-mini .player-controls {
+  gap: 4px;
+  bottom: 6px;
+  left: 6px;
+}
+#playerSection.player-mini .player-controls button {
+  padding: 5px 7px;
+  font-size: 10px;
+  min-height: 28px;
+  min-width: unset;
+}
+#playerSection.player-mini #closeMini {
+  padding: 4px 7px;
+  font-size: 10px;
+  min-height: 28px;
+  min-width: unset;
+  top: 6px;
+  right: 6px;
+}
 </style>
 </head>
 <body>
@@ -795,6 +816,11 @@ backBtn.addEventListener("click", () => {
   playerSection.classList.remove("player-fullscreen");
   playerSection.classList.add("player-mini");
   miniActive = true;
+  // reset hide UI when switching to mini
+  uiHidden = false;
+  playerSection.classList.remove("ui-hidden");
+  document.body.classList.remove("ui-hidden");
+  hideUIBtn.textContent = "Hide UI";
   showUIWithMiniPlayer();
   showHUD("Mini-player");
 });
