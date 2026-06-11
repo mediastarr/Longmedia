@@ -890,6 +890,7 @@ let shortsIndex = 0;
 let lastSearchQuery = "";
 let nextPageToken = null;
 let isLoadingMore = false;
+let savedScrollY = 0;   // remembers scroll position when a video is opened
 
 /* -----------------------------------------------------------
    ELEMENTS
@@ -965,6 +966,7 @@ function saveToHistory(video) {
    PLAYER
 ----------------------------------------------------------- */
 function setPlayerVideo(videoId, snippet) {
+  savedScrollY = window.scrollY;   // save scroll position before hiding feed
   currentVideoId = videoId;
   playerSection.style.display = "block";
   playerSection.classList.remove("player-mini", "player-fullscreen");
@@ -1007,6 +1009,9 @@ function showUIWithMiniPlayer() {
   } else {
     feedEl.style.display = "block";
   }
+
+  // Restore scroll position so the selected video stays in view
+  requestAnimationFrame(() => window.scrollTo({ top: savedScrollY, behavior: "instant" }));
 }
 
 /* -----------------------------------------------------------
@@ -1118,8 +1123,23 @@ hideUIBtn.addEventListener("click", () => {
 });
 
 /* -----------------------------------------------------------
-   SKELETON LOADER
+   FRESH VIDEO HELPERS
 ----------------------------------------------------------- */
+// Rotate through popular category IDs so every tab/open feels different
+const VIDEO_CATEGORIES = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
+let categoryRotation = Math.floor(Math.random() * VIDEO_CATEGORIES.length);
+
+function freshCategory() {
+  const cat = VIDEO_CATEGORIES[categoryRotation % VIDEO_CATEGORIES.length];
+  categoryRotation++;
+  return cat;
+}
+
+// Random popular search terms for Shorts/Movies variety
+const SHORT_QUERIES = ["#shorts","shorts funny","shorts viral","shorts trending","shorts 2024","shorts satisfying"];
+const MOVIE_QUERIES = ["full movie","full movie free","full length movie","full movie english","classic film full movie"];
+let shortQIdx = Math.floor(Math.random() * SHORT_QUERIES.length);
+let movieQIdx = Math.floor(Math.random() * MOVIE_QUERIES.length);
 function showSkeletons(count = 6) {
   feedEl.innerHTML = "";
   for (let i = 0; i < count; i++) {
@@ -1191,14 +1211,14 @@ function setActiveTab(tab) {
 homeTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("home");
   showSkeletons(8);
-  const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+  const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
   nextPageToken = data.nextPageToken || null; renderFeed(data.items || []); showHUD("Home");
 });
 
 trendingTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("trending");
   showSkeletons(8);
-  const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+  const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
   nextPageToken = data.nextPageToken || null; renderFeed(data.items || []); showHUD("Trending");
 });
 
@@ -1227,9 +1247,10 @@ shortsTab.addEventListener("click", async () => {
   const shortsTrans   = document.getElementById("shortsTransition");
   const backBtn2      = document.getElementById("shortsBackBtn");
 
-  // Fetch first batch
+  // Fetch first batch — rotate query for fresh results every open
+  const shortsQ = SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length]; shortQIdx++;
   const data = await fetchYouTube("search", {
-    part: "snippet", q: "#shorts", type: "video",
+    part: "snippet", q: shortsQ, type: "video",
     videoDuration: "short", videoEmbeddable: "true",
     regionCode: "US", maxResults: 20, _: Date.now()
   });
@@ -1349,7 +1370,8 @@ shortsTab.addEventListener("click", async () => {
 moviesTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("movies");
   showSkeletons(8);
-  const data = await fetchYouTube("search", { part: "snippet", q: "full movie", type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
+  const q = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
+  const data = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
   const items = data.items.map(v => ({ id: v.id.videoId, snippet: v.snippet }));
   nextPageToken = data.nextPageToken || null; renderFeed(items); showHUD("Movies");
 });
@@ -1820,7 +1842,8 @@ themeToggle.addEventListener("click", () => { isLight = !isLight; document.body.
 ----------------------------------------------------------- */
 (async function init() {
   showSkeletons(8);
-  const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", maxResults: 20 });
+  const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+  nextPageToken = data.nextPageToken || null;
   renderFeed(data.items || []);
 })();
 </script>
