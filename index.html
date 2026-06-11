@@ -431,6 +431,28 @@ body.fullscreen-active .exit-full-btn { display: block; }
 }
 .exit-full-btn:hover { box-shadow: 0 0 18px rgba(60,242,255,0.9), 0 0 30px rgba(60,242,255,0.5); transform: scale(1.08); }
 body.fullscreen-active .exit-full-btn { display: block; }
+
+/* HIDE UI MODE */
+#playerControls > button,
+#closeMini { transition: opacity 0.3s ease; }
+
+#playerSection.ui-hidden #playerControls > button:not(#hideUIBtn),
+#playerSection.ui-hidden #closeMini {
+  opacity: 0;
+  pointer-events: none;
+}
+body.fullscreen-active.ui-hidden .exit-full-btn {
+  opacity: 0 !important;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+#playerSection.ui-hidden #hideUIBtn {
+  opacity: 0.22;
+}
+#playerSection.ui-hidden #hideUIBtn:hover,
+#playerSection.ui-hidden #hideUIBtn:active {
+  opacity: 1;
+}
 </style>
 </head>
 <body>
@@ -467,11 +489,12 @@ body.fullscreen-active .exit-full-btn { display: block; }
     <iframe id="playerFrame"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
       allowfullscreen></iframe>
-    <div class="player-controls">
+    <div class="player-controls" id="playerControls">
       <button id="playPauseBtn">Pause</button>
       <button id="rewindBtn">-10s</button>
       <button id="forwardBtn">+10s</button>
       <button id="fullBtn">Full</button>
+      <button id="hideUIBtn">Hide UI</button>
     </div>
     <button id="closeMini">✕</button>
   </div>
@@ -675,6 +698,7 @@ const forwardBtn = document.getElementById("forwardBtn");
 const rewindBtn = document.getElementById("rewindBtn");
 const fullBtn = document.getElementById("fullBtn");
 const closeMini = document.getElementById("closeMini");
+const hideUIBtn = document.getElementById("hideUIBtn");
 const searchInput = document.getElementById("searchInput");
 const searchGo = document.getElementById("searchGo");
 const searchBack = document.getElementById("searchBack");
@@ -779,6 +803,11 @@ closeMini.addEventListener("click", () => {
   playerSection.classList.remove("player-fullscreen");
   document.body.classList.remove("fullscreen-active");
   disableCinemaMode();
+  // reset hide UI
+  uiHidden = false;
+  playerSection.classList.remove("ui-hidden");
+  document.body.classList.remove("ui-hidden");
+  hideUIBtn.textContent = "Hide UI";
   playerSection.style.display = "none";
   playerFrame.src = "";
   showUIWithMiniPlayer();
@@ -816,6 +845,11 @@ exitFullBtn.addEventListener("click", () => {
   disableCinemaMode();
   if (miniActive) playerSection.classList.add("player-mini");
   playerSection.classList.remove("settled");
+  // reset hide UI
+  uiHidden = false;
+  playerSection.classList.remove("ui-hidden");
+  document.body.classList.remove("ui-hidden");
+  hideUIBtn.textContent = "Hide UI";
   showUIWithMiniPlayer();
   showHUD("Exited Fullscreen");
 });
@@ -843,6 +877,18 @@ playPauseBtn.addEventListener("click", () => {
 });
 forwardBtn.addEventListener("click", () => postToPlayer({ event: "command", func: "seekBy", args: [10] }));
 rewindBtn.addEventListener("click", () => postToPlayer({ event: "command", func: "seekBy", args: [-10] }));
+
+/* -----------------------------------------------------------
+   HIDE UI TOGGLE
+----------------------------------------------------------- */
+let uiHidden = false;
+hideUIBtn.addEventListener("click", () => {
+  uiHidden = !uiHidden;
+  playerSection.classList.toggle("ui-hidden", uiHidden);
+  document.body.classList.toggle("ui-hidden", uiHidden);
+  hideUIBtn.textContent = uiHidden ? "Show UI" : "Hide UI";
+  showHUD(uiHidden ? "UI Hidden" : "UI Visible");
+});
 
 /* -----------------------------------------------------------
    SKELETON LOADER
