@@ -878,15 +878,15 @@ body.fullscreen-active .exit-full-btn {
 
   <!-- TABS -->
   <div id="tabs">
-    <button id="homeTab" class="tab-btn parallax-tab active">Home</button>
-    <button id="shortsTab" class="tab-btn parallax-tab">Shorts</button>
-    <button id="moviesTab" class="tab-btn parallax-tab">Movies</button>
+    <button id="homeTab" class="tab-btn parallax-tab active" tabindex="0">Home</button>
+    <button id="shortsTab" class="tab-btn parallax-tab active" tabindex="0">Shorts</button>
+    <button id="moviesTab" class="tab-btn parallax-tab active" tabindex="0">Movies</button>
     <button id="historyTab" class="tab-btn parallax-tab">History</button>
-    <button id="trendingTab" class="tab-btn parallax-tab">Trending</button>
-    <button id="channelTab" class="tab-btn parallax-tab">Channel</button>
+    <button id="trendingTab" class="tab-btn parallax-tab active" tabindex="0">Trending</button>
+    <button id="channelTab" class="tab-btn parallax-tab active" tabindex="0">Channel</button>
     <!-- NEW: Subscriptions tab -->
-    <button id="subsTab" class="tab-btn parallax-tab">Subscriptions</button>
-    <button id="playlistsTab" class="tab-btn parallax-tab">Playlists</button>
+    <button id="subsTab" class="tab-btn parallax-tab active" tabindex="0">Subscriptions</button>
+    <button id="playlistsTab" class="tab-btn parallax-tab active" tabindex="0">Playlists</button>
   </div>
 
   
@@ -1547,11 +1547,24 @@ function setActiveTab(tab) {
   if (tab === "subs") subsPageEl.style.display = "block";
   if (tab === "playlists") playlistsPageEl.style.display = "block";
 }
+
+function scrollTabIntoView(btn) {
+  const tabsRect = tabsEl.getBoundingClientRect();
+  const btnRect = btn.getBoundingClientRect();
+
+  if (btnRect.left < tabsRect.left) {
+    tabsEl.scrollBy({ left: btnRect.left - tabsRect.left - 20, behavior: "smooth" });
+  } else if (btnRect.right > tabsRect.right) {
+    tabsEl.scrollBy({ left: btnRect.right - tabsRect.right + 20, behavior: "smooth" });
+  }
+}
+   
 /* -----------------------------------------------------------
    HOME TAB — 20 fresh videos
 ----------------------------------------------------------- */
 homeTab.addEventListener("click", async () => {
   setActiveTab("home");
+  scrollTabIntoView(homeTab);
 
   const data = await fetchYouTube("videos", {
     part: "snippet",
@@ -1573,6 +1586,7 @@ homeTab.addEventListener("click", async () => {
 ----------------------------------------------------------- */
 trendingTab.addEventListener("click", async () => {
   setActiveTab("trending");
+  scrollTabIntoView(trendingTab);
 
   const data = await fetchYouTube("videos", {
     part: "snippet",
@@ -1594,6 +1608,7 @@ trendingTab.addEventListener("click", async () => {
 ----------------------------------------------------------- */
 shortsTab.addEventListener("click", async () => {
   setActiveTab("shorts");
+  scrollTabIntoView(shortsTab);
 
   const data = await fetchYouTube("search", {
     part: "snippet",
@@ -1624,6 +1639,7 @@ shortsTab.addEventListener("click", async () => {
 ----------------------------------------------------------- */
 moviesTab.addEventListener("click", async () => {
   setActiveTab("movies");
+  scrollTabIntoView(moviesTab);
 
   const data = await fetchYouTube("search", {
     part: "snippet",
@@ -1652,6 +1668,7 @@ moviesTab.addEventListener("click", async () => {
 ----------------------------------------------------------- */
 subsTab.addEventListener("click", () => {
   currentTab = "subs";
+  scrollTabIntoView(subsTab);
 
   document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
   subsTab.classList.add("active");
@@ -1672,6 +1689,7 @@ subsTab.addEventListener("click", () => {
 
    playlistsTab.addEventListener("click", () => {
   currentTab = "playlists";
+  scrollTabIntoView(playlistsTab);
 
   document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
   playlistsTab.classList.add("active");
@@ -1915,6 +1933,7 @@ async function loadSubscriptions() {
 ----------------------------------------------------------- */
 historyTab.addEventListener("click", () => {
   setActiveTab("history");
+  scrollTabIntoView(historyTab);
 
   const items = historyList.slice(0, 20).map(h => ({
     id: h.id,
@@ -1934,6 +1953,7 @@ historyTab.addEventListener("click", () => {
 ----------------------------------------------------------- */
 channelTab.addEventListener("click", () => {
   loadChannelPage(currentChannelId);
+  scrollTabIntoView(channelTab);
 });
 
 
@@ -2154,10 +2174,22 @@ function closeKeyboard() {
   keyboardEl.style.display = "none";
   searchPanelEl.style.display = "none";
   suggestionsEl.style.display = "none";
-  tabsEl.style.display = "flex";   /* ⭐ restore tabs */ 
 
-  // ⭐ Restore the correct page based on currentTab
+  // ⭐ Restore tabs FIRST so swipe sees them
+  tabsEl.style.display = "flex";
+
+  // ⭐ Hide all pages first
+  feedEl.style.display = "none";
+  channelPageEl.style.display = "none";
+  subsPageEl.style.display = "none";
+  playlistsPageEl.style.display = "none";
+
+  // ⭐ Restore correct page
   if (currentTab === "home") feedEl.style.display = "block";
+  if (currentTab === "shorts") feedEl.style.display = "block";
+  if (currentTab === "movies") feedEl.style.display = "block";
+  if (currentTab === "history") feedEl.style.display = "block";
+  if (currentTab === "trending") feedEl.style.display = "block";
   if (currentTab === "subs") subsPageEl.style.display = "block";
   if (currentTab === "playlists") playlistsPageEl.style.display = "block";
   if (currentTab === "channel") channelPageEl.style.display = "block";
