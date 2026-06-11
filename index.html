@@ -2389,8 +2389,72 @@ document.addEventListener("mousemove", (e) => {
   applyChroma(x, y);
 });
 
+/* -----------------------------------------------------------
+   ⭐ SWIPE NAVIGATION ENGINE — Focus Layers
+----------------------------------------------------------- */
+let focusIndex = 0;
+
+function getFocusLayers() {
+  const layers = [];
+
+  // 1. Theme button
+  layers.push(themeToggle);
+
+  // 2. Open Keyboard button
+  layers.push(document.querySelector(".search-open-btn"));
+
+  // 3. Tabs container
+  layers.push(tabsEl);
+
+  // 4. Active page (feed, subs, playlists, channel)
+  if (currentTab === "subs") layers.push(subsPageEl);
+  else if (currentTab === "playlists") layers.push(playlistsPageEl);
+  else if (currentTab === "channel") layers.push(channelPageEl);
+  else layers.push(feedEl);
+
+  return layers;
+}
+
+/* -----------------------------------------------------------
+   ⭐ SWIPE HANDLERS
+----------------------------------------------------------- */
+function focusNext() {
+  const layers = getFocusLayers();
+  focusIndex = Math.min(focusIndex + 1, layers.length - 1);
+  layers[focusIndex].scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function focusPrev() {
+  const layers = getFocusLayers();
+  focusIndex = Math.max(focusIndex - 1, 0);
+  layers[focusIndex].scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+/* -----------------------------------------------------------
+   ⭐ TOUCH SWIPE DETECTION
+----------------------------------------------------------- */
+let startY = 0;
+
+document.addEventListener("touchstart", e => {
+  startY = e.touches[0].clientY;
+});
+
+document.addEventListener("touchend", e => {
+  const dy = e.changedTouches[0].clientY - startY;
+  if (Math.abs(dy) < 40) return;
+
+  if (dy < 0) focusNext();  // swipe up
+  else focusPrev();         // swipe down
+});
 
 
+/* -----------------------------------------------------------
+   ⭐ RAY‑BAN EMG GESTURES (optional)
+----------------------------------------------------------- */
+document.addEventListener("emg-flick-up", focusNext);
+document.addEventListener("emg-flick-down", focusPrev);
+
+   
 
 /* -----------------------------------------------------------
    THEME TOGGLE
