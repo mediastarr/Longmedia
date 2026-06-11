@@ -498,6 +498,18 @@ body.fullscreen-active.ui-hidden .exit-full-btn {
   opacity: 1;
 }
 
+/* Resolution button — only visible in fullscreen */
+#resBtn {
+  display: none;
+}
+#playerSection.player-fullscreen #resBtn {
+  display: inline-block;
+}
+#playerSection.player-fullscreen.ui-hidden #resBtn {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* Mini player — shrink controls so all 5 buttons fit */
 #playerSection.player-mini .player-controls {
   gap: 4px;
@@ -703,15 +715,14 @@ body.fullscreen-active.ui-hidden .exit-full-btn {
   </div>
 
   <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
-    <iframe id="playerFrame"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowfullscreen></iframe>
+    <div id="playerFrame"></div>
     <div class="player-controls" id="playerControls">
       <button id="playPauseBtn">Pause</button>
       <button id="rewindBtn">-10s</button>
       <button id="forwardBtn">+10s</button>
       <button id="fullBtn">Full</button>
       <button id="hideUIBtn">Hide UI</button>
+      <button id="resBtn">720p</button>
     </div>
     <button id="closeMini">✕</button>
   </div>
@@ -965,17 +976,6 @@ function saveToHistory(video) {
 /* -----------------------------------------------------------
    PLAYER
 ----------------------------------------------------------- */
-function setPlayerVideo(videoId, snippet) {
-  savedScrollY = window.scrollY;   // save scroll position before hiding feed
-  currentVideoId = videoId;
-  playerSection.style.display = "block";
-  playerSection.classList.remove("player-mini", "player-fullscreen");
-  playerFrame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&rel=0&playsinline=1&modestbranding=1&origin=${location.origin}`;
-  saveToHistory({ id: videoId, snippet });
-  hideUIForVideo();
-  playPauseBtn.textContent = "Pause";
-  initAudioGlow();
-}
 
 function hideUIForVideo() {
   topbarEl.style.display = "flex";
@@ -1041,7 +1041,8 @@ closeMini.addEventListener("click", () => {
   document.body.classList.remove("ui-hidden");
   hideUIBtn.textContent = "Hide UI";
   playerSection.style.display = "none";
-  playerFrame.src = "";
+  // destroy YT player to stop playback
+  if (ytPlayer) { try { ytPlayer.stopVideo(); ytPlayer.destroy(); } catch(e) {} ytPlayer = null; }
   showUIWithMiniPlayer();
   showHUD("Player closed");
 });
@@ -1091,7 +1092,7 @@ setInterval(() => {
   const isCinema = document.body.classList.contains("cinema-mode");
   const isFSBody = document.body.classList.contains("fullscreen-active");
   const isHidden = playerSection.style.display === "none";
-  const isBlank = !playerFrame.src || playerFrame.src === "about:blank";
+  const isBlank = !ytPlayer;
   if (isHidden && (isFullscreen || isCinema || isFSBody)) { playerSection.classList.remove("player-fullscreen"); document.body.classList.remove("fullscreen-active"); disableCinemaMode(); return; }
   if (!isFullscreen && isCinema) disableCinemaMode();
   if (!isFullscreen && isFSBody) document.body.classList.remove("fullscreen-active");
@@ -1102,13 +1103,135 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { playerSection.classList.remove("player-fullscreen"); document.body.classList.remove("fullscreen-active"); disableCinemaMode(); showUIWithMiniPlayer(); showHUD("Exited Fullscreen"); }
 });
 
-function postToPlayer(cmd) { if (!playerFrame.contentWindow) return; playerFrame.contentWindow.postMessage(JSON.stringify(cmd), "*"); }
+/* -----------------------------------------------------------
+   YOUTUBE IFRAME PLAYER API
+----------------------------------------------------------- */
+let ytPlayer = null;
+let ytReady = false;
+let pendingVideoId = null;
+let currentQuality = "hd720";
+const QUALITY_CYCLE = ["hd720", "hd1080"];
+let qualityIndex = 0;
+
+// Load the YT API script once
+const ytScript = document.createElement("script");
+ytScript.src = "https://www.youtube.com/iframe_api";
+document.head.appendChild(ytScript);
+
+window.onYouTubeIframeAPIReady = function () {
+  ytReady = true;
+  if (pendingVideoId) {
+    createYTPlayer(pendingVideoId);
+    pendingVideoId = null;
+  }
+};
+
+function createYTPlayer(videoId) {
+  // Destroy old player if exists
+  if (ytPlayer) {
+    try { ytPlayer.destroy(); } catch(e) {}
+    ytPlayer = null;
+  }
+  // Re-create the div (destroy removes it)
+  const container = document.getElementById("playerSection");
+  let div = document.getElementById("playerFrame");
+  if (!div) {
+    div = document.createElement("div");
+    div.id = "playerFrame";
+    container.insertBefore(div, container.firstChild);
+  }
+
+  ytPlayer = new YT.Player("playerFrame", {
+    videoId: videoId,
+    playerVars: {
+      autoplay: 1,
+      rel: 0,
+      playsinline: 1,
+      modestbranding: 1,
+      enablejsapi: 1,
+      origin: location.origin,
+      vq: currentQuality
+    },
+    events: {
+      onReady: (e) => {
+        e.target.setPlaybackQuality(currentQuality);
+        playPauseBtn.textContent = "Pause";
+      },
+      onStateChange: (e) => {
+        if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "Pause";
+        if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "Play";
+      }
+    }
+  });
+}
+
+function setPlayerVideo(videoId, snippet) {
+  savedScrollY = window.scrollY;
+  currentVideoId = videoId;
+  playerSection.style.display = "block";
+  playerSection.classList.remove("player-mini", "player-fullscreen");
+  saveToHistory({ id: videoId, snippet });
+  hideUIForVideo();
+  playPauseBtn.textContent = "Pause";
+  initAudioGlow();
+
+  if (ytReady) {
+    createYTPlayer(videoId);
+  } else {
+    pendingVideoId = videoId;
+  }
+}
+
+/* -----------------------------------------------------------
+   PLAYER CONTROLS — now using real YT.Player API
+----------------------------------------------------------- */
+function postToPlayer(cmd) {
+  // fallback postMessage for edge cases
+  const frame = document.querySelector("#playerFrame iframe");
+  if (frame && frame.contentWindow) frame.contentWindow.postMessage(JSON.stringify(cmd), "*");
+}
+
 playPauseBtn.addEventListener("click", () => {
-  if (playPauseBtn.textContent === "Pause") { playPauseBtn.textContent = "Play"; postToPlayer({ event: "command", func: "pauseVideo", args: [] }); }
-  else { playPauseBtn.textContent = "Pause"; postToPlayer({ event: "command", func: "playVideo", args: [] }); }
+  if (!ytPlayer) return;
+  if (playPauseBtn.textContent === "Pause") {
+    ytPlayer.pauseVideo();
+    playPauseBtn.textContent = "Play";
+  } else {
+    ytPlayer.playVideo();
+    playPauseBtn.textContent = "Pause";
+  }
 });
-forwardBtn.addEventListener("click", () => postToPlayer({ event: "command", func: "seekBy", args: [10] }));
-rewindBtn.addEventListener("click", () => postToPlayer({ event: "command", func: "seekBy", args: [-10] }));
+
+forwardBtn.addEventListener("click", () => {
+  if (!ytPlayer) return;
+  const t = ytPlayer.getCurrentTime();
+  ytPlayer.seekTo(t + 10, true);
+});
+
+rewindBtn.addEventListener("click", () => {
+  if (!ytPlayer) return;
+  const t = ytPlayer.getCurrentTime();
+  ytPlayer.seekTo(Math.max(0, t - 10), true);
+});
+
+/* -----------------------------------------------------------
+   RESOLUTION TOGGLE (fullscreen only) — real quality via YT API
+----------------------------------------------------------- */
+const resBtn = document.getElementById("resBtn");
+const QUALITY_LABELS = { hd720: "720p", hd1080: "1080p" };
+
+resBtn.addEventListener("click", () => {
+  qualityIndex = (qualityIndex + 1) % QUALITY_CYCLE.length;
+  currentQuality = QUALITY_CYCLE[qualityIndex];
+  resBtn.textContent = QUALITY_LABELS[currentQuality];
+
+  if (ytPlayer && ytPlayer.setPlaybackQuality) {
+    ytPlayer.setPlaybackQuality(currentQuality);
+    // Also set suggested quality so it sticks
+    if (ytPlayer.setPlaybackQualityRange) ytPlayer.setPlaybackQualityRange(currentQuality, currentQuality);
+  }
+  showHUD(QUALITY_LABELS[currentQuality]);
+});
 
 /* -----------------------------------------------------------
    HIDE UI TOGGLE
