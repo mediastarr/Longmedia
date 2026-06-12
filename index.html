@@ -1554,9 +1554,9 @@ channelTab.addEventListener("click", () => loadChannelPage(currentChannelId));
 /* -----------------------------------------------------------
    SUBSCRIPTIONS TAB
 ----------------------------------------------------------- */
-subsTab.addEventListener("click", () => {
+subsTab.addEventListener("click", async () => {
   setActiveTab("subs"); showHUD("Subscriptions");
-  const token = localStorage.getItem("yt_access_token");
+  const token = await getValidToken();
   if (token) loadSubscriptions();
   else deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
 });
@@ -1598,7 +1598,7 @@ async function pollForToken(deviceCode, intervalSeconds, source) {
       else { statusEl.textContent = "Error: " + tokenData.error; showHUD("Login error"); break; }
     }
     authorized = true;
-    localStorage.setItem("yt_access_token", tokenData.access_token);
+    saveTokens(tokenData);
     statusEl.textContent = "Logged in!";
     showHUD("YouTube logged in");
     if (source === "playlists") loadPlaylists();
@@ -1606,8 +1606,68 @@ async function pollForToken(deviceCode, intervalSeconds, source) {
   }
 }
 
+/* -----------------------------------------------------------
+   TOKEN STORAGE + SILENT REFRESH
+----------------------------------------------------------- */
+function saveTokens(tokenData) {
+  localStorage.setItem("yt_access_token", tokenData.access_token);
+  // Only overwrite refresh_token if we got a new one (device flow always gives one; refresh flow may not)
+  if (tokenData.refresh_token) localStorage.setItem("yt_refresh_token", tokenData.refresh_token);
+  // Store expiry as absolute ms timestamp, 60s early to avoid edge cases
+  const expiresIn = (tokenData.expires_in || 3600) - 60;
+  localStorage.setItem("yt_token_expiry", Date.now() + expiresIn * 1000);
+}
+
+function isTokenExpired() {
+  const expiry = localStorage.getItem("yt_token_expiry");
+  if (!expiry) return true;
+  return Date.now() > parseInt(expiry);
+}
+
+async function refreshAccessToken() {
+  const refreshToken = localStorage.getItem("yt_refresh_token");
+  if (!refreshToken) return false;
+  try {
+    const res = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: OAUTH_CLIENT_ID,
+        client_secret: OAUTH_CLIENT_SECRET,
+        refresh_token: refreshToken,
+        grant_type: "refresh_token"
+      })
+    });
+    const data = await res.json();
+    if (data.access_token) {
+      saveTokens(data);
+      return true;
+    }
+    // Refresh token itself expired — clear everything
+    clearTokens();
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+function clearTokens() {
+  localStorage.removeItem("yt_access_token");
+  localStorage.removeItem("yt_refresh_token");
+  localStorage.removeItem("yt_token_expiry");
+}
+
+// Call this before any authenticated API request
+async function getValidToken() {
+  if (isTokenExpired()) {
+    const ok = await refreshAccessToken();
+    if (!ok) return null;
+  }
+  return localStorage.getItem("yt_access_token");
+}
+
 async function loadSubscriptions() {
-  const token = localStorage.getItem("yt_access_token");
+  const token = await getValidToken();
   if (!token) { deviceLoginStatusEl.textContent = "Login required."; return; }
   subsFeedEl.innerHTML = ""; subsNextPageToken = null; showHUD("Loading subscriptions…");
   try {
@@ -1633,15 +1693,13 @@ async function loadSubscriptions() {
 /* -----------------------------------------------------------
    PLAYLISTS TAB
 ----------------------------------------------------------- */
-playlistTab.addEventListener("click", () => {
+playlistTab.addEventListener("click", async () => {
   setActiveTab("playlists");
   showHUD("Playlists");
-
-  const token = localStorage.getItem("yt_access_token");
+  const token = await getValidToken();
   if (token) {
     loadPlaylists();
   } else {
-    // Show login panel, hide grid and items
     playlistLoginPanel.style.display = "block";
     playlistGrid.style.display = "none";
     playlistItemsView.style.display = "none";
@@ -1651,7 +1709,7 @@ playlistTab.addEventListener("click", () => {
 playlistLoginBtn.addEventListener("click", () => startDeviceLogin("playlists"));
 
 async function loadPlaylists() {
-  const token = localStorage.getItem("yt_access_token");
+  const token = await getValidToken();
   if (!token) return;
 
   playlistLoginPanel.style.display = "none";
@@ -1670,7 +1728,7 @@ async function loadPlaylists() {
     if (data.error) {
       playlistLoginPanel.style.display = "block";
       playlistLoginStatus.textContent = "Session expired. Please login again.";
-      localStorage.removeItem("yt_access_token");
+      clearTokens();
       return;
     }
 
@@ -1724,7 +1782,7 @@ async function openPlaylist(playlistId, title) {
   showHUD("Loading playlist…");
 
   try {
-    const token = localStorage.getItem("yt_access_token");
+    const token = await getValidToken();
     let data;
 
     if (token) {
@@ -1828,7 +1886,7 @@ async function loadMoreVideos() {
 
 async function loadMoreSubs() {
   if (!subsNextPageToken) return;
-  const token = localStorage.getItem("yt_access_token");
+  const token = await getValidToken();
   if (!token) return;
   const res = await fetch(
     `https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20&pageToken=${subsNextPageToken}`,
@@ -2009,6 +2067,14 @@ themeToggle.addEventListener("click", () => { isLight = !isLight; document.body.
 ----------------------------------------------------------- */
 (async function init() {
   showSkeletons(8);
+
+  // Silently refresh OAuth token on startup if we have a refresh token
+  const hasRefresh = localStorage.getItem("yt_refresh_token");
+  if (hasRefresh) {
+    const ok = await refreshAccessToken();
+    if (ok) showHUD("Signed in ✓");
+  }
+
   const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
   nextPageToken = data.nextPageToken || null;
   renderFeed(data.items || []);
