@@ -1352,10 +1352,20 @@ async function loadChannelPage(channelId) {
   showHUD("Channel Loaded");
 }
 
-async function fetchSuggestions(q) {
-  if (!q.trim()) return [];
-  const data = await fetchYouTube("search", { part: "snippet", q, type: "video", maxResults: 20 });
-  return data.items?.map(v => v.snippet.title) || [];
+/* Suggestions now use YouTube's own free suggest endpoint (zero API quota)
+   — the old version fired a 100-unit search call on EVERY keystroke */
+function fetchSuggestions(q) {
+  return new Promise(resolve => {
+    if (!q.trim()) return resolve([]);
+    const cb = "ytSuggest_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
+    const script = document.createElement("script");
+    const timer = setTimeout(() => { cleanup(); resolve([]); }, 4000);
+    function cleanup() { try { delete window[cb]; } catch(e) {} script.remove(); clearTimeout(timer); }
+    window[cb] = (data) => { cleanup(); resolve(((data && data[1]) || []).map(s => s[0]).slice(0, 10)); };
+    script.onerror = () => { cleanup(); resolve([]); };
+    script.src = `https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&q=${encodeURIComponent(q)}&callback=${cb}`;
+    document.head.appendChild(script);
+  });
 }
 
 function showSuggestions(list) {
@@ -1389,9 +1399,24 @@ keyboardEl.addEventListener("click", async (e) => {
 function triggerSearch(q) {
   lastSearchQuery = q;
   (async () => {
-    const data = await fetchYouTube("search", { part: "snippet", q, type: "video", maxResults: 20, _: Date.now() });
-    nextPageToken = data.nextPageToken || null; currentTab = "search";
-    renderFeed(data.items || []); closeKeyboard(); showHUD("Search: " + q);
+    currentTab = "search";
+    closeKeyboard();
+    showSkeletons(8);
+    // Retry across multiple API keys — each fetchYouTube call already rotates
+    // through 3 keys internally, so 4 attempts = up to 12 keys tried
+    let data = { items: [] };
+    for (let attempt = 0; attempt < 4; attempt++) {
+      data = await fetchYouTube("search", { part: "snippet", q, type: "video", maxResults: 20, _: Date.now() });
+      if (data.items && data.items.length) break;
+    }
+    nextPageToken = data.nextPageToken || null;
+    if (data.items && data.items.length) {
+      renderFeed(data.items);
+      showHUD("Search: " + q);
+    } else {
+      feedEl.innerHTML = `<div style="font-size:13px;opacity:0.8;padding:16px;text-align:center;">No results for "${q}". API quota may be exhausted — try again in a moment.</div>`;
+      showHUD("No results");
+    }
   })();
 }
 
