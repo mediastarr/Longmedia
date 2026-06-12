@@ -502,7 +502,13 @@ backBtn.addEventListener("click", () => {
   if (playerSection.style.display === "none") return;
   playerSection.classList.remove("player-fullscreen"); playerSection.classList.add("player-mini"); miniActive = true;
   uiHidden = false; playerSection.classList.remove("ui-hidden"); document.body.classList.remove("ui-hidden"); hideUIBtn.textContent = "Hide UI";
-  showUIWithMiniPlayer(); showHUD("Mini-player");
+  showUIWithMiniPlayer();
+  // Scroll the active video card into view so user lands at the right spot
+  requestAnimationFrame(() => {
+    const card = feedEl.querySelector(`[data-videoid="${currentVideoId}"]`);
+    if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+  showHUD("Mini-player");
 });
 closeMini.addEventListener("click", () => {
   playerSection.classList.remove("player-fullscreen"); document.body.classList.remove("fullscreen-active"); disableCinemaMode();
@@ -610,7 +616,7 @@ function renderFeed(items) { feedEl.innerHTML = ""; appendFeed(items); }
 function appendFeed(items) {
   items.forEach(item => {
     const snippet = item.snippet || {}, stats = item.statistics || {}, videoId = item.id?.videoId || item.id;
-    const card = document.createElement("div"); card.className = "video-card parallax";
+    const card = document.createElement("div"); card.className = "video-card parallax"; card.dataset.videoid = videoId;
     card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails?.medium?.url||snippet.thumbnails?.high?.url||""}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle||""}</div><div class="video-meta">${stats.viewCount?Number(stats.viewCount).toLocaleString()+" views":""}</div></div>`;
     card.onclick = () => { setPlayerVideo(videoId, snippet); showHUD("Playing: "+snippet.title); };
     feedEl.appendChild(card);
