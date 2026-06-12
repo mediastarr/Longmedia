@@ -106,9 +106,9 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
 #playerSection {
   margin-top: 16px; border-radius: 22px; overflow: hidden; position: relative;
   background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.18), rgba(5,6,12,0.98));
-  height: 260px; display: none;
+  height: calc(100vh - 80px); display: none;
 }
-#playerSection.player-mini { position: fixed; right: 16px; bottom: 16px; width: 260px; height: 150px; z-index: 40; }
+#playerSection.player-mini { position: fixed; right: 16px; bottom: 16px; width: 260px; height: 150px; z-index: 40; overflow: hidden; }
 #playerSection.player-fullscreen {
   width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh;
   background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.22), transparent 55%),
@@ -1293,6 +1293,8 @@ function createYTPlayer(videoId) {
   }
 
   ytPlayer = new YT.Player("playerFrame", {
+    width: "100%",
+    height: "100%",
     videoId: videoId,
     playerVars: {
       autoplay: 1,
@@ -1306,6 +1308,9 @@ function createYTPlayer(videoId) {
     events: {
       onReady: (e) => {
         e.target.setPlaybackQuality(currentQuality);
+        // Make sure the injected iframe fills the container
+        const iframe = document.querySelector("#playerFrame iframe");
+        if (iframe) { iframe.style.width = "100%"; iframe.style.height = "100%"; iframe.style.display = "block"; }
         playPauseBtn.textContent = "Pause";
       },
       onStateChange: (e) => {
@@ -1404,6 +1409,8 @@ resBtn.addEventListener("click", () => {
 
   // Reload with new vq param and seek to saved time
   ytPlayer = new YT.Player("playerFrame", {
+    width: "100%",
+    height: "100%",
     videoId: currentVideoId,
     playerVars: {
       autoplay: 1,
@@ -1418,11 +1425,11 @@ resBtn.addEventListener("click", () => {
     events: {
       onReady: (e) => {
         e.target.setPlaybackQuality(currentQuality);
-        if (e.target.setPlaybackQualityRange) {
-          e.target.setPlaybackQualityRange(currentQuality, currentQuality);
-        }
+        if (e.target.setPlaybackQualityRange) e.target.setPlaybackQualityRange(currentQuality, currentQuality);
         e.target.seekTo(resumeTime, true);
         e.target.playVideo();
+        const iframe = document.querySelector("#playerFrame iframe");
+        if (iframe) { iframe.style.width = "100%"; iframe.style.height = "100%"; iframe.style.display = "block"; }
         playPauseBtn.textContent = "Pause";
       },
       onStateChange: (e) => {
