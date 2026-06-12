@@ -346,8 +346,8 @@ let keyIndex = 0;
 async function fetchYouTube(endpoint, params = {}, retries = 2) {
   const key = API_KEYS[keyIndex]; keyIndex = (keyIndex + 1) % API_KEYS.length;
   const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
-  params.key = key;
-  Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null) url.searchParams.append(k,v); });
+  const p = Object.assign({}, params, { key });
+  Object.entries(p).forEach(([k,v]) => { if (v !== undefined && v !== null) url.searchParams.append(k,v); });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
   try {
