@@ -667,7 +667,7 @@ shortsTab.addEventListener("click", async () => {
   const shortsHint=document.getElementById("shortsHint"), shortsTrans=document.getElementById("shortsTransition"), backBtn2=document.getElementById("shortsBackBtn");
   const shortsQ = SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length]; shortQIdx++;
   const data = await fetchYouTube("search",{part:"snippet",q:shortsQ,type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:"US",maxResults:20,_:Date.now()});
-  shortsItems = data.items.map(v=>({id:v.id.videoId,snippet:v.snippet})); shortsIndex=0; nextPageToken=data.nextPageToken||null;
+  shortsItems = (data.items || []).map(v=>({id:v.id.videoId,snippet:v.snippet})); shortsIndex=0; nextPageToken=data.nextPageToken||null;
   function updateCounter() { shortsCounter.textContent=`${shortsIndex+1} / ${shortsItems.length}`; }
   function playShort(index) { const item=shortsItems[index]; if(!item) return; shortsIframe.src=`https://www.youtube.com/embed/${item.id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&origin=${location.origin}`; updateCounter(); if(index>=shortsItems.length-4&&nextPageToken) loadMoreShorts(); }
   async function loadMoreShorts() { if(!nextPageToken) return; const more=await fetchYouTube("search",{part:"snippet",q:"#shorts",type:"video",videoDuration:"short",videoEmbeddable:"true",maxResults:20,pageToken:nextPageToken,_:Date.now()}); nextPageToken=more.nextPageToken||null; shortsItems=shortsItems.concat(more.items.map(v=>({id:v.id.videoId,snippet:v.snippet}))); updateCounter(); }
@@ -688,7 +688,8 @@ moviesTab.addEventListener("click", async () => {
   nextPageToken=null; setActiveTab("movies"); showSkeletons(8);
   const q=MOVIE_QUERIES[movieQIdx%MOVIE_QUERIES.length]; movieQIdx++;
   const data=await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:20,_:Date.now()});
-  nextPageToken=data.nextPageToken||null; renderFeed(data.items.map(v=>({id:v.id.videoId,snippet:v.snippet}))); showHUD("Movies");
+  const items = (data.items || []).map(v => ({ id: v.id.videoId, snippet: v.snippet }));
+  nextPageToken=data.nextPageToken||null; renderFeed(items); showHUD("Movies");
 });
 historyTab.addEventListener("click", () => { setActiveTab("history"); nextPageToken=null; renderFeed(historyList.slice(0,50).map(h=>({id:h.id,snippet:h.snippet,statistics:{viewCount:"watched"}}))); showHUD("History"); });
 channelTab.addEventListener("click", () => loadChannelPage(currentChannelId));
