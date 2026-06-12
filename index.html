@@ -510,8 +510,10 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 <script>
 const API_KEYS = [
   "AIzaSyCx0wjIv9VdzaI3oyz34zwkkFgTDj7LgEw","AIzaSyCNKebUdj8bTiRvLoSv28YqGdNoDn53Tk4",
-  "AIzaSyCJY-gccqPtgmqSnPRoo4W2vQp1chFCLHY","AIzaSyAK2AHBbe5wzgcsWzHR_YX6qyxjD1hbyec",
-  "AIzaSyD4tP4THh9ZeDcVW041l_JCjJztZA2zJCA","AIzaSyCR_jLrkrDQoAmT_5XOmeWvZriugTA36KQ",
+  "AIzaSyCJY-gccqPtgmqSnPRoo4W2vQp1chFCLHY","AIzaSyDarRcD3PDP6gqVIx2vMzGSMj0mAljiFmU",
+  "AIzaSyAK2AHBbe5wzgcsWzHR_YX6qyxjD1hbyec","AIzaSyDG3EzP0usjMQYRA0BXCT7WmNUEfJ3PkzY",
+  "AIzaSyCR_jLrkrDQoAmT_5XOmeWvZriugTA36KQ","AIzaSyAMMN_DAvsRqDDf2w66WUVFSnj_jCud-vo",
+  "AIzaSyD4tP4THh9ZeDcVW041l_JCjJztZA2zJCA","AIzaSyCuSia-HGhKHwfTFWNsJIAp-8Q38_7e4dg",
   "AIzaSyBKcKeVWaq_AVca-W3iEGnoQCVb7u0bvUk","AIzaSyDLl8aAik8w2a9CqoQDUcN6rv_cfckDSYg",
   "AIzaSyA2glQivSu01moNJnBr7fqs31E4Zz7K1hs","AIzaSyAvHMZmzEG-ibFKRpRIZUw--7xNSstbmYg",
   "AIzaSyBBhb74OgptZl6MuKxFZZhwBW3WF1PEoS8","AIzaSyAxFZPU9JU9pVBUYat0Emidq1T-halZl7g",
@@ -1029,11 +1031,19 @@ shortsTab.addEventListener("click", async () => {
   const shortsHint    = document.getElementById("shortsHint");
   const shortsTrans   = document.getElementById("shortsTransition");
   const backBtn2      = document.getElementById("shortsBackBtn");
-  const shortsQ = SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length]; shortQIdx++;
-  const data = await fetchYouTube("search", { part: "snippet", q: shortsQ, type: "video", videoDuration: "short", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
-  shortsItems = (data.items || []).map(v => ({ id: v.id.videoId, snippet: v.snippet }));
+  // Try queries until one returns playable shorts (handles quota errors / empty results)
+  let data = { items: [] };
+  for (let attempt = 0; attempt < SHORT_QUERIES.length; attempt++) {
+    const shortsQ = SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length]; shortQIdx++;
+    data = await fetchYouTube("search", { part: "snippet", q: shortsQ, type: "video", videoDuration: "short", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
+    if (data.items && data.items.length) break;
+  }
+  shortsItems = (data.items || []).filter(v => v.id && v.id.videoId).map(v => ({ id: v.id.videoId, snippet: v.snippet }));
   shortsIndex = 0;
   nextPageToken = data.nextPageToken || null;
+  if (!shortsItems.length) {
+    shortsCounter.textContent = "No shorts — tap Back and retry";
+  }
   function updateCounter() { shortsCounter.textContent = `${shortsIndex + 1} / ${shortsItems.length}`; }
   function playShort(index) {
     const item = shortsItems[index]; if (!item) return;
@@ -1045,7 +1055,7 @@ shortsTab.addEventListener("click", async () => {
     if (!nextPageToken) return;
     const more = await fetchYouTube("search", { part: "snippet", q: "#shorts", type: "video", videoDuration: "short", videoEmbeddable: "true", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
     nextPageToken = more.nextPageToken || null;
-    shortsItems = shortsItems.concat((more.items || []).map(v => ({ id: v.id.videoId, snippet: v.snippet })));
+    shortsItems = shortsItems.concat((more.items || []).filter(v => v.id && v.id.videoId).map(v => ({ id: v.id.videoId, snippet: v.snippet })));
     updateCounter();
   }
   function goNext() {
@@ -1075,9 +1085,14 @@ shortsTab.addEventListener("click", async () => {
 
 moviesTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("movies"); showSkeletons(8);
-  const q = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
-  const data = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
-  const items = (data.items || []).map(v => ({ id: v.id.videoId, snippet: v.snippet }));
+  // Try queries until one returns movies (handles quota errors / empty results)
+  let data = { items: [] };
+  for (let attempt = 0; attempt < MOVIE_QUERIES.length; attempt++) {
+    const q = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
+    data = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
+    if (data.items && data.items.length) break;
+  }
+  const items = (data.items || []).filter(v => v.id && v.id.videoId).map(v => ({ id: v.id.videoId, snippet: v.snippet }));
   nextPageToken = data.nextPageToken || null; renderFeed(items); showHUD("Movies");
 });
 
