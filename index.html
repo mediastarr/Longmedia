@@ -639,6 +639,8 @@ homeTab.addEventListener("click", async () => {
   if (hasEnoughHistory()) {
     const items = await fetchPersonalizedFeed();
     renderFeed(items); showHUD("For You ✦");
+    const seed = await fetchYouTube("videos", { part:"snippet,statistics", chart:"mostPopular", regionCode:"US", videoCategoryId:freshCategory(), maxResults:20, _:Date.now() });
+    nextPageToken = seed.nextPageToken || null;
   } else {
     const data = await fetchYouTube("videos", { part:"snippet,statistics", chart:"mostPopular", regionCode:"US", videoCategoryId:freshCategory(), maxResults:20, _:Date.now() });
     nextPageToken = data.nextPageToken || null; renderFeed(data.items || []); showHUD("Home");
@@ -836,6 +838,8 @@ themeToggle.addEventListener("click",()=>{ isLight=!isLight; document.body.class
   if (hasEnoughHistory()) {
     const items = await fetchPersonalizedFeed();
     renderFeed(items); showHUD("For You ✦");
+    const seed = await fetchYouTube("videos", { part:"snippet,statistics", chart:"mostPopular", regionCode:"US", videoCategoryId:freshCategory(), maxResults:20, _:Date.now() });
+    nextPageToken = seed.nextPageToken || null;
   } else {
     const data = await fetchYouTube("videos", { part:"snippet,statistics", chart:"mostPopular", regionCode:"US", videoCategoryId:freshCategory(), maxResults:20, _:Date.now() });
     nextPageToken = data.nextPageToken || null;
