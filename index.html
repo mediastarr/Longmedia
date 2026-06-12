@@ -1109,9 +1109,10 @@ document.addEventListener("keydown", (e) => {
 let ytPlayer = null;
 let ytReady = false;
 let pendingVideoId = null;
-let currentQuality = "hd720";
-const QUALITY_CYCLE = ["hd720", "hd1080"];
+const QUALITY_CYCLE  = ["hd720", "hd1080", "hd1440"];
+const QUALITY_LABELS = { hd720: "720p", hd1080: "1080p", hd1440: "1440p" };
 let qualityIndex = 0;
+let currentQuality = QUALITY_CYCLE[0];
 
 // Load the YT API script once
 const ytScript = document.createElement("script");
@@ -1215,22 +1216,65 @@ rewindBtn.addEventListener("click", () => {
 });
 
 /* -----------------------------------------------------------
-   RESOLUTION TOGGLE (fullscreen only) — real quality via YT API
+   RESOLUTION TOGGLE (fullscreen only)
+   Most reliable method: reload iframe with vq= param + seek back
 ----------------------------------------------------------- */
 const resBtn = document.getElementById("resBtn");
-const QUALITY_LABELS = { hd720: "720p", hd1080: "1080p" };
 
 resBtn.addEventListener("click", () => {
+  if (!ytPlayer || !currentVideoId) return;
+
+  // Cycle to next quality
   qualityIndex = (qualityIndex + 1) % QUALITY_CYCLE.length;
   currentQuality = QUALITY_CYCLE[qualityIndex];
   resBtn.textContent = QUALITY_LABELS[currentQuality];
-
-  if (ytPlayer && ytPlayer.setPlaybackQuality) {
-    ytPlayer.setPlaybackQuality(currentQuality);
-    // Also set suggested quality so it sticks
-    if (ytPlayer.setPlaybackQualityRange) ytPlayer.setPlaybackQualityRange(currentQuality, currentQuality);
-  }
   showHUD(QUALITY_LABELS[currentQuality]);
+
+  // Save current playback position
+  const resumeTime = ytPlayer.getCurrentTime() || 0;
+
+  // Destroy current player
+  try { ytPlayer.destroy(); } catch(e) {}
+  ytPlayer = null;
+
+  // Recreate the target div
+  const container = document.getElementById("playerSection");
+  let div = document.getElementById("playerFrame");
+  if (!div) {
+    div = document.createElement("div");
+    div.id = "playerFrame";
+    container.insertBefore(div, container.firstChild);
+  }
+
+  // Reload with new vq param and seek to saved time
+  ytPlayer = new YT.Player("playerFrame", {
+    videoId: currentVideoId,
+    playerVars: {
+      autoplay: 1,
+      rel: 0,
+      playsinline: 1,
+      modestbranding: 1,
+      enablejsapi: 1,
+      origin: location.origin,
+      vq: currentQuality,
+      start: Math.floor(resumeTime)
+    },
+    events: {
+      onReady: (e) => {
+        e.target.setPlaybackQuality(currentQuality);
+        if (e.target.setPlaybackQualityRange) {
+          e.target.setPlaybackQualityRange(currentQuality, currentQuality);
+        }
+        e.target.seekTo(resumeTime, true);
+        e.target.playVideo();
+        playPauseBtn.textContent = "Pause";
+      },
+      onStateChange: (e) => {
+        if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "Pause";
+        if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "Play";
+      }
+    }
+  });
 });
 
 /* -----------------------------------------------------------
