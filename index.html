@@ -969,8 +969,158 @@ function showHUD(text) {
 ----------------------------------------------------------- */
 function saveToHistory(video) {
   historyList = historyList.filter(v => v.id !== video.id);
-  historyList.unshift(video);
+  historyList.unshift({ ...video, watchedAt: Date.now() });
+  if (historyList.length > 500) historyList = historyList.slice(0, 500);
   localStorage.setItem("historyList", JSON.stringify(historyList));
+  updateTasteProfile(video);
+}
+
+/* -----------------------------------------------------------
+   TASTE PROFILE ENGINE
+   Tracks: top channels, top categories, top keywords,
+   recently watched video IDs (for relatedToVideoId CF)
+----------------------------------------------------------- */
+function updateTasteProfile(video) {
+  const profile = getTasteProfile();
+  const snippet = video.snippet || {};
+  const channelId    = snippet.channelId    || "";
+  const channelTitle = snippet.channelTitle || "";
+  const categoryId   = snippet.categoryId   || "";
+  const title        = snippet.title        || "";
+
+  // Increment channel weight
+  if (channelId) {
+    profile.channels[channelId] = profile.channels[channelId] || { title: channelTitle, weight: 0 };
+    profile.channels[channelId].weight++;
+    profile.channels[channelId].title = channelTitle;
+  }
+
+  // Increment category weight
+  if (categoryId) {
+    profile.categories[categoryId] = (profile.categories[categoryId] || 0) + 1;
+  }
+
+  // Extract keywords from title (filter stopwords)
+  const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","this","that","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","have","has","he","she","they","do","did","new","vs","ep","ft","official","video","full"]);
+  title.toLowerCase().replace(/[^a-z0-9\s]/g,"").split(/\s+/).forEach(w => {
+    if (w.length > 3 && !stopwords.has(w)) {
+      profile.keywords[w] = (profile.keywords[w] || 0) + 1;
+    }
+  });
+
+  // Keep last 20 watched video IDs for collaborative filtering
+  profile.recentVideoIds = [video.id, ...(profile.recentVideoIds || [])].slice(0, 20);
+
+  localStorage.setItem("tasteProfile", JSON.stringify(profile));
+}
+
+function getTasteProfile() {
+  try { return JSON.parse(localStorage.getItem("tasteProfile") || "{}"); } catch(e) { return {}; }
+}
+
+function getTopChannels(n = 5) {
+  const profile = getTasteProfile();
+  const channels = profile.channels || {};
+  return Object.entries(channels)
+    .sort((a,b) => b[1].weight - a[1].weight)
+    .slice(0, n)
+    .map(([id, v]) => ({ id, title: v.title }));
+}
+
+function getTopKeywords(n = 6) {
+  const profile = getTasteProfile();
+  return Object.entries(profile.keywords || {})
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, n)
+    .map(([w]) => w);
+}
+
+function getTopCategoryId() {
+  const profile = getTasteProfile();
+  const cats = profile.categories || {};
+  const top = Object.entries(cats).sort((a,b) => b[1]-a[1])[0];
+  return top ? top[0] : null;
+}
+
+function getRecentVideoIds(n = 5) {
+  const profile = getTasteProfile();
+  return (profile.recentVideoIds || []).slice(0, n);
+}
+
+function hasEnoughHistory() {
+  return historyList.length >= 3;
+}
+
+/* -----------------------------------------------------------
+   PERSONALIZED FEED BUILDER
+   Runs parallel fetches and merges + dedupes results
+----------------------------------------------------------- */
+async function fetchPersonalizedFeed() {
+  const topChannels   = getTopChannels(5);
+  const topKeywords   = getTopKeywords(6);
+  const topCategoryId = getTopCategoryId();
+  const recentIds     = getRecentVideoIds(3);
+
+  const seen = new Set();
+  const allItems = [];
+
+  function addItems(items) {
+    (items || []).forEach(item => {
+      const id = item.id?.videoId || item.id;
+      if (id && !seen.has(id)) { seen.add(id); allItems.push(item); }
+    });
+  }
+
+  const fetches = [];
+
+  // 1. Videos from top watched channels (personalization pillar)
+  topChannels.slice(0, 3).forEach(ch => {
+    fetches.push(
+      fetchYouTube("search", {
+        part: "snippet", channelId: ch.id, type: "video",
+        order: "date", maxResults: 8, _: Date.now()
+      })
+    );
+  });
+
+  // 2. Keyword-based search from watch history (personalization pillar)
+  if (topKeywords.length >= 2) {
+    const q = topKeywords.slice(0, 3).join(" ");
+    fetches.push(
+      fetchYouTube("search", { part: "snippet", q, type: "video", maxResults: 10, _: Date.now() })
+    );
+  }
+
+  // 3. Related videos to recently watched (collaborative filtering pillar)
+  recentIds.forEach(videoId => {
+    fetches.push(
+      fetchYouTube("search", {
+        part: "snippet", type: "video",
+        relatedToVideoId: videoId, maxResults: 6, _: Date.now()
+      })
+    );
+  });
+
+  // 4. Top category fallback mixed in
+  const catId = topCategoryId || freshCategory();
+  fetches.push(
+    fetchYouTube("videos", {
+      part: "snippet,statistics", chart: "mostPopular",
+      regionCode: "US", videoCategoryId: catId, maxResults: 10, _: Date.now()
+    })
+  );
+
+  // Run all in parallel
+  const results = await Promise.allSettled(fetches);
+  results.forEach(r => { if (r.status === "fulfilled") addItems(r.value.items); });
+
+  // Shuffle to avoid all-channel-block grouping
+  for (let i = allItems.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allItems[i], allItems[j]] = [allItems[j], allItems[i]];
+  }
+
+  return allItems;
 }
 
 /* -----------------------------------------------------------
@@ -1176,6 +1326,12 @@ function setPlayerVideo(videoId, snippet) {
   playPauseBtn.textContent = "Pause";
   initAudioGlow();
 
+  // Fetch full video details in background to enrich taste profile with categoryId
+  fetchYouTube("videos", { part: "snippet,statistics", id: videoId }).then(data => {
+    const full = data.items?.[0];
+    if (full) saveToHistory({ id: videoId, snippet: full.snippet });
+  });
+
   if (ytReady) {
     createYTPlayer(videoId);
   } else {
@@ -1378,8 +1534,17 @@ function setActiveTab(tab) {
 homeTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("home");
   showSkeletons(8);
-  const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
-  nextPageToken = data.nextPageToken || null; renderFeed(data.items || []); showHUD("Home");
+  let items;
+  if (hasEnoughHistory()) {
+    items = await fetchPersonalizedFeed();
+    showHUD("For You ✦");
+  } else {
+    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+    nextPageToken = data.nextPageToken || null;
+    items = data.items || [];
+    showHUD("Home");
+  }
+  renderFeed(items);
 });
 
 trendingTab.addEventListener("click", async () => {
@@ -2075,9 +2240,16 @@ themeToggle.addEventListener("click", () => { isLight = !isLight; document.body.
     if (ok) showHUD("Signed in ✓");
   }
 
-  const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
-  nextPageToken = data.nextPageToken || null;
-  renderFeed(data.items || []);
+  let items;
+  if (hasEnoughHistory()) {
+    items = await fetchPersonalizedFeed();
+    showHUD("For You ✦");
+  } else {
+    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+    nextPageToken = data.nextPageToken || null;
+    items = data.items || [];
+  }
+  renderFeed(items);
 })();
 </script>
 </body>
