@@ -1600,6 +1600,187 @@ document.addEventListener("mousemove", (e) => {
   applyChroma(x, y);
 });
 
+/* -----------------------------------------------------------
+   GYROSCOPE PARALLAX — real spatial depth on glasses/phones
+   Replaces mouse parallax when device has a gyroscope
+----------------------------------------------------------- */
+let gyroActive = false;
+
+function initGyroscope() {
+  if (gyroActive) return;
+
+  function handleOrientation(e) {
+    if (!gyroActive) gyroActive = true;
+    // beta = front-back tilt (-180..180), gamma = left-right tilt (-90..90)
+    const beta = e.beta || 0;
+    const gamma = e.gamma || 0;
+
+    // Normalize to -1..1 range (clamp tilt to ±30° for comfortable range)
+    const x = Math.max(-1, Math.min(1, gamma / 30));
+    const y = Math.max(-1, Math.min(1, (beta - 45) / 30)); // 45° = neutral holding angle
+
+    // Depth-layered parallax — closer elements move more
+    document.querySelectorAll(".parallax").forEach(el => {
+      el.style.transform = `translate(${x * 12}px, ${y * 12}px)`;
+    });
+    document.querySelectorAll(".parallax-tab").forEach(el => {
+      el.style.transform = `translate(${x * 6}px, ${y * 6}px)`;
+    });
+
+    // Cards get full 3D rotation from head tilt
+    document.querySelectorAll(".video-card").forEach(card => {
+      card.style.transform = `perspective(1100px) rotateX(${y * -10}deg) rotateY(${x * 10}deg) translateX(${x * 14}px) translateY(${y * 14}px)`;
+    });
+
+    applyDepthGlow(x, y, playerSection.classList.contains("player-fullscreen"));
+    applyChroma(x, y);
+  }
+
+  // iOS 13+ requires permission request
+  if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+    // We'll request on first user tap
+    document.addEventListener("click", function gyroPermission() {
+      DeviceOrientationEvent.requestPermission().then(state => {
+        if (state === "granted") {
+          window.addEventListener("deviceorientation", handleOrientation, true);
+          showHUD("Spatial Mode ✦");
+        }
+      }).catch(() => {});
+      document.removeEventListener("click", gyroPermission);
+    }, { once: true });
+  } else if (typeof DeviceOrientationEvent !== "undefined") {
+    window.addEventListener("deviceorientation", handleOrientation, true);
+    // Check if it actually fires (some desktops have the API but no sensor)
+    setTimeout(() => { if (gyroActive) showHUD("Spatial Mode ✦"); }, 1500);
+  }
+}
+initGyroscope();
+
+/* -----------------------------------------------------------
+   AMBIENT ROOM LIGHTING — camera samples environment color
+   Adapts holographic glow to match real-world lighting
+----------------------------------------------------------- */
+let ambientActive = false;
+let ambientVideo = null;
+let ambientCanvas = null;
+let ambientCtx = null;
+
+async function initAmbientLighting() {
+  if (ambientActive) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment", width: 64, height: 48 }
+    });
+
+    ambientVideo = document.createElement("video");
+    ambientVideo.srcObject = stream;
+    ambientVideo.setAttribute("playsinline", "");
+    ambientVideo.style.display = "none";
+    document.body.appendChild(ambientVideo);
+    await ambientVideo.play();
+
+    ambientCanvas = document.createElement("canvas");
+    ambientCanvas.width = 16;
+    ambientCanvas.height = 12;
+    ambientCtx = ambientCanvas.getContext("2d", { willReadFrequently: true });
+
+    ambientActive = true;
+    showHUD("Ambient Lighting ✦");
+    sampleAmbient();
+  } catch (e) {
+    // Camera denied or unavailable — fall back to time-of-day adaptation
+    initTimeBasedAmbient();
+  }
+}
+
+function sampleAmbient() {
+  if (!ambientActive || !ambientVideo || !ambientCtx) return;
+
+  ambientCtx.drawImage(ambientVideo, 0, 0, 16, 12);
+  const data = ambientCtx.getImageData(0, 0, 16, 12).data;
+
+  // Average color from all pixels
+  let r = 0, g = 0, b = 0, count = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    r += data[i]; g += data[i + 1]; b += data[i + 2]; count++;
+  }
+  r = Math.round(r / count);
+  g = Math.round(g / count);
+  b = Math.round(b / count);
+
+  // Calculate brightness (0-255)
+  const brightness = (r * 0.299 + g * 0.587 + b * 0.114);
+
+  // Adapt glow intensity to room brightness
+  // Dark room = stronger glow, bright room = subtler glow
+  const glowIntensity = brightness < 80 ? 1.0 : brightness < 150 ? 0.7 : 0.4;
+
+  // Blend room color into the accent glow (subtle tint)
+  const tintR = Math.round(60 + (r - 128) * 0.15);
+  const tintG = Math.round(242 + (g - 128) * 0.08);
+  const tintB = Math.round(255 + (b - 128) * 0.05);
+
+  const accentTint = `rgba(${Math.max(0, Math.min(255, tintR))}, ${Math.max(0, Math.min(255, tintG))}, ${Math.max(0, Math.min(255, tintB))}, ${glowIntensity * 0.65})`;
+
+  // Apply to CSS custom properties
+  document.documentElement.style.setProperty("--ambient-glow", accentTint);
+  document.documentElement.style.setProperty("--ambient-intensity", glowIntensity);
+
+  // Adapt logo orb and card glows
+  document.querySelector(".logo-orb").style.boxShadow = `0 0 ${24 * glowIntensity}px ${accentTint}`;
+
+  // Adapt player glow based on room
+  if (playerSection.style.display !== "none") {
+    playerSection.style.setProperty("--glow-strength", 0.35 * glowIntensity);
+  }
+
+  // Warm color shift for bright environments
+  if (brightness > 180) {
+    document.documentElement.style.setProperty("--accent", `rgb(${tintR}, ${Math.min(255, tintG - 20)}, ${Math.min(255, tintB - 40)})`);
+  } else {
+    document.documentElement.style.setProperty("--accent", "#3cf2ff");
+  }
+
+  // Sample every 2 seconds (low CPU cost on tiny 16x12 canvas)
+  setTimeout(sampleAmbient, 2000);
+}
+
+/* Fallback: time-of-day based lighting when camera unavailable */
+function initTimeBasedAmbient() {
+  function updateTimeAmbient() {
+    const hour = new Date().getHours();
+    let glowIntensity, warmth;
+
+    if (hour >= 22 || hour < 6) {
+      // Night — maximum glow, cool tones
+      glowIntensity = 1.0; warmth = 0;
+    } else if (hour >= 6 && hour < 9) {
+      // Morning — warm sunrise tint
+      glowIntensity = 0.7; warmth = 0.4;
+    } else if (hour >= 9 && hour < 17) {
+      // Daytime — subtle glow
+      glowIntensity = 0.4; warmth = 0.1;
+    } else {
+      // Evening — warming up
+      glowIntensity = 0.75; warmth = 0.3;
+    }
+
+    document.querySelector(".logo-orb").style.boxShadow =
+      `0 0 ${24 * glowIntensity}px rgba(${60 + warmth * 80}, ${242 - warmth * 40}, ${255 - warmth * 60}, 0.9)`;
+
+    if (playerSection.style.display !== "none") {
+      playerSection.style.setProperty("--glow-strength", 0.35 * glowIntensity);
+    }
+  }
+
+  updateTimeAmbient();
+  setInterval(updateTimeAmbient, 60000); // update every minute
+  showHUD("Time Ambient ✦");
+}
+
+// Start ambient — tries camera first, falls back to time-of-day
+initAmbientLighting();
+
 themeToggle.addEventListener("click", () => { isLight = !isLight; document.body.classList.toggle("light", isLight); showHUD(isLight ? "Light Mode" : "Dark Mode"); });
 
 /* CHANGE: init uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
