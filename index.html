@@ -1466,44 +1466,55 @@ shortsTab.addEventListener("click", async () => {
     shortsItems = shortsItems.concat((more.items || []).filter(v => v.id && v.id.videoId).map(v => ({ id: v.id.videoId, snippet: v.snippet })));
     updateCounter();
   }
-  function goNext() {
-    if (shortsIndex >= shortsItems.length - 1) return;
-    shortsTrans.classList.add("flash");
-    setTimeout(() => { shortsIndex++; playShort(shortsIndex); }, 120);
-    setTimeout(() => { shortsTrans.classList.remove("flash"); }, 600);
+  // Transition: fully covers iframe while loading, fades after iframe ready
+  let transitioning = false;
+
+  function transitionTo(index) {
+    if (transitioning || index < 0 || index >= shortsItems.length) return;
+    transitioning = true;
+    shortsTrans.style.transition = "opacity 0.12s ease";
+    shortsTrans.style.opacity = "1";
+    setTimeout(() => {
+      shortsIndex = index;
+      playShort(shortsIndex);
+      setTimeout(() => {
+        shortsTrans.style.transition = "opacity 0.35s ease";
+        shortsTrans.style.opacity = "0";
+        transitioning = false;
+      }, 500);
+    }, 150);
   }
-  function goPrev() {
-    if (shortsIndex <= 0) return;
-    shortsTrans.classList.add("flash");
-    setTimeout(() => { shortsIndex--; playShort(shortsIndex); }, 120);
-    setTimeout(() => { shortsTrans.classList.remove("flash"); }, 600);
-  }
+
+  function goNext() { transitionTo(shortsIndex + 1); }
+  function goPrev() { transitionTo(shortsIndex - 1); }
+
   playShort(0);
   shortsHint.classList.add("visible");
   setTimeout(() => shortsHint.classList.remove("visible"), 2800);
   backBtn2.addEventListener("click", () => { shortsIframe.src = ""; setActiveTab("home"); shortsPageEl.style.display = "none"; homeTab.click(); showHUD("Home"); });
-  let touchStartY = 0, touchLastY = 0, touchStartX = 0, touchLocked = false, swipeDir = null;
+
+  // --- SWIPE DETECTION (simplified & reliable) ---
+  let swStartY = 0, swStartTime = 0;
+
   shortsPageEl.addEventListener("touchstart", (e) => {
-    touchStartY = touchLastY = e.touches[0].clientY;
-    touchStartX = e.touches[0].clientX;
-    touchLocked = false; swipeDir = null;
+    if (transitioning) return;
+    swStartY = e.touches[0].clientY;
+    swStartTime = Date.now();
   }, { passive: true });
-  shortsPageEl.addEventListener("touchmove", (e) => {
-    touchLastY = e.touches[0].clientY;
-    if (!touchLocked) {
-      const dy = Math.abs(touchLastY - touchStartY);
-      const dx = Math.abs(e.touches[0].clientX - touchStartX);
-      if (dy > 15 || dx > 15) { touchLocked = true; swipeDir = dy > dx ? "vertical" : "horizontal"; }
-    }
-  }, { passive: true });
-  shortsPageEl.addEventListener("touchend", () => {
-    if (swipeDir !== "vertical") return;
-    const dy = touchLastY - touchStartY;
-    if (dy < -40) goNext();       // swipe up → next
-    else if (dy > 40) goPrev();   // swipe down → prev
+
+  shortsPageEl.addEventListener("touchend", (e) => {
+    if (transitioning) return;
+    const endY = e.changedTouches[0].clientY;
+    const dy = swStartY - endY; // positive = finger moved UP on screen
+    const dt = Date.now() - swStartTime;
+    const velocity = Math.abs(dy) / Math.max(dt, 1);
+    const minDist = velocity > 0.3 ? 20 : 50;
+    if (Math.abs(dy) < minDist) return;
+    if (dy > 0) goNext();      // swiped UP = next video
+    else goPrev();              // swiped DOWN = previous video
   }, { passive: true });
   let wheelCooldown = false;
-  shortsPageEl.addEventListener("wheel", (e) => { if (wheelCooldown) return; wheelCooldown = true; setTimeout(() => wheelCooldown = false, 600); if (e.deltaY > 0) goNext(); else goPrev(); }, { passive: true });
+  shortsPageEl.addEventListener("wheel", (e) => { if (wheelCooldown || transitioning) return; wheelCooldown = true; setTimeout(() => wheelCooldown = false, 700); if (e.deltaY > 0) goNext(); else goPrev(); }, { passive: true });
   function shortsKeyHandler(e) { if (currentTab !== "shorts") return; if (e.key === "ArrowDown") goNext(); if (e.key === "ArrowUp") goPrev(); }
   document.addEventListener("keydown", shortsKeyHandler);
   shortsPageEl._cleanup = () => document.removeEventListener("keydown", shortsKeyHandler);
@@ -1720,7 +1731,15 @@ async function loadMoreSubs() {
 
 /* Scroll to top button */
 const scrollTopBtn = document.getElementById("scrollTopBtn");
-scrollTopBtn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+scrollTopBtn.addEventListener("click", () => {
+  // Instant jump to near-top, then short smooth finish — avoids white flash from long smooth scroll
+  if (window.scrollY > 2000) {
+    window.scrollTo({ top: 200, behavior: "instant" });
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
+  } else {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+});
 
 window.addEventListener("scroll", async () => {
   // Show/hide scroll-to-top button
