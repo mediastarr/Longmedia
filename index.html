@@ -824,6 +824,11 @@ function saveToHistory(video) {
   updateTasteProfile(video);
 }
 
+/* -----------------------------------------------------------
+   TASTE PROFILE ENGINE — YouTube-style signal tracking
+   Tracks: channels (recency-weighted), categories, topics,
+           keyword pairs, recent IDs, session patterns
+----------------------------------------------------------- */
 function updateTasteProfile(video) {
   const profile = getTasteProfile();
   const snippet = video.snippet || {};
@@ -831,72 +836,265 @@ function updateTasteProfile(video) {
   const channelTitle = snippet.channelTitle || "";
   const categoryId = snippet.categoryId || "";
   const title = snippet.title || "";
+  const now = Date.now();
+
+  // Channel engagement — track both frequency AND recency
   if (channelId) {
     profile.channels = profile.channels || {};
-    profile.channels[channelId] = profile.channels[channelId] || { title: channelTitle, weight: 0 };
-    profile.channels[channelId].weight++;
-    profile.channels[channelId].title = channelTitle;
+    const ch = profile.channels[channelId] || { title: channelTitle, weight: 0, lastWatch: 0, watches: [] };
+    ch.weight++;
+    ch.title = channelTitle;
+    ch.lastWatch = now;
+    ch.watches = [...(ch.watches || []), now].slice(-20); // keep last 20 timestamps
+    profile.channels[channelId] = ch;
   }
+
+  // Category frequency
   if (categoryId) {
     profile.categories = profile.categories || {};
     profile.categories[categoryId] = (profile.categories[categoryId] || 0) + 1;
   }
-  const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","this","that","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","have","has","he","she","they","do","did","new","vs","ep","ft","official","video","full","2024","2025"]);
-  title.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).forEach(w => {
-    if (w.length > 3 && !stopwords.has(w)) {
-      profile.keywords = profile.keywords || {};
-      profile.keywords[w] = (profile.keywords[w] || 0) + 1;
-    }
-  });
-  profile.recentVideoIds = [video.id, ...(profile.recentVideoIds || [])].slice(0, 20);
+
+  // Extract meaningful keywords + bigrams from title
+  const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","this","that","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","have","has","he","she","they","do","did","new","vs","ep","ft","official","video","full","2024","2025","2026","part","episode"]);
+  const words = title.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w));
+  profile.keywords = profile.keywords || {};
+  words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 1; });
+
+  // Bigrams capture topic phrases ("dragon ball", "solo leveling", etc.)
+  profile.bigrams = profile.bigrams || {};
+  for (let i = 0; i < words.length - 1; i++) {
+    const bi = words[i] + " " + words[i + 1];
+    profile.bigrams[bi] = (profile.bigrams[bi] || 0) + 1;
+  }
+
+  // Recent video IDs for collaborative filtering
+  profile.recentVideoIds = [video.id, ...(profile.recentVideoIds || [])].slice(0, 30);
+
+  // Session tracking — what time of day you watch (for freshness timing)
+  const hour = new Date().getHours();
+  profile.hourBuckets = profile.hourBuckets || {};
+  const bucket = hour < 6 ? "night" : hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
+  profile.hourBuckets[bucket] = (profile.hourBuckets[bucket] || 0) + 1;
+
   localStorage.setItem("tasteProfile", JSON.stringify(profile));
 }
 
 function getTasteProfile() { try { return JSON.parse(localStorage.getItem("tasteProfile") || "{}"); } catch(e) { return {}; } }
-function getTopChannels(n = 4) { const ch = getTasteProfile().channels || {}; return Object.entries(ch).sort((a,b) => b[1].weight - a[1].weight).slice(0, n).map(([id, v]) => ({ id, title: v.title })); }
-function getTopKeywords(n = 5) { const kw = getTasteProfile().keywords || {}; return Object.entries(kw).sort((a,b) => b[1]-a[1]).slice(0, n).map(([w]) => w); }
-function getTopCategoryId() { const cats = getTasteProfile().categories || {}; const top = Object.entries(cats).sort((a,b) => b[1]-a[1])[0]; return top ? top[0] : null; }
-function getRecentVideoIds(n = 4) { return (getTasteProfile().recentVideoIds || []).slice(0, n); }
+
+// Recency-weighted channel ranking — recent watches boost score exponentially
+function getTopChannels(n = 6) {
+  const ch = getTasteProfile().channels || {};
+  const now = Date.now();
+  const DAY = 86400000;
+  return Object.entries(ch)
+    .map(([id, v]) => {
+      // Base weight from watch count
+      let score = v.weight || 0;
+      // Recency boost — watched today = 3x, this week = 2x, this month = 1.5x
+      const age = (now - (v.lastWatch || 0)) / DAY;
+      if (age < 1) score *= 3;
+      else if (age < 7) score *= 2;
+      else if (age < 30) score *= 1.5;
+      // Frequency boost — regular watching pattern
+      const watches = v.watches || [];
+      if (watches.length >= 5) score *= 1.3;
+      return { id, title: v.title, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, n);
+}
+
+function getTopKeywords(n = 6) {
+  const kw = getTasteProfile().keywords || {};
+  return Object.entries(kw).sort((a, b) => b[1] - a[1]).slice(0, n).map(([w]) => w);
+}
+
+function getTopBigrams(n = 4) {
+  const bi = getTasteProfile().bigrams || {};
+  return Object.entries(bi).sort((a, b) => b[1] - a[1]).slice(0, n).map(([phrase]) => phrase);
+}
+
+function getTopCategories(n = 3) {
+  const cats = getTasteProfile().categories || {};
+  return Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, n).map(([id]) => id);
+}
+
+function getTopCategoryId() { const cats = getTopCategories(1); return cats[0] || null; }
+function getRecentVideoIds(n = 5) { return (getTasteProfile().recentVideoIds || []).slice(0, n); }
 function hasEnoughHistory() { return historyList.length >= 3; }
 
 /* -----------------------------------------------------------
-   CHANGE: personalized feed — pillar 1 (your history) + pillar 2 (collaborative filtering)
+   PERSONALIZED FEED — YouTube-style candidate generation + ranking
+
+   Phase 1: CANDIDATE GENERATION — cast a wide net from multiple signal sources
+     Source A: Latest from your most-watched channels (subscription-like behavior)
+     Source B: Topic search from your keyword/bigram history
+     Source C: Collaborative filtering — "users like you also watched"
+     Source D: Category trending — popular in your preferred categories
+     Source E: Subscription feed (if logged in)
+
+   Phase 2: SCORING — rank candidates by relevance signals
+     - Channel affinity (you watch this channel regularly)
+     - Topic match (title keywords match your interests)
+     - Recency (newer uploads scored higher)
+     - Diversity penalty (don't show 5 from same channel)
+
+   Phase 3: MERGE — interleave scored candidates into a unified stream
 ----------------------------------------------------------- */
 async function fetchPersonalizedFeed() {
-  const topChannels = getTopChannels(4);
-  const topKeywords = getTopKeywords(5);
-  const recentIds = getRecentVideoIds(3);
-  const catId = getTopCategoryId() || freshCategory();
-  const seen = new Set(), allItems = [];
-  function addItems(items) {
+  const topChannels = getTopChannels(6);
+  const topKeywords = getTopKeywords(6);
+  const topBigrams = getTopBigrams(4);
+  const recentIds = getRecentVideoIds(4);
+  const topCats = getTopCategories(3);
+  const watchedIds = new Set((getTasteProfile().recentVideoIds || []).slice(0, 50));
+
+  const seen = new Set();
+  const candidates = []; // { item, source, sourceWeight }
+
+  function addCandidates(items, source, weight) {
     (items || []).forEach(item => {
       const id = item.id?.videoId || item.id;
-      if (id && !seen.has(id)) { seen.add(id); allItems.push(item); }
+      if (!id || seen.has(id) || watchedIds.has(id)) return; // skip already watched
+      seen.add(id);
+      candidates.push({ item, source, sourceWeight: weight });
     });
   }
+
   const fetches = [];
-  // Pillar 1a: latest from your most-watched channels
-  topChannels.slice(0, 3).forEach(ch => fetches.push(
-    fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 8, _: Date.now() })
-  ));
-  // Pillar 1b: keyword search from your watch history titles
-  if (topKeywords.length >= 2) fetches.push(
-    fetchYouTube("search", { part: "snippet", q: topKeywords.slice(0, 3).join(" "), type: "video", maxResults: 10, _: Date.now() })
-  );
-  // Pillar 2: collaborative filtering via relatedToVideoId on recent watches
-  recentIds.forEach(videoId => fetches.push(
-    fetchYouTube("search", { part: "snippet", type: "video", relatedToVideoId: videoId, maxResults: 6, _: Date.now() })
-  ));
-  // Fallback: trending in your top category
-  fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: catId, maxResults: 10, _: Date.now() }));
-  const results = await Promise.allSettled(fetches);
-  results.forEach(r => { if (r.status === "fulfilled") addItems(r.value.items); });
-  // Fisher-Yates shuffle so sources don't cluster
-  for (let i = allItems.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [allItems[i], allItems[j]] = [allItems[j], allItems[i]];
+  const fetchMeta = []; // track what each fetch is for scoring
+
+  // SOURCE A: Latest from top watched channels (your "subscriptions by behavior")
+  // Weight: highest — you've proven you watch these
+  topChannels.slice(0, 4).forEach(ch => {
+    fetches.push(fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 6, _: Date.now() }));
+    fetchMeta.push({ source: "channel", weight: 5, channelId: ch.id });
+  });
+
+  // SOURCE B1: Bigram topic search (captures multi-word interests like "dragon ball")
+  topBigrams.slice(0, 2).forEach(phrase => {
+    fetches.push(fetchYouTube("search", { part: "snippet", q: phrase, type: "video", maxResults: 8, _: Date.now() }));
+    fetchMeta.push({ source: "bigram", weight: 4 });
+  });
+
+  // SOURCE B2: Keyword topic search (single strong keywords)
+  if (topKeywords.length >= 2) {
+    // Search different keyword combos for diversity
+    const kwSet1 = topKeywords.slice(0, 3).join(" ");
+    const kwSet2 = topKeywords.slice(2, 5).join(" ");
+    fetches.push(fetchYouTube("search", { part: "snippet", q: kwSet1, type: "video", maxResults: 8, _: Date.now() }));
+    fetchMeta.push({ source: "keyword", weight: 3 });
+    if (kwSet2.trim()) {
+      fetches.push(fetchYouTube("search", { part: "snippet", q: kwSet2, type: "video", maxResults: 6, _: Date.now() }));
+      fetchMeta.push({ source: "keyword", weight: 3 });
+    }
   }
-  return allItems;
+
+  // SOURCE C: Collaborative filtering — "viewers of X also watched Y"
+  recentIds.slice(0, 3).forEach(videoId => {
+    fetches.push(fetchYouTube("search", { part: "snippet", type: "video", relatedToVideoId: videoId, maxResults: 5, _: Date.now() }));
+    fetchMeta.push({ source: "collaborative", weight: 3 });
+  });
+
+  // SOURCE D: Category trending — popular in YOUR preferred categories (not random)
+  topCats.slice(0, 2).forEach(catId => {
+    fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: catId, maxResults: 8, _: Date.now() }));
+    fetchMeta.push({ source: "trending", weight: 2 });
+  });
+
+  // SOURCE E: Subscription feed (if logged in — real subscription activity)
+  const token = await getValidToken();
+  if (token) {
+    fetches.push(
+      fetch("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=15", {
+        headers: { Authorization: "Bearer " + token }
+      }).then(r => r.json()).then(data => {
+        // Extract video IDs from subscription activity (uploads, likes, etc.)
+        const items = (data.items || []).filter(a =>
+          a.snippet && (a.contentDetails?.upload?.videoId || a.contentDetails?.recommendation?.resourceId?.videoId)
+        ).map(a => ({
+          id: a.contentDetails?.upload?.videoId || a.contentDetails?.recommendation?.resourceId?.videoId,
+          snippet: a.snippet
+        }));
+        return { items };
+      }).catch(() => ({ items: [] }))
+    );
+    fetchMeta.push({ source: "subscriptions", weight: 4 });
+  }
+
+  // Fallback: general trending
+  fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 10, _: Date.now() }));
+  fetchMeta.push({ source: "fallback", weight: 1 });
+
+  // ---- PHASE 1: Fetch all candidates in parallel ----
+  const results = await Promise.allSettled(fetches);
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") {
+      addCandidates(r.value.items, fetchMeta[i].source, fetchMeta[i].weight);
+    }
+  });
+
+  // ---- PHASE 2: Score each candidate ----
+  const channelWeights = {};
+  topChannels.forEach(ch => { channelWeights[ch.id] = ch.score; });
+  const kwSet = new Set(topKeywords.map(w => w.toLowerCase()));
+  const biSet = new Set(topBigrams.map(b => b.toLowerCase()));
+
+  const scored = candidates.map(c => {
+    const snippet = c.item.snippet || {};
+    let score = c.sourceWeight; // base score from source type
+
+    // Channel affinity boost
+    const chId = snippet.channelId || "";
+    if (channelWeights[chId]) score += Math.min(channelWeights[chId], 8);
+
+    // Topic match — title keywords match your interests
+    const titleLower = (snippet.title || "").toLowerCase();
+    let topicHits = 0;
+    kwSet.forEach(kw => { if (titleLower.includes(kw)) topicHits++; });
+    biSet.forEach(bi => { if (titleLower.includes(bi)) topicHits += 2; }); // bigrams worth double
+    score += topicHits * 1.5;
+
+    // Recency bonus — published recently = fresher
+    const pubDate = new Date(snippet.publishedAt || 0).getTime();
+    const ageHours = (Date.now() - pubDate) / 3600000;
+    if (ageHours < 24) score += 3;       // today
+    else if (ageHours < 168) score += 1.5; // this week
+
+    return { ...c, score, channelId: chId };
+  });
+
+  // ---- PHASE 3: Diversity-aware ranking ----
+  // Sort by score, then interleave to avoid same-channel clustering
+  scored.sort((a, b) => b.score - a.score);
+
+  const feed = [];
+  const channelLastIndex = {}; // track last position each channel appeared
+
+  scored.forEach(c => {
+    const chId = c.channelId;
+    const lastIdx = channelLastIndex[chId];
+    // If same channel appeared in last 3 slots, defer it
+    if (lastIdx !== undefined && feed.length - lastIdx < 3) {
+      // Push to later — insert after a gap
+      const insertAt = Math.min(feed.length + 2, scored.length);
+      feed.splice(insertAt, 0, c.item);
+    } else {
+      feed.push(c.item);
+    }
+    channelLastIndex[chId] = feed.length - 1;
+  });
+
+  // Light shuffle within score tiers (±2 positions) for natural feel
+  for (let i = 1; i < feed.length - 1; i++) {
+    if (Math.random() < 0.3) {
+      const j = i + (Math.random() < 0.5 ? 1 : -1);
+      if (j >= 0 && j < feed.length) [feed[i], feed[j]] = [feed[j], feed[i]];
+    }
+  }
+
+  return feed;
 }
 
 function hideUIForVideo() {
