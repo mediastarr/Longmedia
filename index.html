@@ -370,7 +370,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 #playerSection.player-mini .player-controls button { padding: 5px 7px; font-size: 10px; min-height: 28px; min-width: unset; }
 #playerSection.player-mini #closeMini { padding: 4px 7px; font-size: 10px; min-height: 28px; min-width: unset; top: 6px; right: 6px; }
 #shortsPage { display: none; position: fixed; inset: 0; z-index: 5000; background: #000; overflow: hidden; touch-action: none; }
-#shortsIframe { width: 100%; height: 100%; border: none; display: block; }
+#shortsIframe { width: 100%; height: 100%; border: none; display: block; background: #000; }
 #shortsPage::before {
   content: ""; position: absolute; inset: -40px; pointer-events: none; z-index: 0;
   background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.28), transparent 55%), radial-gradient(circle at 0% 100%, rgba(120,80,255,0.22), transparent 60%), radial-gradient(circle at 100% 100%, rgba(0,255,180,0.22), transparent 60%);
@@ -401,8 +401,8 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 @keyframes shortsArrowBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
 .shorts-arrow.up { animation-name: shortsArrowBounceUp; }
 @keyframes shortsArrowBounceUp { 0%, 100% { transform: rotate(180deg) translateY(0); } 50% { transform: rotate(180deg) translateY(5px); } }
-#shortsTransition { position: absolute; inset: 0; z-index: 9; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.18s ease; }
-#shortsTransition.flash { opacity: 0.75; }
+#shortsTransition { position: absolute; inset: 0; z-index: 9; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
+#shortsTransition.flash { opacity: 1; }
 
 /* Scroll to top button */
 #scrollTopBtn {
@@ -1271,12 +1271,14 @@ shortsTab.addEventListener("click", async () => {
   function goNext() {
     if (shortsIndex >= shortsItems.length - 1) return;
     shortsTrans.classList.add("flash");
-    setTimeout(() => { shortsIndex++; playShort(shortsIndex); shortsTrans.classList.remove("flash"); }, 180);
+    setTimeout(() => { shortsIndex++; playShort(shortsIndex); }, 120);
+    setTimeout(() => { shortsTrans.classList.remove("flash"); }, 600);
   }
   function goPrev() {
     if (shortsIndex <= 0) return;
     shortsTrans.classList.add("flash");
-    setTimeout(() => { shortsIndex--; playShort(shortsIndex); shortsTrans.classList.remove("flash"); }, 180);
+    setTimeout(() => { shortsIndex--; playShort(shortsIndex); }, 120);
+    setTimeout(() => { shortsTrans.classList.remove("flash"); }, 600);
   }
   playShort(0);
   shortsHint.classList.add("visible");
