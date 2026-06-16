@@ -157,14 +157,14 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
   color: #f5f7ff; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
   opacity: 0; pointer-events: none; z-index: 60;
 }
-#feed { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; position: relative; z-index: 10; }
+#feed { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; position: relative; z-index: 10; touch-action: pan-y; }
 .video-card {
   display: flex; gap: 10px; padding: 14px; border-radius: 18px;
   background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.08), rgba(8,10,16,0.96));
   cursor: pointer; position: relative; transform-style: preserve-3d; perspective: 1100px;
   transition: transform 0.15s ease-out;
   min-height: 52px;
-  touch-action: manipulation;
+  touch-action: pan-y;
   -webkit-tap-highlight-color: rgba(60,242,255,0.2);
 }
 .skeleton {
@@ -460,15 +460,16 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   100% { width: 100%; }
 }
 /* Playlist picker overlay */
-#playlistPickerOverlay { display:none; position:fixed; inset:0; z-index:100000; background:rgba(0,0,0,0.75); backdrop-filter:blur(8px); align-items:center; justify-content:center; }
+#playlistPickerOverlay { display:none; position:fixed; inset:0; z-index:100000; background:rgba(0,0,0,0.82); align-items:center; justify-content:center; }
 #playlistPickerOverlay.open { display:flex; }
-#plPickerBox { width:90%; max-width:360px; max-height:70vh; border-radius:22px; background:linear-gradient(135deg,rgba(10,12,20,0.97),rgba(20,24,40,0.97)); border:1px solid rgba(60,242,255,0.35); box-shadow:0 0 40px rgba(60,242,255,0.25); display:flex; flex-direction:column; overflow:hidden; }
+#plPickerBox { width:90%; max-width:360px; max-height:70vh; border-radius:22px; background:linear-gradient(135deg,rgba(10,12,20,0.97),rgba(20,24,40,0.97)); border:1px solid rgba(60,242,255,0.35); box-shadow:0 0 40px rgba(60,242,255,0.25); display:flex; flex-direction:column; overflow:hidden; pointer-events:auto; }
 .pl-picker-hdr { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid rgba(60,242,255,0.15); }
 .pl-picker-hdr span { font-size:14px; font-weight:600; letter-spacing:0.04em; }
 .pl-picker-close { border:1px solid rgba(120,130,160,0.6); border-radius:999px; background:radial-gradient(circle at 0% 0%,rgba(255,80,80,0.3),rgba(10,12,20,0.9)); color:#f5f7ff; padding:6px 12px; font-size:12px; cursor:pointer; min-height:36px; touch-action:manipulation; }
 #plPickerList { flex:1; overflow-y:auto; padding:8px 0; -webkit-overflow-scrolling:touch; }
-.pl-pick-item { display:flex; align-items:center; gap:10px; padding:10px 16px; cursor:pointer; transition:background 0.15s; touch-action:manipulation; min-height:48px; }
-.pl-pick-item:active,.pl-pick-item:hover { background:rgba(60,242,255,0.12); }
+.pl-pick-item { display:flex; align-items:center; gap:12px; padding:14px 16px; cursor:pointer; transition:background 0.15s; touch-action:manipulation; min-height:56px; -webkit-tap-highlight-color:rgba(60,242,255,0.25); user-select:none; }
+.pl-pick-item:active { background:rgba(60,242,255,0.25); transform:scale(0.97); }
+.pl-pick-item:hover { background:rgba(60,242,255,0.12); }
 .pl-pick-thumb { width:48px; height:36px; border-radius:6px; overflow:hidden; background:#11131c; flex-shrink:0; }
 .pl-pick-thumb img { width:100%; height:100%; object-fit:cover; }
 .pl-pick-info { flex:1; min-width:0; }
@@ -2104,7 +2105,11 @@ themeToggle.addEventListener("click", () => { isLight = !isLight; document.body.
 ================================================================ */
 function closePicker() { playlistPickerOverlay.classList.remove("open"); }
 document.getElementById("plPickerClose").addEventListener("click", closePicker);
-playlistPickerOverlay.addEventListener("click", function(e) { if (e.target === playlistPickerOverlay) closePicker(); });
+document.getElementById("plPickerClose").addEventListener("touchend", function(e) { e.preventDefault(); closePicker(); });
+document.getElementById("plPickerBox").addEventListener("click", function(e) { e.stopPropagation(); });
+document.getElementById("plPickerBox").addEventListener("touchend", function(e) { e.stopPropagation(); });
+playlistPickerOverlay.addEventListener("click", function() { closePicker(); });
+playlistPickerOverlay.addEventListener("touchend", function(e) { if (e.target === playlistPickerOverlay) { e.preventDefault(); closePicker(); } });
 
 async function startWriteLogin() {
   plPickerList.innerHTML = '<div class="pl-pick-msg">Requesting login code…</div>';
@@ -2155,7 +2160,11 @@ async function openPickerWithToken(token) {
       var thumb = (s.thumbnails && (s.thumbnails.default && s.thumbnails.default.url || s.thumbnails.medium && s.thumbnails.medium.url)) || "";
       var item = document.createElement("div"); item.className = "pl-pick-item";
       item.innerHTML = '<div class="pl-pick-thumb">' + (thumb ? '<img src="' + thumb + '">' : '') + '</div><div class="pl-pick-info"><div class="pl-pick-title">' + s.title + '</div><div class="pl-pick-count">' + count + ' video' + (count !== 1 ? 's' : '') + '</div></div>';
-      item.addEventListener("click", function() { insertVideoToPlaylist(pl.id, s.title, token); });
+      (function(pid, ptitle, tok) {
+        item.addEventListener("click", function(e) { e.stopPropagation(); insertVideoToPlaylist(pid, ptitle, tok); });
+        var tapped = false;
+        item.addEventListener("touchend", function(e) { if (tapped) return; tapped = true; e.preventDefault(); e.stopPropagation(); insertVideoToPlaylist(pid, ptitle, tok); setTimeout(function() { tapped = false; }, 500); });
+      })(pl.id, s.title, token);
       plPickerList.appendChild(item);
     });
   } catch (e) { plPickerList.innerHTML = '<div class="pl-pick-msg">Network error. Try again.</div>'; }
