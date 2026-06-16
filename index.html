@@ -2162,8 +2162,14 @@ async function openPickerWithToken(token) {
       item.innerHTML = '<div class="pl-pick-thumb">' + (thumb ? '<img src="' + thumb + '">' : '') + '</div><div class="pl-pick-info"><div class="pl-pick-title">' + s.title + '</div><div class="pl-pick-count">' + count + ' video' + (count !== 1 ? 's' : '') + '</div></div>';
       (function(pid, ptitle, tok) {
         item.addEventListener("click", function(e) { e.stopPropagation(); insertVideoToPlaylist(pid, ptitle, tok); });
-        var tapped = false;
-        item.addEventListener("touchend", function(e) { if (tapped) return; tapped = true; e.preventDefault(); e.stopPropagation(); insertVideoToPlaylist(pid, ptitle, tok); setTimeout(function() { tapped = false; }, 500); });
+        var startY = 0;
+        item.addEventListener("touchstart", function(e) { startY = e.touches[0].clientY; }, { passive: true });
+        item.addEventListener("touchend", function(e) {
+          var endY = e.changedTouches[0].clientY;
+          if (Math.abs(endY - startY) > 15) return;
+          e.preventDefault(); e.stopPropagation();
+          insertVideoToPlaylist(pid, ptitle, tok);
+        });
       })(pl.id, s.title, token);
       plPickerList.appendChild(item);
     });
