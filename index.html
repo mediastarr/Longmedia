@@ -2104,11 +2104,8 @@ themeToggle.addEventListener("click", () => { isLight = !isLight; document.body.
    ADD TO PLAYLIST — picker overlay + YouTube API insert
 ================================================================ */
 function closePicker() { playlistPickerOverlay.classList.remove("open"); }
-document.getElementById("plPickerClose").addEventListener("click", closePicker);
-document.getElementById("plPickerClose").addEventListener("touchend", function(e) { e.preventDefault(); closePicker(); });
-document.getElementById("plPickerBox").addEventListener("click", function(e) { e.stopPropagation(); });
-playlistPickerOverlay.addEventListener("click", function() { closePicker(); });
-playlistPickerOverlay.addEventListener("touchend", function(e) { if (e.target === playlistPickerOverlay) { e.preventDefault(); closePicker(); } });
+document.getElementById("plPickerClose").onclick = function() { closePicker(); };
+playlistPickerOverlay.onclick = function(e) { if (e.target === playlistPickerOverlay) closePicker(); };
 
 async function startWriteLogin() {
   plPickerList.innerHTML = '<div class="pl-pick-msg">Requesting login code…</div>';
@@ -2159,17 +2156,7 @@ async function openPickerWithToken(token) {
       var thumb = (s.thumbnails && (s.thumbnails.default && s.thumbnails.default.url || s.thumbnails.medium && s.thumbnails.medium.url)) || "";
       var item = document.createElement("div"); item.className = "pl-pick-item";
       item.innerHTML = '<div class="pl-pick-thumb">' + (thumb ? '<img src="' + thumb + '">' : '') + '</div><div class="pl-pick-info"><div class="pl-pick-title">' + s.title + '</div><div class="pl-pick-count">' + count + ' video' + (count !== 1 ? 's' : '') + '</div></div>';
-      (function(pid, ptitle, tok) {
-        item.addEventListener("click", function(e) { e.stopPropagation(); insertVideoToPlaylist(pid, ptitle, tok); });
-        var startY = 0;
-        item.addEventListener("touchstart", function(e) { startY = e.touches[0].clientY; }, { passive: true });
-        item.addEventListener("touchend", function(e) {
-          var endY = e.changedTouches[0].clientY;
-          if (Math.abs(endY - startY) > 15) return;
-          e.preventDefault(); e.stopPropagation();
-          insertVideoToPlaylist(pid, ptitle, tok);
-        });
-      })(pl.id, s.title, token);
+      item.onclick = (function(pid, ptitle, tok) { return function() { insertVideoToPlaylist(pid, ptitle, tok); }; })(pl.id, s.title, token);
       plPickerList.appendChild(item);
     });
   } catch (e) { plPickerList.innerHTML = '<div class="pl-pick-msg">Network error. Try again.</div>'; }
