@@ -467,9 +467,10 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 .pl-picker-hdr span { font-size:14px; font-weight:600; letter-spacing:0.04em; }
 .pl-picker-close { border:1px solid rgba(120,130,160,0.6); border-radius:999px; background:radial-gradient(circle at 0% 0%,rgba(255,80,80,0.3),rgba(10,12,20,0.9)); color:#f5f7ff; padding:6px 12px; font-size:12px; cursor:pointer; min-height:36px; touch-action:manipulation; }
 #plPickerList { max-height:calc(70vh - 110px); overflow-y:scroll; padding:8px 0; -webkit-overflow-scrolling:touch; touch-action:pan-y; overscroll-behavior:contain; }
-.pl-pick-item { display:flex; align-items:center; gap:12px; padding:14px 16px; cursor:pointer; transition:background 0.15s; touch-action:manipulation; min-height:56px; -webkit-tap-highlight-color:rgba(60,242,255,0.25); user-select:none; }
+.pl-pick-item { display:flex; align-items:center; gap:12px; padding:14px 16px; cursor:pointer; transition:background 0.15s; touch-action:manipulation; min-height:56px; -webkit-tap-highlight-color:rgba(60,242,255,0.25); user-select:none; background:none; border:none; width:100%; text-align:left; color:#f5f7ff; font-family:inherit; font-size:inherit; outline:none; }
 .pl-pick-item:active { background:rgba(60,242,255,0.25); transform:scale(0.97); }
 .pl-pick-item:hover { background:rgba(60,242,255,0.12); }
+.pl-pick-item:focus { background:rgba(60,242,255,0.18); outline:2px solid rgba(60,242,255,0.6); outline-offset:-2px; }
 .pl-pick-thumb { width:48px; height:36px; border-radius:6px; overflow:hidden; background:#11131c; flex-shrink:0; }
 .pl-pick-thumb img { width:100%; height:100%; object-fit:cover; }
 .pl-pick-info { flex:1; min-width:0; }
@@ -2154,7 +2155,7 @@ async function openPickerWithToken(token) {
     data.items.forEach(function(pl) {
       var s = pl.snippet, count = (pl.contentDetails && pl.contentDetails.itemCount) || 0;
       var thumb = (s.thumbnails && (s.thumbnails.default && s.thumbnails.default.url || s.thumbnails.medium && s.thumbnails.medium.url)) || "";
-      var item = document.createElement("div"); item.className = "pl-pick-item";
+      var item = document.createElement("button"); item.className = "pl-pick-item"; item.type = "button";
       item.innerHTML = '<div class="pl-pick-thumb">' + (thumb ? '<img src="' + thumb + '">' : '') + '</div><div class="pl-pick-info"><div class="pl-pick-title">' + s.title + '</div><div class="pl-pick-count">' + count + ' video' + (count !== 1 ? 's' : '') + '</div></div>';
       item.onclick = (function(pid, ptitle, tok) { return function() { insertVideoToPlaylist(pid, ptitle, tok); }; })(pl.id, s.title, token);
       plPickerList.appendChild(item);
