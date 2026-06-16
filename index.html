@@ -459,6 +459,27 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   60% { width: 75%; }
   100% { width: 100%; }
 }
+/* Playlist picker overlay */
+#playlistPickerOverlay { display:none; position:fixed; inset:0; z-index:100000; background:rgba(0,0,0,0.75); backdrop-filter:blur(8px); align-items:center; justify-content:center; }
+#playlistPickerOverlay.open { display:flex; }
+#plPickerBox { width:90%; max-width:360px; max-height:70vh; border-radius:22px; background:linear-gradient(135deg,rgba(10,12,20,0.97),rgba(20,24,40,0.97)); border:1px solid rgba(60,242,255,0.35); box-shadow:0 0 40px rgba(60,242,255,0.25); display:flex; flex-direction:column; overflow:hidden; }
+.pl-picker-hdr { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid rgba(60,242,255,0.15); }
+.pl-picker-hdr span { font-size:14px; font-weight:600; letter-spacing:0.04em; }
+.pl-picker-close { border:1px solid rgba(120,130,160,0.6); border-radius:999px; background:radial-gradient(circle at 0% 0%,rgba(255,80,80,0.3),rgba(10,12,20,0.9)); color:#f5f7ff; padding:6px 12px; font-size:12px; cursor:pointer; min-height:36px; touch-action:manipulation; }
+#plPickerList { flex:1; overflow-y:auto; padding:8px 0; -webkit-overflow-scrolling:touch; }
+.pl-pick-item { display:flex; align-items:center; gap:10px; padding:10px 16px; cursor:pointer; transition:background 0.15s; touch-action:manipulation; min-height:48px; }
+.pl-pick-item:active,.pl-pick-item:hover { background:rgba(60,242,255,0.12); }
+.pl-pick-thumb { width:48px; height:36px; border-radius:6px; overflow:hidden; background:#11131c; flex-shrink:0; }
+.pl-pick-thumb img { width:100%; height:100%; object-fit:cover; }
+.pl-pick-info { flex:1; min-width:0; }
+.pl-pick-title { font-size:12px; font-weight:500; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pl-pick-count { font-size:10px; opacity:0.6; }
+.pl-pick-msg { padding:20px 16px; text-align:center; font-size:12px; opacity:0.7; }
+#plPickerStatus { padding:10px 16px; text-align:center; font-size:11px; opacity:0.8; border-top:1px solid rgba(60,242,255,0.1); display:none; }
+#plPickerStatus.success { color:#3cf2ff; }
+#plPickerStatus.error { color:#ff6b6b; }
+.pl-pick-login-btn { display:inline-block; margin-top:8px; padding:8px 16px; border-radius:999px; border:1px solid rgba(60,242,255,0.5); font-size:12px; cursor:pointer; background:radial-gradient(circle at 0% 0%,rgba(60,242,255,0.22),rgba(10,12,20,0.9)); color:#f5f7ff; touch-action:manipulation; min-height:40px; }
+#playerSection.ui-hidden #addToPlaylistBtn { opacity:0; pointer-events:none; }
 </style>
 </head>
 <body>
@@ -502,11 +523,19 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
       <button id="fullBtn">Full</button>
       <button id="hideUIBtn">Hide UI</button>
       <button id="resBtn">720p</button>
+      <button id="addToPlaylistBtn">+ List</button>
     </div>
     <button id="closeMini">✕</button>
   </div>
   <button id="exitFullBtn" class="exit-full-btn">Back</button>
   <button id="scrollTopBtn">▲</button>
+  <div id="playlistPickerOverlay">
+    <div id="plPickerBox">
+      <div class="pl-picker-hdr"><span>Add to Playlist</span><button class="pl-picker-close" id="plPickerClose">Cancel</button></div>
+      <div id="plPickerList"><div class="pl-pick-msg">Loading playlists…</div></div>
+      <div id="plPickerStatus"></div>
+    </div>
+  </div>
   <div id="hud"></div>
   <div id="searchPanel">
     <div class="search-input-bar">
@@ -807,6 +836,10 @@ const playlistItemsView = document.getElementById("playlistItemsView");
 const playlistBackBtn = document.getElementById("playlistBackBtn");
 const playlistItemsTitle = document.getElementById("playlistItemsTitle");
 const playlistItemsList = document.getElementById("playlistItemsList");
+const addToPlaylistBtn = document.getElementById("addToPlaylistBtn");
+const playlistPickerOverlay = document.getElementById("playlistPickerOverlay");
+const plPickerList = document.getElementById("plPickerList");
+const plPickerStatus = document.getElementById("plPickerStatus");
 
 function showHUD(text) {
   hudEl.textContent = text; hudEl.style.opacity = 1;
@@ -1559,7 +1592,7 @@ async function startDeviceLogin(source) {
   const statusEl = source === "playlists" ? playlistLoginStatus : deviceLoginStatusEl;
   const res = await fetch("https://oauth2.googleapis.com/device/code", {
     method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube.readonly" })
+    body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube" })
   });
   const data = await res.json();
   codeEl.textContent = "Code: " + data.user_code;
@@ -2066,6 +2099,107 @@ initAmbientLighting();
 themeToggle.addEventListener("click", () => { isLight = !isLight; document.body.classList.toggle("light", isLight); showHUD(isLight ? "Light Mode" : "Dark Mode"); });
 
 /* CHANGE: init uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
+/* ================================================================
+   ADD TO PLAYLIST — picker overlay + YouTube API insert
+================================================================ */
+function closePicker() { playlistPickerOverlay.classList.remove("open"); }
+document.getElementById("plPickerClose").addEventListener("click", closePicker);
+playlistPickerOverlay.addEventListener("click", function(e) { if (e.target === playlistPickerOverlay) closePicker(); });
+
+async function startWriteLogin() {
+  plPickerList.innerHTML = '<div class="pl-pick-msg">Requesting login code…</div>';
+  plPickerStatus.style.display = "none";
+  try {
+    const res = await fetch("https://oauth2.googleapis.com/device/code", {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube" })
+    });
+    const data = await res.json();
+    plPickerList.innerHTML = '<div class="pl-pick-msg"><div style="font-size:13px;font-weight:600;margin-bottom:8px;">Grant write access</div><div>Go to: <b>' + data.verification_url + '</b></div><div style="margin-top:6px;">Code: <b style="color:#3cf2ff;font-size:16px;letter-spacing:0.1em;">' + data.user_code + '</b></div><div class="pl-pick-code" style="font-size:11px;opacity:0.8;margin-top:6px;">Waiting for authorization…</div></div>';
+    const interval = data.interval || 5;
+    let authorized = false;
+    while (!authorized) {
+      await new Promise(r => setTimeout(r, interval * 1000));
+      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, client_secret: OAUTH_CLIENT_SECRET, device_code: data.device_code, grant_type: "urn:ietf:params:oauth:grant-type:device_code" })
+      });
+      const tokenData = await tokenRes.json();
+      if (tokenData.error) { if (tokenData.error === "authorization_pending") continue; plPickerList.innerHTML = '<div class="pl-pick-msg">Error: ' + tokenData.error + '</div>'; return null; }
+      authorized = true;
+      saveTokens(tokenData);
+      showHUD("Write access granted ✓");
+      return tokenData.access_token;
+    }
+  } catch (e) { plPickerList.innerHTML = '<div class="pl-pick-msg">Login error. Try again.</div>'; return null; }
+}
+
+async function openPickerWithToken(token) {
+  plPickerList.innerHTML = '<div class="pl-pick-msg">Loading playlists…</div>';
+  try {
+    const res = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
+    const data = await res.json();
+    if (data.error) {
+      if (data.error.code === 401 || data.error.code === 403) {
+        clearTokens();
+        plPickerList.innerHTML = '<div class="pl-pick-msg"><div>Session expired or permissions needed.</div><button class="pl-pick-login-btn" id="plPickerReloginBtn">Re-login</button></div>';
+        document.getElementById("plPickerReloginBtn").addEventListener("click", async function() { const t = await startWriteLogin(); if (t) openPickerWithToken(t); });
+        return;
+      }
+      plPickerList.innerHTML = '<div class="pl-pick-msg">Error loading playlists.</div>'; return;
+    }
+    if (!data.items || !data.items.length) { plPickerList.innerHTML = '<div class="pl-pick-msg">No playlists found.</div>'; return; }
+    plPickerList.innerHTML = "";
+    data.items.forEach(function(pl) {
+      var s = pl.snippet, count = (pl.contentDetails && pl.contentDetails.itemCount) || 0;
+      var thumb = (s.thumbnails && (s.thumbnails.default && s.thumbnails.default.url || s.thumbnails.medium && s.thumbnails.medium.url)) || "";
+      var item = document.createElement("div"); item.className = "pl-pick-item";
+      item.innerHTML = '<div class="pl-pick-thumb">' + (thumb ? '<img src="' + thumb + '">' : '') + '</div><div class="pl-pick-info"><div class="pl-pick-title">' + s.title + '</div><div class="pl-pick-count">' + count + ' video' + (count !== 1 ? 's' : '') + '</div></div>';
+      item.addEventListener("click", function() { insertVideoToPlaylist(pl.id, s.title, token); });
+      plPickerList.appendChild(item);
+    });
+  } catch (e) { plPickerList.innerHTML = '<div class="pl-pick-msg">Network error. Try again.</div>'; }
+}
+
+async function insertVideoToPlaylist(playlistId, playlistTitle, token) {
+  plPickerStatus.style.display = "block"; plPickerStatus.className = ""; plPickerStatus.textContent = "Adding…";
+  try {
+    var res = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ snippet: { playlistId: playlistId, resourceId: { kind: "youtube#video", videoId: currentVideoId } } })
+    });
+    var data = await res.json();
+    if (data.error) {
+      if (data.error.code === 403) {
+        plPickerStatus.className = "error"; plPickerStatus.textContent = "";
+        plPickerList.innerHTML = '<div class="pl-pick-msg"><div style="margin-bottom:8px;">Write permission needed.</div><div style="font-size:11px;opacity:0.7;">Re-login to grant write access.</div><button class="pl-pick-login-btn" id="plPickerUpgradeBtn">Upgrade Access</button></div>';
+        document.getElementById("plPickerUpgradeBtn").addEventListener("click", async function() { clearTokens(); var t = await startWriteLogin(); if (t) insertVideoToPlaylist(playlistId, playlistTitle, t); });
+        return;
+      }
+      if (data.error.code === 409 || (data.error.errors && data.error.errors[0] && data.error.errors[0].reason === "videoAlreadyInPlaylist")) { plPickerStatus.className = ""; plPickerStatus.textContent = "Already in this playlist."; return; }
+      plPickerStatus.className = "error"; plPickerStatus.textContent = "Error: " + (data.error.message || "Unknown error"); return;
+    }
+    plPickerStatus.className = "success"; plPickerStatus.textContent = "\u2713 Added to " + playlistTitle;
+    showHUD("Added to " + playlistTitle);
+    setTimeout(closePicker, 1200);
+  } catch (e) { plPickerStatus.className = "error"; plPickerStatus.textContent = "Network error. Try again."; }
+}
+
+addToPlaylistBtn.addEventListener("click", async function() {
+  if (!currentVideoId) { showHUD("No video playing"); return; }
+  playlistPickerOverlay.classList.add("open");
+  plPickerStatus.style.display = "none";
+  plPickerList.innerHTML = '<div class="pl-pick-msg">Loading playlists…</div>';
+  const token = await getValidToken();
+  if (!token) {
+    plPickerList.innerHTML = '<div class="pl-pick-msg"><div>Login to add videos to playlists.</div><button class="pl-pick-login-btn" id="plPickerLoginBtn">Login to YouTube</button></div>';
+    document.getElementById("plPickerLoginBtn").addEventListener("click", async function() { const t = await startWriteLogin(); if (t) openPickerWithToken(t); });
+    return;
+  }
+  openPickerWithToken(token);
+});
+
 (async function init() {
   // Dismiss boot splash after loading bar completes
   setTimeout(() => {
