@@ -27,6 +27,8 @@ body {
   color: #f5f7ff;
   overflow-x: hidden;
   min-height: 100vh;
+  touch-action: pan-y;
+  overscroll-behavior: none;
 }
 body.light {
   background: radial-gradient(circle at 0% 0%, #fdfdff 0%, #e4e7ff 40%, #cfd3ff 100%);
@@ -1992,6 +1994,31 @@ scrollTopBtn.addEventListener("click", () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 });
+
+/* === GLASSES SCROLL DIRECTION LOCK ===
+   Prevents left/right/diagonal swipes from causing vertical scroll.
+   Locks direction after first 10px of movement. */
+(function() {
+  window.addEventListener("wheel", function(e) {
+    if (currentTab === "shorts") return;
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 0.5) { e.preventDefault(); }
+  }, { passive: false });
+
+  var tStartX = 0, tStartY = 0, dirLock = null;
+  document.addEventListener("touchstart", function(e) {
+    if (currentTab === "shorts") return;
+    tStartX = e.touches[0].clientX; tStartY = e.touches[0].clientY; dirLock = null;
+  }, { passive: true });
+  document.addEventListener("touchmove", function(e) {
+    if (currentTab === "shorts") return;
+    if (!dirLock) {
+      var dx = Math.abs(e.touches[0].clientX - tStartX);
+      var dy = Math.abs(e.touches[0].clientY - tStartY);
+      if (dx + dy > 10) dirLock = dx > dy ? "h" : "v";
+    }
+    if (dirLock === "h") e.preventDefault();
+  }, { passive: false });
+})();
 
 window.addEventListener("scroll", async () => {
   // Show/hide scroll-to-top button
