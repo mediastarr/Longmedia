@@ -970,152 +970,167 @@ function hasEnoughHistory() { return historyList.length >= 3; }
    Phase 3: MERGE — interleave scored candidates into a unified stream
 ----------------------------------------------------------- */
 async function fetchPersonalizedFeed() {
+  const token = await getValidToken();
+  const watchedIds = new Set((getTasteProfile().recentVideoIds || []).slice(0, 50));
+  const seen = new Set();
+  const allItems = [];
+
+  function addItems(items, weight) {
+    (items || []).forEach(item => {
+      const id = item.id?.videoId || item.id;
+      if (!id || seen.has(id) || watchedIds.has(id)) return;
+      seen.add(id);
+      allItems.push({ item, weight });
+    });
+  }
+
+  /* ============================================================
+     SOURCE 1: SUBSCRIPTION UPLOADS (OAuth — your actual subs)
+     subscriptions.list → channels.list → playlistItems.list
+     Uses 1-unit calls (playlistItems) instead of 100-unit search
+  ============================================================ */
+  if (token) {
+    try {
+      const subsRes = await fetch(
+        "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance",
+        { headers: { Authorization: "Bearer " + token } }
+      );
+      const subsData = await subsRes.json();
+      const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
+
+      if (channelIds.length > 0) {
+        // Batch-fetch upload playlist IDs for all subscribed channels (1 API call)
+        const chRes = await fetchYouTube("channels", {
+          part: "contentDetails", id: channelIds.slice(0, 50).join(",")
+        });
+        const uploadPlaylists = (chRes.items || [])
+          .map(ch => ch.contentDetails?.relatedPlaylists?.uploads)
+          .filter(Boolean);
+
+        // Fetch latest 5 videos from top 15 channels in parallel (1 unit each)
+        const uploadFetches = uploadPlaylists.slice(0, 15).map(plId =>
+          fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 5, _: Date.now() })
+        );
+        const uploadResults = await Promise.allSettled(uploadFetches);
+        uploadResults.forEach(r => {
+          if (r.status === "fulfilled") {
+            const items = (r.value.items || []).map(it => ({
+              id: it.snippet?.resourceId?.videoId, snippet: it.snippet
+            }));
+            addItems(items, 6);
+          }
+        });
+      }
+    } catch (e) { /* subscription fetch failed, continue */ }
+
+    /* ============================================================
+       SOURCE 2: LIKED VIDEOS (OAuth — your LL playlist)
+    ============================================================ */
+    try {
+      const llRes = await fetch(
+        "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=15",
+        { headers: { Authorization: "Bearer " + token } }
+      );
+      const llData = await llRes.json();
+      const likedItems = (llData.items || []).map(it => ({
+        id: it.snippet?.resourceId?.videoId, snippet: it.snippet
+      }));
+      addItems(likedItems, 4);
+    } catch (e) {}
+  }
+
+  /* ============================================================
+     SOURCE 3: LOCAL TASTE PROFILE — channels you watch most
+     (works logged in or out — supplements account data)
+  ============================================================ */
   const topChannels = getTopChannels(6);
   const topKeywords = getTopKeywords(6);
   const topBigrams = getTopBigrams(4);
   const recentIds = getRecentVideoIds(4);
-  const topCats = getTopCategories(3);
-  const watchedIds = new Set((getTasteProfile().recentVideoIds || []).slice(0, 50));
+  const topCats = getTopCategories(2);
 
-  const seen = new Set();
-  const candidates = []; // { item, source, sourceWeight }
+  const localFetches = [];
+  const localWeights = [];
 
-  function addCandidates(items, source, weight) {
-    (items || []).forEach(item => {
-      const id = item.id?.videoId || item.id;
-      if (!id || seen.has(id) || watchedIds.has(id)) return; // skip already watched
-      seen.add(id);
-      candidates.push({ item, source, sourceWeight: weight });
-    });
-  }
-
-  const fetches = [];
-  const fetchMeta = []; // track what each fetch is for scoring
-
-  // SOURCE A: Latest from top watched channels (your "subscriptions by behavior")
-  // Weight: highest — you've proven you watch these
-  topChannels.slice(0, 4).forEach(ch => {
-    fetches.push(fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 6, _: Date.now() }));
-    fetchMeta.push({ source: "channel", weight: 5, channelId: ch.id });
+  // Top watched channels — latest uploads
+  topChannels.slice(0, token ? 3 : 5).forEach(ch => {
+    localFetches.push(fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 5, _: Date.now() }));
+    localWeights.push(5);
   });
 
-  // SOURCE B1: Bigram topic search (captures multi-word interests like "dragon ball")
+  // Bigram topic searches ("dragon ball", "solo leveling")
   topBigrams.slice(0, 2).forEach(phrase => {
-    fetches.push(fetchYouTube("search", { part: "snippet", q: phrase, type: "video", maxResults: 8, _: Date.now() }));
-    fetchMeta.push({ source: "bigram", weight: 4 });
+    localFetches.push(fetchYouTube("search", { part: "snippet", q: phrase, type: "video", maxResults: 6, _: Date.now() }));
+    localWeights.push(4);
   });
 
-  // SOURCE B2: Keyword topic search (single strong keywords)
+  // Keyword topic searches
   if (topKeywords.length >= 2) {
-    // Search different keyword combos for diversity
-    const kwSet1 = topKeywords.slice(0, 3).join(" ");
-    const kwSet2 = topKeywords.slice(2, 5).join(" ");
-    fetches.push(fetchYouTube("search", { part: "snippet", q: kwSet1, type: "video", maxResults: 8, _: Date.now() }));
-    fetchMeta.push({ source: "keyword", weight: 3 });
-    if (kwSet2.trim()) {
-      fetches.push(fetchYouTube("search", { part: "snippet", q: kwSet2, type: "video", maxResults: 6, _: Date.now() }));
-      fetchMeta.push({ source: "keyword", weight: 3 });
-    }
+    const kwQ = topKeywords.slice(0, 3).join(" ");
+    localFetches.push(fetchYouTube("search", { part: "snippet", q: kwQ, type: "video", maxResults: 6, _: Date.now() }));
+    localWeights.push(3);
   }
 
-  // SOURCE C: Collaborative filtering — "viewers of X also watched Y"
+  // Collaborative filtering — "viewers of X also watched"
   recentIds.slice(0, 3).forEach(videoId => {
-    fetches.push(fetchYouTube("search", { part: "snippet", type: "video", relatedToVideoId: videoId, maxResults: 5, _: Date.now() }));
-    fetchMeta.push({ source: "collaborative", weight: 3 });
+    localFetches.push(fetchYouTube("search", { part: "snippet", type: "video", relatedToVideoId: videoId, maxResults: 5, _: Date.now() }));
+    localWeights.push(3);
   });
 
-  // SOURCE D: Category trending — popular in YOUR preferred categories (not random)
+  // Category trending — popular in YOUR preferred categories
   topCats.slice(0, 2).forEach(catId => {
-    fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: catId, maxResults: 8, _: Date.now() }));
-    fetchMeta.push({ source: "trending", weight: 2 });
+    localFetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: catId, maxResults: 8, _: Date.now() }));
+    localWeights.push(2);
   });
 
-  // SOURCE E: Subscription feed (if logged in — real subscription activity)
-  const token = await getValidToken();
-  if (token) {
-    fetches.push(
-      fetch("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=15", {
-        headers: { Authorization: "Bearer " + token }
-      }).then(r => r.json()).then(data => {
-        // Extract video IDs from subscription activity (uploads, likes, etc.)
-        const items = (data.items || []).filter(a =>
-          a.snippet && (a.contentDetails?.upload?.videoId || a.contentDetails?.recommendation?.resourceId?.videoId)
-        ).map(a => ({
-          id: a.contentDetails?.upload?.videoId || a.contentDetails?.recommendation?.resourceId?.videoId,
-          snippet: a.snippet
-        }));
-        return { items };
-      }).catch(() => ({ items: [] }))
-    );
-    fetchMeta.push({ source: "subscriptions", weight: 4 });
-  }
+  // Fallback trending
+  localFetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 10, _: Date.now() }));
+  localWeights.push(1);
 
-  // Fallback: general trending
-  fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 10, _: Date.now() }));
-  fetchMeta.push({ source: "fallback", weight: 1 });
-
-  // ---- PHASE 1: Fetch all candidates in parallel ----
-  const results = await Promise.allSettled(fetches);
-  results.forEach((r, i) => {
-    if (r.status === "fulfilled") {
-      addCandidates(r.value.items, fetchMeta[i].source, fetchMeta[i].weight);
-    }
+  const localResults = await Promise.allSettled(localFetches);
+  localResults.forEach((r, i) => {
+    if (r.status === "fulfilled") addItems(r.value.items, localWeights[i]);
   });
 
-  // ---- PHASE 2: Score each candidate ----
+  /* ============================================================
+     SCORING — rank every candidate by relevance signals
+  ============================================================ */
   const channelWeights = {};
   topChannels.forEach(ch => { channelWeights[ch.id] = ch.score; });
   const kwSet = new Set(topKeywords.map(w => w.toLowerCase()));
   const biSet = new Set(topBigrams.map(b => b.toLowerCase()));
 
-  const scored = candidates.map(c => {
+  const scored = allItems.map(c => {
     const snippet = c.item.snippet || {};
-    let score = c.sourceWeight; // base score from source type
-
-    // Channel affinity boost
+    let score = c.weight;
     const chId = snippet.channelId || "";
     if (channelWeights[chId]) score += Math.min(channelWeights[chId], 8);
-
-    // Topic match — title keywords match your interests
     const titleLower = (snippet.title || "").toLowerCase();
-    let topicHits = 0;
-    kwSet.forEach(kw => { if (titleLower.includes(kw)) topicHits++; });
-    biSet.forEach(bi => { if (titleLower.includes(bi)) topicHits += 2; }); // bigrams worth double
-    score += topicHits * 1.5;
-
-    // Recency bonus — published recently = fresher
-    const pubDate = new Date(snippet.publishedAt || 0).getTime();
-    const ageHours = (Date.now() - pubDate) / 3600000;
-    if (ageHours < 24) score += 3;       // today
-    else if (ageHours < 168) score += 1.5; // this week
-
-    return { ...c, score, channelId: chId };
+    kwSet.forEach(kw => { if (titleLower.includes(kw)) score += 1.5; });
+    biSet.forEach(bi => { if (titleLower.includes(bi)) score += 3; });
+    const ageHours = (Date.now() - new Date(snippet.publishedAt || 0).getTime()) / 3600000;
+    if (ageHours < 24) score += 3;
+    else if (ageHours < 168) score += 1.5;
+    return { item: c.item, score, channelId: chId };
   });
 
-  // ---- PHASE 3: Diversity-aware ranking ----
-  // Sort by score, then interleave to avoid same-channel clustering
+  /* ============================================================
+     DIVERSITY-AWARE RANKING — space out same-channel videos
+  ============================================================ */
   scored.sort((a, b) => b.score - a.score);
-
   const feed = [];
-  const channelLastIndex = {}; // track last position each channel appeared
-
+  const channelLastIndex = {};
   scored.forEach(c => {
-    const chId = c.channelId;
-    const lastIdx = channelLastIndex[chId];
-    // If same channel appeared in last 3 slots, defer it
+    const lastIdx = channelLastIndex[c.channelId];
     if (lastIdx !== undefined && feed.length - lastIdx < 3) {
-      // Push to later — insert after a gap
-      const insertAt = Math.min(feed.length + 2, scored.length);
-      feed.splice(insertAt, 0, c.item);
-    } else {
-      feed.push(c.item);
-    }
-    channelLastIndex[chId] = feed.length - 1;
+      feed.splice(Math.min(feed.length + 2, scored.length), 0, c.item);
+    } else { feed.push(c.item); }
+    channelLastIndex[c.channelId] = feed.length - 1;
   });
 
-  // Light shuffle within score tiers (±2 positions) for natural feel
+  // Light shuffle for natural feel
   for (let i = 1; i < feed.length - 1; i++) {
-    if (Math.random() < 0.3) {
+    if (Math.random() < 0.25) {
       const j = i + (Math.random() < 0.5 ? 1 : -1);
       if (j >= 0 && j < feed.length) [feed[i], feed[j]] = [feed[j], feed[i]];
     }
@@ -1407,8 +1422,74 @@ homeTab.addEventListener("click", async () => {
 
 trendingTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("trending"); showSkeletons(8);
-  const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
-  nextPageToken = data.nextPageToken || null; renderFeed(data.items || []); showHUD("Trending");
+  const token = await getValidToken();
+  const myCat = getTopCategoryId();
+  const allItems = [];
+  const seen = new Set();
+
+  function addUnique(items) {
+    (items || []).forEach(item => {
+      const id = item.id?.videoId || item.id;
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      allItems.push(item);
+    });
+  }
+
+  const fetches = [];
+
+  // Trending in YOUR top category (not random)
+  if (myCat) {
+    fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: myCat, maxResults: 15, _: Date.now() }));
+  }
+  // Trending in a second category for variety
+  const cats = getTopCategories(3);
+  if (cats.length > 1) {
+    fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cats[1], maxResults: 10, _: Date.now() }));
+  }
+
+  // If logged in — popular recent uploads from subscribed channels
+  if (token) {
+    fetches.push((async () => {
+      try {
+        const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=30&order=relevance", {
+          headers: { Authorization: "Bearer " + token }
+        });
+        const subsData = await subsRes.json();
+        const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
+        if (!channelIds.length) return { items: [] };
+        const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 30).join(",") });
+        const plIds = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
+        const upFetches = plIds.slice(0, 8).map(plId =>
+          fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 3, _: Date.now() })
+        );
+        const upResults = await Promise.allSettled(upFetches);
+        const items = [];
+        upResults.forEach(r => {
+          if (r.status === "fulfilled") {
+            (r.value.items || []).forEach(it => {
+              const vid = it.snippet?.resourceId?.videoId;
+              if (vid) items.push({ id: vid, snippet: it.snippet });
+            });
+          }
+        });
+        return { items };
+      } catch(e) { return { items: [] }; }
+    })());
+  }
+
+  // General trending fallback
+  fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 15, _: Date.now() }));
+
+  const results = await Promise.allSettled(fetches);
+  results.forEach(r => { if (r.status === "fulfilled") addUnique(r.value.items); });
+
+  nextPageToken = null; // trending uses merged sources, seed pagination separately
+  renderFeed(allItems);
+  // Seed pagination from general trending for infinite scroll
+  const seedData = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+  nextPageToken = seedData.nextPageToken || null;
+  showHUD(token ? "Trending For You ✦" : "Trending");
 });
 
 shortsTab.addEventListener("click", async () => {
@@ -1432,33 +1513,68 @@ shortsTab.addEventListener("click", async () => {
   const shortsHint    = document.getElementById("shortsHint");
   const shortsTrans   = document.getElementById("shortsTransition");
   const backBtn2      = document.getElementById("shortsBackBtn");
-  // Try queries until one returns playable shorts (handles quota errors / empty results)
+  // === PERSONALIZED SHORTS: subscription channels + keyword interests ===
+  const token = await getValidToken();
   let data = { items: [] };
-  for (let attempt = 0; attempt < SHORT_QUERIES.length; attempt++) {
-    const shortsQ = SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length]; shortQIdx++;
-    data = await fetchYouTube("search", { part: "snippet", q: shortsQ, type: "video", videoDuration: "short", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
-    if (data.items && data.items.length) break;
-  }
-  shortsItems = (data.items || []).filter(v => v.id && v.id.videoId).map(v => ({ id: v.id.videoId, snippet: v.snippet }));
-  shortsIndex = 0;
-  nextPageToken = data.nextPageToken || null;
+  const pool = [];
 
-  // FALLBACK: search quota exhausted — pull shorts from popular channels' UUSH shorts
-  // playlists via playlistItems (1 quota unit vs search's 100, same cost as Home tab)
-  if (!shortsItems.length) {
+  // SOURCE 1: Shorts from YOUR subscribed channels (UUSH playlists, 1 unit each)
+  if (token) {
+    try {
+      const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=30&order=relevance", {
+        headers: { Authorization: "Bearer " + token }
+      });
+      const subsData = await subsRes.json();
+      const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
+      // Construct UUSH shorts playlist IDs (replace "UC" prefix with "UUSH")
+      const shortsPlIds = channelIds.filter(id => id.startsWith("UC")).map(id => "UUSH" + id.slice(2));
+      // Fetch shorts from top 10 subscribed channels in parallel
+      const subShortsFetches = shortsPlIds.slice(0, 10).map(pid =>
+        fetchYouTube("playlistItems", { part: "snippet", playlistId: pid, maxResults: 5, _: Date.now() })
+      );
+      const subShortsResults = await Promise.allSettled(subShortsFetches);
+      subShortsResults.forEach(r => {
+        if (r.status === "fulfilled") {
+          (r.value.items || []).forEach(it => {
+            const vid = it.snippet?.resourceId?.videoId;
+            if (vid) pool.push({ id: vid, snippet: it.snippet });
+          });
+        }
+      });
+    } catch(e) {}
+  }
+
+  // SOURCE 2: Shorts matching your keyword interests
+  const topKW = getTopKeywords(3);
+  if (topKW.length > 0) {
+    const kwQuery = topKW.slice(0, 2).join(" ") + " #shorts";
+    const kwData = await fetchYouTube("search", { part: "snippet", q: kwQuery, type: "video", videoDuration: "short", videoEmbeddable: "true", maxResults: 10, _: Date.now() });
+    (kwData.items || []).filter(v => v.id && v.id.videoId).forEach(v => pool.push({ id: v.id.videoId, snippet: v.snippet }));
+  }
+
+  // SOURCE 3: Generic shorts queries (fills gaps)
+  if (pool.length < 10) {
+    for (let attempt = 0; attempt < SHORT_QUERIES.length; attempt++) {
+      const shortsQ = SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length]; shortQIdx++;
+      data = await fetchYouTube("search", { part: "snippet", q: shortsQ, type: "video", videoDuration: "short", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
+      if (data.items && data.items.length) {
+        data.items.filter(v => v.id && v.id.videoId).forEach(v => pool.push({ id: v.id.videoId, snippet: v.snippet }));
+        break;
+      }
+    }
+  }
+
+  // FALLBACK: popular channels' UUSH shorts (quota-friendly)
+  if (pool.length < 5) {
     const SHORTS_PLAYLISTS = [
-      "UUSHX6OQ3DkcsbYNE6H8uQQuVA", // MrBeast
-      "UUSHq8DICunczvLuJJq414110A", // Zach King
-      "UUSHRijo3ddMTht_IHyNSNXpNQ", // Dude Perfect
-      "UUSHJ5v_MCY6GNUBTO8-D3XoAg", // WWE
-      "UUSHpEhnqL0y41EpW2TvWAHD7Q", // SET India
-      "UUSH-lHJZR3Gqxm24_Vd_AJ5Yw"  // PewDiePie
+      "UUSHX6OQ3DkcsbYNE6H8uQQuVA","UUSHq8DICunczvLuJJq414110A",
+      "UUSHRijo3ddMTht_IHyNSNXpNQ","UUSHJ5v_MCY6GNUBTO8-D3XoAg",
+      "UUSHpEhnqL0y41EpW2TvWAHD7Q","UUSH-lHJZR3Gqxm24_Vd_AJ5Yw"
     ];
     const plFetches = SHORTS_PLAYLISTS.map(pid =>
       fetchYouTube("playlistItems", { part: "snippet", playlistId: pid, maxResults: 10, _: Date.now() })
     );
     const plResults = await Promise.allSettled(plFetches);
-    const pool = [];
     plResults.forEach(r => {
       if (r.status === "fulfilled") {
         (r.value.items || []).forEach(it => {
@@ -1467,14 +1583,17 @@ shortsTab.addEventListener("click", async () => {
         });
       }
     });
-    // Shuffle so it's not channel-blocked
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
-    shortsItems = pool;
-    nextPageToken = null; // playlist fallback has no shared pagination
   }
+
+  // Dedupe and shuffle
+  const seen = new Set();
+  shortsItems = pool.filter(v => { if (seen.has(v.id)) return false; seen.add(v.id); return true; });
+  for (let i = shortsItems.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shortsItems[i], shortsItems[j]] = [shortsItems[j], shortsItems[i]];
+  }
+  shortsIndex = 0;
+  nextPageToken = data.nextPageToken || null;
 
   if (!shortsItems.length) {
     shortsCounter.textContent = "No shorts — tap Back and retry";
