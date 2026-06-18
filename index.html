@@ -21,6 +21,9 @@
   --shadow-glow: 0 0 40px rgba(60,242,255,0.65);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
+*:focus { outline: 2px solid rgba(60,242,255,0.7); outline-offset: -2px; }
+*:focus:not(:focus-visible) { outline: none; }
+*:focus-visible { outline: 2px solid rgba(60,242,255,0.7); outline-offset: -2px; }
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
   background: radial-gradient(circle at 10% 0%, #05060a 0%, #020308 40%, #000000 100%);
@@ -105,6 +108,8 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
   box-shadow: 0 0 18px rgba(60,242,255,0.7);
   background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.22), rgba(10,12,20,0.9));
 }
+.tab-btn:focus, .tab-btn:focus-visible { border-color: var(--accent); box-shadow: 0 0 14px rgba(60,242,255,0.6); outline: none; }
+.topbar-btn:focus, .topbar-btn:focus-visible { border-color: var(--accent); box-shadow: 0 0 14px rgba(60,242,255,0.6); outline: none; }
 /* CHANGE: sticky so medium player stays visible in viewport */
 #playerSection {
   margin-top: 16px; border-radius: 22px; overflow: hidden; position: sticky; top: 12px; z-index: 30;
@@ -197,6 +202,11 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
   transform: translateZ(22px) scale(1.03);
   box-shadow: 0 0 28px rgba(60,242,255,0.35), 0 0 55px rgba(60,242,255,0.18);
   transition: transform 0.15s ease-out, box-shadow 0.2s ease-out;
+}
+.video-card:focus, .video-card:focus-visible {
+  outline: 2px solid rgba(60,242,255,0.7);
+  outline-offset: -2px;
+  box-shadow: 0 0 22px rgba(60,242,255,0.4), 0 0 44px rgba(60,242,255,0.15);
 }
 .video-card::after {
   content: ""; position: absolute; inset: 0; border-radius: 18px; z-index: -1;
