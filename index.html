@@ -24,9 +24,11 @@
 *:focus { outline: 2px solid rgba(60,242,255,0.7); outline-offset: -2px; }
 *:focus:not(:focus-visible) { outline: none; }
 *:focus-visible { outline: 2px solid rgba(60,242,255,0.7); outline-offset: -2px; }
+html { background: #000; }
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-  background: radial-gradient(circle at 10% 0%, #05060a 0%, #020308 40%, #000000 100%);
+  background-color: #000;
+  background-image: radial-gradient(circle at 10% 0%, #05060a 0%, #020308 40%, #000000 100%);
   color: #f5f7ff;
   overflow-x: hidden;
   min-height: 100vh;
@@ -37,7 +39,7 @@ body.light {
   background: radial-gradient(circle at 0% 0%, #fdfdff 0%, #e4e7ff 40%, #cfd3ff 100%);
   color: #05060a;
 }
-.app-shell { display: flex; flex-direction: column; min-height: 100vh; padding: 16px 18px 24px; }
+.app-shell { display: flex; flex-direction: column; min-height: 100vh; padding: 16px 18px 24px; background: #000; }
 #topbar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 10px 14px; border-radius: 18px;
