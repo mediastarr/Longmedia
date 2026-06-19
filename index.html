@@ -965,6 +965,23 @@ function getTopCategoryId() { const cats = getTopCategories(1); return cats[0] |
 function getRecentVideoIds(n = 5) { return (getTasteProfile().recentVideoIds || []).slice(0, n); }
 function hasEnoughHistory() { return historyList.length >= 3; }
 
+function saveSearchToProfile(query) {
+  if (!query || !query.trim()) return;
+  const profile = getTasteProfile();
+  profile.searchHistory = profile.searchHistory || [];
+  profile.searchHistory = [{ q: query.trim(), ts: Date.now() }, ...profile.searchHistory].slice(0, 30);
+  // Also boost keywords from search queries (stronger signal than title words)
+  const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","this","that","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","have","has","do","did","new","vs","full","2024","2025","2026"]);
+  const words = query.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w));
+  profile.keywords = profile.keywords || {};
+  words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 3; }); // 3x weight vs title keywords
+  profile.bigrams = profile.bigrams || {};
+  for (let i = 0; i < words.length - 1; i++) { const bi = words[i] + " " + words[i + 1]; profile.bigrams[bi] = (profile.bigrams[bi] || 0) + 3; }
+  localStorage.setItem("tasteProfile", JSON.stringify(profile));
+}
+
+function getRecentSearches(n) { return ((getTasteProfile().searchHistory || []).slice(0, n || 5)).map(s => s.q); }
+
 /* -----------------------------------------------------------
    PERSONALIZED FEED — YouTube-style candidate generation + ranking
 
@@ -1062,9 +1079,16 @@ async function fetchPersonalizedFeed() {
   const topBigrams = getTopBigrams(4);
   const recentIds = getRecentVideoIds(4);
   const topCats = getTopCategories(2);
+  const recentSearches = getRecentSearches(3);
 
   const localFetches = [];
   const localWeights = [];
+
+  // Recent search queries — strongest local signal (you actively searched for this)
+  recentSearches.slice(0, 2).forEach(q => {
+    localFetches.push(fetchYouTube("search", { part: "snippet", q: q, type: "video", maxResults: 6, _: Date.now() }));
+    localWeights.push(5);
+  });
 
   // Top watched channels — latest uploads
   topChannels.slice(0, token ? 3 : 5).forEach(ch => {
@@ -2106,6 +2130,7 @@ keyboardEl.addEventListener("click", async (e) => {
 
 function triggerSearch(q) {
   lastSearchQuery = q;
+  saveSearchToProfile(q);
   (async () => {
     currentTab = "search";
     closeKeyboard();
