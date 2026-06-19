@@ -1003,20 +1003,18 @@ function getRecentSearches(n) { return ((getTasteProfile().searchHistory || []).
 async function fetchPersonalizedFeed() {
   const token = await getValidToken();
   const watchedIds = new Set((getTasteProfile().recentVideoIds || []).slice(0, 50));
-  // Track videos already shown in recent feeds so they don't repeat
+  // SKIP videos shown in the LAST feed load — forces fresh content each tap
   let shownHistory = []; try { shownHistory = JSON.parse(localStorage.getItem("feedShownIds") || "[]"); } catch(e) {}
-  const shownIds = new Set(shownHistory.slice(0, 200));
+  const lastFeedIds = new Set(shownHistory.slice(0, 80)); // skip last ~80 shown videos
   const seen = new Set();
   const allItems = [];
 
   function addItems(items, weight) {
     (items || []).forEach(item => {
       const id = item.id?.videoId || item.id;
-      if (!id || seen.has(id) || watchedIds.has(id)) return;
+      if (!id || seen.has(id) || watchedIds.has(id) || lastFeedIds.has(id)) return;
       seen.add(id);
-      // Deprioritize (don't skip) videos shown in previous feeds
-      const adjustedWeight = shownIds.has(id) ? weight * 0.3 : weight;
-      allItems.push({ item, weight: adjustedWeight });
+      allItems.push({ item, weight });
     });
   }
 
@@ -1085,58 +1083,67 @@ async function fetchPersonalizedFeed() {
   }
 
   /* ============================================================
-     SOURCE 3: LOCAL TASTE PROFILE — channels you watch most
-     (works logged in or out — supplements account data)
+     SOURCE 3: LOCAL TASTE + DISCOVERY — rotated each tap
   ============================================================ */
-  const topChannels = getTopChannels(6);
-  const topKeywords = getTopKeywords(6);
-  const topBigrams = getTopBigrams(4);
-  const recentIds = getRecentVideoIds(4);
-  const topCats = getTopCategories(2);
-  const recentSearches = getRecentSearches(3);
+  const topChannels = getTopChannels(8);
+  const topKeywords = getTopKeywords(10);
+  const topBigrams = getTopBigrams(6);
+  const recentIds = getRecentVideoIds(5);
+  const topCats = getTopCategories(3);
+  const recentSearches = getRecentSearches(5);
+
+  // Shuffle all arrays so different items are picked each tap
+  function shuffle(arr) { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+  const shuffledChannels = shuffle(topChannels);
+  const shuffledKeywords = shuffle(topKeywords);
+  const shuffledBigrams = shuffle(topBigrams);
+  const shuffledSearches = shuffle(recentSearches);
+  const shuffledRecent = shuffle(recentIds);
 
   const localFetches = [];
   const localWeights = [];
 
-  // Recent search queries — strongest local signal (you actively searched for this)
-  recentSearches.slice(0, 2).forEach(q => {
+  // Recent search queries — rotated (pick 2 random from last 5)
+  shuffledSearches.slice(0, 2).forEach(q => {
     localFetches.push(fetchYouTube("search", { part: "snippet", q: q, type: "video", maxResults: 6, _: Date.now() }));
     localWeights.push(5);
   });
 
-  // Top watched channels — latest uploads
-  topChannels.slice(0, token ? 3 : 5).forEach(ch => {
-    localFetches.push(fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 5, _: Date.now() }));
-    localWeights.push(5);
+  // Top watched channels — rotated (pick 2-3 random from top 8)
+  shuffledChannels.slice(0, token ? 2 : 4).forEach(ch => {
+    localFetches.push(fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 4, _: Date.now() }));
+    localWeights.push(4);
   });
 
-  // Bigram topic searches ("dragon ball", "solo leveling")
-  topBigrams.slice(0, 2).forEach(phrase => {
+  // Bigram topic searches — rotated (pick 1-2 random from top 6)
+  shuffledBigrams.slice(0, 2).forEach(phrase => {
     localFetches.push(fetchYouTube("search", { part: "snippet", q: phrase, type: "video", maxResults: 6, _: Date.now() }));
     localWeights.push(4);
   });
 
-  // Keyword topic searches
-  if (topKeywords.length >= 2) {
-    const kwQ = topKeywords.slice(0, 3).join(" ");
+  // Keyword topic searches — different combo each tap
+  if (shuffledKeywords.length >= 2) {
+    const kwQ = shuffledKeywords.slice(0, 3).join(" ");
     localFetches.push(fetchYouTube("search", { part: "snippet", q: kwQ, type: "video", maxResults: 6, _: Date.now() }));
     localWeights.push(3);
   }
 
-  // Collaborative filtering — "viewers of X also watched"
-  recentIds.slice(0, 3).forEach(videoId => {
+  // Collaborative filtering — rotated recent videos
+  shuffledRecent.slice(0, 2).forEach(videoId => {
     localFetches.push(fetchYouTube("search", { part: "snippet", type: "video", relatedToVideoId: videoId, maxResults: 5, _: Date.now() }));
     localWeights.push(3);
   });
 
-  // Category trending — popular in YOUR preferred categories
-  topCats.slice(0, 2).forEach(catId => {
-    localFetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: catId, maxResults: 8, _: Date.now() }));
-    localWeights.push(2);
-  });
+  // Category trending — random category each tap for variety
+  const allCats = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
+  const myCats = topCats.length ? topCats : [allCats[Math.floor(Math.random() * allCats.length)]];
+  const randomCat = myCats[Math.floor(Math.random() * myCats.length)];
+  localFetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: randomCat, maxResults: 10, _: Date.now() }));
+  localWeights.push(2);
 
-  // Fallback trending
-  localFetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 10, _: Date.now() }));
+  // General trending — always a different random category as fallback
+  const fallbackCat = allCats[Math.floor(Math.random() * allCats.length)];
+  localFetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: fallbackCat, maxResults: 10, _: Date.now() }));
   localWeights.push(1);
 
   const localResults = await Promise.allSettled(localFetches);
