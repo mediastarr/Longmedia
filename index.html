@@ -1003,6 +1003,9 @@ function getRecentSearches(n) { return ((getTasteProfile().searchHistory || []).
 async function fetchPersonalizedFeed() {
   const token = await getValidToken();
   const watchedIds = new Set((getTasteProfile().recentVideoIds || []).slice(0, 50));
+  // Track videos already shown in recent feeds so they don't repeat
+  let shownHistory = []; try { shownHistory = JSON.parse(localStorage.getItem("feedShownIds") || "[]"); } catch(e) {}
+  const shownIds = new Set(shownHistory.slice(0, 200));
   const seen = new Set();
   const allItems = [];
 
@@ -1011,14 +1014,15 @@ async function fetchPersonalizedFeed() {
       const id = item.id?.videoId || item.id;
       if (!id || seen.has(id) || watchedIds.has(id)) return;
       seen.add(id);
-      allItems.push({ item, weight });
+      // Deprioritize (don't skip) videos shown in previous feeds
+      const adjustedWeight = shownIds.has(id) ? weight * 0.3 : weight;
+      allItems.push({ item, weight: adjustedWeight });
     });
   }
 
   /* ============================================================
      SOURCE 1: SUBSCRIPTION UPLOADS (OAuth — your actual subs)
-     subscriptions.list → channels.list → playlistItems.list
-     Uses 1-unit calls (playlistItems) instead of 100-unit search
+     SHUFFLED each load so different channels surface each time
   ============================================================ */
   if (token) {
     try {
@@ -1030,7 +1034,6 @@ async function fetchPersonalizedFeed() {
       const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
 
       if (channelIds.length > 0) {
-        // Batch-fetch upload playlist IDs for all subscribed channels (1 API call)
         const chRes = await fetchYouTube("channels", {
           part: "contentDetails", id: channelIds.slice(0, 50).join(",")
         });
@@ -1038,9 +1041,15 @@ async function fetchPersonalizedFeed() {
           .map(ch => ch.contentDetails?.relatedPlaylists?.uploads)
           .filter(Boolean);
 
-        // Fetch latest 5 videos from top 15 channels in parallel (1 unit each)
-        const uploadFetches = uploadPlaylists.slice(0, 15).map(plId =>
-          fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 5, _: Date.now() })
+        // Shuffle playlist order so each Home tap surfaces different channels
+        for (let i = uploadPlaylists.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [uploadPlaylists[i], uploadPlaylists[j]] = [uploadPlaylists[j], uploadPlaylists[i]];
+        }
+
+        // Sample 8 random channels (not always the same top 15)
+        const uploadFetches = uploadPlaylists.slice(0, 8).map(plId =>
+          fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 4, _: Date.now() })
         );
         const uploadResults = await Promise.allSettled(uploadFetches);
         uploadResults.forEach(r => {
@@ -1048,25 +1057,30 @@ async function fetchPersonalizedFeed() {
             const items = (r.value.items || []).map(it => ({
               id: it.snippet?.resourceId?.videoId, snippet: it.snippet
             }));
-            addItems(items, 6);
+            addItems(items, 5);
           }
         });
       }
-    } catch (e) { /* subscription fetch failed, continue */ }
+    } catch (e) {}
 
     /* ============================================================
-       SOURCE 2: LIKED VIDEOS (OAuth — your LL playlist)
+       SOURCE 2: LIKED VIDEOS (OAuth — random offset each load)
     ============================================================ */
     try {
       const llRes = await fetch(
-        "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=15",
+        "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=10",
         { headers: { Authorization: "Bearer " + token } }
       );
       const llData = await llRes.json();
       const likedItems = (llData.items || []).map(it => ({
         id: it.snippet?.resourceId?.videoId, snippet: it.snippet
       }));
-      addItems(likedItems, 4);
+      // Shuffle liked videos so different ones surface
+      for (let i = likedItems.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [likedItems[i], likedItems[j]] = [likedItems[j], likedItems[i]];
+      }
+      addItems(likedItems.slice(0, 5), 3);
     } catch (e) {}
   }
 
@@ -1173,6 +1187,11 @@ async function fetchPersonalizedFeed() {
       if (j >= 0 && j < feed.length) [feed[i], feed[j]] = [feed[j], feed[i]];
     }
   }
+
+  // Save shown video IDs so next Home tap surfaces different content
+  const newShownIds = feed.map(item => item.id?.videoId || item.id).filter(Boolean);
+  const updatedShown = [...newShownIds, ...shownHistory].slice(0, 300);
+  try { localStorage.setItem("feedShownIds", JSON.stringify(updatedShown)); } catch(e) {}
 
   return feed;
 }
