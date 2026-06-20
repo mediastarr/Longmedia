@@ -2036,7 +2036,7 @@ async function loadMoreVideos() {
   let data;
   if (currentTab === "home")     data = await fetchYouTube("videos",        { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
   if (currentTab === "movies")   data = await fetchYouTube("search",        { part: "snippet", q: "full movie", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
-  if (currentTab === "trending") data = await fetchYouTube("videos",        { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+  if (currentTab === "trending") data = await fetchYouTube("videos",        { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: getTopCategoryId() || undefined, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
   if (currentTab === "search")   data = await fetchYouTube("search",        { part: "snippet", q: lastSearchQuery, type: "video", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
   if (currentTab === "channel")  data = await fetchYouTube("playlistItems", { part: "snippet", playlistId: channelUploadsId, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
   if (!data) return;
