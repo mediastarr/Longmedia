@@ -2210,9 +2210,12 @@ function applyDepthGlow(x, y, isFullscreen) {
 document.addEventListener("mousemove", (e) => {
   const x = (e.clientX / window.innerWidth) * 2 - 1;
   const y = (e.clientY / window.innerHeight) * 2 - 1;
-  document.querySelectorAll(".parallax").forEach(el => { el.style.transform = `translate(${x*8}px, ${y*8}px)`; });
-  document.querySelectorAll(".parallax-tab").forEach(el => { el.style.transform = `translate(${x*4}px, ${y*4}px)`; });
-  applyDepthGlow(x, y, playerSection.classList.contains("player-fullscreen"));
+  const inFullscreen = playerSection.classList.contains("player-fullscreen");
+  if (!inFullscreen) {
+    document.querySelectorAll(".parallax").forEach(el => { el.style.transform = `translate(${x*8}px, ${y*8}px)`; });
+    document.querySelectorAll(".parallax-tab").forEach(el => { el.style.transform = `translate(${x*4}px, ${y*4}px)`; });
+  }
+  applyDepthGlow(x, y, inFullscreen);
   applyChroma(x, y);
 });
 
@@ -2236,12 +2239,15 @@ function initGyroscope() {
     const y = Math.max(-1, Math.min(1, (beta - 45) / 30)); // 45° = neutral holding angle
 
     // Depth-layered parallax — topbar and tabs only (cards excluded for performance)
-    document.querySelectorAll(".parallax").forEach(el => {
-      el.style.transform = `translate(${x * 12}px, ${y * 12}px)`;
-    });
-    document.querySelectorAll(".parallax-tab").forEach(el => {
-      el.style.transform = `translate(${x * 6}px, ${y * 6}px)`;
-    });
+    // Skipped in fullscreen so nothing peeks out from behind the player on head tilt
+    if (!playerSection.classList.contains("player-fullscreen")) {
+      document.querySelectorAll(".parallax").forEach(el => {
+        el.style.transform = `translate(${x * 12}px, ${y * 12}px)`;
+      });
+      document.querySelectorAll(".parallax-tab").forEach(el => {
+        el.style.transform = `translate(${x * 6}px, ${y * 6}px)`;
+      });
+    }
 
     applyDepthGlow(x, y, playerSection.classList.contains("player-fullscreen"));
     applyChroma(x, y);
