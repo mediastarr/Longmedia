@@ -2082,13 +2082,14 @@ scrollTopBtn.addEventListener("click", () => {
   }, { passive: false });
 })();
 
+let scrollCooldown = false;
 window.addEventListener("scroll", async () => {
-  // Show/hide scroll-to-top button
   scrollTopBtn.classList.toggle("visible", window.scrollY > 600);
-  if (isLoadingMore) return;
+  if (isLoadingMore || scrollCooldown) return;
   const scrollPos = window.innerHeight + window.scrollY;
-  const bottom = document.body.offsetHeight - 500;
+  const bottom = document.body.offsetHeight - 200;
   if (scrollPos < bottom) return;
+  scrollCooldown = true; setTimeout(() => { scrollCooldown = false; }, 2000);
   if (currentTab === "subs" && subsNextPageToken) { isLoadingMore = true; await loadMoreSubs(); isLoadingMore = false; return; }
   if (nextPageToken) { isLoadingMore = true; await loadMoreVideos(); isLoadingMore = false; }
 });
@@ -2214,13 +2215,6 @@ document.addEventListener("mousemove", (e) => {
   document.querySelectorAll(".parallax").forEach(el => { el.style.transform = `translate(${x*8}px, ${y*8}px)`; });
   document.querySelectorAll(".parallax-tab").forEach(el => { el.style.transform = `translate(${x*4}px, ${y*4}px)`; });
   applyDepthGlow(x, y, playerSection.classList.contains("player-fullscreen"));
-  document.querySelectorAll(".video-card").forEach(card => {
-    const isHover = card.matches(":hover"); const boost = isHover ? 1.6 : 1;
-    card.style.transform = `perspective(1100px) rotateX(${y*-8*boost}deg) rotateY(${x*8*boost}deg) translateX(${x*12}px) translateY(${y*12}px) translateZ(${isHover?18:0}px)`;
-    card.style.setProperty("--shadow-x", `${x*14}px`); card.style.setProperty("--shadow-y", `${y*14}px`);
-    card.style.setProperty("--shadow-blur", `${isHover?28:18}px`); card.style.setProperty("--shadow-opacity", isHover?0.75:0.55);
-    card.style.setProperty("--ao-opacity", isHover?0.22:0.35); card.style.setProperty("--ao-blur", `${isHover?32:22}px`);
-  });
   applyChroma(x, y);
 });
 
@@ -2243,17 +2237,12 @@ function initGyroscope() {
     const x = Math.max(-1, Math.min(1, gamma / 30));
     const y = Math.max(-1, Math.min(1, (beta - 45) / 30)); // 45° = neutral holding angle
 
-    // Depth-layered parallax — closer elements move more
+    // Depth-layered parallax — topbar and tabs only (cards excluded for performance)
     document.querySelectorAll(".parallax").forEach(el => {
       el.style.transform = `translate(${x * 12}px, ${y * 12}px)`;
     });
     document.querySelectorAll(".parallax-tab").forEach(el => {
       el.style.transform = `translate(${x * 6}px, ${y * 6}px)`;
-    });
-
-    // Cards get full 3D rotation from head tilt
-    document.querySelectorAll(".video-card").forEach(card => {
-      card.style.transform = `perspective(1100px) rotateX(${y * -10}deg) rotateY(${x * 10}deg) translateX(${x * 14}px) translateY(${y * 14}px)`;
     });
 
     applyDepthGlow(x, y, playerSection.classList.contains("player-fullscreen"));
