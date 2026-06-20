@@ -790,6 +790,7 @@ let channelNextPageToken = null;
 let channelUploadsId = null;
 let historyList = JSON.parse(localStorage.getItem("historyList") || "[]");
 let shortsItems = [];
+let shortsSeenIds = new Set();
 let shortsIndex = 0;
 let lastSearchQuery = "";
 let nextPageToken = null;
@@ -1655,7 +1656,17 @@ shortsTab.addEventListener("click", async () => {
     [shortsItems[i], shortsItems[j]] = [shortsItems[j], shortsItems[i]];
   }
   shortsIndex = 0;
-  nextPageToken = data.nextPageToken || null;
+  shortsSeenIds = new Set(shortsItems.map(v => v.id));
+
+  // Always seed a nextPageToken for infinite scroll, even if the pool came
+  // from subscriptions/keywords (which don't return a token themselves)
+  if (data.nextPageToken) {
+    nextPageToken = data.nextPageToken;
+  } else {
+    const seedQ = SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length]; shortQIdx++;
+    const seed = await fetchYouTube("search", { part: "snippet", q: seedQ, type: "video", videoDuration: "short", videoEmbeddable: "true", regionCode: "US", maxResults: 1, _: Date.now() });
+    nextPageToken = seed.nextPageToken || "seed";
+  }
 
   if (!shortsItems.length) {
     shortsCounter.textContent = "No shorts — tap Back and retry";
@@ -1665,14 +1676,25 @@ shortsTab.addEventListener("click", async () => {
     const item = shortsItems[index]; if (!item) return;
     shortsIframe.src = `https://www.youtube.com/embed/${item.id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&origin=${location.origin}`;
     updateCounter();
-    if (index >= shortsItems.length - 4 && nextPageToken) loadMoreShorts();
+    if (index >= shortsItems.length - 6 && !shortsLoadingMore) loadMoreShorts();
   }
+  let shortsLoadingMore = false;
   async function loadMoreShorts() {
-    if (!nextPageToken) return;
-    const more = await fetchYouTube("search", { part: "snippet", q: "#shorts", type: "video", videoDuration: "short", videoEmbeddable: "true", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
-    nextPageToken = more.nextPageToken || null;
-    shortsItems = shortsItems.concat((more.items || []).filter(v => v.id && v.id.videoId).map(v => ({ id: v.id.videoId, snippet: v.snippet })));
-    updateCounter();
+    if (shortsLoadingMore) return;
+    shortsLoadingMore = true;
+    try {
+      // Rotate through queries each batch so it doesn't just repeat "#shorts"
+      const q = SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length]; shortQIdx++;
+      const validToken = nextPageToken && nextPageToken !== "seed" ? nextPageToken : undefined;
+      const more = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "short", videoEmbeddable: "true", maxResults: 20, pageToken: validToken, _: Date.now() });
+      nextPageToken = more.nextPageToken || "seed"; // keep a truthy token so we keep trying different queries
+      const fresh = (more.items || []).filter(v => v.id && v.id.videoId && !shortsSeenIds.has(v.id.videoId));
+      fresh.forEach(v => shortsSeenIds.add(v.id.videoId));
+      shortsItems = shortsItems.concat(fresh.map(v => ({ id: v.id.videoId, snippet: v.snippet })));
+      updateCounter();
+    } finally {
+      shortsLoadingMore = false;
+    }
   }
   // Transition: fully covers iframe while loading, fades after iframe ready
   let transitioning = false;
