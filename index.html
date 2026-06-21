@@ -1750,15 +1750,20 @@ shortsTab.addEventListener("click", async () => {
   shortsPageEl._cleanup = () => document.removeEventListener("keydown", shortsKeyHandler);
 });
 
+let lastMovieQuery = "";
 moviesTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("movies"); showSkeletons(8);
-  // Try queries until one returns movies (handles quota errors / empty results)
+  // Pick a random starting query each time so re-toggling Movies feels fresh
+  const startIdx = Math.floor(Math.random() * MOVIE_QUERIES.length);
+  movieQIdx = startIdx;
   let data = { items: [] };
+  let usedQuery = "";
   for (let attempt = 0; attempt < MOVIE_QUERIES.length; attempt++) {
     const q = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
     data = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
-    if (data.items && data.items.length) break;
+    if (data.items && data.items.length) { usedQuery = q; break; }
   }
+  lastMovieQuery = usedQuery; // remember exact query so infinite scroll uses the matching pageToken
   const items = (data.items || []).filter(v => v.id && v.id.videoId).map(v => ({ id: v.id.videoId, snippet: v.snippet }));
   nextPageToken = data.nextPageToken || null; renderFeed(items); showHUD("Movies");
 });
@@ -2035,7 +2040,19 @@ async function loadMoreVideos() {
   if (!nextPageToken) return;
   let data;
   if (currentTab === "home")     data = await fetchYouTube("videos",        { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
-  if (currentTab === "movies")   data = await fetchYouTube("search",        { part: "snippet", q: "full movie", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+  if (currentTab === "movies") {
+    const validToken = nextPageToken && nextPageToken !== "seed" ? nextPageToken : undefined;
+    data = validToken
+      ? await fetchYouTube("search", { part: "snippet", q: lastMovieQuery || "full movie", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 20, pageToken: validToken, _: Date.now() })
+      : { items: [] };
+    // If this query's results are exhausted (no token / no items), rotate to a fresh movie query instead of dead-ending
+    if (!data || !data.items || !data.items.length) {
+      const q = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
+      lastMovieQuery = q;
+      data = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
+      if (!data.nextPageToken) data.nextPageToken = "seed"; // guarantee scroll keeps working next time too
+    }
+  }
   if (currentTab === "trending") data = await fetchYouTube("videos",        { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: getTopCategoryId() || undefined, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
   if (currentTab === "search")   data = await fetchYouTube("search",        { part: "snippet", q: lastSearchQuery, type: "video", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
   if (currentTab === "channel")  data = await fetchYouTube("playlistItems", { part: "snippet", playlistId: channelUploadsId, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
