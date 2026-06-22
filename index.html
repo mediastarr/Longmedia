@@ -2045,7 +2045,7 @@ async function startDeviceLogin(source) {
   try {
     const res = await fetch("https://oauth2.googleapis.com/device/code", {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube.readonly" })
+      body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube" })
     });
     const data = await res.json();
     if (data.error) {
@@ -2648,7 +2648,7 @@ async function startWriteLogin() {
   try {
     const res = await fetch("https://oauth2.googleapis.com/device/code", {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube.readonly" })
+      body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube" })
     });
     const data = await res.json();
     plPickerList.innerHTML = '<div class="pl-pick-msg"><div style="font-size:13px;font-weight:600;margin-bottom:8px;">Grant write access</div><div>Go to: <b>' + data.verification_url + '</b></div><div style="margin-top:6px;">Code: <b style="color:#3cf2ff;font-size:16px;letter-spacing:0.1em;">' + data.user_code + '</b></div><div class="pl-pick-code" style="font-size:11px;opacity:0.8;margin-top:6px;">Waiting for authorization…</div></div>';
