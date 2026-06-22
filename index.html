@@ -2063,26 +2063,31 @@ async function startDeviceLogin(source) {
   showHUD("Requesting login code…");
   const codeEl = source === "playlists" ? playlistLoginCode : deviceUserCodeEl;
   const statusEl = source === "playlists" ? playlistLoginStatus : deviceLoginStatusEl;
-  codeEl.textContent = "Requesting code…";
+  codeEl.textContent = "Requesting…";
   statusEl.textContent = "";
   try {
     const res = await fetch("https://oauth2.googleapis.com/device/code", {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube" })
     });
-    const data = await res.json();
+    const raw = await res.text();
+    let data;
+    try { data = JSON.parse(raw); } catch(e) { codeEl.textContent = "Parse error"; statusEl.textContent = raw.slice(0, 200); return; }
     if (data.error) {
       codeEl.textContent = "Error: " + (data.error_description || data.error);
-      statusEl.textContent = "Login failed — try again";
-      showHUD("Login error");
-      return;
+      statusEl.textContent = "Code: " + (data.error || "") + " — " + (data.error_description || "");
+      showHUD("Login error"); return;
+    }
+    if (!data.user_code) {
+      codeEl.textContent = "No code returned";
+      statusEl.textContent = "Response: " + raw.slice(0, 200); return;
     }
     codeEl.textContent = "Code: " + data.user_code;
     statusEl.textContent = "Go to: " + data.verification_url;
     pollForToken(data.device_code, data.interval || 5, source);
   } catch(e) {
-    codeEl.textContent = "Network error";
-    statusEl.textContent = "Check connection and try again";
+    codeEl.textContent = "Fetch failed: " + e.message;
+    statusEl.textContent = "Check connection";
     showHUD("Login error");
   }
 }
