@@ -371,6 +371,9 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 #resBtn { display: none; }
 #playerSection.player-fullscreen #resBtn { display: inline-block; }
 #playerSection.player-fullscreen.ui-hidden #resBtn { opacity: 0; pointer-events: none; }
+#playerSection.ui-hidden #addToPlaylistBtn { opacity: 0; pointer-events: none; }
+#playerSection.player-fullscreen #addToPlaylistBtn { display: none; }
+#playerSection.player-mini #addToPlaylistBtn { display: none; }
 #playerSection.player-mini .player-controls { gap: 4px; bottom: 6px; left: 6px; }
 #playerSection.player-mini .player-controls button { padding: 5px 7px; font-size: 10px; min-height: 28px; min-width: unset; }
 #playerSection.player-mini #closeMini { padding: 4px 7px; font-size: 10px; min-height: 28px; min-width: unset; top: 6px; right: 6px; }
@@ -508,6 +511,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
       <button id="fullBtn">Full</button>
       <button id="hideUIBtn">Hide UI</button>
       <button id="resBtn">720p</button>
+      <button id="addToPlaylistBtn">+ List</button>
     </div>
     <button id="closeMini">✕</button>
   </div>
@@ -1482,8 +1486,8 @@ shortsTab.addEventListener("click", async () => {
   showHUD("Shorts");
   shortsPageEl.innerHTML = `
     <iframe id="shortsIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-    <button id="shortsBackBtn">← Back</button>
-    <div id="shortsCounter">1 / …</div>
+    <button id="shortsBackBtn" tabindex="0">← Back</button>
+    <div id="shortsCounter">Loading…</div>
     <div id="shortsHint">
       <div class="shorts-arrow up">▼</div>
       <div class="shorts-hint-text">swipe up/down</div>
@@ -1497,6 +1501,15 @@ shortsTab.addEventListener("click", async () => {
   const shortsHint    = document.getElementById("shortsHint");
   const shortsTrans   = document.getElementById("shortsTransition");
   const backBtn2      = document.getElementById("shortsBackBtn");
+
+  // Wire back button IMMEDIATELY — before any async work so it always responds
+  backBtn2.addEventListener("click", () => {
+    shortsIframe.src = "";
+    shortsPageEl.style.display = "none";
+    setActiveTab("home");
+    homeTab.click();
+    showHUD("Home");
+  });
 
   const token = await getValidToken();
   let data = { items: [] };
@@ -1575,7 +1588,10 @@ shortsTab.addEventListener("click", async () => {
   if (data.nextPageToken) { nextPageToken = data.nextPageToken; }
   else { const seed = await fetchYouTube("search", { part: "snippet", q: SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length], type: "video", videoDuration: "short", videoEmbeddable: "true", regionCode: "US", maxResults: 1, _: Date.now() }); nextPageToken = seed.nextPageToken || "seed"; }
 
-  if (!shortsItems.length) { shortsCounter.textContent = "No shorts — tap Back and retry"; }
+  if (!shortsItems.length) {
+    shortsCounter.textContent = "No shorts found — tap Back";
+    return;
+  }
   function updateCounter() { shortsCounter.textContent = `${shortsIndex + 1} / ${shortsItems.length}`; }
   function playShort(index) {
     const item = shortsItems[index]; if (!item) return;
@@ -1610,7 +1626,6 @@ shortsTab.addEventListener("click", async () => {
   function goPrev() { transitionTo(shortsIndex - 1); }
   playShort(0);
   shortsHint.classList.add("visible"); setTimeout(() => shortsHint.classList.remove("visible"), 2800);
-  backBtn2.addEventListener("click", () => { shortsIframe.src = ""; setActiveTab("home"); shortsPageEl.style.display = "none"; homeTab.click(); showHUD("Home"); });
   let swStartY = 0, swStartTime = 0;
   shortsPageEl.addEventListener("touchstart", (e) => { if (transitioning) return; swStartY = e.touches[0].clientY; swStartTime = Date.now(); }, { passive: true });
   shortsPageEl.addEventListener("touchend", (e) => {
@@ -2236,8 +2251,105 @@ themeToggle.addEventListener("click", () => { isLight = !isLight; document.body.
 /* CHANGE: init uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
 
 /* ================================================================
-   SYNC FROM YOUTUBE — bootstraps taste profile from account data
+   ADD TO PLAYLIST — picker + YouTube API insert
 ================================================================ */
+const addToPlaylistBtn = document.getElementById("addToPlaylistBtn");
+const playlistPickerPage = document.getElementById("playlistPickerPage");
+const plPickerList = document.getElementById("plPickerList");
+const plPickerStatus = document.getElementById("plPickerStatus");
+
+let pickerPrevState = null;
+function openPicker() {
+  pickerPrevState = { feed: feedEl.style.display, channel: channelPageEl.style.display, subs: subsPageEl.style.display, playlist: playlistPageEl.style.display };
+  feedEl.style.display = "none"; channelPageEl.style.display = "none"; subsPageEl.style.display = "none"; playlistPageEl.style.display = "none";
+  playlistPickerPage.style.display = "block";
+}
+function closePicker() {
+  playlistPickerPage.style.display = "none";
+  if (pickerPrevState) { feedEl.style.display = pickerPrevState.feed; channelPageEl.style.display = pickerPrevState.channel; subsPageEl.style.display = pickerPrevState.subs; playlistPageEl.style.display = pickerPrevState.playlist; }
+  showHUD("Cancelled");
+}
+document.getElementById("plPickerClose").onclick = function() { closePicker(); };
+
+async function startWriteLogin() {
+  plPickerList.innerHTML = '<div class="pl-pick-msg">Requesting login code…</div>';
+  plPickerStatus.style.display = "none";
+  try {
+    const res = await fetch("https://oauth2.googleapis.com/device/code", {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube" })
+    });
+    const data = await res.json();
+    plPickerList.innerHTML = '<div class="pl-pick-msg"><div style="font-size:13px;font-weight:600;margin-bottom:8px;">Grant write access</div><div>Go to: <b>' + data.verification_url + '</b></div><div style="margin-top:6px;">Code: <b style="color:#3cf2ff;font-size:16px;letter-spacing:0.1em;">' + data.user_code + '</b></div><div style="font-size:11px;opacity:0.8;margin-top:6px;">Waiting for authorization…</div></div>';
+    const interval = data.interval || 5;
+    let authorized = false;
+    while (!authorized) {
+      await new Promise(r => setTimeout(r, interval * 1000));
+      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, client_secret: OAUTH_CLIENT_SECRET, device_code: data.device_code, grant_type: "urn:ietf:params:oauth:grant-type:device_code" })
+      });
+      const tokenData = await tokenRes.json();
+      if (tokenData.error) { if (tokenData.error === "authorization_pending") continue; plPickerList.innerHTML = '<div class="pl-pick-msg">Error: ' + tokenData.error + '</div>'; return null; }
+      authorized = true; saveTokens(tokenData); showHUD("Write access granted ✓"); return tokenData.access_token;
+    }
+  } catch (e) { plPickerList.innerHTML = '<div class="pl-pick-msg">Login error. Try again.</div>'; return null; }
+}
+
+async function openPickerWithToken(token) {
+  plPickerList.innerHTML = '<div class="pl-pick-msg">Loading playlists…</div>';
+  try {
+    const res = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
+    const data = await res.json();
+    if (data.error) { clearTokens(); plPickerList.innerHTML = '<div class="pl-pick-msg"><div>Session expired.</div><button id="plPickerReloginBtn" class="topbar-btn" style="margin-top:8px;">Re-login</button></div>'; document.getElementById("plPickerReloginBtn").addEventListener("click", async function() { const t = await startWriteLogin(); if (t) openPickerWithToken(t); }); return; }
+    if (!data.items || !data.items.length) { plPickerList.innerHTML = '<div class="pl-pick-msg">No playlists found.</div>'; return; }
+    plPickerList.innerHTML = "";
+    data.items.forEach(function(pl) {
+      var s = pl.snippet, count = (pl.contentDetails && pl.contentDetails.itemCount) || 0;
+      var thumb = (s.thumbnails && (s.thumbnails.medium && s.thumbnails.medium.url || s.thumbnails.default && s.thumbnails.default.url)) || "";
+      var item = document.createElement("button"); item.className = "pl-pick-item"; item.type = "button";
+      item.innerHTML = '<div class="pl-pick-thumb">' + (thumb ? '<img src="' + thumb + '">' : '') + '</div><div class="pl-pick-info"><div class="pl-pick-title">' + s.title + '</div><div class="pl-pick-count">' + count + ' video' + (count !== 1 ? 's' : '') + '</div></div>';
+      item.onclick = (function(pid, ptitle, tok) { return function() { insertVideoToPlaylist(pid, ptitle, tok); }; })(pl.id, s.title, token);
+      plPickerList.appendChild(item);
+    });
+  } catch (e) { plPickerList.innerHTML = '<div class="pl-pick-msg">Network error. Try again.</div>'; }
+}
+
+async function insertVideoToPlaylist(playlistId, playlistTitle, token) {
+  plPickerStatus.style.display = "block"; plPickerStatus.className = ""; plPickerStatus.textContent = "Adding…";
+  try {
+    var res = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ snippet: { playlistId: playlistId, resourceId: { kind: "youtube#video", videoId: currentVideoId } } })
+    });
+    var data = await res.json();
+    if (data.error) {
+      if (data.error.code === 403) { plPickerList.innerHTML = '<div class="pl-pick-msg"><div>Write permission needed.</div><button id="plPickerUpgradeBtn" class="topbar-btn" style="margin-top:8px;">Upgrade Access</button></div>'; document.getElementById("plPickerUpgradeBtn").addEventListener("click", async function() { clearTokens(); var t = await startWriteLogin(); if (t) insertVideoToPlaylist(playlistId, playlistTitle, t); }); return; }
+      if (data.error.code === 409 || (data.error.errors && data.error.errors[0] && data.error.errors[0].reason === "videoAlreadyInPlaylist")) { plPickerStatus.textContent = "Already in this playlist."; return; }
+      plPickerStatus.className = "error"; plPickerStatus.textContent = "Error: " + (data.error.message || "Unknown error"); return;
+    }
+    plPickerStatus.className = "success"; plPickerStatus.textContent = "✓ Added to " + playlistTitle;
+    showHUD("Added to " + playlistTitle);
+    setTimeout(function() { closePicker(); }, 1200);
+  } catch (e) { plPickerStatus.className = "error"; plPickerStatus.textContent = "Network error. Try again."; }
+}
+
+addToPlaylistBtn.addEventListener("click", async function() {
+  if (!currentVideoId) { showHUD("No video playing"); return; }
+  openPicker();
+  plPickerStatus.style.display = "none";
+  plPickerList.innerHTML = '<div class="pl-pick-msg">Loading playlists…</div>';
+  const token = await getValidToken();
+  if (!token) {
+    plPickerList.innerHTML = '<div class="pl-pick-msg"><div>Login to add videos to playlists.</div><button id="plPickerLoginBtn" class="topbar-btn" style="margin-top:8px;">Login to YouTube</button></div>';
+    document.getElementById("plPickerLoginBtn").addEventListener("click", async function() { const t = await startWriteLogin(); if (t) openPickerWithToken(t); });
+    return;
+  }
+  openPickerWithToken(token);
+});
+
+
 const syncBtn = document.getElementById("syncBtn");
 const syncOverlay = document.getElementById("syncOverlay");
 const syncBox = document.getElementById("syncBox");
