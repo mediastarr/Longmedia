@@ -518,6 +518,14 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   <button id="exitFullBtn" class="exit-full-btn">Back</button>
   <button id="scrollTopBtn">▲</button>
   <div id="hud"></div>
+  <div id="playlistPickerPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+      <button id="plPickerClose" class="topbar-btn" tabindex="0" style="flex:0 0 auto;">← Cancel</button>
+      <div style="font-size:14px; font-weight:600; letter-spacing:0.04em; flex:1;">Add to Playlist</div>
+    </div>
+    <div id="plPickerList"></div>
+    <div id="plPickerStatus" style="display:none; padding:10px; text-align:center; font-size:12px; border-radius:12px; margin-top:8px;"></div>
+  </div>
   <div id="syncOverlay" style="display:none; position:fixed; inset:0; z-index:100001; background:rgba(0,0,0,0.88); align-items:center; justify-content:center;">
     <div id="syncBox" style="width:90%; max-width:380px; border-radius:22px; background:linear-gradient(135deg,rgba(10,12,20,0.98),rgba(20,24,40,0.98)); border:1px solid rgba(60,242,255,0.35); box-shadow:0 0 40px rgba(60,242,255,0.2); padding:20px;">
       <div style="font-size:15px; font-weight:700; letter-spacing:0.05em; margin-bottom:6px; color:#f5f7ff;">⟳ Sync from YouTube</div>
