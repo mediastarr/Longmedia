@@ -456,7 +456,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 #bootSplash .boot-bar-fill {
   width: 0%; height: 100%; border-radius: 3px;
   background: linear-gradient(90deg, rgba(60,242,255,0.9), rgba(0,255,180,0.7));
-  animation: bootLoad 2s ease-in-out forwards;
+  animation: bootLoad 1s ease-in-out forwards;
 }
 @keyframes bootPulse {
   0% { transform: scale(1); filter: drop-shadow(0 0 30px rgba(60,242,255,0.8)) drop-shadow(0 0 60px rgba(60,242,255,0.4)); }
@@ -2480,11 +2480,15 @@ async function silentSync(token) {
 }
 
 (async function init() {
-  setTimeout(() => {
+  // Dismiss splash fast and unconditionally — never let it get stuck
+  function dismissSplash() {
     const splash = document.getElementById("bootSplash");
-    if (splash) { splash.classList.add("fade-out"); setTimeout(() => splash.remove(), 800); }
-  }, 2200);
+    if (splash) { splash.classList.add("fade-out"); setTimeout(() => { try { splash.remove(); } catch(e) {} }, 600); }
+  }
+  setTimeout(dismissSplash, 1200);
+
   showSkeletons(8);
+  try {
   const hasRefresh = localStorage.getItem("yt_refresh_token");
   if (hasRefresh) { const ok = await refreshAccessToken(); if (ok) showHUD("Signed in ✓"); }
   if (hasEnoughHistory()) {
@@ -2506,6 +2510,14 @@ async function silentSync(token) {
     if (Date.now() - lastSync > 6 * 60 * 60 * 1000) {
       silentSync(token).then(() => showHUD("Feed updated ✦")).catch(() => {});
     }
+  }
+  } catch(e) {
+    // If anything in init fails, show trending as fallback
+    try {
+      const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+      nextPageToken = data.nextPageToken || null;
+      renderFeed(data.items || []);
+    } catch(e2) {}
   }
 })();
 </script>
