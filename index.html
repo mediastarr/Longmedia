@@ -142,7 +142,7 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
 .player-controls { position: absolute; left: 12px; bottom: 10px; display: flex; gap: 8px; z-index: 10; }
 .player-controls button {
   border-radius: 999px; border: 1px solid rgba(120,130,160,0.7);
-  padding: 10px 14px; font-size: 13px; min-height: 44px; min-width: 44px;
+  padding: 4px 7px; font-size: 9px; min-height: 24px; min-width: 24px;
   background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.18), rgba(10,12,20,0.9));
   color: #f5f7ff; cursor: pointer;
   touch-action: manipulation;
@@ -370,10 +370,10 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 #playerSection.ui-hidden #hideUIBtn:hover, #playerSection.ui-hidden #hideUIBtn:active { opacity: 1; }
 #resBtn { display: none; }
 #playerSection.player-fullscreen #resBtn { display: inline-block; }
-#playerSection.player-fullscreen.ui-hidden #resBtn { opacity: 0; pointer-events: none; }
-#playerSection.ui-hidden #addToPlaylistBtn { opacity: 0; pointer-events: none; }
+#playerSection.ui-hidden #addToPlaylistBtn { opacity:0; pointer-events:none; }
 #playerSection.player-fullscreen #addToPlaylistBtn { display: none; }
 #playerSection.player-mini #addToPlaylistBtn { display: none; }
+#playerSection.player-fullscreen.ui-hidden #resBtn { opacity: 0; pointer-events: none; }
 #playerSection.player-mini .player-controls { gap: 4px; bottom: 6px; left: 6px; }
 #playerSection.player-mini .player-controls button { padding: 5px 7px; font-size: 10px; min-height: 28px; min-width: unset; }
 #playerSection.player-mini #closeMini { padding: 4px 7px; font-size: 10px; min-height: 28px; min-width: unset; top: 6px; right: 6px; }
@@ -456,7 +456,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 #bootSplash .boot-bar-fill {
   width: 0%; height: 100%; border-radius: 3px;
   background: linear-gradient(90deg, rgba(60,242,255,0.9), rgba(0,255,180,0.7));
-  animation: bootLoad 1s ease-in-out forwards;
+  animation: bootLoad 2s ease-in-out forwards;
 }
 @keyframes bootPulse {
   0% { transform: scale(1); filter: drop-shadow(0 0 30px rgba(60,242,255,0.8)) drop-shadow(0 0 60px rgba(60,242,255,0.4)); }
@@ -518,18 +518,10 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   <button id="exitFullBtn" class="exit-full-btn">Back</button>
   <button id="scrollTopBtn">▲</button>
   <div id="hud"></div>
-  <div id="playlistPickerPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
-    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-      <button id="plPickerClose" class="topbar-btn" tabindex="0" style="flex:0 0 auto;">← Cancel</button>
-      <div style="font-size:14px; font-weight:600; letter-spacing:0.04em; flex:1;">Add to Playlist</div>
-    </div>
-    <div id="plPickerList"></div>
-    <div id="plPickerStatus" style="display:none; padding:10px; text-align:center; font-size:12px; border-radius:12px; margin-top:8px;"></div>
-  </div>
   <div id="syncOverlay" style="display:none; position:fixed; inset:0; z-index:100001; background:rgba(0,0,0,0.88); align-items:center; justify-content:center;">
     <div id="syncBox" style="width:90%; max-width:380px; border-radius:22px; background:linear-gradient(135deg,rgba(10,12,20,0.98),rgba(20,24,40,0.98)); border:1px solid rgba(60,242,255,0.35); box-shadow:0 0 40px rgba(60,242,255,0.2); padding:20px;">
       <div style="font-size:15px; font-weight:700; letter-spacing:0.05em; margin-bottom:6px; color:#f5f7ff;">⟳ Sync from YouTube</div>
-      <div style="font-size:11px; opacity:0.65; margin-bottom:16px; line-height:1.5;">Reads your liked videos, playlists, subscriptions and activity to build a taste profile — so your Home feed matches your real YouTube from day one.</div>
+      <div style="font-size:11px; opacity:0.65; margin-bottom:16px; line-height:1.5;">Reads your liked videos, playlists, subscriptions and activity to build a taste profile — so your Home feed matches your real YouTube.</div>
       <div id="syncStatus" style="font-size:11px; color:rgba(60,242,255,0.9); min-height:16px; margin-bottom:14px;"></div>
       <div id="syncProgress" style="width:100%; height:3px; background:rgba(60,242,255,0.12); border-radius:3px; margin-bottom:16px; display:none;"><div id="syncProgressFill" style="height:100%; width:0%; background:linear-gradient(90deg,rgba(60,242,255,0.9),rgba(0,255,180,0.7)); border-radius:3px; transition:width 0.4s ease;"></div></div>
       <div style="display:flex; gap:8px;">
@@ -537,6 +529,14 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
         <button id="syncCloseBtn" class="topbar-btn" style="flex:0 0 auto;">Close</button>
       </div>
     </div>
+  </div>
+  <div id="playlistPickerPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+      <button id="plPickerClose" class="topbar-btn" tabindex="0" style="flex:0 0 auto;">← Cancel</button>
+      <div style="font-size:14px; font-weight:600; letter-spacing:0.04em; flex:1;">Add to Playlist</div>
+    </div>
+    <div id="plPickerList"></div>
+    <div id="plPickerStatus" style="display:none; padding:10px; text-align:center; font-size:12px; border-radius:12px; margin-top:8px;"></div>
   </div>
   <div id="searchPanel">
     <div class="search-input-bar">
@@ -974,10 +974,9 @@ function saveSearchToProfile(query) {
   profile.keywords = profile.keywords || {};
   words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 3; });
   profile.bigrams = profile.bigrams || {};
-  for (let i = 0; i < words.length - 1; i++) { const bi = words[i] + " " + words[i + 1]; profile.bigrams[bi] = (profile.bigrams[bi] || 0) + 3; }
+  for (let i = 0; i < words.length - 1; i++) { const bi = words[i] + " " + words[i+1]; profile.bigrams[bi] = (profile.bigrams[bi] || 0) + 3; }
   localStorage.setItem("tasteProfile", JSON.stringify(profile));
 }
-
 function getRecentSearches(n) { return ((getTasteProfile().searchHistory || []).slice(0, n || 5)).map(s => s.q); }
 
 /* -----------------------------------------------------------
@@ -1007,136 +1006,87 @@ async function fetchPersonalizedFeed() {
   const recentShownIds = new Set(shownHistoryParsed.filter(e => e.ts > oneDayAgo).map(e => e.id));
   const seen = new Set();
   const allItems = [];
-
   function addItems(items, weight) {
     (items || []).forEach(item => {
       const id = item.id?.videoId || item.id;
       if (!id || seen.has(id) || watchedIds.has(id) || recentShownIds.has(id)) return;
-      seen.add(id);
-      allItems.push({ item, weight });
+      seen.add(id); allItems.push({ item, weight });
     });
   }
-
   if (token) {
     try {
-      const subsRes = await fetch(
-        "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance",
-        { headers: { Authorization: "Bearer " + token } }
-      );
+      const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance", { headers: { Authorization: "Bearer " + token } });
       const subsData = await subsRes.json();
       const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
       if (channelIds.length > 0) {
         const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 50).join(",") });
         const uploadPlaylists = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
-        for (let i = uploadPlaylists.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [uploadPlaylists[i], uploadPlaylists[j]] = [uploadPlaylists[j], uploadPlaylists[i]];
-        }
+        for (let i = uploadPlaylists.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [uploadPlaylists[i], uploadPlaylists[j]] = [uploadPlaylists[j], uploadPlaylists[i]]; }
         const uploadFetches = uploadPlaylists.slice(0, 10).map(plId =>
           fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId: plId, maxResults: 10, _: Date.now() })
         );
         const uploadResults = await Promise.allSettled(uploadFetches);
         uploadResults.forEach(r => {
           if (r.status === "fulfilled") {
-            const sorted = (r.value.items || []).sort((a, b) => {
-              const da = new Date(a.contentDetails?.videoPublishedAt || a.snippet?.publishedAt || 0).getTime();
-              const db = new Date(b.contentDetails?.videoPublishedAt || b.snippet?.publishedAt || 0).getTime();
-              return db - da;
-            });
-            const items = sorted.slice(0, 4).map(it => ({
-              id: it.snippet?.resourceId?.videoId,
-              snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt }
-            }));
-            addItems(items, 6);
+            const sorted = (r.value.items || []).sort((a, b) => new Date(b.contentDetails?.videoPublishedAt || b.snippet?.publishedAt || 0) - new Date(a.contentDetails?.videoPublishedAt || a.snippet?.publishedAt || 0));
+            addItems(sorted.slice(0, 4).map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } })), 6);
           }
         });
       }
-    } catch (e) {}
+    } catch(e) {}
     try {
-      const llRes = await fetch(
-        "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=15",
-        { headers: { Authorization: "Bearer " + token } }
-      );
+      const llRes = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=15", { headers: { Authorization: "Bearer " + token } });
       const llData = await llRes.json();
-      const likedItems = (llData.items || []).map(it => ({
-        id: it.snippet?.resourceId?.videoId,
-        snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt }
-      }));
+      const likedItems = (llData.items || []).map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } }));
       for (let i = likedItems.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [likedItems[i], likedItems[j]] = [likedItems[j], likedItems[i]]; }
       addItems(likedItems.slice(0, 5), 3);
-    } catch (e) {}
+    } catch(e) {}
   }
-
-  const topChannels = getTopChannels(8);
-  const topKeywords = getTopKeywords(10);
-  const topBigrams = getTopBigrams(6);
-  const recentIds = getRecentVideoIds(5);
-  const topCats = getTopCategories(3);
-  const recentSearches = getRecentSearches(5);
-  function shuffle(arr) { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-  const shuffledChannels = shuffle(topChannels);
-  const shuffledKeywords = shuffle(topKeywords);
-  const shuffledBigrams = shuffle(topBigrams);
-  const shuffledSearches = shuffle(recentSearches);
-  const shuffledRecent = shuffle(recentIds);
-  const localFetches = [];
-  const localWeights = [];
-  shuffledSearches.slice(0, 2).forEach(q => { localFetches.push(fetchYouTube("search", { part: "snippet", q, type: "video", maxResults: 6, _: Date.now() })); localWeights.push(5); });
-  shuffledChannels.slice(0, token ? 2 : 4).forEach(ch => { localFetches.push(fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 4, _: Date.now() })); localWeights.push(4); });
-  shuffledBigrams.slice(0, 2).forEach(phrase => { localFetches.push(fetchYouTube("search", { part: "snippet", q: phrase, type: "video", maxResults: 6, _: Date.now() })); localWeights.push(4); });
-  if (shuffledKeywords.length >= 2) { const kwQ = shuffledKeywords.slice(0, 3).join(" "); localFetches.push(fetchYouTube("search", { part: "snippet", q: kwQ, type: "video", maxResults: 6, _: Date.now() })); localWeights.push(3); }
-  shuffledRecent.slice(0, 2).forEach(videoId => { localFetches.push(fetchYouTube("search", { part: "snippet", type: "video", relatedToVideoId: videoId, maxResults: 5, _: Date.now() })); localWeights.push(3); });
+  const topChannels = getTopChannels(8); const topKeywords = getTopKeywords(10); const topBigrams = getTopBigrams(6);
+  const recentIds = getRecentVideoIds(5); const topCats = getTopCategories(3); const recentSearches = getRecentSearches(5);
+  function shuffle(arr) { const a = [...arr]; for (let i = a.length-1; i>0; i--) { const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+  const sC = shuffle(topChannels), sK = shuffle(topKeywords), sB = shuffle(topBigrams), sS = shuffle(recentSearches), sR = shuffle(recentIds);
+  const lf = [], lw = [];
+  sS.slice(0,2).forEach(q => { lf.push(fetchYouTube("search",{part:"snippet",q,type:"video",maxResults:6,_:Date.now()})); lw.push(5); });
+  sC.slice(0,token?2:4).forEach(ch => { lf.push(fetchYouTube("search",{part:"snippet",channelId:ch.id,type:"video",order:"date",maxResults:4,_:Date.now()})); lw.push(4); });
+  sB.slice(0,2).forEach(phrase => { lf.push(fetchYouTube("search",{part:"snippet",q:phrase,type:"video",maxResults:6,_:Date.now()})); lw.push(4); });
+  if (sK.length>=2) { lf.push(fetchYouTube("search",{part:"snippet",q:sK.slice(0,3).join(" "),type:"video",maxResults:6,_:Date.now()})); lw.push(3); }
+  sR.slice(0,2).forEach(videoId => { lf.push(fetchYouTube("search",{part:"snippet",type:"video",relatedToVideoId:videoId,maxResults:5,_:Date.now()})); lw.push(3); });
   const allCats = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
-  const myCats = topCats.length ? topCats : [allCats[Math.floor(Math.random() * allCats.length)]];
-  const randomCat = myCats[Math.floor(Math.random() * myCats.length)];
-  localFetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: randomCat, maxResults: 10, _: Date.now() }));
-  localWeights.push(2);
-  const fallbackCat = allCats[Math.floor(Math.random() * allCats.length)];
-  localFetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: fallbackCat, maxResults: 10, _: Date.now() }));
-  localWeights.push(1);
-  const localResults = await Promise.allSettled(localFetches);
-  localResults.forEach((r, i) => { if (r.status === "fulfilled") addItems(r.value.items, localWeights[i]); });
-
-  const channelWeights = {};
-  topChannels.forEach(ch => { channelWeights[ch.id] = ch.score; });
-  const kwSet = new Set(topKeywords.map(w => w.toLowerCase()));
-  const biSet = new Set(topBigrams.map(b => b.toLowerCase()));
+  const myCats = topCats.length ? topCats : [allCats[Math.floor(Math.random()*allCats.length)]];
+  lf.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCats[Math.floor(Math.random()*myCats.length)],maxResults:10,_:Date.now()})); lw.push(2);
+  lf.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:allCats[Math.floor(Math.random()*allCats.length)],maxResults:10,_:Date.now()})); lw.push(1);
+  const lr = await Promise.allSettled(lf);
+  lr.forEach((r,i) => { if (r.status==="fulfilled") addItems(r.value.items, lw[i]); });
+  const chW = {}; topChannels.forEach(ch => { chW[ch.id] = ch.score; });
+  const kwSet = new Set(topKeywords.map(w=>w.toLowerCase())), biSet = new Set(topBigrams.map(b=>b.toLowerCase()));
   const scored = allItems.map(c => {
-    const snippet = c.item.snippet || {};
-    let score = c.weight;
-    const chId = snippet.channelId || "";
-    if (channelWeights[chId]) score += Math.min(channelWeights[chId], 8);
-    const titleLower = (snippet.title || "").toLowerCase();
-    kwSet.forEach(kw => { if (titleLower.includes(kw)) score += 1.5; });
-    biSet.forEach(bi => { if (titleLower.includes(bi)) score += 3; });
-    const ageHours = (Date.now() - new Date(snippet.publishedAt || 0).getTime()) / 3600000;
-    if (ageHours < 24) score += 3;
-    else if (ageHours < 168) score += 1.5;
-    return { item: c.item, score, channelId: chId };
+    const s = c.item.snippet||{}; let score = c.weight; const chId = s.channelId||"";
+    if (chW[chId]) score += Math.min(chW[chId],8);
+    const tl = (s.title||"").toLowerCase();
+    kwSet.forEach(kw => { if (tl.includes(kw)) score+=1.5; });
+    biSet.forEach(bi => { if (tl.includes(bi)) score+=3; });
+    const age = (Date.now()-new Date(s.publishedAt||0).getTime())/3600000;
+    if (age<24) score+=3; else if (age<168) score+=1.5;
+    return { item:c.item, score, channelId:chId };
   });
-
-  scored.sort((a, b) => b.score - a.score);
-  const feed = [];
-  const channelLastIndex = {};
+  scored.sort((a,b)=>b.score-a.score);
+  const feed = []; const cli = {};
   scored.forEach(c => {
-    const lastIdx = channelLastIndex[c.channelId];
-    if (lastIdx !== undefined && feed.length - lastIdx < 3) {
-      feed.splice(Math.min(feed.length + 2, scored.length), 0, c.item);
-    } else { feed.push(c.item); }
-    channelLastIndex[c.channelId] = feed.length - 1;
+    const li = cli[c.channelId];
+    if (li!==undefined && feed.length-li<3) feed.splice(Math.min(feed.length+2,scored.length),0,c.item);
+    else feed.push(c.item);
+    cli[c.channelId] = feed.length-1;
   });
-  for (let i = 1; i < feed.length - 1; i++) {
-    if (Math.random() < 0.25) { const j = i + (Math.random() < 0.5 ? 1 : -1); if (j >= 0 && j < feed.length) [feed[i], feed[j]] = [feed[j], feed[i]]; }
-  }
-
-  const newShownIds = feed.map(item => item.id?.videoId || item.id).filter(Boolean);
-  const newTimed = newShownIds.map(id => ({ id, ts: Date.now() }));
-  const updatedTimed = [...newTimed, ...shownHistoryParsed].filter(e => e.ts > oneDayAgo).slice(0, 200);
-  try { localStorage.setItem("feedShownTimed", JSON.stringify(updatedTimed)); } catch(e) {}
-  const updatedShown = [...newShownIds, ...shownHistory].slice(0, 300);
-  try { localStorage.setItem("feedShownIds", JSON.stringify(updatedShown)); } catch(e) {}
+  for (let i=1;i<feed.length-1;i++) { if (Math.random()<0.25) { const j=i+(Math.random()<0.5?1:-1); if (j>=0&&j<feed.length) [feed[i],feed[j]]=[feed[j],feed[i]]; } }
+  const newIds = feed.map(item=>item.id?.videoId||item.id).filter(Boolean);
+  const newTimed = newIds.map(id=>({id,ts:Date.now()}));
+  const updTimed = [...newTimed,...shownHistoryParsed].filter(e=>e.ts>oneDayAgo).slice(0,200);
+  try { localStorage.setItem("feedShownTimed",JSON.stringify(updTimed)); } catch(e) {}
+  try { localStorage.setItem("feedShownIds",JSON.stringify([...newIds,...shownHistory].slice(0,300))); } catch(e) {}
   return feed;
 }
+
 
 function hideUIForVideo() {
   topbarEl.style.display = "flex";
@@ -1422,276 +1372,190 @@ homeTab.addEventListener("click", async () => {
 trendingTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("trending"); showSkeletons(8);
   const token = await getValidToken();
-  const myCat = getTopCategoryId();
-  const cats = getTopCategories(3);
-  const allItems = [];
-  const seen = new Set();
-  let trendingShown = []; try { trendingShown = JSON.parse(localStorage.getItem("trendingShownTimed") || "[]"); } catch(e) {}
-  const sixHoursAgo = Date.now() - 6 * 3600000;
-  const recentTrendingIds = new Set(trendingShown.filter(e => e.ts > sixHoursAgo).map(e => e.id));
-  function addUnique(items) {
-    (items || []).forEach(item => {
-      const id = item.id?.videoId || item.id;
-      if (!id || seen.has(id) || recentTrendingIds.has(id)) return;
-      seen.add(id); allItems.push(item);
-    });
-  }
+  const myCat = getTopCategoryId(); const cats = getTopCategories(3);
+  const allItems = []; const seen = new Set();
+  let tShown = []; try { tShown = JSON.parse(localStorage.getItem("trendingShownTimed")||"[]"); } catch(e) {}
+  const sixAgo = Date.now()-6*3600000;
+  const tRecent = new Set(tShown.filter(e=>e.ts>sixAgo).map(e=>e.id));
+  function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id)||tRecent.has(id))return; seen.add(id); allItems.push(item); }); }
   const fetches = [];
-  if (myCat) fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: myCat, maxResults: 15, _: Date.now() }));
-  if (cats.length > 1) fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cats[1], maxResults: 10, _: Date.now() }));
-  if (cats.length > 2) fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cats[2], maxResults: 8, _: Date.now() }));
+  if (myCat) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:15,_:Date.now()}));
+  if (cats.length>1) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:cats[1],maxResults:10,_:Date.now()}));
+  if (cats.length>2) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:cats[2],maxResults:8,_:Date.now()}));
+  fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",maxResults:15,_:Date.now()}));
   if (token) {
-    fetches.push((async () => {
-      try {
-        const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=30&order=relevance", { headers: { Authorization: "Bearer " + token } });
-        const subsData = await subsRes.json();
-        const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
-        if (!channelIds.length) return { items: [] };
-        const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 30).join(",") });
-        const plIds = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean).sort(() => Math.random() - 0.5);
-        const upFetches = plIds.slice(0, 8).map(plId =>
-          fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId: plId, maxResults: 10, _: Date.now() })
-        );
-        const upResults = await Promise.allSettled(upFetches);
-        const items = [];
-        upResults.forEach(r => {
-          if (r.status === "fulfilled") {
-            const sorted = (r.value.items || []).sort((a, b) => {
-              const da = new Date(a.contentDetails?.videoPublishedAt || a.snippet?.publishedAt || 0).getTime();
-              const db = new Date(b.contentDetails?.videoPublishedAt || b.snippet?.publishedAt || 0).getTime();
-              return db - da;
-            });
-            sorted.slice(0, 3).forEach(it => {
-              const vid = it.snippet?.resourceId?.videoId;
-              if (vid) items.push({ id: vid, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } });
-            });
-          }
-        });
-        return { items };
-      } catch(e) { return { items: [] }; }
-    })());
-  }
-  fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 15, _: Date.now() }));
-  const topKW = getTopKeywords(4);
-  if (topKW.length >= 2) {
-    const kw = [...topKW].sort(() => Math.random() - 0.5).slice(0, 2).join(" ");
-    fetches.push(fetchYouTube("search", { part: "snippet", q: kw, type: "video", order: "date", maxResults: 10, _: Date.now() }));
+    fetches.push((async()=>{ try {
+      const sr=await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=30&order=relevance",{headers:{Authorization:"Bearer "+token}});
+      const sd=await sr.json(); const cids=(sd.items||[]).map(s=>s.snippet.resourceId.channelId);
+      if(!cids.length) return {items:[]};
+      const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,30).join(",")});
+      const pls=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean).sort(()=>Math.random()-0.5);
+      const ur=await Promise.allSettled(pls.slice(0,8).map(plId=>fetchYouTube("playlistItems",{part:"snippet,contentDetails",playlistId:plId,maxResults:10,_:Date.now()})));
+      const items=[];
+      ur.forEach(r=>{ if(r.status==="fulfilled") { const sorted=(r.value.items||[]).sort((a,b)=>new Date(b.contentDetails?.videoPublishedAt||b.snippet?.publishedAt||0)-new Date(a.contentDetails?.videoPublishedAt||a.snippet?.publishedAt||0)); sorted.slice(0,3).forEach(it=>{ const vid=it.snippet?.resourceId?.videoId; if(vid) items.push({id:vid,snippet:{...it.snippet,publishedAt:it.contentDetails?.videoPublishedAt||it.snippet?.publishedAt}}); }); } });
+      return {items};
+    } catch(e){return{items:[]};} })());
   }
   const results = await Promise.allSettled(fetches);
-  results.forEach(r => { if (r.status === "fulfilled") addUnique(r.value.items); });
+  results.forEach(r=>{ if(r.status==="fulfilled") addU(r.value.items); });
   renderFeed(allItems);
-  const shownNow = allItems.map(item => item.id?.videoId || item.id).filter(Boolean);
-  const updatedTrending = [...shownNow.map(id => ({ id, ts: Date.now() })), ...trendingShown].filter(e => e.ts > sixHoursAgo).slice(0, 200);
-  try { localStorage.setItem("trendingShownTimed", JSON.stringify(updatedTrending)); } catch(e) {}
-  const seedData = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: myCat || undefined, maxResults: 20, _: Date.now() });
-  nextPageToken = seedData.nextPageToken || null;
-  showHUD(token ? "Trending For You ✦" : "Trending");
+  const shownNow=allItems.map(item=>item.id?.videoId||item.id).filter(Boolean);
+  try { localStorage.setItem("trendingShownTimed",JSON.stringify([...shownNow.map(id=>({id,ts:Date.now()})),...tShown].filter(e=>e.ts>sixAgo).slice(0,200))); } catch(e) {}
+  const seed=await fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat||undefined,maxResults:20,_:Date.now()});
+  nextPageToken=seed.nextPageToken||null;
+  showHUD(token?"Trending For You ✦":"Trending");
 });
 
 shortsTab.addEventListener("click", async () => {
-  nextPageToken = null;
-  setActiveTab("shorts");
-  showHUD("Shorts");
+  nextPageToken = null; setActiveTab("shorts"); showHUD("Shorts");
   shortsPageEl.innerHTML = `
     <iframe id="shortsIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
     <button id="shortsBackBtn" tabindex="0">← Back</button>
     <div id="shortsCounter">Loading…</div>
-    <div id="shortsHint">
-      <div class="shorts-arrow up">▼</div>
-      <div class="shorts-hint-text">swipe up/down</div>
-      <div class="shorts-arrow down">▼</div>
-    </div>
+    <div id="shortsHint"><div class="shorts-arrow up">▼</div><div class="shorts-hint-text">swipe up/down</div><div class="shorts-arrow down">▼</div></div>
     <div id="shortsTransition"></div>
   `;
   shortsPageEl.classList.add("shorts-bloom");
-  const shortsIframe  = document.getElementById("shortsIframe");
+  const shortsIframe = document.getElementById("shortsIframe");
   const shortsCounter = document.getElementById("shortsCounter");
-  const shortsHint    = document.getElementById("shortsHint");
-  const shortsTrans   = document.getElementById("shortsTransition");
-  const backBtn2      = document.getElementById("shortsBackBtn");
+  const shortsHint = document.getElementById("shortsHint");
+  const shortsTrans = document.getElementById("shortsTransition");
+  const backBtn2 = document.getElementById("shortsBackBtn");
 
-  // Wire back button IMMEDIATELY — before any async work so it always responds
-  backBtn2.addEventListener("click", () => {
-    shortsIframe.src = "";
-    shortsPageEl.style.display = "none";
-    setActiveTab("home");
-    homeTab.click();
-    showHUD("Home");
-  });
+  // Wire back button immediately before any async work
+  backBtn2.addEventListener("click", () => { shortsIframe.src = ""; shortsPageEl.style.display = "none"; setActiveTab("home"); homeTab.click(); showHUD("Home"); });
 
   const token = await getValidToken();
   let data = { items: [] };
   const pool = [];
-
   let persistentSeenIds = new Set();
   try { persistentSeenIds = new Set(JSON.parse(localStorage.getItem("shortsSeenHistory") || "[]")); } catch(e) {}
   function isNew(id) { return !persistentSeenIds.has(id) && !shortsSeenIds.has(id); }
 
-  // SOURCE 1: Newest shorts from subscribed channels (UUSH playlists, sorted by videoPublishedAt)
+  // SOURCE 1: Newest from subscribed channels (UUSH, sorted by videoPublishedAt)
   if (token) {
     try {
       const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance", { headers: { Authorization: "Bearer " + token } });
       const subsData = await subsRes.json();
       let channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
-      for (let i = channelIds.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [channelIds[i], channelIds[j]] = [channelIds[j], channelIds[i]]; }
-      const shortsPlIds = channelIds.filter(id => id.startsWith("UC")).map(id => "UUSH" + id.slice(2));
-      const subShortsFetches = shortsPlIds.slice(0, 15).map(pid =>
-        fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId: pid, maxResults: 15, _: Date.now() })
-      );
-      const subShortsResults = await Promise.allSettled(subShortsFetches);
-      subShortsResults.forEach(r => {
-        if (r.status === "fulfilled") {
-          const sorted = (r.value.items || []).sort((a, b) => {
-            const da = new Date(a.contentDetails?.videoPublishedAt || a.snippet?.publishedAt || 0).getTime();
-            const db = new Date(b.contentDetails?.videoPublishedAt || b.snippet?.publishedAt || 0).getTime();
-            return db - da;
-          });
-          sorted.slice(0, 5).forEach(it => {
-            const vid = it.snippet?.resourceId?.videoId;
-            if (vid && isNew(vid)) pool.push({ id: vid, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } });
-          });
+      for (let i = channelIds.length-1; i>0; i--) { const j = Math.floor(Math.random()*(i+1)); [channelIds[i],channelIds[j]]=[channelIds[j],channelIds[i]]; }
+      const plIds = channelIds.filter(id=>id.startsWith("UC")).map(id=>"UUSH"+id.slice(2));
+      const fetches = plIds.slice(0,15).map(pid => fetchYouTube("playlistItems",{part:"snippet,contentDetails",playlistId:pid,maxResults:15,_:Date.now()}));
+      const results = await Promise.allSettled(fetches);
+      results.forEach(r => {
+        if (r.status==="fulfilled") {
+          const sorted = (r.value.items||[]).sort((a,b)=>new Date(b.contentDetails?.videoPublishedAt||b.snippet?.publishedAt||0)-new Date(a.contentDetails?.videoPublishedAt||a.snippet?.publishedAt||0));
+          sorted.slice(0,5).forEach(it => { const vid=it.snippet?.resourceId?.videoId; if (vid&&isNew(vid)) pool.push({id:vid,snippet:{...it.snippet,publishedAt:it.contentDetails?.videoPublishedAt||it.snippet?.publishedAt}}); });
         }
       });
     } catch(e) {}
   }
 
-  // SOURCE 2: Shorts matching taste keywords/bigrams
-  const topKW = getTopKeywords(6);
-  const topBI = getTopBigrams(4);
-  const shuffledKW = [...topKW].sort(() => Math.random() - 0.5);
-  const shuffledBI = [...topBI].sort(() => Math.random() - 0.5);
-  const kwQueries = [];
-  if (shuffledBI.length > 0) kwQueries.push(shuffledBI[0] + " shorts");
-  if (shuffledBI.length > 1) kwQueries.push(shuffledBI[1] + " #shorts");
-  if (shuffledKW.length > 0) kwQueries.push(shuffledKW.slice(0, 2).join(" ") + " shorts");
-  for (const q of kwQueries) {
-    const kwData = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "short", videoEmbeddable: "true", maxResults: 10, _: Date.now() });
-    (kwData.items || []).filter(v => v.id && v.id.videoId && isNew(v.id.videoId)).forEach(v => pool.push({ id: v.id.videoId, snippet: v.snippet }));
+  // SOURCE 2: Taste keywords/bigrams
+  const topKW=getTopKeywords(6), topBI=getTopBigrams(4);
+  const sKW=[...topKW].sort(()=>Math.random()-0.5), sBI=[...topBI].sort(()=>Math.random()-0.5);
+  const kwQ = [];
+  if (sBI.length>0) kwQ.push(sBI[0]+" shorts");
+  if (sBI.length>1) kwQ.push(sBI[1]+" #shorts");
+  if (sKW.length>0) kwQ.push(sKW.slice(0,2).join(" ")+" shorts");
+  for (const q of kwQ) {
+    const d = await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",maxResults:10,_:Date.now()});
+    (d.items||[]).filter(v=>v.id&&v.id.videoId&&isNew(v.id.videoId)).forEach(v=>pool.push({id:v.id.videoId,snippet:v.snippet}));
   }
 
-  // SOURCE 3: Generic shorts with random rotation
-  const startQ = Math.floor(Math.random() * SHORT_QUERIES.length);
-  shortQIdx = startQ;
-  for (let attempt = 0; attempt < SHORT_QUERIES.length; attempt++) {
-    const shortsQ = SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length]; shortQIdx++;
-    data = await fetchYouTube("search", { part: "snippet", q: shortsQ, type: "video", videoDuration: "short", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
-    if (data.items && data.items.length) { data.items.filter(v => v.id && v.id.videoId && isNew(v.id.videoId)).forEach(v => pool.push({ id: v.id.videoId, snippet: v.snippet })); break; }
+  // SOURCE 3: Generic with random rotation
+  shortQIdx = Math.floor(Math.random()*SHORT_QUERIES.length);
+  for (let attempt=0; attempt<SHORT_QUERIES.length; attempt++) {
+    const q = SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length]; shortQIdx++;
+    data = await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:"US",maxResults:20,_:Date.now()});
+    if (data.items&&data.items.length) { data.items.filter(v=>v.id&&v.id.videoId&&isNew(v.id.videoId)).forEach(v=>pool.push({id:v.id.videoId,snippet:v.snippet})); break; }
   }
 
   // FALLBACK
-  if (pool.length < 5) {
-    const SHORTS_PLAYLISTS = ["UUSHX6OQ3DkcsbYNE6H8uQQuVA","UUSHq8DICunczvLuJJq414110A","UUSHRijo3ddMTht_IHyNSNXpNQ","UUSHJ5v_MCY6GNUBTO8-D3XoAg","UUSHpEhnqL0y41EpW2TvWAHD7Q","UUSH-lHJZR3Gqxm24_Vd_AJ5Yw"];
-    const plFetches = SHORTS_PLAYLISTS.sort(() => Math.random() - 0.5).map(pid => fetchYouTube("playlistItems", { part: "snippet", playlistId: pid, maxResults: 10, _: Date.now() }));
-    const plResults = await Promise.allSettled(plFetches);
-    plResults.forEach(r => { if (r.status === "fulfilled") { (r.value.items || []).forEach(it => { const vid = it.snippet?.resourceId?.videoId; if (vid && isNew(vid)) pool.push({ id: vid, snippet: it.snippet }); }); } });
+  if (pool.length<5) {
+    const FBP=["UUSHX6OQ3DkcsbYNE6H8uQQuVA","UUSHq8DICunczvLuJJq414110A","UUSHRijo3ddMTht_IHyNSNXpNQ","UUSHJ5v_MCY6GNUBTO8-D3XoAg","UUSHpEhnqL0y41EpW2TvWAHD7Q","UUSH-lHJZR3Gqxm24_Vd_AJ5Yw"];
+    const pr = await Promise.allSettled(FBP.sort(()=>Math.random()-0.5).map(pid=>fetchYouTube("playlistItems",{part:"snippet",playlistId:pid,maxResults:10,_:Date.now()})));
+    pr.forEach(r=>{ if (r.status==="fulfilled") (r.value.items||[]).forEach(it=>{ const vid=it.snippet?.resourceId?.videoId; if(vid&&isNew(vid)) pool.push({id:vid,snippet:it.snippet}); }); });
   }
 
-  const seen = new Set();
-  shortsItems = pool.filter(v => { if (seen.has(v.id)) return false; seen.add(v.id); return true; });
-  for (let i = shortsItems.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [shortsItems[i], shortsItems[j]] = [shortsItems[j], shortsItems[i]]; }
-  shortsIndex = 0;
-  shortsSeenIds = new Set(shortsItems.map(v => v.id));
-  try { const updated = [...shortsSeenIds, ...persistentSeenIds].slice(0, 300); localStorage.setItem("shortsSeenHistory", JSON.stringify(updated)); } catch(e) {}
+  const seen=new Set();
+  shortsItems = pool.filter(v=>{ if(seen.has(v.id))return false; seen.add(v.id); return true; });
+  for (let i=shortsItems.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [shortsItems[i],shortsItems[j]]=[shortsItems[j],shortsItems[i]]; }
+  shortsIndex=0;
+  shortsSeenIds = new Set(shortsItems.map(v=>v.id));
+  try { localStorage.setItem("shortsSeenHistory",JSON.stringify([...shortsSeenIds,...persistentSeenIds].slice(0,300))); } catch(e) {}
 
-  if (data.nextPageToken) { nextPageToken = data.nextPageToken; }
-  else { const seed = await fetchYouTube("search", { part: "snippet", q: SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length], type: "video", videoDuration: "short", videoEmbeddable: "true", regionCode: "US", maxResults: 1, _: Date.now() }); nextPageToken = seed.nextPageToken || "seed"; }
+  if (data.nextPageToken) nextPageToken=data.nextPageToken;
+  else { const seed=await fetchYouTube("search",{part:"snippet",q:SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length],type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:"US",maxResults:1,_:Date.now()}); nextPageToken=seed.nextPageToken||"seed"; }
 
-  if (!shortsItems.length) {
-    shortsCounter.textContent = "No shorts found — tap Back";
-    return;
-  }
-  function updateCounter() { shortsCounter.textContent = `${shortsIndex + 1} / ${shortsItems.length}`; }
+  if (!shortsItems.length) { shortsCounter.textContent="No shorts — tap Back"; return; }
+
+  function updateCounter() { shortsCounter.textContent=`${shortsIndex+1} / ${shortsItems.length}`; }
   function playShort(index) {
-    const item = shortsItems[index]; if (!item) return;
-    shortsIframe.src = `https://www.youtube.com/embed/${item.id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&origin=${location.origin}`;
+    const item=shortsItems[index]; if(!item) return;
+    shortsIframe.src=`https://www.youtube.com/embed/${item.id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&origin=${location.origin}`;
     updateCounter();
-    if (index >= shortsItems.length - 6 && !shortsLoadingMore) loadMoreShorts();
+    if (index>=shortsItems.length-6&&!shortsLoadingMore) loadMoreShorts();
   }
-  let shortsLoadingMore = false;
+  let shortsLoadingMore=false;
   async function loadMoreShorts() {
-    if (shortsLoadingMore) return;
-    shortsLoadingMore = true;
+    if (shortsLoadingMore) return; shortsLoadingMore=true;
     try {
-      const q = SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length]; shortQIdx++;
-      const validToken = nextPageToken && nextPageToken !== "seed" ? nextPageToken : undefined;
-      const more = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "short", videoEmbeddable: "true", maxResults: 20, pageToken: validToken, _: Date.now() });
-      nextPageToken = more.nextPageToken || "seed";
-      const fresh = (more.items || []).filter(v => v.id && v.id.videoId && !shortsSeenIds.has(v.id.videoId));
-      fresh.forEach(v => shortsSeenIds.add(v.id.videoId));
-      shortsItems = shortsItems.concat(fresh.map(v => ({ id: v.id.videoId, snippet: v.snippet })));
+      const q=SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length]; shortQIdx++;
+      const vt=nextPageToken&&nextPageToken!=="seed"?nextPageToken:undefined;
+      const more=await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",maxResults:20,pageToken:vt,_:Date.now()});
+      nextPageToken=more.nextPageToken||"seed";
+      const fresh=(more.items||[]).filter(v=>v.id&&v.id.videoId&&!shortsSeenIds.has(v.id.videoId));
+      fresh.forEach(v=>shortsSeenIds.add(v.id.videoId));
+      shortsItems=shortsItems.concat(fresh.map(v=>({id:v.id.videoId,snippet:v.snippet})));
       updateCounter();
-    } finally { shortsLoadingMore = false; }
+    } finally { shortsLoadingMore=false; }
   }
-
-  let transitioning = false;
+  let transitioning=false;
   function transitionTo(index) {
-    if (transitioning || index < 0 || index >= shortsItems.length) return;
-    transitioning = true;
-    shortsTrans.style.transition = "opacity 0.12s ease"; shortsTrans.style.opacity = "1";
-    setTimeout(() => { shortsIndex = index; playShort(shortsIndex); setTimeout(() => { shortsTrans.style.transition = "opacity 0.35s ease"; shortsTrans.style.opacity = "0"; transitioning = false; }, 500); }, 150);
+    if (transitioning||index<0||index>=shortsItems.length) return;
+    transitioning=true; shortsTrans.style.transition="opacity 0.12s ease"; shortsTrans.style.opacity="1";
+    setTimeout(()=>{ shortsIndex=index; playShort(shortsIndex); setTimeout(()=>{ shortsTrans.style.transition="opacity 0.35s ease"; shortsTrans.style.opacity="0"; transitioning=false; },500); },150);
   }
-  function goNext() { transitionTo(shortsIndex + 1); }
-  function goPrev() { transitionTo(shortsIndex - 1); }
+  function goNext() { transitionTo(shortsIndex+1); }
+  function goPrev() { transitionTo(shortsIndex-1); }
   playShort(0);
-  shortsHint.classList.add("visible"); setTimeout(() => shortsHint.classList.remove("visible"), 2800);
-  let swStartY = 0, swStartTime = 0;
-  shortsPageEl.addEventListener("touchstart", (e) => { if (transitioning) return; swStartY = e.touches[0].clientY; swStartTime = Date.now(); }, { passive: true });
-  shortsPageEl.addEventListener("touchend", (e) => {
-    if (transitioning) return;
-    const endY = e.changedTouches[0].clientY; const dy = swStartY - endY; const dt = Date.now() - swStartTime;
-    const velocity = Math.abs(dy) / Math.max(dt, 1); const minDist = velocity > 0.3 ? 20 : 50;
-    if (Math.abs(dy) < minDist) return;
-    if (dy > 0) goNext(); else goPrev();
-  }, { passive: true });
-  let wheelCooldown = false;
-  shortsPageEl.addEventListener("wheel", (e) => { if (wheelCooldown || transitioning) return; wheelCooldown = true; setTimeout(() => wheelCooldown = false, 700); if (e.deltaY > 0) goNext(); else goPrev(); }, { passive: true });
-  function shortsKeyHandler(e) { if (currentTab !== "shorts") return; if (e.key === "ArrowDown") goNext(); if (e.key === "ArrowUp") goPrev(); }
-  document.addEventListener("keydown", shortsKeyHandler);
-  shortsPageEl._cleanup = () => document.removeEventListener("keydown", shortsKeyHandler);
+  shortsHint.classList.add("visible"); setTimeout(()=>shortsHint.classList.remove("visible"),2800);
+  let swY=0,swT=0;
+  shortsPageEl.addEventListener("touchstart",(e)=>{ if(transitioning)return; swY=e.touches[0].clientY; swT=Date.now(); },{passive:true});
+  shortsPageEl.addEventListener("touchend",(e)=>{ if(transitioning)return; const dy=swY-e.changedTouches[0].clientY,dt=Date.now()-swT,v=Math.abs(dy)/Math.max(dt,1); if(Math.abs(dy)<(v>0.3?20:50))return; if(dy>0)goNext(); else goPrev(); },{passive:true});
+  let wc=false; shortsPageEl.addEventListener("wheel",(e)=>{ if(wc||transitioning)return; wc=true; setTimeout(()=>wc=false,700); if(e.deltaY>0)goNext(); else goPrev(); },{passive:true});
+  function skH(e){if(currentTab!=="shorts")return;if(e.key==="ArrowDown")goNext();if(e.key==="ArrowUp")goPrev();}
+  document.addEventListener("keydown",skH); shortsPageEl._cleanup=()=>document.removeEventListener("keydown",skH);
 });
 
 let lastMovieQuery = "";
 moviesTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("movies"); showSkeletons(8);
-  const allItems = [];
-  const seen = new Set();
-  let moviesShown = []; try { moviesShown = JSON.parse(localStorage.getItem("moviesShownTimed") || "[]"); } catch(e) {}
-  const sixHoursAgo = Date.now() - 6 * 3600000;
-  const recentMovieIds = new Set(moviesShown.filter(e => e.ts > sixHoursAgo).map(e => e.id));
-  function addUnique(items) {
-    (items || []).forEach(item => {
-      const id = item.id?.videoId || item.id;
-      if (!id || seen.has(id) || recentMovieIds.has(id)) return;
-      seen.add(id); allItems.push(item);
-    });
-  }
-  const startIdx = Math.floor(Math.random() * MOVIE_QUERIES.length);
-  movieQIdx = startIdx;
-  let usedQuery = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
-  const fetches = [];
-  fetches.push(fetchYouTube("search", { part: "snippet", q: usedQuery, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 15, order: "date", _: Date.now() }));
-  const q2 = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
-  fetches.push(fetchYouTube("search", { part: "snippet", q: q2, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 10, order: "date", _: Date.now() }));
-  const topKW = getTopKeywords(6);
-  const topBI = getTopBigrams(3);
-  const shuffledKW = [...topKW].sort(() => Math.random() - 0.5);
-  const shuffledBI = [...topBI].sort(() => Math.random() - 0.5);
-  if (shuffledKW.length >= 2) fetches.push(fetchYouTube("search", { part: "snippet", q: shuffledKW.slice(0, 2).join(" ") + " full movie", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 8, _: Date.now() }));
-  if (shuffledBI.length > 0) fetches.push(fetchYouTube("search", { part: "snippet", q: shuffledBI[0] + " full movie", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 8, _: Date.now() }));
-  const recentSearches = getRecentSearches(5);
-  const movieSearch = recentSearches.find(q => /movie|film|documentary|watch|episode|season/i.test(q));
-  if (movieSearch) fetches.push(fetchYouTube("search", { part: "snippet", q: movieSearch + " full", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 8, _: Date.now() }));
-  const results = await Promise.allSettled(fetches);
-  results.forEach(r => { if (r.status === "fulfilled") addUnique(r.value.items || []); });
-  lastMovieQuery = usedQuery;
-  for (let i = allItems.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [allItems[i], allItems[j]] = [allItems[j], allItems[i]]; }
-  const items = allItems.filter(v => v.id?.videoId || v.id).map(v => ({ id: v.id?.videoId || v.id, snippet: v.snippet }));
-  const shownNow = items.map(v => v.id).filter(Boolean);
-  const updatedMovies = [...shownNow.map(id => ({ id, ts: Date.now() })), ...moviesShown].filter(e => e.ts > sixHoursAgo).slice(0, 200);
-  try { localStorage.setItem("moviesShownTimed", JSON.stringify(updatedMovies)); } catch(e) {}
-  nextPageToken = null;
-  const seed = await fetchYouTube("search", { part: "snippet", q: usedQuery, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
-  nextPageToken = seed.nextPageToken || "seed";
+  const allItems=[]; const seen=new Set();
+  let mShown=[]; try { mShown=JSON.parse(localStorage.getItem("moviesShownTimed")||"[]"); } catch(e) {}
+  const sixAgo=Date.now()-6*3600000;
+  const mRecent=new Set(mShown.filter(e=>e.ts>sixAgo).map(e=>e.id));
+  function addU(items){ (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id)||mRecent.has(id))return; seen.add(id); allItems.push(item); }); }
+  movieQIdx=Math.floor(Math.random()*MOVIE_QUERIES.length);
+  const usedQ=MOVIE_QUERIES[movieQIdx%MOVIE_QUERIES.length]; movieQIdx++;
+  const q2=MOVIE_QUERIES[movieQIdx%MOVIE_QUERIES.length]; movieQIdx++;
+  lastMovieQuery=usedQ;
+  const fetches=[
+    fetchYouTube("search",{part:"snippet",q:usedQ,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:15,order:"date",_:Date.now()}),
+    fetchYouTube("search",{part:"snippet",q:q2,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:10,order:"date",_:Date.now()})
+  ];
+  const topKW=getTopKeywords(6),topBI=getTopBigrams(3);
+  const sKW=[...topKW].sort(()=>Math.random()-0.5),sBI=[...topBI].sort(()=>Math.random()-0.5);
+  if (sKW.length>=2) fetches.push(fetchYouTube("search",{part:"snippet",q:sKW.slice(0,2).join(" ")+" full movie",type:"video",videoDuration:"long",videoEmbeddable:"true",maxResults:8,_:Date.now()}));
+  if (sBI.length>0) fetches.push(fetchYouTube("search",{part:"snippet",q:sBI[0]+" full movie",type:"video",videoDuration:"long",videoEmbeddable:"true",maxResults:8,_:Date.now()}));
+  const results=await Promise.allSettled(fetches);
+  results.forEach(r=>{ if(r.status==="fulfilled") addU(r.value.items||[]); });
+  for (let i=allItems.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [allItems[i],allItems[j]]=[allItems[j],allItems[i]]; }
+  const items=allItems.filter(v=>v.id?.videoId||v.id).map(v=>({id:v.id?.videoId||v.id,snippet:v.snippet}));
+  try { localStorage.setItem("moviesShownTimed",JSON.stringify([...items.map(v=>({id:v.id,ts:Date.now()})),...mShown].filter(e=>e.ts>sixAgo).slice(0,200))); } catch(e) {}
+  const seed=await fetchYouTube("search",{part:"snippet",q:usedQ,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:20,_:Date.now()});
+  nextPageToken=seed.nextPageToken||"seed";
   renderFeed(items); showHUD("Movies");
 });
 
@@ -1703,27 +1567,23 @@ historyTab.addEventListener("click", () => {
 
 channelTab.addEventListener("click", () => loadChannelPage(currentChannelId));
 
-
+subsTab.addEventListener("click", async () => {
+  setActiveTab("subs"); showHUD("Subscriptions");
+  document.getElementById("subsLoginPanel").style.display = "block";
+  const token = await getValidToken();
+  if (token) { deviceLoginStatusEl.textContent = "Logged in ✓"; loadSubscriptions(); }
+  else deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
+});
 
 const OAUTH_CLIENT_ID = "153049037088-10qnschnsie4mqpdsdscd0uk2auqogdt.apps.googleusercontent.com";
 const OAUTH_CLIENT_SECRET = "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";
 
 startLoginBtn.addEventListener("click", () => startDeviceLogin("subs"));
-
 document.getElementById("reloginBtn").addEventListener("click", () => {
   clearTokens();
   deviceUserCodeEl.textContent = "";
   deviceLoginStatusEl.textContent = "Tokens cleared — tap Login to YouTube";
   showHUD("Ready to re-login");
-});
-
-subsTab.addEventListener("click", async () => {
-  setActiveTab("subs"); showHUD("Subscriptions");
-  const subsLoginPanel = document.getElementById("subsLoginPanel");
-  if (subsLoginPanel) subsLoginPanel.style.display = "block";
-  const token = await getValidToken();
-  if (token) { deviceLoginStatusEl.textContent = "Logged in ✓"; loadSubscriptions(); }
-  else { deviceLoginStatusEl.textContent = "Login required to load subscriptions."; }
 });
 
 async function startDeviceLogin(source) {
@@ -1871,23 +1731,16 @@ let subsNextPageToken = null;
 async function loadMoreVideos() {
   if (!nextPageToken) return;
   let data;
-  const validPageToken = nextPageToken !== "seed" ? nextPageToken : undefined;
-  if (currentTab === "home")     data = await fetchYouTube("videos",        { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, pageToken: validPageToken, _: Date.now() });
+  const vt = nextPageToken !== "seed" ? nextPageToken : undefined;
+  if (currentTab === "home") data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, pageToken: vt, _: Date.now() });
   if (currentTab === "movies") {
-    data = validPageToken
-      ? await fetchYouTube("search", { part: "snippet", q: lastMovieQuery || "full movie", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 20, pageToken: validPageToken, _: Date.now() })
-      : { items: [] };
-    if (!data || !data.items || !data.items.length) {
-      const q = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
-      lastMovieQuery = q;
-      data = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
-      if (!data.nextPageToken) data.nextPageToken = "seed";
-    }
-    if (data && data.items) data.items = data.items.filter(v => v.id && v.id.videoId).map(v => ({ id: v.id.videoId, snippet: v.snippet }));
+    data = vt ? await fetchYouTube("search", { part: "snippet", q: lastMovieQuery||"full movie", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 20, pageToken: vt, _: Date.now() }) : { items: [] };
+    if (!data||!data.items||!data.items.length) { const q=MOVIE_QUERIES[movieQIdx%MOVIE_QUERIES.length]; movieQIdx++; lastMovieQuery=q; data=await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:20,_:Date.now()}); if(!data.nextPageToken) data.nextPageToken="seed"; }
+    if (data&&data.items) data.items=data.items.filter(v=>v.id&&v.id.videoId).map(v=>({id:v.id.videoId,snippet:v.snippet}));
   }
-  if (currentTab === "trending") { const cat = getTopCategoryId() || undefined; data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 20, pageToken: validPageToken, _: Date.now() }); }
-  if (currentTab === "search")   data = await fetchYouTube("search",        { part: "snippet", q: lastSearchQuery, type: "video", maxResults: 20, pageToken: validPageToken, _: Date.now() });
-  if (currentTab === "channel")  data = await fetchYouTube("playlistItems", { part: "snippet", playlistId: channelUploadsId, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+  if (currentTab === "trending") { data=await fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:getTopCategoryId()||undefined,maxResults:20,pageToken:vt,_:Date.now()}); }
+  if (currentTab === "search") data = await fetchYouTube("search", { part: "snippet", q: lastSearchQuery, type: "video", maxResults: 20, pageToken: vt, _: Date.now() });
+  if (currentTab === "channel") data = await fetchYouTube("playlistItems", { part: "snippet", playlistId: channelUploadsId, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
   if (!data) return;
   nextPageToken = data.nextPageToken || (["home","trending","movies"].includes(currentTab) ? "seed" : null);
   if (currentTab === "channel") {
@@ -2055,8 +1908,7 @@ function applyDepthGlow(x, y, isFullscreen) {
 document.addEventListener("mousemove", (e) => {
   const x = (e.clientX / window.innerWidth) * 2 - 1;
   const y = (e.clientY / window.innerHeight) * 2 - 1;
-  const inFullscreen = playerSection.classList.contains("player-fullscreen");
-  if (!inFullscreen) {
+  if (!playerSection.classList.contains("player-fullscreen")) {
     document.querySelectorAll(".parallax").forEach(el => { el.style.transform = `translate(${x*8}px, ${y*8}px)`; });
     document.querySelectorAll(".parallax-tab").forEach(el => { el.style.transform = `translate(${x*4}px, ${y*4}px)`; });
   }
@@ -2090,7 +1942,7 @@ function initGyroscope() {
     const x = Math.max(-1, Math.min(1, gamma / 30));
     const y = Math.max(-1, Math.min(1, (beta - 45) / 30)); // 45° = neutral holding angle
 
-    // Stop parallax in fullscreen so nothing bleeds behind player on head tilt
+    // Stop parallax in fullscreen so nothing bleeds behind player
     if (!playerSection.classList.contains("player-fullscreen")) {
       document.querySelectorAll(".parallax").forEach(el => {
         el.style.transform = `translate(${x * 12}px, ${y * 12}px)`;
@@ -2259,105 +2111,91 @@ themeToggle.addEventListener("click", () => { isLight = !isLight; document.body.
 /* CHANGE: init uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
 
 /* ================================================================
-   ADD TO PLAYLIST — picker + YouTube API insert
+   ADD TO PLAYLIST
 ================================================================ */
 const addToPlaylistBtn = document.getElementById("addToPlaylistBtn");
 const playlistPickerPage = document.getElementById("playlistPickerPage");
 const plPickerList = document.getElementById("plPickerList");
 const plPickerStatus = document.getElementById("plPickerStatus");
-
 let pickerPrevState = null;
 function openPicker() {
   pickerPrevState = { feed: feedEl.style.display, channel: channelPageEl.style.display, subs: subsPageEl.style.display, playlist: playlistPageEl.style.display };
-  feedEl.style.display = "none"; channelPageEl.style.display = "none"; subsPageEl.style.display = "none"; playlistPageEl.style.display = "none";
-  playlistPickerPage.style.display = "block";
+  feedEl.style.display="none"; channelPageEl.style.display="none"; subsPageEl.style.display="none"; playlistPageEl.style.display="none";
+  playlistPickerPage.style.display="block";
 }
 function closePicker() {
-  playlistPickerPage.style.display = "none";
-  if (pickerPrevState) { feedEl.style.display = pickerPrevState.feed; channelPageEl.style.display = pickerPrevState.channel; subsPageEl.style.display = pickerPrevState.subs; playlistPageEl.style.display = pickerPrevState.playlist; }
+  playlistPickerPage.style.display="none";
+  if (pickerPrevState) { feedEl.style.display=pickerPrevState.feed; channelPageEl.style.display=pickerPrevState.channel; subsPageEl.style.display=pickerPrevState.subs; playlistPageEl.style.display=pickerPrevState.playlist; }
   showHUD("Cancelled");
 }
 document.getElementById("plPickerClose").onclick = function() { closePicker(); };
-
 async function startWriteLogin() {
-  plPickerList.innerHTML = '<div class="pl-pick-msg">Requesting login code…</div>';
-  plPickerStatus.style.display = "none";
+  plPickerList.innerHTML='<div class="pl-pick-msg">Requesting login code…</div>';
+  plPickerStatus.style.display="none";
   try {
-    const res = await fetch("https://oauth2.googleapis.com/device/code", {
-      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube" })
-    });
-    const data = await res.json();
-    plPickerList.innerHTML = '<div class="pl-pick-msg"><div style="font-size:13px;font-weight:600;margin-bottom:8px;">Grant write access</div><div>Go to: <b>' + data.verification_url + '</b></div><div style="margin-top:6px;">Code: <b style="color:#3cf2ff;font-size:16px;letter-spacing:0.1em;">' + data.user_code + '</b></div><div style="font-size:11px;opacity:0.8;margin-top:6px;">Waiting for authorization…</div></div>';
-    const interval = data.interval || 5;
-    let authorized = false;
+    const res=await fetch("https://oauth2.googleapis.com/device/code",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:OAUTH_CLIENT_ID,scope:"https://www.googleapis.com/auth/youtube"})});
+    const data=await res.json();
+    plPickerList.innerHTML='<div class="pl-pick-msg"><div style="font-size:13px;font-weight:600;margin-bottom:8px;">Grant write access</div><div>Go to: <b>'+data.verification_url+'</b></div><div style="margin-top:6px;">Code: <b style="color:#3cf2ff;font-size:16px;letter-spacing:0.1em;">'+data.user_code+'</b></div></div>';
+    const interval=data.interval||5; let authorized=false;
     while (!authorized) {
-      await new Promise(r => setTimeout(r, interval * 1000));
-      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, client_secret: OAUTH_CLIENT_SECRET, device_code: data.device_code, grant_type: "urn:ietf:params:oauth:grant-type:device_code" })
-      });
-      const tokenData = await tokenRes.json();
-      if (tokenData.error) { if (tokenData.error === "authorization_pending") continue; plPickerList.innerHTML = '<div class="pl-pick-msg">Error: ' + tokenData.error + '</div>'; return null; }
-      authorized = true; saveTokens(tokenData); showHUD("Write access granted ✓"); return tokenData.access_token;
+      await new Promise(r=>setTimeout(r,interval*1000));
+      const tr=await fetch("https://oauth2.googleapis.com/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:OAUTH_CLIENT_ID,client_secret:OAUTH_CLIENT_SECRET,device_code:data.device_code,grant_type:"urn:ietf:params:oauth:grant-type:device_code"})});
+      const td=await tr.json();
+      if (td.error) { if(td.error==="authorization_pending")continue; plPickerList.innerHTML='<div class="pl-pick-msg">Error: '+td.error+'</div>'; return null; }
+      authorized=true; saveTokens(td); showHUD("Write access granted ✓"); return td.access_token;
     }
-  } catch (e) { plPickerList.innerHTML = '<div class="pl-pick-msg">Login error. Try again.</div>'; return null; }
+  } catch(e) { plPickerList.innerHTML='<div class="pl-pick-msg">Login error. Try again.</div>'; return null; }
 }
-
 async function openPickerWithToken(token) {
-  plPickerList.innerHTML = '<div class="pl-pick-msg">Loading playlists…</div>';
+  plPickerList.innerHTML='<div class="pl-pick-msg">Loading playlists…</div>';
   try {
-    const res = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
-    const data = await res.json();
-    if (data.error) { clearTokens(); plPickerList.innerHTML = '<div class="pl-pick-msg"><div>Session expired.</div><button id="plPickerReloginBtn" class="topbar-btn" style="margin-top:8px;">Re-login</button></div>'; document.getElementById("plPickerReloginBtn").addEventListener("click", async function() { const t = await startWriteLogin(); if (t) openPickerWithToken(t); }); return; }
-    if (!data.items || !data.items.length) { plPickerList.innerHTML = '<div class="pl-pick-msg">No playlists found.</div>'; return; }
-    plPickerList.innerHTML = "";
-    data.items.forEach(function(pl) {
-      var s = pl.snippet, count = (pl.contentDetails && pl.contentDetails.itemCount) || 0;
-      var thumb = (s.thumbnails && (s.thumbnails.medium && s.thumbnails.medium.url || s.thumbnails.default && s.thumbnails.default.url)) || "";
-      var item = document.createElement("button"); item.className = "pl-pick-item"; item.type = "button";
-      item.innerHTML = '<div class="pl-pick-thumb">' + (thumb ? '<img src="' + thumb + '">' : '') + '</div><div class="pl-pick-info"><div class="pl-pick-title">' + s.title + '</div><div class="pl-pick-count">' + count + ' video' + (count !== 1 ? 's' : '') + '</div></div>';
-      item.onclick = (function(pid, ptitle, tok) { return function() { insertVideoToPlaylist(pid, ptitle, tok); }; })(pl.id, s.title, token);
+    const res=await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});
+    const data=await res.json();
+    if (data.error) { clearTokens(); plPickerList.innerHTML='<div class="pl-pick-msg"><div>Session expired.</div><button id="plPickerReloginBtn" class="topbar-btn" style="margin-top:8px;">Re-login</button></div>'; document.getElementById("plPickerReloginBtn").addEventListener("click",async function(){const t=await startWriteLogin();if(t)openPickerWithToken(t);}); return; }
+    if (!data.items||!data.items.length){plPickerList.innerHTML='<div class="pl-pick-msg">No playlists found.</div>';return;}
+    plPickerList.innerHTML="";
+    data.items.forEach(function(pl){
+      var s=pl.snippet,count=(pl.contentDetails&&pl.contentDetails.itemCount)||0;
+      var thumb=(s.thumbnails&&(s.thumbnails.medium&&s.thumbnails.medium.url||s.thumbnails.default&&s.thumbnails.default.url))||"";
+      var item=document.createElement("button");item.className="pl-pick-item";item.type="button";
+      item.innerHTML='<div class="pl-pick-thumb">'+(thumb?'<img src="'+thumb+'">':"")+'</div><div class="pl-pick-info"><div class="pl-pick-title">'+s.title+'</div><div class="pl-pick-count">'+count+' video'+(count!==1?'s':'')+'</div></div>';
+      item.onclick=(function(pid,ptitle,tok){return function(){insertVideoToPlaylist(pid,ptitle,tok);};})(pl.id,s.title,token);
       plPickerList.appendChild(item);
     });
-  } catch (e) { plPickerList.innerHTML = '<div class="pl-pick-msg">Network error. Try again.</div>'; }
+  } catch(e){plPickerList.innerHTML='<div class="pl-pick-msg">Network error. Try again.</div>';}
 }
-
-async function insertVideoToPlaylist(playlistId, playlistTitle, token) {
-  plPickerStatus.style.display = "block"; plPickerStatus.className = ""; plPickerStatus.textContent = "Adding…";
+async function insertVideoToPlaylist(playlistId,playlistTitle,token) {
+  plPickerStatus.style.display="block";plPickerStatus.className="";plPickerStatus.textContent="Adding…";
   try {
-    var res = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet", {
-      method: "POST",
-      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify({ snippet: { playlistId: playlistId, resourceId: { kind: "youtube#video", videoId: currentVideoId } } })
-    });
-    var data = await res.json();
-    if (data.error) {
-      if (data.error.code === 403) { plPickerList.innerHTML = '<div class="pl-pick-msg"><div>Write permission needed.</div><button id="plPickerUpgradeBtn" class="topbar-btn" style="margin-top:8px;">Upgrade Access</button></div>'; document.getElementById("plPickerUpgradeBtn").addEventListener("click", async function() { clearTokens(); var t = await startWriteLogin(); if (t) insertVideoToPlaylist(playlistId, playlistTitle, t); }); return; }
-      if (data.error.code === 409 || (data.error.errors && data.error.errors[0] && data.error.errors[0].reason === "videoAlreadyInPlaylist")) { plPickerStatus.textContent = "Already in this playlist."; return; }
-      plPickerStatus.className = "error"; plPickerStatus.textContent = "Error: " + (data.error.message || "Unknown error"); return;
+    var res=await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({snippet:{playlistId:playlistId,resourceId:{kind:"youtube#video",videoId:currentVideoId}}})});
+    var data=await res.json();
+    if (data.error){
+      if(data.error.code===403){plPickerList.innerHTML='<div class="pl-pick-msg"><div>Write permission needed.</div><button id="plPickerUpgradeBtn" class="topbar-btn" style="margin-top:8px;">Upgrade Access</button></div>';document.getElementById("plPickerUpgradeBtn").addEventListener("click",async function(){clearTokens();var t=await startWriteLogin();if(t)insertVideoToPlaylist(playlistId,playlistTitle,t);});return;}
+      if(data.error.code===409||(data.error.errors&&data.error.errors[0]&&data.error.errors[0].reason==="videoAlreadyInPlaylist")){plPickerStatus.textContent="Already in this playlist.";return;}
+      plPickerStatus.className="error";plPickerStatus.textContent="Error: "+(data.error.message||"Unknown error");return;
     }
-    plPickerStatus.className = "success"; plPickerStatus.textContent = "✓ Added to " + playlistTitle;
-    showHUD("Added to " + playlistTitle);
-    setTimeout(function() { closePicker(); }, 1200);
-  } catch (e) { plPickerStatus.className = "error"; plPickerStatus.textContent = "Network error. Try again."; }
+    plPickerStatus.className="success";plPickerStatus.textContent="✓ Added to "+playlistTitle;
+    showHUD("Added to "+playlistTitle);
+    setTimeout(function(){closePicker();},1200);
+  } catch(e){plPickerStatus.className="error";plPickerStatus.textContent="Network error. Try again.";}
 }
-
 addToPlaylistBtn.addEventListener("click", async function() {
-  if (!currentVideoId) { showHUD("No video playing"); return; }
-  openPicker();
-  plPickerStatus.style.display = "none";
-  plPickerList.innerHTML = '<div class="pl-pick-msg">Loading playlists…</div>';
-  const token = await getValidToken();
-  if (!token) {
-    plPickerList.innerHTML = '<div class="pl-pick-msg"><div>Login to add videos to playlists.</div><button id="plPickerLoginBtn" class="topbar-btn" style="margin-top:8px;">Login to YouTube</button></div>';
-    document.getElementById("plPickerLoginBtn").addEventListener("click", async function() { const t = await startWriteLogin(); if (t) openPickerWithToken(t); });
+  if (!currentVideoId){showHUD("No video playing");return;}
+  openPicker(); plPickerStatus.style.display="none";
+  plPickerList.innerHTML='<div class="pl-pick-msg">Loading playlists…</div>';
+  const token=await getValidToken();
+  if (!token){
+    plPickerList.innerHTML='<div class="pl-pick-msg"><div>Login to add videos to playlists.</div><button id="plPickerLoginBtn" class="topbar-btn" style="margin-top:8px;">Login to YouTube</button></div>';
+    document.getElementById("plPickerLoginBtn").addEventListener("click",async function(){const t=await startWriteLogin();if(t)openPickerWithToken(t);});
     return;
   }
   openPickerWithToken(token);
 });
 
 
+/* ================================================================
+   SYNC FROM YOUTUBE
+================================================================ */
 const syncBtn = document.getElementById("syncBtn");
 const syncOverlay = document.getElementById("syncOverlay");
 const syncBox = document.getElementById("syncBox");
@@ -2366,159 +2204,80 @@ const syncProgress = document.getElementById("syncProgress");
 const syncProgressFill = document.getElementById("syncProgressFill");
 const syncStartBtn = document.getElementById("syncStartBtn");
 const syncCloseBtn = document.getElementById("syncCloseBtn");
-
-syncBtn.onclick = function() { syncOverlay.style.display = "flex"; syncStatus.textContent = ""; syncProgressFill.style.width = "0%"; syncProgress.style.display = "none"; syncStartBtn.textContent = "Start Sync"; syncStartBtn.disabled = false; };
-syncCloseBtn.onclick = function() { syncOverlay.style.display = "none"; };
-syncOverlay.onclick = function(e) { if (e.target === syncOverlay) syncOverlay.style.display = "none"; };
-syncBox.onclick = function(e) { e.stopPropagation(); };
-
-function buildSyncExtractFn(profile) {
-  const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","this","that","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","have","has","he","she","they","do","did","new","vs","ep","ft","official","video","full","2024","2025","2026","part","episode"]);
-  return function extractSignals(title, channelId, channelTitle, weight) {
-    weight = weight || 1;
-    if (channelId) {
-      profile.channels[channelId] = profile.channels[channelId] || { title: channelTitle, weight: 0, lastWatch: 0, watches: [] };
-      profile.channels[channelId].weight += weight;
-      if (channelTitle) profile.channels[channelId].title = channelTitle;
-      if (!profile.channels[channelId].lastWatch) profile.channels[channelId].lastWatch = Date.now();
-    }
-    if (title) {
-      const words = title.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w));
-      words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + weight; });
-      for (let i = 0; i < words.length - 1; i++) { const bi = words[i] + " " + words[i+1]; profile.bigrams[bi] = (profile.bigrams[bi] || 0) + weight; }
-    }
+syncBtn.onclick=function(){syncOverlay.style.display="flex";syncStatus.textContent="";syncProgressFill.style.width="0%";syncProgress.style.display="none";syncStartBtn.textContent="Start Sync";syncStartBtn.disabled=false;};
+syncCloseBtn.onclick=function(){syncOverlay.style.display="none";};
+syncOverlay.onclick=function(e){if(e.target===syncOverlay)syncOverlay.style.display="none";};
+syncBox.onclick=function(e){e.stopPropagation();};
+function buildExtract(profile){
+  const sw=new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","this","that","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","have","has","he","she","they","do","did","new","vs","ep","ft","official","video","full","2024","2025","2026","part","episode"]);
+  return function(title,chId,chTitle,w){
+    w=w||1;
+    if(chId){profile.channels[chId]=profile.channels[chId]||{title:chTitle,weight:0,lastWatch:0,watches:[]};profile.channels[chId].weight+=w;if(chTitle)profile.channels[chId].title=chTitle;if(!profile.channels[chId].lastWatch)profile.channels[chId].lastWatch=Date.now();}
+    if(title){const words=title.toLowerCase().replace(/[^a-z0-9\s]/g,"").split(/\s+/).filter(w=>w.length>2&&!sw.has(w));words.forEach(w=>{profile.keywords[w]=(profile.keywords[w]||0)+w;});for(let i=0;i<words.length-1;i++){const bi=words[i]+" "+words[i+1];profile.bigrams[bi]=(profile.bigrams[bi]||0)+w;}}
   };
 }
-
-syncStartBtn.onclick = async function() {
-  const token = await getValidToken();
-  if (!token) { syncStatus.textContent = "Not logged in — please login via Subscriptions tab first."; return; }
-  syncStartBtn.disabled = true; syncStartBtn.textContent = "Syncing…";
-  syncProgress.style.display = "block";
-  const profile = getTasteProfile();
-  profile.channels = profile.channels || {}; profile.categories = profile.categories || {};
-  profile.keywords = profile.keywords || {}; profile.bigrams = profile.bigrams || {};
-  profile.recentVideoIds = profile.recentVideoIds || [];
-  const extractSignals = buildSyncExtractFn(profile);
-  let totalSignals = 0;
-  const isFirstSync = !profile.syncedAt;
-  function setProgress(pct, msg) { syncProgressFill.style.width = pct + "%"; syncStatus.textContent = msg; }
-  // Liked Videos
-  setProgress(5, isFirstSync ? "Deep syncing liked videos (up to 500)…" : "Reading liked videos…");
-  try {
-    let llPageToken = ""; let llPages = 0; const maxLL = isFirstSync ? 25 : 10;
-    while (llPages < maxLL) {
-      const url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=20" + (llPageToken ? "&pageToken=" + llPageToken : "");
-      const res = await fetch(url, { headers: { Authorization: "Bearer " + token } });
-      const data = await res.json();
-      if (data.error || !data.items) break;
-      data.items.forEach(it => { const s = it.snippet || {}; extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 3); const vid = s.resourceId?.videoId; if (vid && !profile.recentVideoIds.includes(vid)) profile.recentVideoIds.push(vid); totalSignals++; });
-      llPageToken = data.nextPageToken || ""; llPages++; if (!llPageToken) break;
-      setProgress(5 + Math.round((llPages / maxLL) * 15), `Liked videos: ${totalSignals} so far…`);
-    }
-    setProgress(20, `Liked videos: ${totalSignals} signals`);
-  } catch(e) {}
-  // Watch Later
-  setProgress(22, "Reading Watch Later…");
-  try { const res = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=50", { headers: { Authorization: "Bearer " + token } }); const data = await res.json(); (data.items || []).forEach(it => { const s = it.snippet || {}; extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 2); totalSignals++; }); setProgress(30, `Watch Later: ${totalSignals} signals`); } catch(e) {}
-  // Playlists
-  setProgress(32, "Reading your playlists…");
-  try {
-    const plRes = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
-    const plData = await plRes.json();
-    const plLimit = isFirstSync ? (plData.items || []).length : 8;
-    const itemsPerPl = isFirstSync ? 20 : 10;
-    for (const pl of (plData.items || []).slice(0, plLimit)) {
-      try { const itemRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: pl.id, maxResults: itemsPerPl, _: Date.now() }); (itemRes.items || []).forEach(it => { const s = it.snippet || {}; extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 2); totalSignals++; }); } catch(e) {}
-    }
-    setProgress(50, `Playlists: ${totalSignals} signals`);
-  } catch(e) {}
-  // Subscriptions
-  setProgress(52, "Reading subscriptions…");
-  try {
-    const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
-    const subsData = await subsRes.json();
-    const channelIds = (subsData.items || []).map(s => { extractSignals(null, s.snippet.resourceId.channelId, s.snippet.title, 1); return s.snippet.resourceId.channelId; });
-    if (channelIds.length) {
-      const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 50).join(",") });
-      const uploadPls = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
-      const sampleCount = isFirstSync ? 20 : 5;
-      for (const plId of uploadPls.sort(() => Math.random() - 0.5).slice(0, sampleCount)) {
-        try { const upRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 8, _: Date.now() }); (upRes.items || []).forEach(it => { extractSignals(it.snippet?.title, null, null, 1); totalSignals++; }); } catch(e) {}
-      }
-    }
-    setProgress(75, `Subscriptions: ${totalSignals} signals`);
-  } catch(e) {}
-  // Activity
-  setProgress(77, "Reading recent activity…");
-  try { const actRes = await fetch("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } }); const actData = await actRes.json(); (actData.items || []).forEach(it => { const s = it.snippet || {}; const vid = it.contentDetails?.upload?.videoId || it.contentDetails?.recommendation?.resourceId?.videoId; extractSignals(s.title, s.channelId, s.channelTitle, 2); if (vid && !profile.recentVideoIds.includes(vid)) profile.recentVideoIds.push(vid); totalSignals++; }); setProgress(90, `Activity: ${totalSignals} signals`); } catch(e) {}
-  profile.recentVideoIds = profile.recentVideoIds.slice(0, 50);
-  profile.syncedAt = Date.now();
-  localStorage.setItem("tasteProfile", JSON.stringify(profile));
-  setProgress(100, `✓ Sync complete — ${totalSignals} signals from your account`);
-  syncStartBtn.textContent = "Sync Again"; syncStartBtn.disabled = false;
-  showHUD("YouTube synced ✦");
-  setTimeout(() => { syncOverlay.style.display = "none"; homeTab.click(); }, 1500);
+syncStartBtn.onclick=async function(){
+  const token=await getValidToken();
+  if(!token){syncStatus.textContent="Not logged in — login via Subscriptions first.";return;}
+  syncStartBtn.disabled=true;syncStartBtn.textContent="Syncing…";syncProgress.style.display="block";
+  const profile=getTasteProfile();
+  profile.channels=profile.channels||{};profile.categories=profile.categories||{};profile.keywords=profile.keywords||{};profile.bigrams=profile.bigrams||{};profile.recentVideoIds=profile.recentVideoIds||[];
+  const extract=buildExtract(profile);
+  const isFirst=!profile.syncedAt;
+  let total=0;
+  function sp(pct,msg){syncProgressFill.style.width=pct+"%";syncStatus.textContent=msg;}
+  sp(5,isFirst?"Deep syncing liked videos (up to 500)…":"Reading liked videos…");
+  try{let pt="",pages=0,max=isFirst?25:10;while(pages<max){const url="https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=20"+(pt?"&pageToken="+pt:"");const r=await fetch(url,{headers:{Authorization:"Bearer "+token}});const d=await r.json();if(d.error||!d.items)break;d.items.forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,3);const vid=s.resourceId?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);total++;});pt=d.nextPageToken||"";pages++;if(!pt)break;sp(5+Math.round((pages/max)*15),"Liked: "+total+" so far…");}sp(20,"Liked videos: "+total+" signals");}catch(e){}
+  sp(22,"Reading Watch Later…");try{const r=await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=50",{headers:{Authorization:"Bearer "+token}});const d=await r.json();(d.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,2);total++;});sp(30,"Watch Later: "+total+" signals");}catch(e){}
+  sp(32,"Reading playlists…");try{const pr=await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});const pd=await pr.json();const plLimit=isFirst?(pd.items||[]).length:8,iPerPl=isFirst?20:10;for(const pl of(pd.items||[]).slice(0,plLimit)){try{const ir=await fetchYouTube("playlistItems",{part:"snippet",playlistId:pl.id,maxResults:iPerPl,_:Date.now()});(ir.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,2);total++;});}catch(e){}}sp(50,"Playlists: "+total+" signals");}catch(e){}
+  sp(52,"Reading subscriptions…");try{const sr=await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});const sd=await sr.json();const cids=(sd.items||[]).map(s=>{extract(null,s.snippet.resourceId.channelId,s.snippet.title,1);return s.snippet.resourceId.channelId;});if(cids.length){const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,50).join(",")});const ups=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);const sc=isFirst?20:5;for(const plId of ups.sort(()=>Math.random()-0.5).slice(0,sc)){try{const ur=await fetchYouTube("playlistItems",{part:"snippet",playlistId:plId,maxResults:8,_:Date.now()});(ur.items||[]).forEach(it=>{extract(it.snippet?.title,null,null,1);total++;});}catch(e){}}}sp(75,"Subscriptions: "+total+" signals");}catch(e){}
+  sp(77,"Reading activity…");try{const ar=await fetch("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});const ad=await ar.json();(ad.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.channelId,s.channelTitle,2);const vid=it.contentDetails?.upload?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);total++;});sp(90,"Activity: "+total+" signals");}catch(e){}
+  profile.recentVideoIds=profile.recentVideoIds.slice(0,50);profile.syncedAt=Date.now();
+  localStorage.setItem("tasteProfile",JSON.stringify(profile));
+  sp(100,"✓ Sync complete — "+total+" signals");
+  syncStartBtn.textContent="Sync Again";syncStartBtn.disabled=false;showHUD("YouTube synced ✦");
+  setTimeout(()=>{syncOverlay.style.display="none";homeTab.click();},1500);
 };
-
-async function silentSync(token) {
-  const profile = getTasteProfile();
-  profile.channels = profile.channels || {}; profile.categories = profile.categories || {};
-  profile.keywords = profile.keywords || {}; profile.bigrams = profile.bigrams || {};
-  profile.recentVideoIds = profile.recentVideoIds || [];
-  const extractSignals = buildSyncExtractFn(profile);
-  const isFirstSilentSync = !profile.syncedAt;
-  const maxPages = isFirstSilentSync ? 10 : 5;
-  try { let pageToken = ""; for (let p = 0; p < maxPages; p++) { const url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=20" + (pageToken ? "&pageToken=" + pageToken : ""); const res = await fetch(url, { headers: { Authorization: "Bearer " + token } }); const data = await res.json(); if (data.error || !data.items) break; data.items.forEach(it => { const s = it.snippet || {}; extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 3); const vid = s.resourceId?.videoId; if (vid && !profile.recentVideoIds.includes(vid)) profile.recentVideoIds.push(vid); }); pageToken = data.nextPageToken || ""; if (!pageToken) break; } } catch(e) {}
-  try { const res = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=50", { headers: { Authorization: "Bearer " + token } }); const data = await res.json(); (data.items || []).forEach(it => { const s = it.snippet || {}; extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 2); }); } catch(e) {}
-  try { const plRes = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } }); const plData = await plRes.json(); for (const pl of (plData.items || []).slice(0, 8)) { try { const itemRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: pl.id, maxResults: 10, _: Date.now() }); (itemRes.items || []).forEach(it => { const s = it.snippet || {}; extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 2); }); } catch(e) {} } } catch(e) {}
-  try { const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } }); const subsData = await subsRes.json(); const channelIds = (subsData.items || []).map(s => { extractSignals(null, s.snippet.resourceId.channelId, s.snippet.title, 1); return s.snippet.resourceId.channelId; }); if (channelIds.length) { const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 50).join(",") }); const uploadPls = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean); const silentSampleCount = isFirstSilentSync ? 15 : 5; for (const plId of uploadPls.sort(() => Math.random() - 0.5).slice(0, silentSampleCount)) { try { const upRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 8, _: Date.now() }); (upRes.items || []).forEach(it => { extractSignals(it.snippet?.title, null, null, 1); }); } catch(e) {} } } } catch(e) {}
-  try { const actRes = await fetch("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } }); const actData = await actRes.json(); (actData.items || []).forEach(it => { const s = it.snippet || {}; extractSignals(s.title, s.channelId, s.channelTitle, 2); const vid = it.contentDetails?.upload?.videoId; if (vid && !profile.recentVideoIds.includes(vid)) profile.recentVideoIds.push(vid); }); } catch(e) {}
-  profile.recentVideoIds = profile.recentVideoIds.slice(0, 50);
-  profile.syncedAt = Date.now();
-  localStorage.setItem("tasteProfile", JSON.stringify(profile));
+async function silentSync(token){
+  const profile=getTasteProfile();
+  profile.channels=profile.channels||{};profile.categories=profile.categories||{};profile.keywords=profile.keywords||{};profile.bigrams=profile.bigrams||{};profile.recentVideoIds=profile.recentVideoIds||[];
+  const extract=buildExtract(profile);
+  const isFirst=!profile.syncedAt,maxPages=isFirst?10:5;
+  try{let pt="";for(let p=0;p<maxPages;p++){const url="https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=20"+(pt?"&pageToken="+pt:"");const r=await fetch(url,{headers:{Authorization:"Bearer "+token}});const d=await r.json();if(d.error||!d.items)break;d.items.forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,3);const vid=s.resourceId?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);});pt=d.nextPageToken||"";if(!pt)break;}}catch(e){}
+  try{const r=await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=50",{headers:{Authorization:"Bearer "+token}});const d=await r.json();(d.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,2);});}catch(e){}
+  try{const sr=await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});const sd=await sr.json();const cids=(sd.items||[]).map(s=>{extract(null,s.snippet.resourceId.channelId,s.snippet.title,1);return s.snippet.resourceId.channelId;});if(cids.length){const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,50).join(",")});const ups=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);for(const plId of ups.sort(()=>Math.random()-0.5).slice(0,isFirst?15:5)){try{const ur=await fetchYouTube("playlistItems",{part:"snippet",playlistId:plId,maxResults:8,_:Date.now()});(ur.items||[]).forEach(it=>{extract(it.snippet?.title,null,null,1);});}catch(e){}}}}catch(e){}
+  try{const ar=await fetch("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});const ad=await ar.json();(ad.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.channelId,s.channelTitle,2);const vid=it.contentDetails?.upload?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);});}catch(e){}
+  profile.recentVideoIds=profile.recentVideoIds.slice(0,50);profile.syncedAt=Date.now();
+  localStorage.setItem("tasteProfile",JSON.stringify(profile));
 }
 
 (async function init() {
-  // Dismiss splash fast and unconditionally — never let it get stuck
-  function dismissSplash() {
+  // Dismiss boot splash after loading bar completes
+  setTimeout(() => {
     const splash = document.getElementById("bootSplash");
-    if (splash) { splash.classList.add("fade-out"); setTimeout(() => { try { splash.remove(); } catch(e) {} }, 600); }
-  }
-  setTimeout(dismissSplash, 1200);
-
+    if (splash) { splash.classList.add("fade-out"); setTimeout(() => splash.remove(), 800); }
+  }, 2200);
   showSkeletons(8);
-  try {
   const hasRefresh = localStorage.getItem("yt_refresh_token");
   if (hasRefresh) { const ok = await refreshAccessToken(); if (ok) showHUD("Signed in ✓"); }
-  if (hasEnoughHistory()) {
-    const items = await fetchPersonalizedFeed();
-    renderFeed(items);
-    showHUD("For You ✦");
-    const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
-    nextPageToken = seed.nextPageToken || null;
-  } else {
-    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
-    nextPageToken = data.nextPageToken || null;
-    renderFeed(data.items || []);
-  }
-  // Silent background sync every 6 hours
-  const token = await getValidToken();
-  if (token) {
-    const profile = getTasteProfile();
-    const lastSync = profile.syncedAt || 0;
-    if (Date.now() - lastSync > 6 * 60 * 60 * 1000) {
-      silentSync(token).then(() => showHUD("Feed updated ✦")).catch(() => {});
-    }
-  }
-  } catch(e) {
-    // If anything in init fails, show trending as fallback
-    try {
-      const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+  try {
+    if (hasEnoughHistory()) {
+      const items = await fetchPersonalizedFeed();
+      renderFeed(items);
+      showHUD("For You ✦");
+      const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+      nextPageToken = seed.nextPageToken || null;
+    } else {
+      const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
       nextPageToken = data.nextPageToken || null;
       renderFeed(data.items || []);
-    } catch(e2) {}
+    }
+  } catch(e) {
+    try { const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() }); nextPageToken = data.nextPageToken || null; renderFeed(data.items || []); } catch(e2) {}
   }
+  // Silent background sync every 6 hours
+  const tkn = await getValidToken();
+  if (tkn) { const p = getTasteProfile(); if (Date.now() - (p.syncedAt||0) > 21600000) { silentSync(tkn).then(()=>showHUD("Feed updated ✦")).catch(()=>{}); } }
 })();
 </script>
 </body>
