@@ -1619,7 +1619,7 @@ shortsTab.addEventListener("click", async () => {
   function isNew(id) { return !persistentSeenIds.has(id) && !shortsSeenIds.has(id); }
 
   // SOURCE 1: Shorts from YOUR subscribed channels (UUSH playlists, 1 unit each)
-  // Shuffled + newest-first so you get fresh shorts every time
+  // Fetch with contentDetails so we can sort by videoPublishedAt — newest first
   if (token) {
     try {
       const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance", {
@@ -1633,16 +1633,25 @@ shortsTab.addEventListener("click", async () => {
         [channelIds[i], channelIds[j]] = [channelIds[j], channelIds[i]];
       }
       const shortsPlIds = channelIds.filter(id => id.startsWith("UC")).map(id => "UUSH" + id.slice(2));
-      // Sample 15 random channels, fetch newest 6 shorts each
+      // Fetch 15 items per channel with contentDetails so we get real publish dates
       const subShortsFetches = shortsPlIds.slice(0, 15).map(pid =>
-        fetchYouTube("playlistItems", { part: "snippet", playlistId: pid, maxResults: 6, _: Date.now() })
+        fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId: pid, maxResults: 15, _: Date.now() })
       );
       const subShortsResults = await Promise.allSettled(subShortsFetches);
       subShortsResults.forEach(r => {
         if (r.status === "fulfilled") {
-          (r.value.items || []).forEach(it => {
+          // Sort newest-first using videoPublishedAt (actual publish date)
+          const sorted = (r.value.items || []).sort((a, b) => {
+            const da = new Date(a.contentDetails?.videoPublishedAt || a.snippet?.publishedAt || 0).getTime();
+            const db = new Date(b.contentDetails?.videoPublishedAt || b.snippet?.publishedAt || 0).getTime();
+            return db - da;
+          });
+          sorted.slice(0, 5).forEach(it => {
             const vid = it.snippet?.resourceId?.videoId;
-            if (vid && isNew(vid)) pool.push({ id: vid, snippet: it.snippet });
+            if (vid && isNew(vid)) pool.push({
+              id: vid,
+              snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt }
+            });
           });
         }
       });
