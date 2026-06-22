@@ -502,6 +502,7 @@ body.fullscreen-active .exit-full-btn { display: block; padding: 3px 8px; font-s
     </div>
     <div class="topbar-right">
       <button id="themeToggle" class="topbar-btn">Theme</button>
+      <button id="syncBtn" class="topbar-btn">⟳ Sync</button>
       <button id="backBtn" class="topbar-btn">Mini</button>
     </div>
   </div>
@@ -542,7 +543,18 @@ body.fullscreen-active .exit-full-btn { display: block; padding: 3px 8px; font-s
     <div id="plPickerList"></div>
     <div id="plPickerStatus" style="display:none; padding:10px; text-align:center; font-size:12px; border-radius:12px; margin-top:8px;"></div>
   </div>
-  <div id="hud"></div>
+  <div id="syncOverlay" style="display:none; position:fixed; inset:0; z-index:100001; background:rgba(0,0,0,0.88); align-items:center; justify-content:center;">
+    <div id="syncBox" style="width:90%; max-width:380px; border-radius:22px; background:linear-gradient(135deg,rgba(10,12,20,0.98),rgba(20,24,40,0.98)); border:1px solid rgba(60,242,255,0.35); box-shadow:0 0 40px rgba(60,242,255,0.2); padding:20px;">
+      <div style="font-size:15px; font-weight:700; letter-spacing:0.05em; margin-bottom:6px; color:#f5f7ff;">⟳ Sync from YouTube</div>
+      <div style="font-size:11px; opacity:0.65; margin-bottom:16px; line-height:1.5;">Reads your liked videos, playlists, subscriptions and watch activity to build a taste profile — so your Home feed matches your real YouTube from day one.</div>
+      <div id="syncStatus" style="font-size:11px; color:rgba(60,242,255,0.9); min-height:16px; margin-bottom:14px;"></div>
+      <div id="syncProgress" style="width:100%; height:3px; background:rgba(60,242,255,0.12); border-radius:3px; margin-bottom:16px; display:none;"><div id="syncProgressFill" style="height:100%; width:0%; background:linear-gradient(90deg,rgba(60,242,255,0.9),rgba(0,255,180,0.7)); border-radius:3px; transition:width 0.4s ease;"></div></div>
+      <div style="display:flex; gap:8px;">
+        <button id="syncStartBtn" class="topbar-btn" style="flex:1;">Start Sync</button>
+        <button id="syncCloseBtn" class="topbar-btn" style="flex:0 0 auto;">Close</button>
+      </div>
+    </div>
+  </div>
   <div id="searchPanel">
     <div class="search-input-bar">
       <input id="searchInput" type="text" placeholder="Search videos..." />
@@ -2593,6 +2605,200 @@ addToPlaylistBtn.addEventListener("click", async function() {
   openPickerWithToken(token);
 });
 
+/* ================================================================
+   SYNC FROM YOUTUBE — bootstraps taste profile from account data
+   Reads: liked videos, saved playlists, subscriptions, watch activity
+================================================================ */
+const syncBtn = document.getElementById("syncBtn");
+const syncOverlay = document.getElementById("syncOverlay");
+const syncBox = document.getElementById("syncBox");
+const syncStatus = document.getElementById("syncStatus");
+const syncProgress = document.getElementById("syncProgress");
+const syncProgressFill = document.getElementById("syncProgressFill");
+const syncStartBtn = document.getElementById("syncStartBtn");
+const syncCloseBtn = document.getElementById("syncCloseBtn");
+
+syncBtn.onclick = function() {
+  syncOverlay.style.display = "flex";
+  syncStatus.textContent = "";
+  syncProgressFill.style.width = "0%";
+  syncProgress.style.display = "none";
+  syncStartBtn.textContent = "Start Sync";
+  syncStartBtn.disabled = false;
+};
+syncCloseBtn.onclick = function() { syncOverlay.style.display = "none"; };
+syncOverlay.onclick = function(e) { if (e.target === syncOverlay) syncOverlay.style.display = "none"; };
+syncBox.onclick = function(e) { e.stopPropagation(); };
+
+syncStartBtn.onclick = async function() {
+  const token = await getValidToken();
+  if (!token) {
+    syncStatus.textContent = "Not logged in — please login via Subscriptions tab first.";
+    return;
+  }
+  syncStartBtn.disabled = true;
+  syncStartBtn.textContent = "Syncing…";
+  syncProgress.style.display = "block";
+
+  const profile = getTasteProfile();
+  profile.channels = profile.channels || {};
+  profile.categories = profile.categories || {};
+  profile.keywords = profile.keywords || {};
+  profile.bigrams = profile.bigrams || {};
+  profile.recentVideoIds = profile.recentVideoIds || [];
+
+  const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","this","that","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","have","has","he","she","they","do","did","new","vs","ep","ft","official","video","full","2024","2025","2026","part","episode"]);
+
+  function extractSignals(title, channelId, channelTitle, weight) {
+    weight = weight || 1;
+    // Channel signal
+    if (channelId) {
+      profile.channels[channelId] = profile.channels[channelId] || { title: channelTitle, weight: 0, lastWatch: 0, watches: [] };
+      profile.channels[channelId].weight += weight;
+      profile.channels[channelId].title = channelTitle || profile.channels[channelId].title;
+      if (!profile.channels[channelId].lastWatch) profile.channels[channelId].lastWatch = Date.now();
+    }
+    // Keywords & bigrams from title
+    if (title) {
+      const words = title.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w));
+      words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + weight; });
+      for (let i = 0; i < words.length - 1; i++) {
+        const bi = words[i] + " " + words[i+1];
+        profile.bigrams[bi] = (profile.bigrams[bi] || 0) + weight;
+      }
+    }
+  }
+
+  function setProgress(pct, msg) {
+    syncProgressFill.style.width = pct + "%";
+    syncStatus.textContent = msg;
+  }
+
+  let totalSignals = 0;
+
+  // STEP 1: Liked Videos (LL) — strong signal, weight 3 each
+  setProgress(5, "Reading liked videos…");
+  try {
+    let llPageToken = "";
+    let llPages = 0;
+    while (llPages < 5) { // up to 5 pages = 100 liked videos
+      const url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=20" + (llPageToken ? "&pageToken=" + llPageToken : "");
+      const res = await fetch(url, { headers: { Authorization: "Bearer " + token } });
+      const data = await res.json();
+      if (data.error || !data.items) break;
+      data.items.forEach(it => {
+        const s = it.snippet || {};
+        extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 3);
+        const vid = s.resourceId?.videoId;
+        if (vid && !profile.recentVideoIds.includes(vid)) profile.recentVideoIds.push(vid);
+        totalSignals++;
+      });
+      llPageToken = data.nextPageToken || "";
+      llPages++;
+      if (!llPageToken) break;
+    }
+    setProgress(20, `Liked videos: ${totalSignals} signals collected`);
+  } catch(e) { setProgress(20, "Liked videos: skipped"); }
+
+  // STEP 2: Watch Later (WL) — medium signal, weight 2
+  setProgress(22, "Reading Watch Later…");
+  try {
+    const wlRes = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=50", { headers: { Authorization: "Bearer " + token } });
+    const wlData = await wlRes.json();
+    (wlData.items || []).forEach(it => {
+      const s = it.snippet || {};
+      extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 2);
+      totalSignals++;
+    });
+    setProgress(30, `Watch Later: ${totalSignals} signals collected`);
+  } catch(e) { setProgress(30, "Watch Later: skipped"); }
+
+  // STEP 3: Your playlists — reads titles and channel ownership, weight 2
+  setProgress(32, "Reading your playlists…");
+  try {
+    const plRes = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
+    const plData = await plRes.json();
+    const myPlaylists = plData.items || [];
+    // Fetch first 10 videos from each playlist
+    for (const pl of myPlaylists.slice(0, 8)) {
+      try {
+        const itemRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: pl.id, maxResults: 10, _: Date.now() });
+        (itemRes.items || []).forEach(it => {
+          const s = it.snippet || {};
+          extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 2);
+          totalSignals++;
+        });
+      } catch(e) {}
+    }
+    setProgress(50, `Playlists: ${totalSignals} signals collected`);
+  } catch(e) { setProgress(50, "Playlists: skipped"); }
+
+  // STEP 4: Subscriptions — fetch each channel's latest uploads for topic signals, weight 1
+  setProgress(52, "Reading subscriptions…");
+  try {
+    const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
+    const subsData = await subsRes.json();
+    const channelIds = (subsData.items || []).map(s => {
+      const chId = s.snippet.resourceId.channelId;
+      const chTitle = s.snippet.title;
+      // Give every subscribed channel baseline weight
+      profile.channels[chId] = profile.channels[chId] || { title: chTitle, weight: 0, lastWatch: 0, watches: [] };
+      profile.channels[chId].weight += 1;
+      profile.channels[chId].title = chTitle;
+      return chId;
+    });
+
+    // Get upload playlists then sample recent video titles for topic signals
+    if (channelIds.length > 0) {
+      const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 50).join(",") });
+      const uploadPls = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
+      // Sample 5 random upload playlists to get topic signals without burning quota
+      const sample = uploadPls.sort(() => Math.random() - 0.5).slice(0, 5);
+      for (const plId of sample) {
+        try {
+          const upRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 5, _: Date.now() });
+          (upRes.items || []).forEach(it => {
+            extractSignals(it.snippet?.title, null, null, 1);
+            totalSignals++;
+          });
+        } catch(e) {}
+      }
+    }
+    setProgress(75, `Subscriptions: ${totalSignals} signals collected`);
+  } catch(e) { setProgress(75, "Subscriptions: skipped"); }
+
+  // STEP 5: Recent activity via Activities API — weight 2
+  setProgress(77, "Reading recent activity…");
+  try {
+    const actRes = await fetch("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
+    const actData = await actRes.json();
+    (actData.items || []).forEach(it => {
+      const s = it.snippet || {};
+      const vid = it.contentDetails?.upload?.videoId || it.contentDetails?.recommendation?.resourceId?.videoId;
+      extractSignals(s.title, s.channelId, s.channelTitle, 2);
+      if (vid && !profile.recentVideoIds.includes(vid)) profile.recentVideoIds.push(vid);
+      totalSignals++;
+    });
+    setProgress(90, `Activity: ${totalSignals} signals collected`);
+  } catch(e) { setProgress(90, "Activity: skipped"); }
+
+  // Save enriched profile
+  profile.recentVideoIds = profile.recentVideoIds.slice(0, 50);
+  profile.syncedAt = Date.now();
+  localStorage.setItem("tasteProfile", JSON.stringify(profile));
+
+  setProgress(100, `✓ Sync complete — ${totalSignals} signals from your account`);
+  syncStartBtn.textContent = "Sync Again";
+  syncStartBtn.disabled = false;
+  showHUD("YouTube synced ✦");
+
+  // Reload home feed with the new enriched profile
+  setTimeout(() => {
+    syncOverlay.style.display = "none";
+    homeTab.click();
+  }, 1500);
+};
+
 (async function init() {
   // Dismiss boot splash after loading bar completes
   setTimeout(() => {
@@ -2602,6 +2808,8 @@ addToPlaylistBtn.addEventListener("click", async function() {
   showSkeletons(8);
   const hasRefresh = localStorage.getItem("yt_refresh_token");
   if (hasRefresh) { const ok = await refreshAccessToken(); if (ok) showHUD("Signed in ✓"); }
+
+  // Load feed first so the app feels instant
   if (hasEnoughHistory()) {
     const items = await fetchPersonalizedFeed();
     renderFeed(items);
@@ -2613,7 +2821,124 @@ addToPlaylistBtn.addEventListener("click", async function() {
     nextPageToken = data.nextPageToken || null;
     renderFeed(data.items || []);
   }
+
+  // Silent background sync — runs after feed loads, only if:
+  // 1. Token exists, AND 2. Last sync was more than 6 hours ago (or never)
+  const token = await getValidToken();
+  if (token) {
+    const profile = getTasteProfile();
+    const lastSync = profile.syncedAt || 0;
+    const SIX_HOURS = 6 * 60 * 60 * 1000;
+    if (Date.now() - lastSync > SIX_HOURS) {
+      // Run silently in background — no UI blocking, no popup
+      silentSync(token).then(() => {
+        showHUD("Feed updated ✦");
+      }).catch(() => {});
+    }
+  }
 })();
+
+async function silentSync(token) {
+  const profile = getTasteProfile();
+  profile.channels = profile.channels || {};
+  profile.categories = profile.categories || {};
+  profile.keywords = profile.keywords || {};
+  profile.bigrams = profile.bigrams || {};
+  profile.recentVideoIds = profile.recentVideoIds || [];
+
+  const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","this","that","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","have","has","he","she","they","do","did","new","vs","ep","ft","official","video","full","2024","2025","2026","part","episode"]);
+
+  function extractSignals(title, channelId, channelTitle, weight) {
+    weight = weight || 1;
+    if (channelId) {
+      profile.channels[channelId] = profile.channels[channelId] || { title: channelTitle, weight: 0, lastWatch: 0, watches: [] };
+      profile.channels[channelId].weight += weight;
+      if (channelTitle) profile.channels[channelId].title = channelTitle;
+      if (!profile.channels[channelId].lastWatch) profile.channels[channelId].lastWatch = Date.now();
+    }
+    if (title) {
+      const words = title.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w));
+      words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + weight; });
+      for (let i = 0; i < words.length - 1; i++) {
+        const bi = words[i] + " " + words[i+1];
+        profile.bigrams[bi] = (profile.bigrams[bi] || 0) + weight;
+      }
+    }
+  }
+
+  // Liked videos (up to 100) — weight 3
+  try {
+    let pageToken = "";
+    for (let p = 0; p < 5; p++) {
+      const url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=20" + (pageToken ? "&pageToken=" + pageToken : "");
+      const res = await fetch(url, { headers: { Authorization: "Bearer " + token } });
+      const data = await res.json();
+      if (data.error || !data.items) break;
+      data.items.forEach(it => {
+        const s = it.snippet || {};
+        extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 3);
+        const vid = s.resourceId?.videoId;
+        if (vid && !profile.recentVideoIds.includes(vid)) profile.recentVideoIds.push(vid);
+      });
+      pageToken = data.nextPageToken || ""; if (!pageToken) break;
+    }
+  } catch(e) {}
+
+  // Watch Later — weight 2
+  try {
+    const res = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=50", { headers: { Authorization: "Bearer " + token } });
+    const data = await res.json();
+    (data.items || []).forEach(it => { const s = it.snippet || {}; extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 2); });
+  } catch(e) {}
+
+  // Playlists — weight 2
+  try {
+    const plRes = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
+    const plData = await plRes.json();
+    for (const pl of (plData.items || []).slice(0, 8)) {
+      try {
+        const itemRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: pl.id, maxResults: 10, _: Date.now() });
+        (itemRes.items || []).forEach(it => { const s = it.snippet || {}; extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 2); });
+      } catch(e) {}
+    }
+  } catch(e) {}
+
+  // Subscriptions — weight 1
+  try {
+    const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
+    const subsData = await subsRes.json();
+    const channelIds = (subsData.items || []).map(s => {
+      extractSignals(null, s.snippet.resourceId.channelId, s.snippet.title, 1);
+      return s.snippet.resourceId.channelId;
+    });
+    if (channelIds.length) {
+      const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 50).join(",") });
+      const uploadPls = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
+      for (const plId of uploadPls.sort(() => Math.random() - 0.5).slice(0, 5)) {
+        try {
+          const upRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 5, _: Date.now() });
+          (upRes.items || []).forEach(it => { extractSignals(it.snippet?.title, null, null, 1); });
+        } catch(e) {}
+      }
+    }
+  } catch(e) {}
+
+  // Recent activity — weight 2
+  try {
+    const actRes = await fetch("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
+    const actData = await actRes.json();
+    (actData.items || []).forEach(it => {
+      const s = it.snippet || {};
+      extractSignals(s.title, s.channelId, s.channelTitle, 2);
+      const vid = it.contentDetails?.upload?.videoId || it.contentDetails?.recommendation?.resourceId?.videoId;
+      if (vid && !profile.recentVideoIds.includes(vid)) profile.recentVideoIds.push(vid);
+    });
+  } catch(e) {}
+
+  profile.recentVideoIds = profile.recentVideoIds.slice(0, 50);
+  profile.syncedAt = Date.now();
+  localStorage.setItem("tasteProfile", JSON.stringify(profile));
+}
 </script>
 </body>
 </html>
