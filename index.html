@@ -1002,24 +1002,27 @@ function getRecentSearches(n) { return ((getTasteProfile().searchHistory || []).
 async function fetchPersonalizedFeed() {
   const token = await getValidToken();
   const watchedIds = new Set((getTasteProfile().recentVideoIds || []).slice(0, 50));
-  // SKIP videos shown in the LAST feed load — forces fresh content each tap
+  // Only skip videos shown in the LAST 24 hours (not a hard count-based block)
   let shownHistory = []; try { shownHistory = JSON.parse(localStorage.getItem("feedShownIds") || "[]"); } catch(e) {}
-  const lastFeedIds = new Set(shownHistory.slice(0, 80)); // skip last ~80 shown videos
+  const oneDayAgo = Date.now() - 86400000;
+  let shownHistoryParsed = []; try { shownHistoryParsed = JSON.parse(localStorage.getItem("feedShownTimed") || "[]"); } catch(e) {}
+  const recentShownIds = new Set(shownHistoryParsed.filter(e => e.ts > oneDayAgo).map(e => e.id));
   const seen = new Set();
   const allItems = [];
 
   function addItems(items, weight) {
     (items || []).forEach(item => {
       const id = item.id?.videoId || item.id;
-      if (!id || seen.has(id) || watchedIds.has(id) || lastFeedIds.has(id)) return;
+      if (!id || seen.has(id) || watchedIds.has(id) || recentShownIds.has(id)) return;
       seen.add(id);
       allItems.push({ item, weight });
     });
   }
 
   /* ============================================================
-     SOURCE 1: SUBSCRIPTION UPLOADS (OAuth — your actual subs)
-     SHUFFLED each load so different channels surface each time
+     SOURCE 1: SUBSCRIPTION UPLOADS — newest videos first
+     Uses videoPublishedAt (actual publish date, not playlist-add date)
+     Shuffles channels so different ones surface each load
   ============================================================ */
   if (token) {
     try {
@@ -1038,41 +1041,54 @@ async function fetchPersonalizedFeed() {
           .map(ch => ch.contentDetails?.relatedPlaylists?.uploads)
           .filter(Boolean);
 
-        // Shuffle playlist order so each Home tap surfaces different channels
+        // Shuffle so different channels surface each load
         for (let i = uploadPlaylists.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [uploadPlaylists[i], uploadPlaylists[j]] = [uploadPlaylists[j], uploadPlaylists[i]];
         }
 
-        // Sample 8 random channels (not always the same top 15)
-        const uploadFetches = uploadPlaylists.slice(0, 8).map(plId =>
-          fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 4, _: Date.now() })
+        // Fetch 10 items per channel so we can sort by actual publish date
+        // (playlistItems returns oldest-first by default, so we fetch more and sort)
+        const uploadFetches = uploadPlaylists.slice(0, 10).map(plId =>
+          fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId: plId, maxResults: 10, _: Date.now() })
         );
         const uploadResults = await Promise.allSettled(uploadFetches);
         uploadResults.forEach(r => {
           if (r.status === "fulfilled") {
-            const items = (r.value.items || []).map(it => ({
-              id: it.snippet?.resourceId?.videoId, snippet: it.snippet
+            // Sort by videoPublishedAt descending — newest first
+            const sorted = (r.value.items || []).sort((a, b) => {
+              const da = new Date(a.contentDetails?.videoPublishedAt || a.snippet?.publishedAt || 0).getTime();
+              const db = new Date(b.contentDetails?.videoPublishedAt || b.snippet?.publishedAt || 0).getTime();
+              return db - da;
+            });
+            const items = sorted.slice(0, 4).map(it => ({
+              id: it.snippet?.resourceId?.videoId,
+              snippet: {
+                ...it.snippet,
+                // Override publishedAt with the real video publish date for accurate recency scoring
+                publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt
+              }
             }));
-            addItems(items, 5);
+            addItems(items, 6);
           }
         });
       }
     } catch (e) {}
 
     /* ============================================================
-       SOURCE 2: LIKED VIDEOS (OAuth — random offset each load)
+       SOURCE 2: LIKED VIDEOS — newest likes first
     ============================================================ */
     try {
       const llRes = await fetch(
-        "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=10",
+        "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=15",
         { headers: { Authorization: "Bearer " + token } }
       );
       const llData = await llRes.json();
       const likedItems = (llData.items || []).map(it => ({
-        id: it.snippet?.resourceId?.videoId, snippet: it.snippet
+        id: it.snippet?.resourceId?.videoId,
+        snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt }
       }));
-      // Shuffle liked videos so different ones surface
+      // Shuffle slightly for variety
       for (let i = likedItems.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [likedItems[i], likedItems[j]] = [likedItems[j], likedItems[i]];
@@ -1194,8 +1210,12 @@ async function fetchPersonalizedFeed() {
     }
   }
 
-  // Save shown video IDs so next Home tap surfaces different content
+  // Save shown video IDs with timestamps — only skipped for 24h, then eligible again
   const newShownIds = feed.map(item => item.id?.videoId || item.id).filter(Boolean);
+  const newTimed = newShownIds.map(id => ({ id, ts: Date.now() }));
+  const updatedTimed = [...newTimed, ...shownHistoryParsed].filter(e => e.ts > oneDayAgo).slice(0, 200);
+  try { localStorage.setItem("feedShownTimed", JSON.stringify(updatedTimed)); } catch(e) {}
+  // Also keep legacy format for backward compat
   const updatedShown = [...newShownIds, ...shownHistory].slice(0, 300);
   try { localStorage.setItem("feedShownIds", JSON.stringify(updatedShown)); } catch(e) {}
 
@@ -1581,49 +1601,66 @@ shortsTab.addEventListener("click", async () => {
   let data = { items: [] };
   const pool = [];
 
+  // Load persistent seen IDs so we never repeat across sessions
+  let persistentSeenIds = new Set();
+  try { persistentSeenIds = new Set(JSON.parse(localStorage.getItem("shortsSeenHistory") || "[]")); } catch(e) {}
+  function isNew(id) { return !persistentSeenIds.has(id) && !shortsSeenIds.has(id); }
+
   // SOURCE 1: Shorts from YOUR subscribed channels (UUSH playlists, 1 unit each)
+  // Shuffled + newest-first so you get fresh shorts every time
   if (token) {
     try {
-      const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=30&order=relevance", {
+      const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance", {
         headers: { Authorization: "Bearer " + token }
       });
       const subsData = await subsRes.json();
-      const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
-      // Construct UUSH shorts playlist IDs (replace "UC" prefix with "UUSH")
+      let channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
+      // Shuffle channel order so different channels surface each time
+      for (let i = channelIds.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [channelIds[i], channelIds[j]] = [channelIds[j], channelIds[i]];
+      }
       const shortsPlIds = channelIds.filter(id => id.startsWith("UC")).map(id => "UUSH" + id.slice(2));
-      // Fetch shorts from top 10 subscribed channels in parallel
-      const subShortsFetches = shortsPlIds.slice(0, 10).map(pid =>
-        fetchYouTube("playlistItems", { part: "snippet", playlistId: pid, maxResults: 5, _: Date.now() })
+      // Sample 15 random channels, fetch newest 6 shorts each
+      const subShortsFetches = shortsPlIds.slice(0, 15).map(pid =>
+        fetchYouTube("playlistItems", { part: "snippet", playlistId: pid, maxResults: 6, _: Date.now() })
       );
       const subShortsResults = await Promise.allSettled(subShortsFetches);
       subShortsResults.forEach(r => {
         if (r.status === "fulfilled") {
           (r.value.items || []).forEach(it => {
             const vid = it.snippet?.resourceId?.videoId;
-            if (vid) pool.push({ id: vid, snippet: it.snippet });
+            if (vid && isNew(vid)) pool.push({ id: vid, snippet: it.snippet });
           });
         }
       });
     } catch(e) {}
   }
 
-  // SOURCE 2: Shorts matching your keyword interests
-  const topKW = getTopKeywords(3);
-  if (topKW.length > 0) {
-    const kwQuery = topKW.slice(0, 2).join(" ") + " #shorts";
-    const kwData = await fetchYouTube("search", { part: "snippet", q: kwQuery, type: "video", videoDuration: "short", videoEmbeddable: "true", maxResults: 10, _: Date.now() });
-    (kwData.items || []).filter(v => v.id && v.id.videoId).forEach(v => pool.push({ id: v.id.videoId, snippet: v.snippet }));
+  // SOURCE 2: Shorts matching your keyword interests — rotate keywords each open
+  const topKW = getTopKeywords(6);
+  const topBI = getTopBigrams(4);
+  // Shuffle keywords and bigrams so different combos each time
+  const shuffledKW = [...topKW].sort(() => Math.random() - 0.5);
+  const shuffledBI = [...topBI].sort(() => Math.random() - 0.5);
+  const kwQueries = [];
+  if (shuffledBI.length > 0) kwQueries.push(shuffledBI[0] + " shorts");
+  if (shuffledBI.length > 1) kwQueries.push(shuffledBI[1] + " #shorts");
+  if (shuffledKW.length > 0) kwQueries.push(shuffledKW.slice(0, 2).join(" ") + " shorts");
+  for (const q of kwQueries) {
+    const kwData = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "short", videoEmbeddable: "true", maxResults: 10, _: Date.now() });
+    (kwData.items || []).filter(v => v.id && v.id.videoId && isNew(v.id.videoId)).forEach(v => pool.push({ id: v.id.videoId, snippet: v.snippet }));
   }
 
-  // SOURCE 3: Generic shorts queries (fills gaps)
-  if (pool.length < 10) {
-    for (let attempt = 0; attempt < SHORT_QUERIES.length; attempt++) {
-      const shortsQ = SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length]; shortQIdx++;
-      data = await fetchYouTube("search", { part: "snippet", q: shortsQ, type: "video", videoDuration: "short", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
-      if (data.items && data.items.length) {
-        data.items.filter(v => v.id && v.id.videoId).forEach(v => pool.push({ id: v.id.videoId, snippet: v.snippet }));
-        break;
-      }
+  // SOURCE 3: Generic shorts — random query each time
+  const startQ = Math.floor(Math.random() * SHORT_QUERIES.length);
+  shortQIdx = startQ;
+  for (let attempt = 0; attempt < SHORT_QUERIES.length; attempt++) {
+    const shortsQ = SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length]; shortQIdx++;
+    data = await fetchYouTube("search", { part: "snippet", q: shortsQ, type: "video", videoDuration: "short", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
+    if (data.items && data.items.length) {
+      data.items.filter(v => v.id && v.id.videoId && isNew(v.id.videoId)).forEach(v => pool.push({ id: v.id.videoId, snippet: v.snippet }));
+      break;
     }
   }
 
@@ -1634,7 +1671,8 @@ shortsTab.addEventListener("click", async () => {
       "UUSHRijo3ddMTht_IHyNSNXpNQ","UUSHJ5v_MCY6GNUBTO8-D3XoAg",
       "UUSHpEhnqL0y41EpW2TvWAHD7Q","UUSH-lHJZR3Gqxm24_Vd_AJ5Yw"
     ];
-    const plFetches = SHORTS_PLAYLISTS.map(pid =>
+    const shuffledFB = SHORTS_PLAYLISTS.sort(() => Math.random() - 0.5);
+    const plFetches = shuffledFB.map(pid =>
       fetchYouTube("playlistItems", { part: "snippet", playlistId: pid, maxResults: 10, _: Date.now() })
     );
     const plResults = await Promise.allSettled(plFetches);
@@ -1642,13 +1680,13 @@ shortsTab.addEventListener("click", async () => {
       if (r.status === "fulfilled") {
         (r.value.items || []).forEach(it => {
           const vid = it.snippet?.resourceId?.videoId;
-          if (vid) pool.push({ id: vid, snippet: it.snippet });
+          if (vid && isNew(vid)) pool.push({ id: vid, snippet: it.snippet });
         });
       }
     });
   }
 
-  // Dedupe and shuffle
+  // Dedupe, shuffle, and save seen IDs persistently
   const seen = new Set();
   shortsItems = pool.filter(v => { if (seen.has(v.id)) return false; seen.add(v.id); return true; });
   for (let i = shortsItems.length - 1; i > 0; i--) {
@@ -1657,6 +1695,11 @@ shortsTab.addEventListener("click", async () => {
   }
   shortsIndex = 0;
   shortsSeenIds = new Set(shortsItems.map(v => v.id));
+  // Persist seen IDs (keep last 300) so next session also gets fresh content
+  try {
+    const updated = [...shortsSeenIds, ...persistentSeenIds].slice(0, 300);
+    localStorage.setItem("shortsSeenHistory", JSON.stringify(updated));
+  } catch(e) {}
 
   // Always seed a nextPageToken for infinite scroll, even if the pool came
   // from subscriptions/keywords (which don't return a token themselves)
