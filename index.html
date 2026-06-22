@@ -118,16 +118,13 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
 #playerSection.player-mini { position: fixed; right: 16px; bottom: 16px; top: auto; width: 260px; height: 150px; z-index: 40; }
 #playerSection.player-fullscreen {
   width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh;
-  background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.22), transparent 55%),
-    radial-gradient(circle at 0% 100%, rgba(120,80,255,0.18), transparent 65%),
-    radial-gradient(circle at 100% 100%, rgba(0,255,180,0.18), transparent 65%),
-    radial-gradient(circle at 50% 50%, rgba(5,6,12,0.99), rgba(2,3,8,1));
+  background: #000;
   position: fixed; top: 0; left: 0; z-index: 9999;
-  overflow: visible;
-  transform: perspective(1200px) translateZ(45px) scale(1.08) rotateX(4deg);
-  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), filter 0.55s ease, box-shadow 0.55s ease;
+  overflow: hidden;
+  transform: none;
+  transition: none;
 }
-#playerSection.player-fullscreen iframe { width: 100%; height: 100%; object-fit: contain; background: transparent; }
+#playerSection.player-fullscreen iframe { width: 100%; height: 100%; object-fit: contain; background: #000; }
 #playerSection.player-fullscreen #playerFrame { width: 100%; height: 100%; }
 #playerSection { --glow-strength: 0.35; --glow-blur: 22px; --glow-shift-x: 0px; --glow-shift-y: 0px; }
 #playerSection::after {
@@ -149,9 +146,9 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
   -webkit-tap-highlight-color: rgba(60,242,255,0.25);
 }
 #closeMini {
-  position: absolute; right: 10px; top: 10px; border-radius: 999px;
-  border: 1px solid rgba(120,130,160,0.7); padding: 8px 12px; font-size: 13px;
-  min-height: 44px; min-width: 44px;
+  position: absolute; right: 8px; top: 8px; border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.7); padding: 3px 6px; font-size: 9px;
+  min-height: 22px; min-width: 22px;
   background: radial-gradient(circle at 0% 0%, rgba(255,80,80,0.35), rgba(10,12,20,0.9));
   color: #f5f7ff; cursor: pointer; z-index: 12;
   touch-action: manipulation;
@@ -320,16 +317,12 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
 .suggestion-item { padding: 5px 6px; font-size: 12px; cursor: pointer; border-radius: 10px; }
 .suggestion-item:hover { background: rgba(60,242,255,0.16); }
 #playerSection.fx-bloom { box-shadow: 0 0 40px rgba(60,242,255,0.65), 0 26px 70px rgba(0,0,0,0.85); }
-#playerSection.player-fullscreen.fx-bloom {
-  box-shadow: 0 0 80px rgba(60,242,255,0.85), 0 0 160px rgba(60,242,255,0.45), 0 0 260px rgba(0,200,255,0.3), 0 0 400px rgba(120,60,255,0.2);
-}
-#playerSection.player-fullscreen.fx-ambient {
-  background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.35), transparent 55%), radial-gradient(circle at 0% 100%, rgba(120,80,255,0.28), transparent 65%), radial-gradient(circle at 100% 100%, rgba(0,255,180,0.28), transparent 65%), radial-gradient(circle at 50% 50%, rgba(5,6,12,0.97), rgba(2,3,8,1));
-}
-#playerSection.player-fullscreen.fx-chroma::before { opacity: var(--chroma-opacity, 0.45) !important; filter: blur(var(--chroma-blur, 18px)) !important; inset: -30px; }
-#playerSection.player-fullscreen.fx-audio::after { inset: -80px; opacity: var(--audio-glow-opacity, 0.5) !important; filter: blur(var(--audio-glow-blur, 50px)) !important; }
-#playerSection.player-fullscreen::after { inset: -60px; background: radial-gradient(circle, rgba(60,242,255,0.75), rgba(120,60,255,0.35) 40%, transparent 70%); }
-#playerSection.player-fullscreen.fx-glass { backdrop-filter: blur(0px) saturate(1.8); border: 1px solid rgba(60,242,255,0.5); }
+#playerSection.player-fullscreen.fx-bloom { box-shadow: none; }
+#playerSection.player-fullscreen.fx-ambient { background: #000; }
+#playerSection.player-fullscreen.fx-chroma::before { display: none; }
+#playerSection.player-fullscreen.fx-audio::after { display: none; }
+#playerSection.player-fullscreen::after { display: none; }
+#playerSection.player-fullscreen.fx-glass { backdrop-filter: none; border: none; }
 #playerSection.fx-ambient {
   background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.25), transparent 60%), radial-gradient(circle at 0% 100%, rgba(120,80,255,0.18), transparent 70%), radial-gradient(circle at 100% 100%, rgba(0,255,180,0.18), transparent 70%), radial-gradient(circle at 50% 50%, rgba(5,6,12,0.98), rgba(2,3,8,1));
 }
@@ -347,14 +340,9 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
   transition: opacity 0.12s ease-out, filter 0.12s ease-out; z-index: -3;
 }
 body.search-depth-mode #feed, body.search-depth-mode #channelPage { filter: blur(4px) brightness(0.7); pointer-events: none; }
-body.cinema-mode::before { content: ""; position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); z-index: 9998; pointer-events: none; }
-#playerSection.player-fullscreen.cinema { border-radius: 40px; overflow: hidden; transform: perspective(900px) rotateX(6deg); box-shadow: 0 0 80px rgba(0,0,0,0.6); }
-body.cinema-mode #playerSection {
-  --audio-glow-opacity: 0.55 !important; --audio-glow-blur: 55px !important;
-  --chroma-opacity: 0.45 !important; --chroma-blur: 18px !important;
-  box-shadow: 0 0 120px rgba(60,242,255,0.55), 0 0 180px rgba(0,200,255,0.45), 0 0 260px rgba(0,255,180,0.35);
-  transition: box-shadow 0.35s ease, filter 0.35s ease;
-}
+body.cinema-mode::before { display: none; }
+#playerSection.player-fullscreen.cinema { border-radius: 0; overflow: hidden; transform: none; box-shadow: none; }
+body.cinema-mode #playerSection { box-shadow: none; }
 #playerSection { transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.45s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.45s ease, filter 0.45s ease; }
 body.cinema-mode::before { transition: background 0.45s ease, backdrop-filter 0.45s ease; }
 body.cinema-mode #playerSection { transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.55s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.55s ease, filter 0.55s ease; }
@@ -366,8 +354,8 @@ body.cinema-mode #playerSection { transition: transform 0.55s cubic-bezier(0.22,
 #playerSection.player-fullscreen.cinema.zoom-intro { animation: cinemaZoomIntro 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 body.fullscreen-active .exit-full-btn { display: block; }
 .exit-full-btn {
-  position: fixed; left: 20px; top: 20px; border-radius: 999px;
-  border: 1px solid rgba(120,130,160,0.7); padding: 8px 14px; font-size: 14px;
+  position: fixed; left: 16px; top: 16px; border-radius: 999px;
+  border: 1px solid rgba(120,130,160,0.7); padding: 3px 8px; font-size: 9px;
   background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.35), rgba(10,12,20,0.9));
   color: #f5f7ff; cursor: pointer; z-index: 999999999 !important; pointer-events: auto; display: none;
   transition: box-shadow 0.2s ease, transform 0.2s ease;
@@ -381,6 +369,9 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 #playerSection.ui-hidden #hideUIBtn:hover, #playerSection.ui-hidden #hideUIBtn:active { opacity: 1; }
 #resBtn { display: none; }
 #playerSection.player-fullscreen #resBtn { display: inline-block; }
+#playerSection.player-fullscreen .player-controls { bottom: 48px; }
+#playerSection.player-fullscreen .player-controls button { padding: 3px 7px; font-size: 9px; min-height: 22px; min-width: 22px; }
+#playerSection.player-fullscreen #closeMini { padding: 3px 6px; font-size: 9px; min-height: 22px; min-width: 22px; top: 8px; right: 8px; }
 #playerSection.ui-hidden #addToPlaylistBtn { opacity:0; pointer-events:none; }
 #playerSection.player-fullscreen #addToPlaylistBtn { display: none; }
 #playerSection.player-mini #addToPlaylistBtn { display: none; }
