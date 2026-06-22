@@ -1519,13 +1519,18 @@ trendingTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("trending"); showSkeletons(8);
   const token = await getValidToken();
   const myCat = getTopCategoryId();
+  const cats = getTopCategories(3);
   const allItems = [];
   const seen = new Set();
+  // Skip videos shown in trending in last 6 hours
+  let trendingShown = []; try { trendingShown = JSON.parse(localStorage.getItem("trendingShownTimed") || "[]"); } catch(e) {}
+  const sixHoursAgo = Date.now() - 6 * 3600000;
+  const recentTrendingIds = new Set(trendingShown.filter(e => e.ts > sixHoursAgo).map(e => e.id));
 
   function addUnique(items) {
     (items || []).forEach(item => {
       const id = item.id?.videoId || item.id;
-      if (!id || seen.has(id)) return;
+      if (!id || seen.has(id) || recentTrendingIds.has(id)) return;
       seen.add(id);
       allItems.push(item);
     });
@@ -1533,38 +1538,38 @@ trendingTab.addEventListener("click", async () => {
 
   const fetches = [];
 
-  // Trending in YOUR top category (not random)
-  if (myCat) {
-    fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: myCat, maxResults: 15, _: Date.now() }));
-  }
-  // Trending in a second category for variety
-  const cats = getTopCategories(3);
-  if (cats.length > 1) {
-    fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cats[1], maxResults: 10, _: Date.now() }));
-  }
+  // Trending in YOUR top categories
+  if (myCat) fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: myCat, maxResults: 15, _: Date.now() }));
+  if (cats.length > 1) fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cats[1], maxResults: 10, _: Date.now() }));
+  if (cats.length > 2) fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cats[2], maxResults: 8, _: Date.now() }));
 
-  // If logged in — popular recent uploads from subscribed channels
+  // Newest uploads from subscribed channels — with contentDetails for real publish dates
   if (token) {
     fetches.push((async () => {
       try {
-        const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=30&order=relevance", {
-          headers: { Authorization: "Bearer " + token }
-        });
+        const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=30&order=relevance", { headers: { Authorization: "Bearer " + token } });
         const subsData = await subsRes.json();
         const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
         if (!channelIds.length) return { items: [] };
         const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 30).join(",") });
-        const plIds = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
+        const plIds = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean)
+          .sort(() => Math.random() - 0.5); // shuffle so different channels each load
         const upFetches = plIds.slice(0, 8).map(plId =>
-          fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 3, _: Date.now() })
+          fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId: plId, maxResults: 10, _: Date.now() })
         );
         const upResults = await Promise.allSettled(upFetches);
         const items = [];
         upResults.forEach(r => {
           if (r.status === "fulfilled") {
-            (r.value.items || []).forEach(it => {
+            // Sort newest-first using real videoPublishedAt
+            const sorted = (r.value.items || []).sort((a, b) => {
+              const da = new Date(a.contentDetails?.videoPublishedAt || a.snippet?.publishedAt || 0).getTime();
+              const db = new Date(b.contentDetails?.videoPublishedAt || b.snippet?.publishedAt || 0).getTime();
+              return db - da;
+            });
+            sorted.slice(0, 3).forEach(it => {
               const vid = it.snippet?.resourceId?.videoId;
-              if (vid) items.push({ id: vid, snippet: it.snippet });
+              if (vid) items.push({ id: vid, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } });
             });
           }
         });
@@ -1573,16 +1578,26 @@ trendingTab.addEventListener("click", async () => {
     })());
   }
 
-  // General trending fallback
+  // General trending fallback + keyword trending from taste profile
   fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 15, _: Date.now() }));
+  const topKW = getTopKeywords(4);
+  if (topKW.length >= 2) {
+    const kw = [...topKW].sort(() => Math.random() - 0.5).slice(0, 2).join(" ");
+    fetches.push(fetchYouTube("search", { part: "snippet", q: kw, type: "video", order: "date", maxResults: 10, _: Date.now() }));
+  }
 
   const results = await Promise.allSettled(fetches);
   results.forEach(r => { if (r.status === "fulfilled") addUnique(r.value.items); });
 
-  nextPageToken = null; // trending uses merged sources, seed pagination separately
   renderFeed(allItems);
-  // Seed pagination from general trending for infinite scroll
-  const seedData = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+
+  // Save shown IDs for dedup
+  const shownNow = allItems.map(item => item.id?.videoId || item.id).filter(Boolean);
+  const updatedTrending = [...shownNow.map(id => ({ id, ts: Date.now() })), ...trendingShown].filter(e => e.ts > sixHoursAgo).slice(0, 200);
+  try { localStorage.setItem("trendingShownTimed", JSON.stringify(updatedTrending)); } catch(e) {}
+
+  // Seed pagination
+  const seedData = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: myCat || undefined, maxResults: 20, _: Date.now() });
   nextPageToken = seedData.nextPageToken || null;
   showHUD(token ? "Trending For You ✦" : "Trending");
 });
@@ -1817,19 +1832,82 @@ shortsTab.addEventListener("click", async () => {
 let lastMovieQuery = "";
 moviesTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("movies"); showSkeletons(8);
-  // Pick a random starting query each time so re-toggling Movies feels fresh
+  const token = await getValidToken();
+  const allItems = [];
+  const seen = new Set();
+  // Dedup against recently shown movies (6 hours)
+  let moviesShown = []; try { moviesShown = JSON.parse(localStorage.getItem("moviesShownTimed") || "[]"); } catch(e) {}
+  const sixHoursAgo = Date.now() - 6 * 3600000;
+  const recentMovieIds = new Set(moviesShown.filter(e => e.ts > sixHoursAgo).map(e => e.id));
+
+  function addUnique(items) {
+    (items || []).forEach(item => {
+      const id = item.id?.videoId || item.id;
+      if (!id || seen.has(id) || recentMovieIds.has(id)) return;
+      seen.add(id);
+      allItems.push(item);
+    });
+  }
+
+  const fetches = [];
+
+  // SOURCE 1: Generic movie queries — random each toggle for fresh content
   const startIdx = Math.floor(Math.random() * MOVIE_QUERIES.length);
   movieQIdx = startIdx;
-  let data = { items: [] };
-  let usedQuery = "";
-  for (let attempt = 0; attempt < MOVIE_QUERIES.length; attempt++) {
-    const q = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
-    data = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
-    if (data.items && data.items.length) { usedQuery = q; break; }
+  let usedQuery = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
+  fetches.push(fetchYouTube("search", { part: "snippet", q: usedQuery, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 15, order: "date", _: Date.now() }));
+  // Second query for variety
+  const q2 = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
+  fetches.push(fetchYouTube("search", { part: "snippet", q: q2, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 10, order: "date", _: Date.now() }));
+
+  // SOURCE 2: Movies matching your taste profile keywords
+  const topKW = getTopKeywords(6);
+  const topBI = getTopBigrams(3);
+  const shuffledKW = [...topKW].sort(() => Math.random() - 0.5);
+  const shuffledBI = [...topBI].sort(() => Math.random() - 0.5);
+  if (shuffledKW.length >= 2) {
+    const kwQ = shuffledKW.slice(0, 2).join(" ") + " full movie";
+    fetches.push(fetchYouTube("search", { part: "snippet", q: kwQ, type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 8, _: Date.now() }));
   }
-  lastMovieQuery = usedQuery; // remember exact query so infinite scroll uses the matching pageToken
-  const items = (data.items || []).filter(v => v.id && v.id.videoId).map(v => ({ id: v.id.videoId, snippet: v.snippet }));
-  nextPageToken = data.nextPageToken || null; renderFeed(items); showHUD("Movies");
+  if (shuffledBI.length > 0) {
+    const biQ = shuffledBI[0] + " full movie";
+    fetches.push(fetchYouTube("search", { part: "snippet", q: biQ, type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 8, _: Date.now() }));
+  }
+
+  // SOURCE 3: Liked/watched topics — recent searches that might relate to movies
+  const recentSearches = getRecentSearches(5);
+  const movieSearch = recentSearches.find(q => /movie|film|documentary|watch|episode|season/i.test(q));
+  if (movieSearch) {
+    fetches.push(fetchYouTube("search", { part: "snippet", q: movieSearch + " full", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 8, _: Date.now() }));
+  }
+
+  const results = await Promise.allSettled(fetches);
+  results.forEach(r => { if (r.status === "fulfilled") addUnique(r.value.items || []); });
+
+  lastMovieQuery = usedQuery;
+
+  // Shuffle so keyword results and generic results are interleaved
+  for (let i = allItems.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allItems[i], allItems[j]] = [allItems[j], allItems[i]];
+  }
+
+  const items = allItems.filter(v => v.id?.videoId || v.id).map(v => ({
+    id: v.id?.videoId || v.id, snippet: v.snippet
+  }));
+
+  // Save shown IDs
+  const shownNow = items.map(v => v.id).filter(Boolean);
+  const updatedMovies = [...shownNow.map(id => ({ id, ts: Date.now() })), ...moviesShown].filter(e => e.ts > sixHoursAgo).slice(0, 200);
+  try { localStorage.setItem("moviesShownTimed", JSON.stringify(updatedMovies)); } catch(e) {}
+
+  nextPageToken = null;
+  // Seed a real token from the same query for infinite scroll
+  const seed = await fetchYouTube("search", { part: "snippet", q: usedQuery, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
+  nextPageToken = seed.nextPageToken || "seed";
+  lastMovieQuery = usedQuery;
+
+  renderFeed(items); showHUD("Movies");
 });
 
 historyTab.addEventListener("click", async () => {
@@ -2103,25 +2181,53 @@ let subsNextPageToken = null;
 async function loadMoreVideos() {
   if (!nextPageToken) return;
   let data;
-  if (currentTab === "home")     data = await fetchYouTube("videos",        { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+
+  if (currentTab === "home") {
+    const validToken = nextPageToken !== "seed" ? nextPageToken : undefined;
+    data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, pageToken: validToken, _: Date.now() });
+  }
+
   if (currentTab === "movies") {
-    const validToken = nextPageToken && nextPageToken !== "seed" ? nextPageToken : undefined;
+    const validToken = nextPageToken !== "seed" ? nextPageToken : undefined;
     data = validToken
       ? await fetchYouTube("search", { part: "snippet", q: lastMovieQuery || "full movie", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 20, pageToken: validToken, _: Date.now() })
       : { items: [] };
-    // If this query's results are exhausted (no token / no items), rotate to a fresh movie query instead of dead-ending
+    // Rotate to fresh query if exhausted
     if (!data || !data.items || !data.items.length) {
       const q = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
       lastMovieQuery = q;
       data = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
-      if (!data.nextPageToken) data.nextPageToken = "seed"; // guarantee scroll keeps working next time too
+      if (!data.nextPageToken) data.nextPageToken = "seed";
+    }
+    // Map search results to the format appendFeed expects
+    if (data && data.items) {
+      data.items = data.items.filter(v => v.id && v.id.videoId).map(v => ({ id: v.id.videoId, snippet: v.snippet }));
     }
   }
-  if (currentTab === "trending") data = await fetchYouTube("videos",        { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: getTopCategoryId() || undefined, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
-  if (currentTab === "search")   data = await fetchYouTube("search",        { part: "snippet", q: lastSearchQuery, type: "video", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
-  if (currentTab === "channel")  data = await fetchYouTube("playlistItems", { part: "snippet", playlistId: channelUploadsId, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+
+  if (currentTab === "trending") {
+    const validToken = nextPageToken !== "seed" ? nextPageToken : undefined;
+    data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: getTopCategoryId() || undefined, maxResults: 20, pageToken: validToken, _: Date.now() });
+    // If token exhausted, rotate to next top category
+    if (!data || !data.items || !data.items.length) {
+      const cats = getTopCategories(3);
+      const nextCat = cats[Math.floor(Math.random() * cats.length)] || undefined;
+      data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: nextCat, maxResults: 20, _: Date.now() });
+    }
+  }
+
+  if (currentTab === "search") {
+    data = await fetchYouTube("search", { part: "snippet", q: lastSearchQuery, type: "video", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+  }
+
+  if (currentTab === "channel") {
+    data = await fetchYouTube("playlistItems", { part: "snippet", playlistId: channelUploadsId, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+  }
+
   if (!data) return;
-  nextPageToken = data.nextPageToken || null;
+  // Keep nextPageToken alive — use "seed" as fallback so we always have a continuation path
+  nextPageToken = data.nextPageToken || (["home","trending","movies"].includes(currentTab) ? "seed" : null);
+
   if (currentTab === "channel") {
     (data.items || []).forEach(item => {
       const snippet = item.snippet; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
@@ -2129,7 +2235,9 @@ async function loadMoreVideos() {
       card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle || ""}</div></div>`;
       card.onclick = () => setPlayerVideo(videoId, snippet); channelPageEl.appendChild(card);
     });
-  } else { appendFeed(data.items || []); }
+  } else {
+    appendFeed(data.items || []);
+  }
 }
 
 async function loadMoreSubs() {
@@ -2686,11 +2794,15 @@ syncStartBtn.onclick = async function() {
   let totalSignals = 0;
 
   // STEP 1: Liked Videos (LL) — strong signal, weight 3 each
-  setProgress(5, "Reading liked videos…");
+  // First-ever sync: up to 500 liked videos (25 pages × 20)
+  // Re-sync: up to 200 (10 pages) — only fetches new ones since last sync
+  const isFirstSync = !profile.syncedAt;
+  const maxLLPages = isFirstSync ? 25 : 10;
+  setProgress(5, isFirstSync ? "Deep syncing liked videos (up to 500)…" : "Reading liked videos…");
   try {
     let llPageToken = "";
     let llPages = 0;
-    while (llPages < 5) { // up to 5 pages = 100 liked videos
+    while (llPages < maxLLPages) {
       const url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=20" + (llPageToken ? "&pageToken=" + llPageToken : "");
       const res = await fetch(url, { headers: { Authorization: "Bearer " + token } });
       const data = await res.json();
@@ -2705,6 +2817,7 @@ syncStartBtn.onclick = async function() {
       llPageToken = data.nextPageToken || "";
       llPages++;
       if (!llPageToken) break;
+      setProgress(5 + Math.round((llPages / maxLLPages) * 15), `Liked videos: ${totalSignals} so far…`);
     }
     setProgress(20, `Liked videos: ${totalSignals} signals collected`);
   } catch(e) { setProgress(20, "Liked videos: skipped"); }
@@ -2728,10 +2841,12 @@ syncStartBtn.onclick = async function() {
     const plRes = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
     const plData = await plRes.json();
     const myPlaylists = plData.items || [];
-    // Fetch first 10 videos from each playlist
-    for (const pl of myPlaylists.slice(0, 8)) {
+    // First sync: all playlists, 20 items each. Re-sync: top 8, 10 items each
+    const plLimit = isFirstSync ? myPlaylists.length : 8;
+    const itemsPerPl = isFirstSync ? 20 : 10;
+    for (const pl of myPlaylists.slice(0, plLimit)) {
       try {
-        const itemRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: pl.id, maxResults: 10, _: Date.now() });
+        const itemRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: pl.id, maxResults: itemsPerPl, _: Date.now() });
         (itemRes.items || []).forEach(it => {
           const s = it.snippet || {};
           extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 2);
@@ -2758,14 +2873,15 @@ syncStartBtn.onclick = async function() {
     });
 
     // Get upload playlists then sample recent video titles for topic signals
+    // First sync: sample 20 channels. Re-sync: sample 5 (quota-friendly)
     if (channelIds.length > 0) {
       const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 50).join(",") });
       const uploadPls = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
-      // Sample 5 random upload playlists to get topic signals without burning quota
-      const sample = uploadPls.sort(() => Math.random() - 0.5).slice(0, 5);
+      const sampleCount = isFirstSync ? 20 : 5;
+      const sample = uploadPls.sort(() => Math.random() - 0.5).slice(0, sampleCount);
       for (const plId of sample) {
         try {
-          const upRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 5, _: Date.now() });
+          const upRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 8, _: Date.now() });
           (upRes.items || []).forEach(it => {
             extractSignals(it.snippet?.title, null, null, 1);
             totalSignals++;
@@ -2875,10 +2991,12 @@ async function silentSync(token) {
     }
   }
 
-  // Liked videos (up to 100) — weight 3
+  // Liked videos — first sync: up to 200 (10 pages), re-sync: 100 (5 pages)
+  const isFirstSilentSync = !profile.syncedAt;
+  const maxPages = isFirstSilentSync ? 10 : 5;
   try {
     let pageToken = "";
-    for (let p = 0; p < 5; p++) {
+    for (let p = 0; p < maxPages; p++) {
       const url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=20" + (pageToken ? "&pageToken=" + pageToken : "");
       const res = await fetch(url, { headers: { Authorization: "Bearer " + token } });
       const data = await res.json();
@@ -2923,9 +3041,10 @@ async function silentSync(token) {
     if (channelIds.length) {
       const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 50).join(",") });
       const uploadPls = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
-      for (const plId of uploadPls.sort(() => Math.random() - 0.5).slice(0, 5)) {
+      const silentSampleCount = isFirstSilentSync ? 15 : 5;
+      for (const plId of uploadPls.sort(() => Math.random() - 0.5).slice(0, silentSampleCount)) {
         try {
-          const upRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 5, _: Date.now() });
+          const upRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 8, _: Date.now() });
           (upRes.items || []).forEach(it => { extractSignals(it.snippet?.title, null, null, 1); });
         } catch(e) {}
       }
