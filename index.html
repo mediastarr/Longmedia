@@ -589,6 +589,7 @@ body.fullscreen-active .exit-full-btn { display: block; padding: 3px 8px; font-s
     <div id="subsLoginPanel" style="margin-top:12px; padding:12px; border-radius:16px; background:linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));">
       <div style="font-size:13px; opacity:0.85; margin-bottom:6px;">Sign in to load your YouTube subscriptions</div>
       <button id="startLoginBtn" class="topbar-btn" style="margin-bottom:8px;">Login to YouTube</button>
+      <button id="reloginBtn" class="topbar-btn" style="margin-bottom:8px; background:radial-gradient(circle at 0% 0%,rgba(255,80,80,0.2),rgba(10,12,20,0.9));">Clear & Re-login</button>
       <div id="deviceUserCode" style="font-size:12px; margin-top:6px; opacity:0.8;"></div>
       <div id="deviceLoginStatus" style="font-size:12px; margin-top:4px; opacity:0.8;"></div>
     </div>
@@ -767,7 +768,16 @@ const API_KEYS = [
   "AIzaSyB8-sm9Nd1GA5P3pwC4z8wd-MvwlTKGcwo","AIzaSyAqErB0WmrOt2vGxnD-LRdeMBldoGoKbOo",
   "AIzaSyA_F5GcpmUsCEiPCHs1vC8CEXzVN2EnfcI","AIzaSyBd_lVv5o3ytHUwDWLhtqq-NgcNcpNCHGA",
   "AIzaSyBQriBvxSUYcLuutFIS7SLfOwpTme5Fgpk","AIzaSyDLZCdPCPp6hcqT37e1S2dbNTJADZBUt8o",
-  "AIzaSyBafO00Lc3ZEpRjHi0FhsL6Xfeb3GAJ_B8","AIzaSyDs2jIad2HCfY0o3j4kLFvducChpgv9qmU"
+  "AIzaSyBafO00Lc3ZEpRjHi0FhsL6Xfeb3GAJ_B8","AIzaSyDs2jIad2HCfY0o3j4kLFvducChpgv9qmU",
+  "AIzaSyC1pCcPHsL11vrxRuUNoeN3urdwt3qjilM","AIzaSyAF7addOWtR2zzVfZAXyW_GkUM-zSslFWA",
+  "AIzaSyDz_P6WIbRBr31VO7fQX0UcP3tFSBlGEE0","AIzaSyDsL7qek4qkCjmyczIUArhK8krUq2QV3mo",
+  "AIzaSyBKgt_-gM4Nnfkxj-6xz81tNHMydBLD0CQ","AIzaSyAxz8JgYT02TS12fcdIYVNqmhT_0OwA48Q",
+  "AIzaSyDM_mZiXih02mMOCKEUgfrJhHU0RCO_W4Y","AIzaSyAAqJcN9TJiNpPSvvIX8IP2pDCbwrwbH68",
+  "AIzaSyALpQ6mleh8v4SlVnk1V8nBZ2pTIUQAoLk","AIzaSyAGy9rR4lbNYMlRgQcluVUlCpuRFIWbnZk",
+  "AIzaSyD1f3AnsJRrGmTTBWK_XsgwqLnDQv2mA00","AIzaSyB0cB1FlDb4Azzq2xh7_ENz2CvwpWJnJXg",
+  "AIzaSyCjyaZibozhYOTolhznZ0zLz45mIqtOLaw","AIzaSyC9qC_Q3q-aDhVwfp4QOdIvecqQW04Mq3M",
+  "AIzaSyDTIw26DvcDWRCGftd-c-_SdcllN0zvxE0","AIzaSyALn7in8kXrFCzC1VU51UqNFZ9YuLkwXNY",
+  "AIzaSyB_3g7oRfcoKqQYqt7UPHwQNTt3BjLD4iw"
 ];
 
 let keyIndex = 0;
@@ -2027,14 +2037,29 @@ channelTab.addEventListener("click", () => loadChannelPage(currentChannelId));
 subsTab.addEventListener("click", async () => {
   setActiveTab("subs"); showHUD("Subscriptions");
   const token = await getValidToken();
-  if (token) loadSubscriptions();
-  else deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
+  if (token) {
+    // Show login panel with a re-login option in case scope is outdated
+    const subsLoginPanel = document.getElementById("subsLoginPanel");
+    if (subsLoginPanel) subsLoginPanel.style.display = "none";
+    loadSubscriptions();
+  } else {
+    const subsLoginPanel = document.getElementById("subsLoginPanel");
+    if (subsLoginPanel) subsLoginPanel.style.display = "block";
+    deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
+  }
 });
 
 const OAUTH_CLIENT_ID = "153049037088-10qnschnsie4mqpdsdscd0uk2auqogdt.apps.googleusercontent.com";
 const OAUTH_CLIENT_SECRET = "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";
 
 startLoginBtn.addEventListener("click", () => startDeviceLogin("subs"));
+
+document.getElementById("reloginBtn").addEventListener("click", () => {
+  clearTokens();
+  deviceUserCodeEl.textContent = "";
+  deviceLoginStatusEl.textContent = "Tokens cleared — click Login to YouTube";
+  showHUD("Ready to re-login");
+});
 
 async function startDeviceLogin(source) {
   showHUD("Requesting login code…");
