@@ -502,7 +502,6 @@ body.fullscreen-active .exit-full-btn { display: block; padding: 3px 8px; font-s
     </div>
     <div class="topbar-right">
       <button id="themeToggle" class="topbar-btn">Theme</button>
-      <button id="syncBtn" class="topbar-btn">⟳ Sync</button>
       <button id="backBtn" class="topbar-btn">Mini</button>
     </div>
   </div>
@@ -543,18 +542,7 @@ body.fullscreen-active .exit-full-btn { display: block; padding: 3px 8px; font-s
     <div id="plPickerList"></div>
     <div id="plPickerStatus" style="display:none; padding:10px; text-align:center; font-size:12px; border-radius:12px; margin-top:8px;"></div>
   </div>
-  <div id="syncOverlay" style="display:none; position:fixed; inset:0; z-index:100001; background:rgba(0,0,0,0.88); align-items:center; justify-content:center;">
-    <div id="syncBox" style="width:90%; max-width:380px; border-radius:22px; background:linear-gradient(135deg,rgba(10,12,20,0.98),rgba(20,24,40,0.98)); border:1px solid rgba(60,242,255,0.35); box-shadow:0 0 40px rgba(60,242,255,0.2); padding:20px;">
-      <div style="font-size:15px; font-weight:700; letter-spacing:0.05em; margin-bottom:6px; color:#f5f7ff;">⟳ Sync from YouTube</div>
-      <div style="font-size:11px; opacity:0.65; margin-bottom:16px; line-height:1.5;">Reads your liked videos, playlists, subscriptions and watch activity to build a taste profile — so your Home feed matches your real YouTube from day one.</div>
-      <div id="syncStatus" style="font-size:11px; color:rgba(60,242,255,0.9); min-height:16px; margin-bottom:14px;"></div>
-      <div id="syncProgress" style="width:100%; height:3px; background:rgba(60,242,255,0.12); border-radius:3px; margin-bottom:16px; display:none;"><div id="syncProgressFill" style="height:100%; width:0%; background:linear-gradient(90deg,rgba(60,242,255,0.9),rgba(0,255,180,0.7)); border-radius:3px; transition:width 0.4s ease;"></div></div>
-      <div style="display:flex; gap:8px;">
-        <button id="syncStartBtn" class="topbar-btn" style="flex:1;">Start Sync</button>
-        <button id="syncCloseBtn" class="topbar-btn" style="flex:0 0 auto;">Close</button>
-      </div>
-    </div>
-  </div>
+  <div id="hud"></div>
   <div id="searchPanel">
     <div class="search-input-bar">
       <input id="searchInput" type="text" placeholder="Search videos..." />
@@ -589,7 +577,6 @@ body.fullscreen-active .exit-full-btn { display: block; padding: 3px 8px; font-s
     <div id="subsLoginPanel" style="margin-top:12px; padding:12px; border-radius:16px; background:linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));">
       <div style="font-size:13px; opacity:0.85; margin-bottom:6px;">Sign in to load your YouTube subscriptions</div>
       <button id="startLoginBtn" class="topbar-btn" style="margin-bottom:8px;">Login to YouTube</button>
-      <button id="reloginBtn" class="topbar-btn" style="margin-bottom:8px; background:radial-gradient(circle at 0% 0%,rgba(255,80,80,0.2),rgba(10,12,20,0.9));">Clear & Re-login</button>
       <div id="deviceUserCode" style="font-size:12px; margin-top:6px; opacity:0.8;"></div>
       <div id="deviceLoginStatus" style="font-size:12px; margin-top:4px; opacity:0.8;"></div>
     </div>
@@ -768,16 +755,7 @@ const API_KEYS = [
   "AIzaSyB8-sm9Nd1GA5P3pwC4z8wd-MvwlTKGcwo","AIzaSyAqErB0WmrOt2vGxnD-LRdeMBldoGoKbOo",
   "AIzaSyA_F5GcpmUsCEiPCHs1vC8CEXzVN2EnfcI","AIzaSyBd_lVv5o3ytHUwDWLhtqq-NgcNcpNCHGA",
   "AIzaSyBQriBvxSUYcLuutFIS7SLfOwpTme5Fgpk","AIzaSyDLZCdPCPp6hcqT37e1S2dbNTJADZBUt8o",
-  "AIzaSyBafO00Lc3ZEpRjHi0FhsL6Xfeb3GAJ_B8","AIzaSyDs2jIad2HCfY0o3j4kLFvducChpgv9qmU",
-  "AIzaSyC1pCcPHsL11vrxRuUNoeN3urdwt3qjilM","AIzaSyAF7addOWtR2zzVfZAXyW_GkUM-zSslFWA",
-  "AIzaSyDz_P6WIbRBr31VO7fQX0UcP3tFSBlGEE0","AIzaSyDsL7qek4qkCjmyczIUArhK8krUq2QV3mo",
-  "AIzaSyBKgt_-gM4Nnfkxj-6xz81tNHMydBLD0CQ","AIzaSyAxz8JgYT02TS12fcdIYVNqmhT_0OwA48Q",
-  "AIzaSyDM_mZiXih02mMOCKEUgfrJhHU0RCO_W4Y","AIzaSyAAqJcN9TJiNpPSvvIX8IP2pDCbwrwbH68",
-  "AIzaSyALpQ6mleh8v4SlVnk1V8nBZ2pTIUQAoLk","AIzaSyAGy9rR4lbNYMlRgQcluVUlCpuRFIWbnZk",
-  "AIzaSyD1f3AnsJRrGmTTBWK_XsgwqLnDQv2mA00","AIzaSyB0cB1FlDb4Azzq2xh7_ENz2CvwpWJnJXg",
-  "AIzaSyCjyaZibozhYOTolhznZ0zLz45mIqtOLaw","AIzaSyC9qC_Q3q-aDhVwfp4QOdIvecqQW04Mq3M",
-  "AIzaSyDTIw26DvcDWRCGftd-c-_SdcllN0zvxE0","AIzaSyALn7in8kXrFCzC1VU51UqNFZ9YuLkwXNY",
-  "AIzaSyB_3g7oRfcoKqQYqt7UPHwQNTt3BjLD4iw"
+  "AIzaSyBafO00Lc3ZEpRjHi0FhsL6Xfeb3GAJ_B8","AIzaSyDs2jIad2HCfY0o3j4kLFvducChpgv9qmU"
 ];
 
 let keyIndex = 0;
@@ -1529,18 +1507,13 @@ trendingTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("trending"); showSkeletons(8);
   const token = await getValidToken();
   const myCat = getTopCategoryId();
-  const cats = getTopCategories(3);
   const allItems = [];
   const seen = new Set();
-  // Skip videos shown in trending in last 6 hours
-  let trendingShown = []; try { trendingShown = JSON.parse(localStorage.getItem("trendingShownTimed") || "[]"); } catch(e) {}
-  const sixHoursAgo = Date.now() - 6 * 3600000;
-  const recentTrendingIds = new Set(trendingShown.filter(e => e.ts > sixHoursAgo).map(e => e.id));
 
   function addUnique(items) {
     (items || []).forEach(item => {
       const id = item.id?.videoId || item.id;
-      if (!id || seen.has(id) || recentTrendingIds.has(id)) return;
+      if (!id || seen.has(id)) return;
       seen.add(id);
       allItems.push(item);
     });
@@ -1548,38 +1521,38 @@ trendingTab.addEventListener("click", async () => {
 
   const fetches = [];
 
-  // Trending in YOUR top categories
-  if (myCat) fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: myCat, maxResults: 15, _: Date.now() }));
-  if (cats.length > 1) fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cats[1], maxResults: 10, _: Date.now() }));
-  if (cats.length > 2) fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cats[2], maxResults: 8, _: Date.now() }));
+  // Trending in YOUR top category (not random)
+  if (myCat) {
+    fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: myCat, maxResults: 15, _: Date.now() }));
+  }
+  // Trending in a second category for variety
+  const cats = getTopCategories(3);
+  if (cats.length > 1) {
+    fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cats[1], maxResults: 10, _: Date.now() }));
+  }
 
-  // Newest uploads from subscribed channels — with contentDetails for real publish dates
+  // If logged in — popular recent uploads from subscribed channels
   if (token) {
     fetches.push((async () => {
       try {
-        const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=30&order=relevance", { headers: { Authorization: "Bearer " + token } });
+        const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=30&order=relevance", {
+          headers: { Authorization: "Bearer " + token }
+        });
         const subsData = await subsRes.json();
         const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
         if (!channelIds.length) return { items: [] };
         const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 30).join(",") });
-        const plIds = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean)
-          .sort(() => Math.random() - 0.5); // shuffle so different channels each load
+        const plIds = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
         const upFetches = plIds.slice(0, 8).map(plId =>
-          fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId: plId, maxResults: 10, _: Date.now() })
+          fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 3, _: Date.now() })
         );
         const upResults = await Promise.allSettled(upFetches);
         const items = [];
         upResults.forEach(r => {
           if (r.status === "fulfilled") {
-            // Sort newest-first using real videoPublishedAt
-            const sorted = (r.value.items || []).sort((a, b) => {
-              const da = new Date(a.contentDetails?.videoPublishedAt || a.snippet?.publishedAt || 0).getTime();
-              const db = new Date(b.contentDetails?.videoPublishedAt || b.snippet?.publishedAt || 0).getTime();
-              return db - da;
-            });
-            sorted.slice(0, 3).forEach(it => {
+            (r.value.items || []).forEach(it => {
               const vid = it.snippet?.resourceId?.videoId;
-              if (vid) items.push({ id: vid, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } });
+              if (vid) items.push({ id: vid, snippet: it.snippet });
             });
           }
         });
@@ -1588,26 +1561,16 @@ trendingTab.addEventListener("click", async () => {
     })());
   }
 
-  // General trending fallback + keyword trending from taste profile
+  // General trending fallback
   fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 15, _: Date.now() }));
-  const topKW = getTopKeywords(4);
-  if (topKW.length >= 2) {
-    const kw = [...topKW].sort(() => Math.random() - 0.5).slice(0, 2).join(" ");
-    fetches.push(fetchYouTube("search", { part: "snippet", q: kw, type: "video", order: "date", maxResults: 10, _: Date.now() }));
-  }
 
   const results = await Promise.allSettled(fetches);
   results.forEach(r => { if (r.status === "fulfilled") addUnique(r.value.items); });
 
+  nextPageToken = null; // trending uses merged sources, seed pagination separately
   renderFeed(allItems);
-
-  // Save shown IDs for dedup
-  const shownNow = allItems.map(item => item.id?.videoId || item.id).filter(Boolean);
-  const updatedTrending = [...shownNow.map(id => ({ id, ts: Date.now() })), ...trendingShown].filter(e => e.ts > sixHoursAgo).slice(0, 200);
-  try { localStorage.setItem("trendingShownTimed", JSON.stringify(updatedTrending)); } catch(e) {}
-
-  // Seed pagination
-  const seedData = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: myCat || undefined, maxResults: 20, _: Date.now() });
+  // Seed pagination from general trending for infinite scroll
+  const seedData = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
   nextPageToken = seedData.nextPageToken || null;
   showHUD(token ? "Trending For You ✦" : "Trending");
 });
@@ -1644,7 +1607,7 @@ shortsTab.addEventListener("click", async () => {
   function isNew(id) { return !persistentSeenIds.has(id) && !shortsSeenIds.has(id); }
 
   // SOURCE 1: Shorts from YOUR subscribed channels (UUSH playlists, 1 unit each)
-  // Fetch with contentDetails so we can sort by videoPublishedAt — newest first
+  // Shuffled + newest-first so you get fresh shorts every time
   if (token) {
     try {
       const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance", {
@@ -1658,25 +1621,16 @@ shortsTab.addEventListener("click", async () => {
         [channelIds[i], channelIds[j]] = [channelIds[j], channelIds[i]];
       }
       const shortsPlIds = channelIds.filter(id => id.startsWith("UC")).map(id => "UUSH" + id.slice(2));
-      // Fetch 15 items per channel with contentDetails so we get real publish dates
+      // Sample 15 random channels, fetch newest 6 shorts each
       const subShortsFetches = shortsPlIds.slice(0, 15).map(pid =>
-        fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId: pid, maxResults: 15, _: Date.now() })
+        fetchYouTube("playlistItems", { part: "snippet", playlistId: pid, maxResults: 6, _: Date.now() })
       );
       const subShortsResults = await Promise.allSettled(subShortsFetches);
       subShortsResults.forEach(r => {
         if (r.status === "fulfilled") {
-          // Sort newest-first using videoPublishedAt (actual publish date)
-          const sorted = (r.value.items || []).sort((a, b) => {
-            const da = new Date(a.contentDetails?.videoPublishedAt || a.snippet?.publishedAt || 0).getTime();
-            const db = new Date(b.contentDetails?.videoPublishedAt || b.snippet?.publishedAt || 0).getTime();
-            return db - da;
-          });
-          sorted.slice(0, 5).forEach(it => {
+          (r.value.items || []).forEach(it => {
             const vid = it.snippet?.resourceId?.videoId;
-            if (vid && isNew(vid)) pool.push({
-              id: vid,
-              snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt }
-            });
+            if (vid && isNew(vid)) pool.push({ id: vid, snippet: it.snippet });
           });
         }
       });
@@ -1842,82 +1796,19 @@ shortsTab.addEventListener("click", async () => {
 let lastMovieQuery = "";
 moviesTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("movies"); showSkeletons(8);
-  const token = await getValidToken();
-  const allItems = [];
-  const seen = new Set();
-  // Dedup against recently shown movies (6 hours)
-  let moviesShown = []; try { moviesShown = JSON.parse(localStorage.getItem("moviesShownTimed") || "[]"); } catch(e) {}
-  const sixHoursAgo = Date.now() - 6 * 3600000;
-  const recentMovieIds = new Set(moviesShown.filter(e => e.ts > sixHoursAgo).map(e => e.id));
-
-  function addUnique(items) {
-    (items || []).forEach(item => {
-      const id = item.id?.videoId || item.id;
-      if (!id || seen.has(id) || recentMovieIds.has(id)) return;
-      seen.add(id);
-      allItems.push(item);
-    });
-  }
-
-  const fetches = [];
-
-  // SOURCE 1: Generic movie queries — random each toggle for fresh content
+  // Pick a random starting query each time so re-toggling Movies feels fresh
   const startIdx = Math.floor(Math.random() * MOVIE_QUERIES.length);
   movieQIdx = startIdx;
-  let usedQuery = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
-  fetches.push(fetchYouTube("search", { part: "snippet", q: usedQuery, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 15, order: "date", _: Date.now() }));
-  // Second query for variety
-  const q2 = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
-  fetches.push(fetchYouTube("search", { part: "snippet", q: q2, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 10, order: "date", _: Date.now() }));
-
-  // SOURCE 2: Movies matching your taste profile keywords
-  const topKW = getTopKeywords(6);
-  const topBI = getTopBigrams(3);
-  const shuffledKW = [...topKW].sort(() => Math.random() - 0.5);
-  const shuffledBI = [...topBI].sort(() => Math.random() - 0.5);
-  if (shuffledKW.length >= 2) {
-    const kwQ = shuffledKW.slice(0, 2).join(" ") + " full movie";
-    fetches.push(fetchYouTube("search", { part: "snippet", q: kwQ, type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 8, _: Date.now() }));
+  let data = { items: [] };
+  let usedQuery = "";
+  for (let attempt = 0; attempt < MOVIE_QUERIES.length; attempt++) {
+    const q = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
+    data = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
+    if (data.items && data.items.length) { usedQuery = q; break; }
   }
-  if (shuffledBI.length > 0) {
-    const biQ = shuffledBI[0] + " full movie";
-    fetches.push(fetchYouTube("search", { part: "snippet", q: biQ, type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 8, _: Date.now() }));
-  }
-
-  // SOURCE 3: Liked/watched topics — recent searches that might relate to movies
-  const recentSearches = getRecentSearches(5);
-  const movieSearch = recentSearches.find(q => /movie|film|documentary|watch|episode|season/i.test(q));
-  if (movieSearch) {
-    fetches.push(fetchYouTube("search", { part: "snippet", q: movieSearch + " full", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 8, _: Date.now() }));
-  }
-
-  const results = await Promise.allSettled(fetches);
-  results.forEach(r => { if (r.status === "fulfilled") addUnique(r.value.items || []); });
-
-  lastMovieQuery = usedQuery;
-
-  // Shuffle so keyword results and generic results are interleaved
-  for (let i = allItems.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [allItems[i], allItems[j]] = [allItems[j], allItems[i]];
-  }
-
-  const items = allItems.filter(v => v.id?.videoId || v.id).map(v => ({
-    id: v.id?.videoId || v.id, snippet: v.snippet
-  }));
-
-  // Save shown IDs
-  const shownNow = items.map(v => v.id).filter(Boolean);
-  const updatedMovies = [...shownNow.map(id => ({ id, ts: Date.now() })), ...moviesShown].filter(e => e.ts > sixHoursAgo).slice(0, 200);
-  try { localStorage.setItem("moviesShownTimed", JSON.stringify(updatedMovies)); } catch(e) {}
-
-  nextPageToken = null;
-  // Seed a real token from the same query for infinite scroll
-  const seed = await fetchYouTube("search", { part: "snippet", q: usedQuery, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
-  nextPageToken = seed.nextPageToken || "seed";
-  lastMovieQuery = usedQuery;
-
-  renderFeed(items); showHUD("Movies");
+  lastMovieQuery = usedQuery; // remember exact query so infinite scroll uses the matching pageToken
+  const items = (data.items || []).filter(v => v.id && v.id.videoId).map(v => ({ id: v.id.videoId, snippet: v.snippet }));
+  nextPageToken = data.nextPageToken || null; renderFeed(items); showHUD("Movies");
 });
 
 historyTab.addEventListener("click", async () => {
@@ -2036,15 +1927,9 @@ channelTab.addEventListener("click", () => loadChannelPage(currentChannelId));
 
 subsTab.addEventListener("click", async () => {
   setActiveTab("subs"); showHUD("Subscriptions");
-  const subsLoginPanel = document.getElementById("subsLoginPanel");
-  if (subsLoginPanel) subsLoginPanel.style.display = "block";
   const token = await getValidToken();
-  if (token) {
-    deviceLoginStatusEl.textContent = "Logged in ✓";
-    loadSubscriptions();
-  } else {
-    deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
-  }
+  if (token) loadSubscriptions();
+  else deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
 });
 
 const OAUTH_CLIENT_ID = "153049037088-10qnschnsie4mqpdsdscd0uk2auqogdt.apps.googleusercontent.com";
@@ -2052,44 +1937,18 @@ const OAUTH_CLIENT_SECRET = "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";
 
 startLoginBtn.addEventListener("click", () => startDeviceLogin("subs"));
 
-document.getElementById("reloginBtn").addEventListener("click", () => {
-  clearTokens();
-  deviceUserCodeEl.textContent = "";
-  deviceLoginStatusEl.textContent = "Tokens cleared — click Login to YouTube";
-  showHUD("Ready to re-login");
-});
-
 async function startDeviceLogin(source) {
   showHUD("Requesting login code…");
   const codeEl = source === "playlists" ? playlistLoginCode : deviceUserCodeEl;
   const statusEl = source === "playlists" ? playlistLoginStatus : deviceLoginStatusEl;
-  codeEl.textContent = "Requesting…";
-  statusEl.textContent = "";
-  try {
-    const res = await fetch("https://oauth2.googleapis.com/device/code", {
-      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube" })
-    });
-    const raw = await res.text();
-    let data;
-    try { data = JSON.parse(raw); } catch(e) { codeEl.textContent = "Parse error"; statusEl.textContent = raw.slice(0, 200); return; }
-    if (data.error) {
-      codeEl.textContent = "Error: " + (data.error_description || data.error);
-      statusEl.textContent = "Code: " + (data.error || "") + " — " + (data.error_description || "");
-      showHUD("Login error"); return;
-    }
-    if (!data.user_code) {
-      codeEl.textContent = "No code returned";
-      statusEl.textContent = "Response: " + raw.slice(0, 200); return;
-    }
-    codeEl.textContent = "Code: " + data.user_code;
-    statusEl.textContent = "Go to: " + data.verification_url;
-    pollForToken(data.device_code, data.interval || 5, source);
-  } catch(e) {
-    codeEl.textContent = "Fetch failed: " + e.message;
-    statusEl.textContent = "Check connection";
-    showHUD("Login error");
-  }
+  const res = await fetch("https://oauth2.googleapis.com/device/code", {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube" })
+  });
+  const data = await res.json();
+  codeEl.textContent = "Code: " + data.user_code;
+  statusEl.textContent = "Go to: " + data.verification_url;
+  pollForToken(data.device_code, data.interval || 5, source);
 }
 
 async function pollForToken(deviceCode, intervalSeconds, source) {
@@ -2223,53 +2082,25 @@ let subsNextPageToken = null;
 async function loadMoreVideos() {
   if (!nextPageToken) return;
   let data;
-
-  if (currentTab === "home") {
-    const validToken = nextPageToken !== "seed" ? nextPageToken : undefined;
-    data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, pageToken: validToken, _: Date.now() });
-  }
-
+  if (currentTab === "home")     data = await fetchYouTube("videos",        { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
   if (currentTab === "movies") {
-    const validToken = nextPageToken !== "seed" ? nextPageToken : undefined;
+    const validToken = nextPageToken && nextPageToken !== "seed" ? nextPageToken : undefined;
     data = validToken
       ? await fetchYouTube("search", { part: "snippet", q: lastMovieQuery || "full movie", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 20, pageToken: validToken, _: Date.now() })
       : { items: [] };
-    // Rotate to fresh query if exhausted
+    // If this query's results are exhausted (no token / no items), rotate to a fresh movie query instead of dead-ending
     if (!data || !data.items || !data.items.length) {
       const q = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
       lastMovieQuery = q;
       data = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
-      if (!data.nextPageToken) data.nextPageToken = "seed";
-    }
-    // Map search results to the format appendFeed expects
-    if (data && data.items) {
-      data.items = data.items.filter(v => v.id && v.id.videoId).map(v => ({ id: v.id.videoId, snippet: v.snippet }));
+      if (!data.nextPageToken) data.nextPageToken = "seed"; // guarantee scroll keeps working next time too
     }
   }
-
-  if (currentTab === "trending") {
-    const validToken = nextPageToken !== "seed" ? nextPageToken : undefined;
-    data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: getTopCategoryId() || undefined, maxResults: 20, pageToken: validToken, _: Date.now() });
-    // If token exhausted, rotate to next top category
-    if (!data || !data.items || !data.items.length) {
-      const cats = getTopCategories(3);
-      const nextCat = cats[Math.floor(Math.random() * cats.length)] || undefined;
-      data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: nextCat, maxResults: 20, _: Date.now() });
-    }
-  }
-
-  if (currentTab === "search") {
-    data = await fetchYouTube("search", { part: "snippet", q: lastSearchQuery, type: "video", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
-  }
-
-  if (currentTab === "channel") {
-    data = await fetchYouTube("playlistItems", { part: "snippet", playlistId: channelUploadsId, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
-  }
-
+  if (currentTab === "trending") data = await fetchYouTube("videos",        { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: getTopCategoryId() || undefined, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+  if (currentTab === "search")   data = await fetchYouTube("search",        { part: "snippet", q: lastSearchQuery, type: "video", maxResults: 20, pageToken: nextPageToken, _: Date.now() });
+  if (currentTab === "channel")  data = await fetchYouTube("playlistItems", { part: "snippet", playlistId: channelUploadsId, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
   if (!data) return;
-  // Keep nextPageToken alive — use "seed" as fallback so we always have a continuation path
-  nextPageToken = data.nextPageToken || (["home","trending","movies"].includes(currentTab) ? "seed" : null);
-
+  nextPageToken = data.nextPageToken || null;
   if (currentTab === "channel") {
     (data.items || []).forEach(item => {
       const snippet = item.snippet; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
@@ -2277,9 +2108,7 @@ async function loadMoreVideos() {
       card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle || ""}</div></div>`;
       card.onclick = () => setPlayerVideo(videoId, snippet); channelPageEl.appendChild(card);
     });
-  } else {
-    appendFeed(data.items || []);
-  }
+  } else { appendFeed(data.items || []); }
 }
 
 async function loadMoreSubs() {
@@ -2764,208 +2593,6 @@ addToPlaylistBtn.addEventListener("click", async function() {
   openPickerWithToken(token);
 });
 
-/* ================================================================
-   SYNC FROM YOUTUBE — bootstraps taste profile from account data
-   Reads: liked videos, saved playlists, subscriptions, watch activity
-================================================================ */
-const syncBtn = document.getElementById("syncBtn");
-const syncOverlay = document.getElementById("syncOverlay");
-const syncBox = document.getElementById("syncBox");
-const syncStatus = document.getElementById("syncStatus");
-const syncProgress = document.getElementById("syncProgress");
-const syncProgressFill = document.getElementById("syncProgressFill");
-const syncStartBtn = document.getElementById("syncStartBtn");
-const syncCloseBtn = document.getElementById("syncCloseBtn");
-
-syncBtn.onclick = function() {
-  syncOverlay.style.display = "flex";
-  syncStatus.textContent = "";
-  syncProgressFill.style.width = "0%";
-  syncProgress.style.display = "none";
-  syncStartBtn.textContent = "Start Sync";
-  syncStartBtn.disabled = false;
-};
-syncCloseBtn.onclick = function() { syncOverlay.style.display = "none"; };
-syncOverlay.onclick = function(e) { if (e.target === syncOverlay) syncOverlay.style.display = "none"; };
-syncBox.onclick = function(e) { e.stopPropagation(); };
-
-syncStartBtn.onclick = async function() {
-  const token = await getValidToken();
-  if (!token) {
-    syncStatus.textContent = "Not logged in — please login via Subscriptions tab first.";
-    return;
-  }
-  syncStartBtn.disabled = true;
-  syncStartBtn.textContent = "Syncing…";
-  syncProgress.style.display = "block";
-
-  const profile = getTasteProfile();
-  profile.channels = profile.channels || {};
-  profile.categories = profile.categories || {};
-  profile.keywords = profile.keywords || {};
-  profile.bigrams = profile.bigrams || {};
-  profile.recentVideoIds = profile.recentVideoIds || [];
-
-  const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","this","that","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","have","has","he","she","they","do","did","new","vs","ep","ft","official","video","full","2024","2025","2026","part","episode"]);
-
-  function extractSignals(title, channelId, channelTitle, weight) {
-    weight = weight || 1;
-    // Channel signal
-    if (channelId) {
-      profile.channels[channelId] = profile.channels[channelId] || { title: channelTitle, weight: 0, lastWatch: 0, watches: [] };
-      profile.channels[channelId].weight += weight;
-      profile.channels[channelId].title = channelTitle || profile.channels[channelId].title;
-      if (!profile.channels[channelId].lastWatch) profile.channels[channelId].lastWatch = Date.now();
-    }
-    // Keywords & bigrams from title
-    if (title) {
-      const words = title.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w));
-      words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + weight; });
-      for (let i = 0; i < words.length - 1; i++) {
-        const bi = words[i] + " " + words[i+1];
-        profile.bigrams[bi] = (profile.bigrams[bi] || 0) + weight;
-      }
-    }
-  }
-
-  function setProgress(pct, msg) {
-    syncProgressFill.style.width = pct + "%";
-    syncStatus.textContent = msg;
-  }
-
-  let totalSignals = 0;
-
-  // STEP 1: Liked Videos (LL) — strong signal, weight 3 each
-  // First-ever sync: up to 500 liked videos (25 pages × 20)
-  // Re-sync: up to 200 (10 pages) — only fetches new ones since last sync
-  const isFirstSync = !profile.syncedAt;
-  const maxLLPages = isFirstSync ? 25 : 10;
-  setProgress(5, isFirstSync ? "Deep syncing liked videos (up to 500)…" : "Reading liked videos…");
-  try {
-    let llPageToken = "";
-    let llPages = 0;
-    while (llPages < maxLLPages) {
-      const url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=20" + (llPageToken ? "&pageToken=" + llPageToken : "");
-      const res = await fetch(url, { headers: { Authorization: "Bearer " + token } });
-      const data = await res.json();
-      if (data.error || !data.items) break;
-      data.items.forEach(it => {
-        const s = it.snippet || {};
-        extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 3);
-        const vid = s.resourceId?.videoId;
-        if (vid && !profile.recentVideoIds.includes(vid)) profile.recentVideoIds.push(vid);
-        totalSignals++;
-      });
-      llPageToken = data.nextPageToken || "";
-      llPages++;
-      if (!llPageToken) break;
-      setProgress(5 + Math.round((llPages / maxLLPages) * 15), `Liked videos: ${totalSignals} so far…`);
-    }
-    setProgress(20, `Liked videos: ${totalSignals} signals collected`);
-  } catch(e) { setProgress(20, "Liked videos: skipped"); }
-
-  // STEP 2: Watch Later (WL) — medium signal, weight 2
-  setProgress(22, "Reading Watch Later…");
-  try {
-    const wlRes = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=50", { headers: { Authorization: "Bearer " + token } });
-    const wlData = await wlRes.json();
-    (wlData.items || []).forEach(it => {
-      const s = it.snippet || {};
-      extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 2);
-      totalSignals++;
-    });
-    setProgress(30, `Watch Later: ${totalSignals} signals collected`);
-  } catch(e) { setProgress(30, "Watch Later: skipped"); }
-
-  // STEP 3: Your playlists — reads titles and channel ownership, weight 2
-  setProgress(32, "Reading your playlists…");
-  try {
-    const plRes = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
-    const plData = await plRes.json();
-    const myPlaylists = plData.items || [];
-    // First sync: all playlists, 20 items each. Re-sync: top 8, 10 items each
-    const plLimit = isFirstSync ? myPlaylists.length : 8;
-    const itemsPerPl = isFirstSync ? 20 : 10;
-    for (const pl of myPlaylists.slice(0, plLimit)) {
-      try {
-        const itemRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: pl.id, maxResults: itemsPerPl, _: Date.now() });
-        (itemRes.items || []).forEach(it => {
-          const s = it.snippet || {};
-          extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 2);
-          totalSignals++;
-        });
-      } catch(e) {}
-    }
-    setProgress(50, `Playlists: ${totalSignals} signals collected`);
-  } catch(e) { setProgress(50, "Playlists: skipped"); }
-
-  // STEP 4: Subscriptions — fetch each channel's latest uploads for topic signals, weight 1
-  setProgress(52, "Reading subscriptions…");
-  try {
-    const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
-    const subsData = await subsRes.json();
-    const channelIds = (subsData.items || []).map(s => {
-      const chId = s.snippet.resourceId.channelId;
-      const chTitle = s.snippet.title;
-      // Give every subscribed channel baseline weight
-      profile.channels[chId] = profile.channels[chId] || { title: chTitle, weight: 0, lastWatch: 0, watches: [] };
-      profile.channels[chId].weight += 1;
-      profile.channels[chId].title = chTitle;
-      return chId;
-    });
-
-    // Get upload playlists then sample recent video titles for topic signals
-    // First sync: sample 20 channels. Re-sync: sample 5 (quota-friendly)
-    if (channelIds.length > 0) {
-      const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 50).join(",") });
-      const uploadPls = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
-      const sampleCount = isFirstSync ? 20 : 5;
-      const sample = uploadPls.sort(() => Math.random() - 0.5).slice(0, sampleCount);
-      for (const plId of sample) {
-        try {
-          const upRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 8, _: Date.now() });
-          (upRes.items || []).forEach(it => {
-            extractSignals(it.snippet?.title, null, null, 1);
-            totalSignals++;
-          });
-        } catch(e) {}
-      }
-    }
-    setProgress(75, `Subscriptions: ${totalSignals} signals collected`);
-  } catch(e) { setProgress(75, "Subscriptions: skipped"); }
-
-  // STEP 5: Recent activity via Activities API — weight 2
-  setProgress(77, "Reading recent activity…");
-  try {
-    const actRes = await fetch("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
-    const actData = await actRes.json();
-    (actData.items || []).forEach(it => {
-      const s = it.snippet || {};
-      const vid = it.contentDetails?.upload?.videoId || it.contentDetails?.recommendation?.resourceId?.videoId;
-      extractSignals(s.title, s.channelId, s.channelTitle, 2);
-      if (vid && !profile.recentVideoIds.includes(vid)) profile.recentVideoIds.push(vid);
-      totalSignals++;
-    });
-    setProgress(90, `Activity: ${totalSignals} signals collected`);
-  } catch(e) { setProgress(90, "Activity: skipped"); }
-
-  // Save enriched profile
-  profile.recentVideoIds = profile.recentVideoIds.slice(0, 50);
-  profile.syncedAt = Date.now();
-  localStorage.setItem("tasteProfile", JSON.stringify(profile));
-
-  setProgress(100, `✓ Sync complete — ${totalSignals} signals from your account`);
-  syncStartBtn.textContent = "Sync Again";
-  syncStartBtn.disabled = false;
-  showHUD("YouTube synced ✦");
-
-  // Reload home feed with the new enriched profile
-  setTimeout(() => {
-    syncOverlay.style.display = "none";
-    homeTab.click();
-  }, 1500);
-};
-
 (async function init() {
   // Dismiss boot splash after loading bar completes
   setTimeout(() => {
@@ -2975,8 +2602,6 @@ syncStartBtn.onclick = async function() {
   showSkeletons(8);
   const hasRefresh = localStorage.getItem("yt_refresh_token");
   if (hasRefresh) { const ok = await refreshAccessToken(); if (ok) showHUD("Signed in ✓"); }
-
-  // Load feed first so the app feels instant
   if (hasEnoughHistory()) {
     const items = await fetchPersonalizedFeed();
     renderFeed(items);
@@ -2988,127 +2613,7 @@ syncStartBtn.onclick = async function() {
     nextPageToken = data.nextPageToken || null;
     renderFeed(data.items || []);
   }
-
-  // Silent background sync — runs after feed loads, only if:
-  // 1. Token exists, AND 2. Last sync was more than 6 hours ago (or never)
-  const token = await getValidToken();
-  if (token) {
-    const profile = getTasteProfile();
-    const lastSync = profile.syncedAt || 0;
-    const SIX_HOURS = 6 * 60 * 60 * 1000;
-    if (Date.now() - lastSync > SIX_HOURS) {
-      // Run silently in background — no UI blocking, no popup
-      silentSync(token).then(() => {
-        showHUD("Feed updated ✦");
-      }).catch(() => {});
-    }
-  }
 })();
-
-async function silentSync(token) {
-  const profile = getTasteProfile();
-  profile.channels = profile.channels || {};
-  profile.categories = profile.categories || {};
-  profile.keywords = profile.keywords || {};
-  profile.bigrams = profile.bigrams || {};
-  profile.recentVideoIds = profile.recentVideoIds || [];
-
-  const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","this","that","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","have","has","he","she","they","do","did","new","vs","ep","ft","official","video","full","2024","2025","2026","part","episode"]);
-
-  function extractSignals(title, channelId, channelTitle, weight) {
-    weight = weight || 1;
-    if (channelId) {
-      profile.channels[channelId] = profile.channels[channelId] || { title: channelTitle, weight: 0, lastWatch: 0, watches: [] };
-      profile.channels[channelId].weight += weight;
-      if (channelTitle) profile.channels[channelId].title = channelTitle;
-      if (!profile.channels[channelId].lastWatch) profile.channels[channelId].lastWatch = Date.now();
-    }
-    if (title) {
-      const words = title.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w));
-      words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + weight; });
-      for (let i = 0; i < words.length - 1; i++) {
-        const bi = words[i] + " " + words[i+1];
-        profile.bigrams[bi] = (profile.bigrams[bi] || 0) + weight;
-      }
-    }
-  }
-
-  // Liked videos — first sync: up to 200 (10 pages), re-sync: 100 (5 pages)
-  const isFirstSilentSync = !profile.syncedAt;
-  const maxPages = isFirstSilentSync ? 10 : 5;
-  try {
-    let pageToken = "";
-    for (let p = 0; p < maxPages; p++) {
-      const url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=20" + (pageToken ? "&pageToken=" + pageToken : "");
-      const res = await fetch(url, { headers: { Authorization: "Bearer " + token } });
-      const data = await res.json();
-      if (data.error || !data.items) break;
-      data.items.forEach(it => {
-        const s = it.snippet || {};
-        extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 3);
-        const vid = s.resourceId?.videoId;
-        if (vid && !profile.recentVideoIds.includes(vid)) profile.recentVideoIds.push(vid);
-      });
-      pageToken = data.nextPageToken || ""; if (!pageToken) break;
-    }
-  } catch(e) {}
-
-  // Watch Later — weight 2
-  try {
-    const res = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=50", { headers: { Authorization: "Bearer " + token } });
-    const data = await res.json();
-    (data.items || []).forEach(it => { const s = it.snippet || {}; extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 2); });
-  } catch(e) {}
-
-  // Playlists — weight 2
-  try {
-    const plRes = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
-    const plData = await plRes.json();
-    for (const pl of (plData.items || []).slice(0, 8)) {
-      try {
-        const itemRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: pl.id, maxResults: 10, _: Date.now() });
-        (itemRes.items || []).forEach(it => { const s = it.snippet || {}; extractSignals(s.title, s.videoOwnerChannelId, s.videoOwnerChannelTitle, 2); });
-      } catch(e) {}
-    }
-  } catch(e) {}
-
-  // Subscriptions — weight 1
-  try {
-    const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
-    const subsData = await subsRes.json();
-    const channelIds = (subsData.items || []).map(s => {
-      extractSignals(null, s.snippet.resourceId.channelId, s.snippet.title, 1);
-      return s.snippet.resourceId.channelId;
-    });
-    if (channelIds.length) {
-      const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 50).join(",") });
-      const uploadPls = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
-      const silentSampleCount = isFirstSilentSync ? 15 : 5;
-      for (const plId of uploadPls.sort(() => Math.random() - 0.5).slice(0, silentSampleCount)) {
-        try {
-          const upRes = await fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 8, _: Date.now() });
-          (upRes.items || []).forEach(it => { extractSignals(it.snippet?.title, null, null, 1); });
-        } catch(e) {}
-      }
-    }
-  } catch(e) {}
-
-  // Recent activity — weight 2
-  try {
-    const actRes = await fetch("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
-    const actData = await actRes.json();
-    (actData.items || []).forEach(it => {
-      const s = it.snippet || {};
-      extractSignals(s.title, s.channelId, s.channelTitle, 2);
-      const vid = it.contentDetails?.upload?.videoId || it.contentDetails?.recommendation?.resourceId?.videoId;
-      if (vid && !profile.recentVideoIds.includes(vid)) profile.recentVideoIds.push(vid);
-    });
-  } catch(e) {}
-
-  profile.recentVideoIds = profile.recentVideoIds.slice(0, 50);
-  profile.syncedAt = Date.now();
-  localStorage.setItem("tasteProfile", JSON.stringify(profile));
-}
 </script>
 </body>
 </html>
