@@ -965,7 +965,11 @@ function getTopCategories(n = 3) {
 
 function getTopCategoryId() { const cats = getTopCategories(1); return cats[0] || null; }
 function getRecentVideoIds(n = 5) { return (getTasteProfile().recentVideoIds || []).slice(0, n); }
-function hasEnoughHistory() { return historyList.length >= 3; }
+function hasEnoughHistory() { 
+  // Use personalized feed if we have local history OR if we've synced from YouTube
+  const profile = getTasteProfile();
+  return historyList.length >= 3 || !!profile.syncedAt || Object.keys(profile.channels || {}).length >= 3;
+}
 
 function saveSearchToProfile(query) {
   if (!query || !query.trim()) return;
@@ -2213,10 +2217,10 @@ syncOverlay.onclick=function(e){if(e.target===syncOverlay)syncOverlay.style.disp
 syncBox.onclick=function(e){e.stopPropagation();};
 function buildExtract(profile){
   const sw=new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","this","that","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","have","has","he","she","they","do","did","new","vs","ep","ft","official","video","full","2024","2025","2026","part","episode"]);
-  return function(title,chId,chTitle,w){
-    w=w||1;
-    if(chId){profile.channels[chId]=profile.channels[chId]||{title:chTitle,weight:0,lastWatch:0,watches:[]};profile.channels[chId].weight+=w;if(chTitle)profile.channels[chId].title=chTitle;if(!profile.channels[chId].lastWatch)profile.channels[chId].lastWatch=Date.now();}
-    if(title){const words=title.toLowerCase().replace(/[^a-z0-9\s]/g,"").split(/\s+/).filter(w=>w.length>2&&!sw.has(w));words.forEach(w=>{profile.keywords[w]=(profile.keywords[w]||0)+w;});for(let i=0;i<words.length-1;i++){const bi=words[i]+" "+words[i+1];profile.bigrams[bi]=(profile.bigrams[bi]||0)+w;}}
+  return function(title,chId,chTitle,weight){
+    weight=weight||1;
+    if(chId){profile.channels[chId]=profile.channels[chId]||{title:chTitle,weight:0,lastWatch:0,watches:[]};profile.channels[chId].weight+=weight;if(chTitle)profile.channels[chId].title=chTitle;if(!profile.channels[chId].lastWatch)profile.channels[chId].lastWatch=Date.now();}
+    if(title){const words=title.toLowerCase().replace(/[^a-z0-9\s]/g,"").split(/\s+/).filter(word=>word.length>2&&!sw.has(word));words.forEach(word=>{profile.keywords[word]=(profile.keywords[word]||0)+weight;});for(let i=0;i<words.length-1;i++){const bi=words[i]+" "+words[i+1];profile.bigrams[bi]=(profile.bigrams[bi]||0)+weight;}}
   };
 }
 syncStartBtn.onclick=async function(){
@@ -2237,7 +2241,9 @@ syncStartBtn.onclick=async function(){
   sp(77,"Reading activity…");try{const ar=await fetch("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});const ad=await ar.json();(ad.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.channelId,s.channelTitle,2);const vid=it.contentDetails?.upload?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);total++;});sp(90,"Activity: "+total+" signals");}catch(e){}
   profile.recentVideoIds=profile.recentVideoIds.slice(0,50);profile.syncedAt=Date.now();
   localStorage.setItem("tasteProfile",JSON.stringify(profile));
-  sp(100,"✓ Sync complete — "+total+" signals");
+  // Clear feed dedup so synced content loads fresh on Home
+  localStorage.removeItem("feedShownTimed"); localStorage.removeItem("feedShownIds");
+  sp(100,"✓ Sync complete — "+total+" signals from your account");
   syncStartBtn.textContent="Sync Again";syncStartBtn.disabled=false;showHUD("YouTube synced ✦");
   setTimeout(()=>{syncOverlay.style.display="none";homeTab.click();},1500);
 };
