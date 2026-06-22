@@ -2036,15 +2036,13 @@ channelTab.addEventListener("click", () => loadChannelPage(currentChannelId));
 
 subsTab.addEventListener("click", async () => {
   setActiveTab("subs"); showHUD("Subscriptions");
+  const subsLoginPanel = document.getElementById("subsLoginPanel");
+  if (subsLoginPanel) subsLoginPanel.style.display = "block";
   const token = await getValidToken();
   if (token) {
-    // Show login panel with a re-login option in case scope is outdated
-    const subsLoginPanel = document.getElementById("subsLoginPanel");
-    if (subsLoginPanel) subsLoginPanel.style.display = "none";
+    deviceLoginStatusEl.textContent = "Logged in ✓";
     loadSubscriptions();
   } else {
-    const subsLoginPanel = document.getElementById("subsLoginPanel");
-    if (subsLoginPanel) subsLoginPanel.style.display = "block";
     deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
   }
 });
