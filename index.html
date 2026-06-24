@@ -1425,6 +1425,32 @@ function showSkeletons(count = 6) {
 function renderFeed(items) { feedEl.innerHTML = ""; appendFeed(items); }
 
 /* CHANGE: data-videoid on each card so back button can find it */
+function timeAgo(dateStr) {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  const h = Math.floor(diff / 3600000);
+  const d = Math.floor(diff / 86400000);
+  const w = Math.floor(d / 7);
+  const mo = Math.floor(d / 30);
+  const y = Math.floor(d / 365);
+  if (m < 1) return "just now";
+  if (m < 60) return m + " minute" + (m > 1 ? "s" : "") + " ago";
+  if (h < 24) return h + " hour" + (h > 1 ? "s" : "") + " ago";
+  if (d < 7) return d + " day" + (d > 1 ? "s" : "") + " ago";
+  if (w < 4) return w + " week" + (w > 1 ? "s" : "") + " ago";
+  if (mo < 12) return mo + " month" + (mo > 1 ? "s" : "") + " ago";
+  return y + " year" + (y > 1 ? "s" : "") + " ago";
+}
+
+function formatViews(n) {
+  if (!n) return "";
+  n = parseInt(n);
+  if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, "") + "M views";
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "K views";
+  return n + " views";
+}
+
 function appendFeed(items) {
   const frag = document.createDocumentFragment();
   items.forEach((item) => {
@@ -1436,8 +1462,10 @@ function appendFeed(items) {
     card.className = "video-card parallax";
     card.dataset.videoid = videoId;
     const thumb = snippet.thumbnails?.medium?.url || snippet.thumbnails?.high?.url || "";
-    const views = stats.viewCount ? Number(stats.viewCount).toLocaleString() + " views" : "";
-    card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title || ""}</div><div class="video-channel">${snippet.channelTitle || ""}</div><div class="video-meta">${views}</div></div>`;
+    const views = formatViews(stats.viewCount);
+    const ago = timeAgo(snippet.publishedAt);
+    const meta = [views, ago].filter(Boolean).join(" · ");
+    card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title || ""}</div><div class="video-channel">${snippet.channelTitle || ""}</div><div class="video-meta">${meta}</div></div>`;
     card.onclick = () => { setPlayerVideo(videoId, snippet); showHUD("Playing: " + (snippet.title || "")); };
     frag.appendChild(card);
   });
@@ -1974,6 +2002,35 @@ scrollTopBtn.addEventListener("click", () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 });
+
+/* === SCROLL DIRECTION LOCK ===
+   Prevents horizontal/diagonal swipes from triggering vertical scroll.
+   On glasses, swiping left/right or at an angle often reads as scroll-down. */
+(function() {
+  // Wheel: block horizontal component
+  window.addEventListener("wheel", function(e) {
+    if (currentTab === "shorts") return;
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 0.5) { e.preventDefault(); }
+  }, { passive: false });
+
+  // Touch: lock direction after first 10px of movement
+  var tStartX = 0, tStartY = 0, dirLock = null;
+  document.addEventListener("touchstart", function(e) {
+    if (currentTab === "shorts") return;
+    tStartX = e.touches[0].clientX;
+    tStartY = e.touches[0].clientY;
+    dirLock = null;
+  }, { passive: true });
+  document.addEventListener("touchmove", function(e) {
+    if (currentTab === "shorts") return;
+    if (!dirLock) {
+      var dx = Math.abs(e.touches[0].clientX - tStartX);
+      var dy = Math.abs(e.touches[0].clientY - tStartY);
+      if (dx + dy > 10) dirLock = dx > dy ? "h" : "v";
+    }
+    if (dirLock === "h") e.preventDefault();
+  }, { passive: false });
+})();
 
 let scrollCooldown = false;
 window.addEventListener("scroll", async () => {
