@@ -1646,6 +1646,31 @@ shortsTab.addEventListener("click", async () => {
     if (data.items&&data.items.length) { data.items.filter(v=>v.id&&v.id.videoId&&isNew(v.id.videoId)).forEach(v=>pool.push({id:v.id.videoId,snippet:v.snippet})); break; }
   }
 
+  // SOURCE 4: "For You" discovery — trending shorts in your top categories
+  // This is what makes real YouTube Shorts feel like discovery, not just subscriptions
+  const topCatsForShorts = getTopCategories(3);
+  const allCatsForShorts = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
+  // Pick 2 categories — your top ones if available, otherwise random
+  const catsToSearch = topCatsForShorts.length >= 2
+    ? topCatsForShorts.slice(0, 2)
+    : [allCatsForShorts[Math.floor(Math.random()*allCatsForShorts.length)], allCatsForShorts[Math.floor(Math.random()*allCatsForShorts.length)]];
+  const forYouFetches = catsToSearch.map(catId =>
+    fetchYouTube("videos", {part:"snippet,statistics", chart:"mostPopular", regionCode:"US", videoCategoryId:catId, videoDuration:"short", maxResults:15, _:Date.now()})
+  );
+  // Also add a trending shorts search with random viral query
+  const viralQueries = ["shorts viral 2024","shorts trending now","shorts funny viral","shorts satisfying trending","shorts amazing moments"];
+  const viralQ = viralQueries[Math.floor(Math.random()*viralQueries.length)];
+  forYouFetches.push(fetchYouTube("search",{part:"snippet",q:viralQ,type:"video",videoDuration:"short",videoEmbeddable:"true",order:"viewCount",maxResults:15,_:Date.now()}));
+
+  const forYouResults = await Promise.allSettled(forYouFetches);
+  forYouResults.forEach(r => {
+    if (r.status==="fulfilled") {
+      (r.value.items||[]).filter(v=>{
+        const id = v.id?.videoId||v.id; return id && isNew(id);
+      }).forEach(v => pool.push({id:v.id?.videoId||v.id, snippet:v.snippet}));
+    }
+  });
+
   // FALLBACK
   if (pool.length<5) {
     const FBP=["UUSHX6OQ3DkcsbYNE6H8uQQuVA","UUSHq8DICunczvLuJJq414110A","UUSHRijo3ddMTht_IHyNSNXpNQ","UUSHJ5v_MCY6GNUBTO8-D3XoAg","UUSHpEhnqL0y41EpW2TvWAHD7Q","UUSH-lHJZR3Gqxm24_Vd_AJ5Yw"];
@@ -1655,6 +1680,8 @@ shortsTab.addEventListener("click", async () => {
 
   const seen=new Set();
   shortsItems = pool.filter(v=>{ if(seen.has(v.id))return false; seen.add(v.id); return true; });
+  // Interleave: every 3rd short is a discovery short (from For You sources)
+  // Pool was built: [subs][keywords][generic][forYou] — shuffle within each group then interleave
   for (let i=shortsItems.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [shortsItems[i],shortsItems[j]]=[shortsItems[j],shortsItems[i]]; }
   shortsIndex=0;
   shortsSeenIds = new Set(shortsItems.map(v=>v.id));
