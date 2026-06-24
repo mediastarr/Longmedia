@@ -1444,11 +1444,12 @@ function timeAgo(dateStr) {
 }
 
 function formatViews(n) {
-  if (!n) return "";
+  if (!n || n === "0" || n === 0) return "";
   n = parseInt(n);
+  if (!n) return "";
   if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, "") + "M views";
   if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "K views";
-  return n + " views";
+  return n.toLocaleString() + " views";
 }
 
 function appendFeed(items) {
