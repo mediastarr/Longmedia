@@ -5,8 +5,12 @@
 <title>ViewTube AR OS</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="preconnect" href="https://www.youtube.com">
+<link rel="preload" href="https://www.youtube.com/iframe_api" as="script">
 <link rel="preconnect" href="https://www.youtube-nocookie.com">
 <link rel="preconnect" href="https://i.ytimg.com">
+<link rel="preconnect" href="https://rr1---sn-vgqs7nld.googlevideo.com">
+<link rel="dns-prefetch" href="https://googlevideo.com">
+<link rel="dns-prefetch" href="https://yt3.ggpht.com">
 <link rel="preconnect" href="https://s.ytimg.com">
 <link rel="dns-prefetch" href="https://www.youtube.com">
 <link rel="dns-prefetch" href="https://s.ytimg.com">
@@ -460,7 +464,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 #bootSplash .boot-bar-fill {
   width: 0%; height: 100%; border-radius: 3px;
   background: linear-gradient(90deg, rgba(60,242,255,0.9), rgba(0,255,180,0.7));
-  animation: bootLoad 2s ease-in-out forwards;
+  animation: bootLoad 1.2s ease-in-out forwards;
 }
 @keyframes bootPulse {
   0% { transform: scale(1); filter: drop-shadow(0 0 30px rgba(60,242,255,0.8)) drop-shadow(0 0 60px rgba(60,242,255,0.4)); }
@@ -777,7 +781,7 @@ async function fetchYouTube(endpoint, params = {}, retries = 2) {
   const p = Object.assign({}, params, { key });
   Object.entries(p).forEach(([k, v]) => { if (v !== undefined && v !== null) url.searchParams.append(k, v); });
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const timeout = setTimeout(() => controller.abort(), 3500);
   try {
     const res = await fetch(url.toString(), { signal: controller.signal });
     clearTimeout(timeout);
@@ -1158,15 +1162,26 @@ function showUIWithMiniPlayer() {
   else if (currentTab === "playlists") playlistPageEl.style.display = "block";
   else feedEl.style.display = "block";
   requestAnimationFrame(() => window.scrollTo({ top: savedScrollY, behavior: "instant" }));
-  // Auto-refresh Home feed in background when returning from a video
-  if (currentTab === "home" && hasEnoughHistory()) {
-    setTimeout(async () => {
-      try {
+  // Auto-refresh tabs in background when returning from a video
+  setTimeout(async () => {
+    try {
+      if (currentTab === "home" && hasEnoughHistory()) {
         const freshItems = await fetchPersonalizedFeed();
-        if (freshItems && freshItems.length) { renderFeed(freshItems); window.scrollTo({ top: 0, behavior: "instant" }); showHUD("Feed refreshed ✦"); const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() }); nextPageToken = seed.nextPageToken || null; }
-      } catch(e) {}
-    }, 800);
-  }
+        if (freshItems && freshItems.length) {
+          renderFeed(freshItems); window.scrollTo({ top: 0, behavior: "instant" });
+          showHUD("Feed refreshed ✦");
+          const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+          nextPageToken = seed.nextPageToken || null;
+        }
+      } else if (currentTab === "trending") {
+        trendingTab.click();
+      } else if (currentTab === "movies") {
+        moviesTab.click();
+      } else if (currentTab === "shorts") {
+        // Don't auto-reload shorts — user is browsing, keep position
+      }
+    } catch(e) {}
+  }, 1000);
 }
 
 /* CHANGE: back button scrolls to the selected video card after exiting fullscreen */
@@ -1450,7 +1465,7 @@ function setActiveTab(tab) {
 
 /* CHANGE: home tab uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
 homeTab.addEventListener("click", async () => {
-  nextPageToken = null; setActiveTab("home"); showSkeletons(8);
+  nextPageToken = null; setActiveTab("home"); showSkeletons(6);
   if (hasEnoughHistory()) {
     const items = await fetchPersonalizedFeed();
     renderFeed(items);
@@ -1464,7 +1479,7 @@ homeTab.addEventListener("click", async () => {
 });
 
 trendingTab.addEventListener("click", async () => {
-  nextPageToken = null; setActiveTab("trending"); showSkeletons(8);
+  nextPageToken = null; setActiveTab("trending"); showSkeletons(6);
   const token = await getValidToken();
   const myCat = getTopCategoryId(); const cats = getTopCategories(3);
   const allItems = []; const seen = new Set();
@@ -1594,7 +1609,7 @@ shortsTab.addEventListener("click", async () => {
   function playShort(index) {
     const item=shortsItems[index]; if(!item) return;
     // Load directly — transition overlay covers while loading
-    shortsIframe.src=`https://www.youtube.com/embed/${item.id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=0&origin=${location.origin}`;
+    shortsIframe.src=`https://www.youtube.com/embed/${item.id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=0&controls=0&origin=${location.origin}`;
     updateCounter();
     if (index>=shortsItems.length-6&&!shortsLoadingMore) loadMoreShorts();
   }
@@ -1638,7 +1653,7 @@ shortsTab.addEventListener("click", async () => {
 
 let lastMovieQuery = "";
 moviesTab.addEventListener("click", async () => {
-  nextPageToken = null; setActiveTab("movies"); showSkeletons(8);
+  nextPageToken = null; setActiveTab("movies"); showSkeletons(6);
   const allItems=[]; const seen=new Set();
   let mShown=[]; try { mShown=JSON.parse(localStorage.getItem("moviesShownTimed")||"[]"); } catch(e) {}
   const sixAgo=Date.now()-6*3600000;
@@ -1965,9 +1980,9 @@ window.addEventListener("scroll", async () => {
   scrollTopBtn.classList.toggle("visible", window.scrollY > 600);
   if (isLoadingMore || scrollCooldown) return;
   const scrollPos = window.innerHeight + window.scrollY;
-  const bottom = document.body.offsetHeight - 200;
+  const bottom = document.body.offsetHeight - 400;
   if (scrollPos < bottom) return;
-  scrollCooldown = true; setTimeout(() => { scrollCooldown = false; }, 2000);
+  scrollCooldown = true; setTimeout(() => { scrollCooldown = false; }, 1500);
   if (currentTab === "subs" && subsNextPageToken) {
     isLoadingMore = true;
     try { await loadMoreSubs(); } catch(e) {} finally { isLoadingMore = false; }
@@ -2046,7 +2061,7 @@ function triggerSearch(q) {
   (async () => {
     currentTab = "search";
     closeKeyboard();
-    showSkeletons(8);
+    showSkeletons(6);
     // Retry across multiple API keys — each fetchYouTube call already rotates
     // through 3 keys internally, so 4 attempts = up to 12 keys tried
     let data = { items: [] };
@@ -2447,10 +2462,13 @@ async function silentSync(token){
   setTimeout(() => {
     const splash = document.getElementById("bootSplash");
     if (splash) { splash.classList.add("fade-out"); setTimeout(() => splash.remove(), 800); }
-  }, 2200);
-  showSkeletons(8);
+  }, 1400);
+  showSkeletons(6);
+  // Start token refresh AND feed fetch in parallel — don't wait for auth before loading
   const hasRefresh = localStorage.getItem("yt_refresh_token");
-  if (hasRefresh) { const ok = await refreshAccessToken(); if (ok) showHUD("Signed in ✓"); }
+  const authPromise = hasRefresh ? refreshAccessToken() : Promise.resolve(false);
+
+  // Fetch feed immediately without waiting for auth
   try {
     if (hasEnoughHistory()) {
       const items = await fetchPersonalizedFeed();
@@ -2466,6 +2484,11 @@ async function silentSync(token){
   } catch(e) {
     try { const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() }); nextPageToken = data.nextPageToken || null; renderFeed(data.items || []); } catch(e2) {}
   }
+
+  // Wait for auth to complete (was running in parallel)
+  const ok = await authPromise;
+  if (ok) showHUD("Signed in ✓");
+
   // Silent background sync every 6 hours
   const tkn = await getValidToken();
   if (tkn) { const p = getTasteProfile(); if (Date.now() - (p.syncedAt||0) > 21600000) { silentSync(tkn).then(()=>showHUD("Feed updated ✦")).catch(()=>{}); } }
