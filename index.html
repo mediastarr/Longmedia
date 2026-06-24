@@ -867,6 +867,39 @@ function saveToHistory(video) {
   updateTasteProfile(video);
 }
 
+function saveResumePosition(videoId, seconds) {
+  if (!videoId || seconds < 5) return; // don't save if less than 5 seconds in
+  let positions = {};
+  try { positions = JSON.parse(localStorage.getItem("resumePositions") || "{}"); } catch(e) {}
+  positions[videoId] = { t: Math.floor(seconds), savedAt: Date.now() };
+  // Keep only last 100 positions
+  const keys = Object.keys(positions);
+  if (keys.length > 100) {
+    const sorted = keys.sort((a,b) => (positions[a].savedAt||0) - (positions[b].savedAt||0));
+    sorted.slice(0, keys.length - 100).forEach(k => delete positions[k]);
+  }
+  localStorage.setItem("resumePositions", JSON.stringify(positions));
+}
+
+function getResumePosition(videoId) {
+  try {
+    const positions = JSON.parse(localStorage.getItem("resumePositions") || "{}");
+    const p = positions[videoId];
+    if (!p) return 0;
+    // Expire after 90 days
+    if (Date.now() - (p.savedAt||0) > 90 * 86400000) return 0;
+    return p.t || 0;
+  } catch(e) { return 0; }
+}
+
+function clearResumePosition(videoId) {
+  try {
+    const positions = JSON.parse(localStorage.getItem("resumePositions") || "{}");
+    delete positions[videoId];
+    localStorage.setItem("resumePositions", JSON.stringify(positions));
+  } catch(e) {}
+}
+
 /* -----------------------------------------------------------
    TASTE PROFILE ENGINE — YouTube-style signal tracking
    Tracks: channels (recency-weighted), categories, topics,
@@ -1123,6 +1156,15 @@ function showUIWithMiniPlayer() {
   else if (currentTab === "playlists") playlistPageEl.style.display = "block";
   else feedEl.style.display = "block";
   requestAnimationFrame(() => window.scrollTo({ top: savedScrollY, behavior: "instant" }));
+  // Auto-refresh Home feed in background when returning from a video
+  if (currentTab === "home" && hasEnoughHistory()) {
+    setTimeout(async () => {
+      try {
+        const freshItems = await fetchPersonalizedFeed();
+        if (freshItems && freshItems.length) { renderFeed(freshItems); window.scrollTo({ top: 0, behavior: "instant" }); showHUD("Feed refreshed ✦"); const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() }); nextPageToken = seed.nextPageToken || null; }
+      } catch(e) {}
+    }, 800);
+  }
 }
 
 /* CHANGE: back button scrolls to the selected video card after exiting fullscreen */
@@ -1144,6 +1186,10 @@ backBtn.addEventListener("click", () => {
 });
 
 closeMini.addEventListener("click", () => {
+  // Save resume position before closing
+  if (ytPlayer && currentVideoId) {
+    try { const t = ytPlayer.getCurrentTime(); const dur = ytPlayer.getDuration(); if (t > 5 && dur > 0 && t < dur - 10) saveResumePosition(currentVideoId, t); else if (t >= dur - 10) clearResumePosition(currentVideoId); } catch(e) {}
+  }
   playerSection.classList.remove("player-fullscreen");
   document.body.classList.remove("fullscreen-active");
   disableCinemaMode();
@@ -1209,6 +1255,7 @@ document.addEventListener("keydown", (e) => {
 let ytPlayer = null;
 let ytReady = false;
 let pendingVideoId = null;
+let pendingStartSeconds = 0;
 const QUALITY_CYCLE  = ["hd720", "hd1080", "hd1440"];
 const QUALITY_LABELS = { hd720: "720p", hd1080: "1080p", hd1440: "1440p" };
 let qualityIndex = 0;
@@ -1220,28 +1267,35 @@ document.head.appendChild(ytScript);
 
 window.onYouTubeIframeAPIReady = function () {
   ytReady = true;
-  if (pendingVideoId) { createYTPlayer(pendingVideoId); pendingVideoId = null; }
+  if (pendingVideoId) { createYTPlayer(pendingVideoId, pendingStartSeconds); pendingVideoId = null; pendingStartSeconds = 0; }
 };
 
-function createYTPlayer(videoId) {
+function createYTPlayer(videoId, startSeconds) {
   if (ytPlayer) { try { ytPlayer.destroy(); } catch(e) {} ytPlayer = null; }
   const container = document.getElementById("playerSection");
   let div = document.getElementById("playerFrame");
   if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
+  const pv = { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin, vq: currentQuality };
+  if (startSeconds && startSeconds > 5) { pv.start = Math.floor(startSeconds); showHUD("Resuming ▶"); }
   ytPlayer = new YT.Player("playerFrame", {
     videoId: videoId,
-    playerVars: { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin, vq: currentQuality },
+    playerVars: pv,
     events: {
-      onReady: (e) => { e.target.setPlaybackQuality(currentQuality); playPauseBtn.textContent = "Pause"; },
+      onReady: (e) => {
+        e.target.setPlaybackQuality(currentQuality);
+        playPauseBtn.textContent = "Pause";
+      },
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "Pause";
         if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "Play";
+        // When video ends naturally, clear resume position
+        if (e.data === YT.PlayerState.ENDED && currentVideoId) clearResumePosition(currentVideoId);
       }
     }
   });
 }
 
-function setPlayerVideo(videoId, snippet) {
+function setPlayerVideo(videoId, snippet, startSeconds) {
   savedScrollY = window.scrollY;
   currentVideoId = videoId;
   playerSection.style.display = "block";
@@ -1250,8 +1304,10 @@ function setPlayerVideo(videoId, snippet) {
   hideUIForVideo();
   playPauseBtn.textContent = "Pause";
   initAudioGlow();
-  if (ytReady) createYTPlayer(videoId);
-  else pendingVideoId = videoId;
+  // Use provided startSeconds, or check for saved resume position
+  const resumeAt = startSeconds || getResumePosition(videoId);
+  if (ytReady) createYTPlayer(videoId, resumeAt);
+  else { pendingVideoId = videoId; pendingStartSeconds = resumeAt; }
 }
 
 function postToPlayer(cmd) {
@@ -1309,7 +1365,12 @@ const VIDEO_CATEGORIES = ["0","1","2","10","15","17","20","22","23","24","25","2
 let categoryRotation = Math.floor(Math.random() * VIDEO_CATEGORIES.length);
 function freshCategory() { const cat = VIDEO_CATEGORIES[categoryRotation % VIDEO_CATEGORIES.length]; categoryRotation++; return cat; }
 
-const SHORT_QUERIES = ["#shorts","shorts funny","shorts viral","shorts trending","shorts 2024","shorts satisfying"];
+const SHORT_QUERIES = [
+  "#shorts","shorts funny","shorts viral","shorts trending","shorts satisfying",
+  "short video 2024","shorts comedy","shorts dance","shorts music","shorts cooking",
+  "shorts gaming","shorts sports","shorts travel","shorts animals","shorts life hacks",
+  "youtube shorts new","best shorts this week","shorts motivation","shorts amazing"
+];
 const MOVIE_QUERIES = ["full movie","full movie free","full length movie","full movie english","classic film full movie"];
 let shortQIdx = Math.floor(Math.random() * SHORT_QUERIES.length);
 let movieQIdx = Math.floor(Math.random() * MOVIE_QUERIES.length);
@@ -1461,15 +1522,20 @@ shortsTab.addEventListener("click", async () => {
     } catch(e) {}
   }
 
-  // SOURCE 2: Taste keywords/bigrams
-  const topKW=getTopKeywords(6), topBI=getTopBigrams(4);
+  // SOURCE 2: Taste keywords/bigrams — multiple combos, ordered by date for freshness
+  const topKW=getTopKeywords(8), topBI=getTopBigrams(6);
   const sKW=[...topKW].sort(()=>Math.random()-0.5), sBI=[...topBI].sort(()=>Math.random()-0.5);
   const kwQ = [];
   if (sBI.length>0) kwQ.push(sBI[0]+" shorts");
   if (sBI.length>1) kwQ.push(sBI[1]+" #shorts");
+  if (sBI.length>2) kwQ.push(sBI[2]+" short video");
   if (sKW.length>0) kwQ.push(sKW.slice(0,2).join(" ")+" shorts");
+  if (sKW.length>2) kwQ.push(sKW[2]+" shorts viral");
+  // Also add recent search queries as shorts
+  const recentS = getRecentSearches(3);
+  if (recentS.length>0) kwQ.push(recentS[0]+" shorts");
   for (const q of kwQ) {
-    const d = await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",maxResults:10,_:Date.now()});
+    const d = await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",order:"date",maxResults:10,_:Date.now()});
     (d.items||[]).filter(v=>v.id&&v.id.videoId&&isNew(v.id.videoId)).forEach(v=>pool.push({id:v.id.videoId,snippet:v.snippet}));
   }
 
@@ -1596,7 +1662,10 @@ historyTab.addEventListener("click", async () => {
       const ago = diff < 3600000 ? Math.floor(diff/60000)+"m ago" : diff < DAY ? Math.floor(diff/3600000)+"h ago" : diff < 2*DAY ? "yesterday" : Math.floor(diff/DAY)+"d ago";
       const card = document.createElement("div"); card.className = "video-card parallax"; card.dataset.videoid = h.id;
       card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"Untitled")+'</div><div class="video-channel">'+(snippet.channelTitle||"")+'</div><div class="video-meta">Watched '+ago+'</div></div>';
-      card.onclick = () => { setPlayerVideo(h.id, snippet); showHUD("Playing: "+(snippet.title||"")); };
+      const resumeT = getResumePosition(h.id);
+      const resumeLabel = resumeT > 5 ? " ▶ "+Math.floor(resumeT/60)+":"+(String(Math.floor(resumeT%60)).padStart(2,"0")) : "";
+      card.querySelector(".video-meta").textContent = "Watched "+ago+resumeLabel;
+      card.onclick = () => { setPlayerVideo(h.id, snippet, resumeT); showHUD(resumeT > 5 ? "Resuming ▶" : "Playing: "+(snippet.title||"")); };
       feedEl.appendChild(card);
     });
   }
