@@ -1162,26 +1162,6 @@ function showUIWithMiniPlayer() {
   else if (currentTab === "playlists") playlistPageEl.style.display = "block";
   else feedEl.style.display = "block";
   requestAnimationFrame(() => window.scrollTo({ top: savedScrollY, behavior: "instant" }));
-  // Auto-refresh tabs in background when returning from a video
-  setTimeout(async () => {
-    try {
-      if (currentTab === "home" && hasEnoughHistory()) {
-        const freshItems = await fetchPersonalizedFeed();
-        if (freshItems && freshItems.length) {
-          renderFeed(freshItems); window.scrollTo({ top: 0, behavior: "instant" });
-          showHUD("Feed refreshed ✦");
-          const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
-          nextPageToken = seed.nextPageToken || null;
-        }
-      } else if (currentTab === "trending") {
-        trendingTab.click();
-      } else if (currentTab === "movies") {
-        moviesTab.click();
-      } else if (currentTab === "shorts") {
-        // Don't auto-reload shorts — user is browsing, keep position
-      }
-    } catch(e) {}
-  }, 1000);
 }
 
 /* CHANGE: back button scrolls to the selected video card after exiting fullscreen */
