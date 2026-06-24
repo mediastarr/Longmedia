@@ -518,7 +518,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
       <button id="forwardBtn">+10s</button>
       <button id="fullBtn">Full</button>
       <button id="hideUIBtn">Hide UI</button>
-      <button id="resBtn">720p</button>
+      <button id="resBtn">Auto</button>
       <button id="addToPlaylistBtn">+ List</button>
     </div>
     <button id="closeMini">✕</button>
@@ -1261,10 +1261,10 @@ let ytPlayer = null;
 let ytReady = false;
 let pendingVideoId = null;
 let pendingStartSeconds = 0;
-const QUALITY_CYCLE  = ["hd720", "hd1080", "hd1440"];
-const QUALITY_LABELS = { hd720: "720p", hd1080: "1080p", hd1440: "1440p" };
-let qualityIndex = 0;
-let currentQuality = QUALITY_CYCLE[0];
+const QUALITY_CYCLE  = ["auto", "small", "medium", "large", "hd720", "hd1080", "hd1440"];
+const QUALITY_LABELS = { auto: "Auto", small: "240p", medium: "360p", large: "480p", hd720: "720p", hd1080: "1080p", hd1440: "1440p" };
+let qualityIndex = 0;           // starts at "auto" — like real YouTube ABR
+let currentQuality = "auto";   // no forced quality until user taps the button
 
 const ytScript = document.createElement("script");
 ytScript.src = "https://www.youtube.com/iframe_api";
@@ -1284,6 +1284,7 @@ window.onYouTubeIframeAPIReady = function () {
     ytPlayer = new YT.Player("playerFrame", {
       videoId: "",
       playerVars: { autoplay: 0, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin },
+      // No vq — let YouTube ABR choose quality freely like real YouTube
       events: {
         onReady: () => { /* player warmed up, ready for instant loadVideoById */ },
         onStateChange: (e) => {
@@ -1307,7 +1308,8 @@ function createYTPlayer(videoId, startSeconds) {
       } else {
         ytPlayer.loadVideoById(videoId);
       }
-      try { ytPlayer.setPlaybackQuality(currentQuality); } catch(e) {}
+      // Only force quality if user manually selected one (not auto)
+      if (currentQuality !== "auto") { try { ytPlayer.setPlaybackQuality(currentQuality); } catch(e) {} }
       playPauseBtn.textContent = "Pause";
       return;
     } catch(e) {
@@ -1319,13 +1321,14 @@ function createYTPlayer(videoId, startSeconds) {
   const container = document.getElementById("playerSection");
   let div = document.getElementById("playerFrame");
   if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
-  const pv = { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin, vq: currentQuality };
+  const pv = { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin };
+  if (currentQuality !== "auto") pv.vq = currentQuality; // only hint quality if user chose one
   if (start > 0) { pv.start = start; showHUD("Resuming ▶"); }
   ytPlayer = new YT.Player("playerFrame", {
     videoId,
     playerVars: pv,
     events: {
-      onReady: (e) => { e.target.setPlaybackQuality(currentQuality); playPauseBtn.textContent = "Pause"; },
+      onReady: (e) => { if (currentQuality !== "auto") e.target.setPlaybackQuality(currentQuality); playPauseBtn.textContent = "Pause"; },
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "Pause";
         if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "Play";
@@ -1370,26 +1373,17 @@ resBtn.addEventListener("click", () => {
   currentQuality = QUALITY_CYCLE[qualityIndex];
   resBtn.textContent = QUALITY_LABELS[currentQuality];
   showHUD(QUALITY_LABELS[currentQuality]);
-  const resumeTime = ytPlayer.getCurrentTime() || 0;
-  try { ytPlayer.destroy(); } catch(e) {} ytPlayer = null;
-  const container = document.getElementById("playerSection");
-  let div = document.getElementById("playerFrame");
-  if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
-  ytPlayer = new YT.Player("playerFrame", {
-    videoId: currentVideoId,
-    playerVars: { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin, vq: currentQuality, start: Math.floor(resumeTime) },
-    events: {
-      onReady: (e) => {
-        e.target.setPlaybackQuality(currentQuality);
-        if (e.target.setPlaybackQualityRange) e.target.setPlaybackQualityRange(currentQuality, currentQuality);
-        e.target.seekTo(resumeTime, true); e.target.playVideo(); playPauseBtn.textContent = "Pause";
-      },
-      onStateChange: (e) => {
-        if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "Pause";
-        if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "Play";
-      }
+  // No destroy/recreate — just call setPlaybackQuality directly (instant, no black flash)
+  try {
+    if (currentQuality === "auto") {
+      // Return to ABR — YouTube will pick quality automatically
+      ytPlayer.setPlaybackQualityRange("tiny", "hd1440");
+      showHUD("Auto ✦");
+    } else {
+      ytPlayer.setPlaybackQuality(currentQuality);
+      if (ytPlayer.setPlaybackQualityRange) ytPlayer.setPlaybackQualityRange(currentQuality, currentQuality);
     }
-  });
+  } catch(e) {}
 });
 
 let uiHidden = false;
