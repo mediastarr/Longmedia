@@ -373,7 +373,8 @@ body.fullscreen-active .exit-full-btn { display: block; }
 body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer-events: none; transition: opacity 0.3s ease; }
 #playerSection.ui-hidden #hideUIBtn { opacity: 0.22; }
 #playerSection.ui-hidden #hideUIBtn:hover, #playerSection.ui-hidden #hideUIBtn:active { opacity: 1; }
-#resBtn { display: none; }
+#resBtn { display: inline-block; }
+#playerSection.player-mini #resBtn { display: none; }
 #playerSection.player-fullscreen #resBtn { display: inline-block; }
 #playerSection.player-fullscreen .player-controls { bottom: 48px; }
 #playerSection.player-fullscreen .player-controls button { padding: 3px 7px; font-size: 9px; min-height: 22px; min-width: 22px; }
@@ -1373,17 +1374,48 @@ resBtn.addEventListener("click", () => {
   currentQuality = QUALITY_CYCLE[qualityIndex];
   resBtn.textContent = QUALITY_LABELS[currentQuality];
   showHUD(QUALITY_LABELS[currentQuality]);
-  // No destroy/recreate — just call setPlaybackQuality directly (instant, no black flash)
+
+  const resumeTime = Math.floor(ytPlayer.getCurrentTime() || 0);
+
+  if (currentQuality === "auto") {
+    // Auto: reload without vq so YouTube ABR takes over
+    ytPlayer.loadVideoById({ videoId: currentVideoId, startSeconds: resumeTime });
+    showHUD("Auto ✦");
+    return;
+  }
+
+  // Forced quality: must reload with vq — setPlaybackQuality() was deprecated in 2021
+  // Use loadVideoById with suggested quality (most reliable method still working)
   try {
-    if (currentQuality === "auto") {
-      // Return to ABR — YouTube will pick quality automatically
-      ytPlayer.setPlaybackQualityRange("tiny", "hd1440");
-      showHUD("Auto ✦");
-    } else {
-      ytPlayer.setPlaybackQuality(currentQuality);
-      if (ytPlayer.setPlaybackQualityRange) ytPlayer.setPlaybackQualityRange(currentQuality, currentQuality);
-    }
-  } catch(e) {}
+    ytPlayer.loadVideoById({
+      videoId: currentVideoId,
+      startSeconds: resumeTime,
+      suggestedQuality: currentQuality
+    });
+    // Also try setPlaybackQuality as belt-and-suspenders
+    setTimeout(() => {
+      try { ytPlayer.setPlaybackQuality(currentQuality); } catch(e) {}
+    }, 500);
+  } catch(e) {
+    // Final fallback: recreate player with vq param
+    const start = resumeTime;
+    try { ytPlayer.destroy(); } catch(e2) {} ytPlayer = null;
+    const container = document.getElementById("playerSection");
+    let div = document.getElementById("playerFrame");
+    if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
+    ytPlayer = new YT.Player("playerFrame", {
+      videoId: currentVideoId,
+      playerVars: { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin, vq: currentQuality, start },
+      events: {
+        onReady: (e) => { e.target.setPlaybackQuality(currentQuality); playPauseBtn.textContent = "Pause"; },
+        onStateChange: (e) => {
+          if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "Pause";
+          if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "Play";
+          if (e.data === YT.PlayerState.ENDED && currentVideoId) clearResumePosition(currentVideoId);
+        }
+      }
+    });
+  }
 });
 
 let uiHidden = false;
