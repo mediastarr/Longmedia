@@ -2580,7 +2580,7 @@ async function silentSync(token){
 
   // Silent background sync every 6 hours
   const tkn = await getValidToken();
-  if (tkn) { const p = getTasteProfile(); if (Date.now() - (p.syncedAt||0) > 21600000) { silentSync(tkn).then(()=>showHUD("Feed updated ✦")).catch(()=>{}); } }
+  if (tkn) { const p = getTasteProfile(); if (Date.now() - (p.syncedAt||0) > 7200000) { silentSync(tkn).then(()=>showHUD("Feed updated ✦")).catch(()=>{}); } }
 })();
 </script>
 </body>
