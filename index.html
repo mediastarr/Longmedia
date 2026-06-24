@@ -1292,12 +1292,33 @@ document.head.appendChild(ytScript);
 
 window.onYouTubeIframeAPIReady = function () {
   ytReady = true;
-  if (pendingVideoId) { createYTPlayer(pendingVideoId, pendingStartSeconds); pendingVideoId = null; pendingStartSeconds = 0; }
+  if (pendingVideoId) {
+    createYTPlayer(pendingVideoId, pendingStartSeconds);
+    pendingVideoId = null; pendingStartSeconds = 0;
+  } else {
+    // Pre-warm the player immediately so first tap is instant
+    // Use a silent placeholder — player exists but no video loaded yet
+    const container = document.getElementById("playerSection");
+    let div = document.getElementById("playerFrame");
+    if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
+    ytPlayer = new YT.Player("playerFrame", {
+      videoId: "",
+      playerVars: { autoplay: 0, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin },
+      events: {
+        onReady: () => { /* player warmed up, ready for instant loadVideoById */ },
+        onStateChange: (e) => {
+          if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "Pause";
+          if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "Play";
+          if (e.data === YT.PlayerState.ENDED && currentVideoId) clearResumePosition(currentVideoId);
+        }
+      }
+    });
+  }
 };
 
 function createYTPlayer(videoId, startSeconds) {
   const start = (startSeconds && startSeconds > 5) ? Math.floor(startSeconds) : 0;
-  // If player already exists, just load the new video — no destroy/recreate, no black flash
+  // Player already exists (either pre-warmed or from previous video) — just swap video
   if (ytPlayer) {
     try {
       if (start > 0) {
@@ -1306,23 +1327,22 @@ function createYTPlayer(videoId, startSeconds) {
       } else {
         ytPlayer.loadVideoById(videoId);
       }
-      ytPlayer.setPlaybackQuality(currentQuality);
+      try { ytPlayer.setPlaybackQuality(currentQuality); } catch(e) {}
       playPauseBtn.textContent = "Pause";
       return;
     } catch(e) {
-      // If reuse fails, fall through to full recreate
       try { ytPlayer.destroy(); } catch(e2) {}
       ytPlayer = null;
     }
   }
-  // First time: create the player
+  // Fallback: create from scratch
   const container = document.getElementById("playerSection");
   let div = document.getElementById("playerFrame");
   if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
   const pv = { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin, vq: currentQuality };
   if (start > 0) { pv.start = start; showHUD("Resuming ▶"); }
   ytPlayer = new YT.Player("playerFrame", {
-    videoId: videoId,
+    videoId,
     playerVars: pv,
     events: {
       onReady: (e) => { e.target.setPlaybackQuality(currentQuality); playPauseBtn.textContent = "Pause"; },
