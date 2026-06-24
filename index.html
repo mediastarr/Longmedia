@@ -7,8 +7,10 @@
 <link rel="preconnect" href="https://www.youtube.com">
 <link rel="preconnect" href="https://www.youtube-nocookie.com">
 <link rel="preconnect" href="https://i.ytimg.com">
+<link rel="preconnect" href="https://s.ytimg.com">
 <link rel="dns-prefetch" href="https://www.youtube.com">
 <link rel="dns-prefetch" href="https://s.ytimg.com">
+<link rel="dns-prefetch" href="https://i.ytimg.com">
 <style>
 :root {
   --bg-dark: #05060a;
@@ -411,7 +413,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 @keyframes shortsArrowBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
 .shorts-arrow.up { animation-name: shortsArrowBounceUp; }
 @keyframes shortsArrowBounceUp { 0%, 100% { transform: rotate(180deg) translateY(0); } 50% { transform: rotate(180deg) translateY(5px); } }
-#shortsTransition { position: absolute; inset: 0; z-index: 9; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
+#shortsTransition { position: absolute; inset: 0; z-index: 9; background: #000; opacity: 0; pointer-events: none; }
 #shortsTransition.flash { opacity: 1; }
 
 /* Scroll to top button */
@@ -1170,6 +1172,10 @@ function showUIWithMiniPlayer() {
 /* CHANGE: back button scrolls to the selected video card after exiting fullscreen */
 backBtn.addEventListener("click", () => {
   if (playerSection.style.display === "none") return;
+  // Save resume position
+  if (ytPlayer && currentVideoId) {
+    try { const t = ytPlayer.getCurrentTime(); const dur = ytPlayer.getDuration(); if (t > 5 && dur > 0 && t < dur - 10) saveResumePosition(currentVideoId, t); else if (t >= dur - 10) clearResumePosition(currentVideoId); } catch(e) {}
+  }
   playerSection.classList.remove("player-fullscreen");
   playerSection.classList.add("player-mini");
   miniActive = true;
@@ -1223,6 +1229,10 @@ fullBtn.addEventListener("click", () => {
 
 const exitFullBtn = document.getElementById("exitFullBtn");
 exitFullBtn.addEventListener("click", () => {
+  // Save resume position
+  if (ytPlayer && currentVideoId) {
+    try { const t = ytPlayer.getCurrentTime(); const dur = ytPlayer.getDuration(); if (t > 5 && dur > 0 && t < dur - 10) saveResumePosition(currentVideoId, t); else if (t >= dur - 10) clearResumePosition(currentVideoId); } catch(e) {}
+  }
   playerSection.classList.remove("player-fullscreen");
   document.body.classList.remove("fullscreen-active");
   disableCinemaMode();
@@ -1569,7 +1579,8 @@ shortsTab.addEventListener("click", async () => {
   function updateCounter() { shortsCounter.textContent=`${shortsIndex+1} / ${shortsItems.length}`; }
   function playShort(index) {
     const item=shortsItems[index]; if(!item) return;
-    shortsIframe.src=`https://www.youtube.com/embed/${item.id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&origin=${location.origin}`;
+    // Load directly — transition overlay covers while loading
+    shortsIframe.src=`https://www.youtube.com/embed/${item.id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=0&origin=${location.origin}`;
     updateCounter();
     if (index>=shortsItems.length-6&&!shortsLoadingMore) loadMoreShorts();
   }
@@ -1590,8 +1601,14 @@ shortsTab.addEventListener("click", async () => {
   let transitioning=false;
   function transitionTo(index) {
     if (transitioning||index<0||index>=shortsItems.length) return;
-    transitioning=true; shortsTrans.style.transition="opacity 0.12s ease"; shortsTrans.style.opacity="1";
-    setTimeout(()=>{ shortsIndex=index; playShort(shortsIndex); setTimeout(()=>{ shortsTrans.style.transition="opacity 0.35s ease"; shortsTrans.style.opacity="0"; transitioning=false; },500); },150);
+    transitioning=true;
+    // Blank iframe immediately so old video disappears instantly
+    shortsIframe.src="about:blank";
+    shortsTrans.style.transition="none"; shortsTrans.style.opacity="1";
+    setTimeout(()=>{
+      shortsIndex=index; playShort(shortsIndex);
+      setTimeout(()=>{ shortsTrans.style.transition="opacity 0.25s ease"; shortsTrans.style.opacity="0"; transitioning=false; }, 400);
+    }, 80);
   }
   function goNext() { transitionTo(shortsIndex+1); }
   function goPrev() { transitionTo(shortsIndex-1); }
