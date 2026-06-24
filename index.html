@@ -1789,15 +1789,23 @@ scrollTopBtn.addEventListener("click", () => {
   }
 });
 
+let scrollCooldown = false;
 window.addEventListener("scroll", async () => {
-  // Show/hide scroll-to-top button
   scrollTopBtn.classList.toggle("visible", window.scrollY > 600);
-  if (isLoadingMore) return;
+  if (isLoadingMore || scrollCooldown) return;
   const scrollPos = window.innerHeight + window.scrollY;
-  const bottom = document.body.offsetHeight - 500;
+  const bottom = document.body.offsetHeight - 200;
   if (scrollPos < bottom) return;
-  if (currentTab === "subs" && subsNextPageToken) { isLoadingMore = true; await loadMoreSubs(); isLoadingMore = false; return; }
-  if (nextPageToken) { isLoadingMore = true; await loadMoreVideos(); isLoadingMore = false; }
+  scrollCooldown = true; setTimeout(() => { scrollCooldown = false; }, 2000);
+  if (currentTab === "subs" && subsNextPageToken) {
+    isLoadingMore = true;
+    try { await loadMoreSubs(); } catch(e) {} finally { isLoadingMore = false; }
+    return;
+  }
+  if (nextPageToken) {
+    isLoadingMore = true;
+    try { await loadMoreVideos(); } catch(e) {} finally { isLoadingMore = false; }
+  }
 });
 
 async function loadChannelPage(channelId) {
