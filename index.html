@@ -1569,10 +1569,75 @@ moviesTab.addEventListener("click", async () => {
   renderFeed(items); showHUD("Movies");
 });
 
-historyTab.addEventListener("click", () => {
-  setActiveTab("history");
-  const items = historyList.slice(0, 50).map(h => ({ id: h.id, snippet: h.snippet, statistics: { viewCount: "watched" } }));
-  nextPageToken = null; renderFeed(items); showHUD("History");
+historyTab.addEventListener("click", async () => {
+  setActiveTab("history"); nextPageToken = null;
+  feedEl.innerHTML = ""; showHUD("Loading history…");
+  const now = Date.now(); const DAY = 86400000;
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const yesterdayStart = new Date(todayStart.getTime() - DAY);
+  const weekStart = new Date(todayStart.getTime() - 6 * DAY);
+  const today = [], yesterday = [], thisWeek = [], earlier = [];
+  historyList.forEach(h => {
+    const t = h.watchedAt || 0;
+    if (t >= todayStart.getTime()) today.push(h);
+    else if (t >= yesterdayStart.getTime()) yesterday.push(h);
+    else if (t >= weekStart.getTime()) thisWeek.push(h);
+    else earlier.push(h);
+  });
+  function addHeader(title) {
+    const hdr = document.createElement("div");
+    hdr.style.cssText = "font-size:13px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; padding:14px 4px 6px; opacity:0.7; color:var(--accent);";
+    hdr.textContent = title; feedEl.appendChild(hdr);
+  }
+  function addHistoryCards(items) {
+    items.forEach(h => {
+      const snippet = h.snippet || {};
+      const diff = now - (h.watchedAt || 0);
+      const ago = diff < 3600000 ? Math.floor(diff/60000)+"m ago" : diff < DAY ? Math.floor(diff/3600000)+"h ago" : diff < 2*DAY ? "yesterday" : Math.floor(diff/DAY)+"d ago";
+      const card = document.createElement("div"); card.className = "video-card parallax"; card.dataset.videoid = h.id;
+      card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"Untitled")+'</div><div class="video-channel">'+(snippet.channelTitle||"")+'</div><div class="video-meta">Watched '+ago+'</div></div>';
+      card.onclick = () => { setPlayerVideo(h.id, snippet); showHUD("Playing: "+(snippet.title||"")); };
+      feedEl.appendChild(card);
+    });
+  }
+  if (today.length) { addHeader("▸ Today"); addHistoryCards(today); }
+  if (yesterday.length) { addHeader("▸ Yesterday"); addHistoryCards(yesterday); }
+  if (thisWeek.length) { addHeader("▸ This Week"); addHistoryCards(thisWeek); }
+  if (earlier.length) { addHeader("▸ Earlier"); addHistoryCards(earlier.slice(0, 30)); }
+  if (!historyList.length) feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">No watch history yet. Videos you watch will appear here.</div>';
+  // Fetch Liked Videos and Watch Later from YouTube
+  const token = await getValidToken();
+  if (token) {
+    try {
+      const llRes = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=20", { headers: { Authorization: "Bearer " + token } });
+      const llData = await llRes.json();
+      if (llData.items && llData.items.length) {
+        addHeader("♥ Liked Videos");
+        llData.items.forEach(it => {
+          const snippet = it.snippet || {}; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
+          const card = document.createElement("div"); card.className = "video-card parallax"; card.dataset.videoid = videoId;
+          card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Liked</div></div>';
+          card.onclick = () => { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); };
+          feedEl.appendChild(card);
+        });
+      }
+    } catch(e) {}
+    try {
+      const wlRes = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=20", { headers: { Authorization: "Bearer " + token } });
+      const wlData = await wlRes.json();
+      if (wlData.items && wlData.items.length) {
+        addHeader("⏱ Watch Later");
+        wlData.items.forEach(it => {
+          const snippet = it.snippet || {}; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
+          const card = document.createElement("div"); card.className = "video-card parallax"; card.dataset.videoid = videoId;
+          card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Watch Later</div></div>';
+          card.onclick = () => { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); };
+          feedEl.appendChild(card);
+        });
+      }
+    } catch(e) {}
+  }
+  showHUD(token ? "History ✦" : "History");
 });
 
 channelTab.addEventListener("click", () => loadChannelPage(currentChannelId));
@@ -1600,14 +1665,20 @@ async function startDeviceLogin(source) {
   showHUD("Requesting login code…");
   const codeEl = source === "playlists" ? playlistLoginCode : deviceUserCodeEl;
   const statusEl = source === "playlists" ? playlistLoginStatus : deviceLoginStatusEl;
-  const res = await fetch("https://oauth2.googleapis.com/device/code", {
-    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube" })
-  });
-  const data = await res.json();
-  codeEl.textContent = "Code: " + data.user_code;
-  statusEl.textContent = "Go to: " + data.verification_url;
-  pollForToken(data.device_code, data.interval || 5, source);
+  codeEl.textContent = "Requesting code…";
+  statusEl.textContent = "";
+  try {
+    const res = await fetch("https://oauth2.googleapis.com/device/code", {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube" })
+    });
+    const data = await res.json();
+    if (data.error) { codeEl.textContent = "Error: " + (data.error_description || data.error); statusEl.textContent = "Check Google Cloud Console scope settings"; showHUD("Login error"); return; }
+    if (!data.user_code) { codeEl.textContent = "No code returned — try again"; return; }
+    codeEl.textContent = "Code: " + data.user_code;
+    statusEl.textContent = "Go to: " + data.verification_url;
+    pollForToken(data.device_code, data.interval || 5, source);
+  } catch(e) { codeEl.textContent = "Network error — check connection"; statusEl.textContent = e.message || ""; showHUD("Login error"); }
 }
 
 async function pollForToken(deviceCode, intervalSeconds, source) {
