@@ -1058,7 +1058,9 @@ async function fetchPersonalizedFeed() {
   sC.slice(0,token?2:4).forEach(ch => { lf.push(fetchYouTube("search",{part:"snippet",channelId:ch.id,type:"video",order:"date",maxResults:4,_:Date.now()})); lw.push(4); });
   sB.slice(0,2).forEach(phrase => { lf.push(fetchYouTube("search",{part:"snippet",q:phrase,type:"video",maxResults:6,_:Date.now()})); lw.push(4); });
   if (sK.length>=2) { lf.push(fetchYouTube("search",{part:"snippet",q:sK.slice(0,3).join(" "),type:"video",maxResults:6,_:Date.now()})); lw.push(3); }
-  sR.slice(0,2).forEach(videoId => { lf.push(fetchYouTube("search",{part:"snippet",type:"video",relatedToVideoId:videoId,maxResults:5,_:Date.now()})); lw.push(3); });
+  // Add extra keyword searches to fill the gap from removed relatedToVideoId (deprecated Aug 2023)
+  if (sS.length>0) { lf.push(fetchYouTube("search",{part:"snippet",q:sS[0],type:"video",order:"date",maxResults:6,_:Date.now()})); lw.push(3); }
+  if (sB.length>2) { lf.push(fetchYouTube("search",{part:"snippet",q:sB[2],type:"video",order:"date",maxResults:6,_:Date.now()})); lw.push(3); }
   const allCats = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
   const myCats = topCats.length ? topCats : [allCats[Math.floor(Math.random()*allCats.length)]];
   lf.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCats[Math.floor(Math.random()*myCats.length)],maxResults:10,_:Date.now()})); lw.push(2);
@@ -1383,7 +1385,8 @@ trendingTab.addEventListener("click", async () => {
   const allItems = []; const seen = new Set();
   let tShown = []; try { tShown = JSON.parse(localStorage.getItem("trendingShownTimed")||"[]"); } catch(e) {}
   const sixAgo = Date.now()-6*3600000;
-  const tRecent = new Set(tShown.filter(e=>e.ts>sixAgo).map(e=>e.id));
+  const hasTaste = getTopChannels(1).length > 0 || getTopKeywords(1).length > 0;
+  const tRecent = hasTaste ? new Set(tShown.filter(e=>e.ts>sixAgo).map(e=>e.id)) : new Set();
   function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id)||tRecent.has(id))return; seen.add(id); allItems.push(item); }); }
   const fetches = [];
   if (myCat) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:15,_:Date.now()}));
