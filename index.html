@@ -1602,7 +1602,8 @@ shortsTab.addEventListener("click", async () => {
   try { persistentSeenIds = new Set(JSON.parse(localStorage.getItem("shortsSeenHistory") || "[]")); } catch(e) {}
   function isNew(id) { return !persistentSeenIds.has(id) && !shortsSeenIds.has(id); }
 
-  // SOURCE 1: Newest from subscribed channels (UUSH, sorted by videoPublishedAt)
+  // SOURCE 1: Newest from subscribed channels (UUSH)
+  // 8 channels instead of 15 — saves 7 API calls
   if (token) {
     try {
       const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance", { headers: { Authorization: "Bearer " + token } });
@@ -1610,66 +1611,45 @@ shortsTab.addEventListener("click", async () => {
       let channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
       for (let i = channelIds.length-1; i>0; i--) { const j = Math.floor(Math.random()*(i+1)); [channelIds[i],channelIds[j]]=[channelIds[j],channelIds[i]]; }
       const plIds = channelIds.filter(id=>id.startsWith("UC")).map(id=>"UUSH"+id.slice(2));
-      const fetches = plIds.slice(0,15).map(pid => fetchYouTube("playlistItems",{part:"snippet,contentDetails",playlistId:pid,maxResults:15,_:Date.now()}));
+      const fetches = plIds.slice(0,4).map(pid => fetchYouTube("playlistItems",{part:"snippet,contentDetails",playlistId:pid,maxResults:6,_:Date.now()}));
       const results = await Promise.allSettled(fetches);
       results.forEach(r => {
         if (r.status==="fulfilled") {
           const sorted = (r.value.items||[]).sort((a,b)=>new Date(b.contentDetails?.videoPublishedAt||b.snippet?.publishedAt||0)-new Date(a.contentDetails?.videoPublishedAt||a.snippet?.publishedAt||0));
-          sorted.slice(0,5).forEach(it => { const vid=it.snippet?.resourceId?.videoId; if (vid&&isNew(vid)) pool.push({id:vid,snippet:{...it.snippet,publishedAt:it.contentDetails?.videoPublishedAt||it.snippet?.publishedAt}}); });
+          sorted.slice(0,3).forEach(it => { const vid=it.snippet?.resourceId?.videoId; if (vid&&isNew(vid)) pool.push({id:vid,snippet:{...it.snippet,publishedAt:it.contentDetails?.videoPublishedAt||it.snippet?.publishedAt}}); });
         }
       });
     } catch(e) {}
   }
 
-  // SOURCE 2: Taste keywords/bigrams — multiple combos, ordered by date for freshness
-  const topKW=getTopKeywords(8), topBI=getTopBigrams(6);
+  // SOURCES 2+3+4 all in parallel — taste keywords + generic + For You discovery
+  // Was 9+ sequential/parallel calls. Now 6 calls all at once — much faster load
+  const topKW=getTopKeywords(6), topBI=getTopBigrams(4);
   const sKW=[...topKW].sort(()=>Math.random()-0.5), sBI=[...topBI].sort(()=>Math.random()-0.5);
-  const kwQ = [];
-  if (sBI.length>0) kwQ.push(sBI[0]+" shorts");
-  if (sBI.length>1) kwQ.push(sBI[1]+" #shorts");
-  if (sBI.length>2) kwQ.push(sBI[2]+" short video");
-  if (sKW.length>0) kwQ.push(sKW.slice(0,2).join(" ")+" shorts");
-  if (sKW.length>2) kwQ.push(sKW[2]+" shorts viral");
-  // Also add recent search queries as shorts
-  const recentS = getRecentSearches(3);
-  if (recentS.length>0) kwQ.push(recentS[0]+" shorts");
-  for (const q of kwQ) {
-    const d = await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",order:"date",maxResults:10,_:Date.now()});
-    (d.items||[]).filter(v=>v.id&&v.id.videoId&&isNew(v.id.videoId)).forEach(v=>pool.push({id:v.id.videoId,snippet:v.snippet}));
-  }
-
-  // SOURCE 3: Generic with random rotation
+  const recentS = getRecentSearches(2);
   shortQIdx = Math.floor(Math.random()*SHORT_QUERIES.length);
-  for (let attempt=0; attempt<SHORT_QUERIES.length; attempt++) {
-    const q = SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length]; shortQIdx++;
-    data = await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:"US",maxResults:20,_:Date.now()});
-    if (data.items&&data.items.length) { data.items.filter(v=>v.id&&v.id.videoId&&isNew(v.id.videoId)).forEach(v=>pool.push({id:v.id.videoId,snippet:v.snippet})); break; }
-  }
-
-  // SOURCE 4: "For You" discovery — trending shorts in your top categories
-  // This is what makes real YouTube Shorts feel like discovery, not just subscriptions
-  const topCatsForShorts = getTopCategories(3);
+  const genericQ = SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length]; shortQIdx++;
+  const topCatsForShorts = getTopCategories(2);
   const allCatsForShorts = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
-  // Pick 2 categories — your top ones if available, otherwise random
-  const catsToSearch = topCatsForShorts.length >= 2
-    ? topCatsForShorts.slice(0, 2)
-    : [allCatsForShorts[Math.floor(Math.random()*allCatsForShorts.length)], allCatsForShorts[Math.floor(Math.random()*allCatsForShorts.length)]];
-  const forYouFetches = catsToSearch.map(catId =>
-    fetchYouTube("videos", {part:"snippet,statistics", chart:"mostPopular", regionCode:"US", videoCategoryId:catId, videoDuration:"short", maxResults:15, _:Date.now()})
-  );
-  // Also add a trending shorts search with random viral query
+  const catToSearch = topCatsForShorts.length ? topCatsForShorts[0] : allCatsForShorts[Math.floor(Math.random()*allCatsForShorts.length)];
   const viralQueries = ["shorts viral 2024","shorts trending now","shorts funny viral","shorts satisfying trending","shorts amazing moments"];
   const viralQ = viralQueries[Math.floor(Math.random()*viralQueries.length)];
-  forYouFetches.push(fetchYouTube("search",{part:"snippet",q:viralQ,type:"video",videoDuration:"short",videoEmbeddable:"true",order:"viewCount",maxResults:15,_:Date.now()}));
 
-  const forYouResults = await Promise.allSettled(forYouFetches);
-  forYouResults.forEach(r => {
+  const parallelFetches = [
+    sBI.length>0 ? fetchYouTube("search",{part:"snippet",q:sBI[0]+" shorts",type:"video",videoDuration:"short",videoEmbeddable:"true",order:"date",maxResults:7,_:Date.now()}) : Promise.resolve({items:[]}),
+    sKW.length>0 ? fetchYouTube("search",{part:"snippet",q:sKW.slice(0,2).join(" ")+" shorts",type:"video",videoDuration:"short",videoEmbeddable:"true",order:"date",maxResults:7,_:Date.now()}) : Promise.resolve({items:[]}),
+    recentS.length>0 ? fetchYouTube("search",{part:"snippet",q:recentS[0]+" shorts",type:"video",videoDuration:"short",videoEmbeddable:"true",order:"date",maxResults:7,_:Date.now()}) : Promise.resolve({items:[]}),
+    fetchYouTube("search",{part:"snippet",q:genericQ,type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:"US",maxResults:10,_:Date.now()}),
+    fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:catToSearch,videoDuration:"short",maxResults:10,_:Date.now()}),
+    fetchYouTube("search",{part:"snippet",q:viralQ,type:"video",videoDuration:"short",videoEmbeddable:"true",order:"viewCount",maxResults:10,_:Date.now()}),
+  ];
+  const parallelResults = await Promise.allSettled(parallelFetches);
+  parallelResults.forEach(r => {
     if (r.status==="fulfilled") {
-      (r.value.items||[]).filter(v=>{
-        const id = v.id?.videoId||v.id; return id && isNew(id);
-      }).forEach(v => pool.push({id:v.id?.videoId||v.id, snippet:v.snippet}));
+      (r.value.items||[]).forEach(v => { const id=v.id?.videoId||v.id; if(id&&isNew(id)) pool.push({id,snippet:v.snippet}); });
     }
   });
+  data = parallelResults.find(r=>r.status==="fulfilled")?.value || {items:[]};
 
   // FALLBACK
   if (pool.length<5) {
@@ -1678,7 +1658,7 @@ shortsTab.addEventListener("click", async () => {
     pr.forEach(r=>{ if (r.status==="fulfilled") (r.value.items||[]).forEach(it=>{ const vid=it.snippet?.resourceId?.videoId; if(vid&&isNew(vid)) pool.push({id:vid,snippet:it.snippet}); }); });
   }
 
-  const seen=new Set();
+    const seen=new Set();
   shortsItems = pool.filter(v=>{ if(seen.has(v.id))return false; seen.add(v.id); return true; });
   // Interleave: every 3rd short is a discovery short (from For You sources)
   // Pool was built: [subs][keywords][generic][forYou] — shuffle within each group then interleave
@@ -1706,7 +1686,7 @@ shortsTab.addEventListener("click", async () => {
     try {
       const q=SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length]; shortQIdx++;
       const vt=nextPageToken&&nextPageToken!=="seed"?nextPageToken:undefined;
-      const more=await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",maxResults:20,pageToken:vt,_:Date.now()});
+      const more=await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",maxResults:20,pageToken:vt,_:Date.now()}); // 20 more per scroll batch
       nextPageToken=more.nextPageToken||"seed";
       const fresh=(more.items||[]).filter(v=>v.id&&v.id.videoId&&!shortsSeenIds.has(v.id.videoId));
       fresh.forEach(v=>shortsSeenIds.add(v.id.videoId));
