@@ -387,12 +387,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 #playerSection.player-mini .player-controls button { padding: 5px 7px; font-size: 10px; min-height: 28px; min-width: unset; }
 #playerSection.player-mini #closeMini { padding: 4px 7px; font-size: 10px; min-height: 28px; min-width: unset; top: 6px; right: 6px; }
 #shortsPage { display: none; position: fixed; inset: 0; z-index: 5000; background: #000; overflow: hidden; touch-action: none; }
-#shortsIframe, #shortsIframeNext {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  border: none; background: #000;
-}
-#shortsIframe { z-index: 1; opacity: 1; }
-#shortsIframeNext { z-index: 0; opacity: 0; pointer-events: none; }
+#shortsIframe { width: 100%; height: 100%; border: none; display: block; background: #000; }
 #shortsPage::before {
   content: ""; position: absolute; inset: -40px; pointer-events: none; z-index: 0;
   background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.28), transparent 55%), radial-gradient(circle at 0% 100%, rgba(120,80,255,0.22), transparent 60%), radial-gradient(circle at 100% 100%, rgba(0,255,180,0.22), transparent 60%);
@@ -1585,22 +1580,20 @@ shortsTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("shorts"); showHUD("Shorts");
   shortsPageEl.innerHTML = `
     <iframe id="shortsIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-    <iframe id="shortsIframeNext" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-    <button id="shortsBackBtn" tabindex="0">← Back</button>
+<button id="shortsBackBtn" tabindex="0">← Back</button>
     <div id="shortsCounter">Loading…</div>
     <div id="shortsHint"><div class="shorts-arrow up">▼</div><div class="shorts-hint-text">swipe up/down</div><div class="shorts-arrow down">▼</div></div>
     <div id="shortsTransition"></div>
   `;
   shortsPageEl.classList.add("shorts-bloom");
   const shortsIframe = document.getElementById("shortsIframe");
-  const shortsIframeNext = document.getElementById("shortsIframeNext");
   const shortsCounter = document.getElementById("shortsCounter");
   const shortsHint = document.getElementById("shortsHint");
   const shortsTrans = document.getElementById("shortsTransition");
   const backBtn2 = document.getElementById("shortsBackBtn");
 
   // Wire back button immediately before any async work
-  backBtn2.addEventListener("click", () => { shortsIframe.src = ""; shortsIframeNext.src = ""; shortsPageEl.style.display = "none"; setActiveTab("home"); homeTab.click(); showHUD("Home"); });
+  backBtn2.addEventListener("click", () => { shortsIframe.src = "about:blank"; shortsPageEl.style.display = "none"; setActiveTab("home"); homeTab.click(); showHUD("Home"); });
 
   const token = await getValidToken();
   let data = { items: [] };
@@ -1693,50 +1686,17 @@ shortsTab.addEventListener("click", async () => {
 
   if (!shortsItems.length) { shortsCounter.textContent="No shorts — tap Back"; return; }
 
-  const EMBED = id => `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=0&controls=0&origin=${location.origin}`;
-  const PRELOAD = id => `https://www.youtube.com/embed/${id}?autoplay=0&playsinline=1&rel=0&modestbranding=1&fs=0&controls=0&mute=1&origin=${location.origin}`;
+  const EMBED = id => `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=1&origin=${location.origin}`;
+  
 
   function updateCounter() { shortsCounter.textContent=`${shortsIndex+1} / ${shortsItems.length}`; }
 
-  function preloadNext(index) {
-    const next = shortsItems[index];
-    if (!next || shortsIframeNext.dataset.preloaded === next.id) return;
-    shortsIframeNext.src = PRELOAD(next.id);
-    shortsIframeNext.dataset.preloaded = next.id;
-  }
-
-  function playShort(index) {
+function playShort(index) {
     const item = shortsItems[index]; if (!item) return;
-    // If next iframe already has this video preloaded — swap instantly
-    if (shortsIframeNext.dataset.preloaded === item.id) {
-      // Swap: make next the active one
-      shortsIframe.style.zIndex = "0"; shortsIframe.style.opacity = "0";
-      shortsIframeNext.style.zIndex = "1"; shortsIframeNext.style.opacity = "1";
-      shortsIframeNext.style.pointerEvents = "auto";
-      // Reload preloaded iframe with autoplay now active
-      shortsIframeNext.src = EMBED(item.id);
-      // Reset old iframe for next preload
-      shortsIframe.src = "about:blank"; shortsIframe.dataset.preloaded = "";
-      // Swap references
-      const tmp = shortsIframe; 
-      // Can't reassign const — use dataset flag to track which is "active"
-      shortsIframe.dataset.active = ""; shortsIframeNext.dataset.active = "1";
-    } else {
-      // Cold load — find the active iframe and load into it
-      const activeEl = document.querySelector('#shortsPage iframe[data-active="1"]') || shortsIframe;
-      activeEl.src = EMBED(item.id);
-      activeEl.dataset.active = "1"; activeEl.style.zIndex = "1"; activeEl.style.opacity = "1"; activeEl.style.pointerEvents = "auto";
-      const inactiveEl = activeEl === shortsIframe ? shortsIframeNext : shortsIframe;
-      inactiveEl.dataset.active = ""; inactiveEl.style.zIndex = "0"; inactiveEl.style.opacity = "0"; inactiveEl.style.pointerEvents = "none";
-    }
+    shortsIframe.src = EMBED(item.id);
     updateCounter();
-    // Preload the next one immediately
-    setTimeout(() => preloadNext(index + 1), 800);
     if (index >= shortsItems.length - 6 && !shortsLoadingMore) loadMoreShorts();
   }
-  // Initialize: first iframe is active
-  shortsIframe.dataset.active = "1";
-  shortsIframeNext.dataset.active = "";
   let shortsLoadingMore=false;
   async function loadMoreShorts() {
     if (shortsLoadingMore) return; shortsLoadingMore=true;
@@ -1755,17 +1715,13 @@ shortsTab.addEventListener("click", async () => {
   function transitionTo(index) {
     if (transitioning||index<0||index>=shortsItems.length) return;
     transitioning=true;
-    // Check if next video is preloaded — if so, near-instant swap
-    const nextItem = shortsItems[index];
-    const isPreloaded = nextItem && (shortsIframe.dataset.preloaded === nextItem.id || shortsIframeNext.dataset.preloaded === nextItem.id);
-    const overlayDuration = isPreloaded ? 50 : 80;
-    const revealDelay = isPreloaded ? 200 : 400;
     shortsTrans.style.transition="none"; shortsTrans.style.opacity="1";
+    shortsIframe.src="about:blank";
     setTimeout(()=>{
       shortsIndex=index; playShort(shortsIndex);
-      setTimeout(()=>{ shortsTrans.style.transition="opacity 0.2s ease"; shortsTrans.style.opacity="0"; transitioning=false; }, revealDelay);
-    }, overlayDuration);
-    setTimeout(()=>{ transitioning=false; }, 1200);
+      setTimeout(()=>{ shortsTrans.style.transition="opacity 0.35s ease"; shortsTrans.style.opacity="0"; transitioning=false; }, 700);
+    }, 100);
+    setTimeout(()=>{ transitioning=false; }, 2500);
   }
   function goNext() { transitionTo(shortsIndex+1); }
   function goPrev() { transitionTo(shortsIndex-1); }
@@ -1790,13 +1746,14 @@ shortsTab.addEventListener("click", async () => {
 });
 
 let lastMovieQuery = "";
+let isLoadingMovies = false;
 moviesTab.addEventListener("click", async () => {
+  if (isLoadingMovies) return; isLoadingMovies = true;
   nextPageToken = null; setActiveTab("movies"); showSkeletons(6);
+  try {
   const allItems=[]; const seen=new Set();
-  let mShown=[]; try { mShown=JSON.parse(localStorage.getItem("moviesShownTimed")||"[]"); } catch(e) {}
-  const sixAgo=Date.now()-6*3600000;
-  const mRecent=new Set(mShown.filter(e=>e.ts>sixAgo).map(e=>e.id));
-  function addU(items){ (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id)||mRecent.has(id))return; seen.add(id); allItems.push(item); }); }
+  // No 6h dedup on movies — it caused empty feed on every open
+  function addU(items){ (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); }); }
   movieQIdx=Math.floor(Math.random()*MOVIE_QUERIES.length);
   const usedQ=MOVIE_QUERIES[movieQIdx%MOVIE_QUERIES.length]; movieQIdx++;
   const q2=MOVIE_QUERIES[movieQIdx%MOVIE_QUERIES.length]; movieQIdx++;
@@ -1813,10 +1770,10 @@ moviesTab.addEventListener("click", async () => {
   results.forEach(r=>{ if(r.status==="fulfilled") addU(r.value.items||[]); });
   for (let i=allItems.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [allItems[i],allItems[j]]=[allItems[j],allItems[i]]; }
   const items=allItems.filter(v=>v.id?.videoId||v.id).map(v=>({id:v.id?.videoId||v.id,snippet:v.snippet}));
-  try { localStorage.setItem("moviesShownTimed",JSON.stringify([...items.map(v=>({id:v.id,ts:Date.now()})),...mShown].filter(e=>e.ts>sixAgo).slice(0,200))); } catch(e) {}
-  const seed=await fetchYouTube("search",{part:"snippet",q:usedQ,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:20,_:Date.now()});
-  nextPageToken=seed.nextPageToken||"seed";
+  if (!items.length) { feedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies again to retry.</div>'; isLoadingMovies=false; return; }
+  nextPageToken="seed";
   renderFeed(items); showHUD("Movies");
+  } catch(e) { feedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies to retry.</div>'; } finally { isLoadingMovies = false; }
 });
 
 historyTab.addEventListener("click", async () => {
