@@ -1665,7 +1665,7 @@ shortsTab.addEventListener("click", async () => {
   for (let i=shortsItems.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [shortsItems[i],shortsItems[j]]=[shortsItems[j],shortsItems[i]]; }
   shortsIndex=0;
   shortsSeenIds = new Set(shortsItems.map(v=>v.id));
-  try { localStorage.setItem("shortsSeenHistory",JSON.stringify([...shortsSeenIds,...persistentSeenIds].slice(0,300))); } catch(e) {}
+  try { localStorage.setItem("shortsSeenHistory",JSON.stringify([...shortsSeenIds,...persistentSeenIds].slice(0,50))); } catch(e) {}
 
   if (data.nextPageToken) nextPageToken=data.nextPageToken;
   else { const seed=await fetchYouTube("search",{part:"snippet",q:SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length],type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:"US",maxResults:1,_:Date.now()}); nextPageToken=seed.nextPageToken||"seed"; }
@@ -1698,21 +1698,32 @@ shortsTab.addEventListener("click", async () => {
   function transitionTo(index) {
     if (transitioning||index<0||index>=shortsItems.length) return;
     transitioning=true;
-    // Blank iframe immediately so old video disappears instantly
     shortsIframe.src="about:blank";
     shortsTrans.style.transition="none"; shortsTrans.style.opacity="1";
     setTimeout(()=>{
       shortsIndex=index; playShort(shortsIndex);
       setTimeout(()=>{ shortsTrans.style.transition="opacity 0.25s ease"; shortsTrans.style.opacity="0"; transitioning=false; }, 400);
     }, 80);
+    // Hard safety reset — if transitioning gets stuck, force-release after 1s
+    setTimeout(()=>{ transitioning=false; }, 1000);
   }
   function goNext() { transitionTo(shortsIndex+1); }
   function goPrev() { transitionTo(shortsIndex-1); }
   playShort(0);
   shortsHint.classList.add("visible"); setTimeout(()=>shortsHint.classList.remove("visible"),2800);
-  let swY=0,swT=0;
-  shortsPageEl.addEventListener("touchstart",(e)=>{ if(transitioning)return; swY=e.touches[0].clientY; swT=Date.now(); },{passive:true});
-  shortsPageEl.addEventListener("touchend",(e)=>{ if(transitioning)return; const dy=swY-e.changedTouches[0].clientY,dt=Date.now()-swT,v=Math.abs(dy)/Math.max(dt,1); if(Math.abs(dy)<(v>0.3?20:50))return; if(dy>0)goNext(); else goPrev(); },{passive:true});
+  let swY=0,swX=0,swT=0;
+  shortsPageEl.addEventListener("touchstart",(e)=>{ swY=e.touches[0].clientY; swX=e.touches[0].clientX; swT=Date.now(); },{passive:true});
+  shortsPageEl.addEventListener("touchend",(e)=>{
+    if(transitioning)return;
+    const dy=swY-e.changedTouches[0].clientY;
+    const dx=swX-e.changedTouches[0].clientX;
+    const dt=Date.now()-swT;
+    // Only trigger if vertical movement is clearly dominant (2x horizontal)
+    if(Math.abs(dx)>Math.abs(dy)*0.7) return; // too horizontal — ignore
+    const v=Math.abs(dy)/Math.max(dt,1);
+    if(Math.abs(dy)<(v>0.3?20:50))return; // too short
+    if(dy>0)goNext(); else goPrev();
+  },{passive:true});
   let wc=false; shortsPageEl.addEventListener("wheel",(e)=>{ if(wc||transitioning)return; wc=true; setTimeout(()=>wc=false,700); if(e.deltaY>0)goNext(); else goPrev(); },{passive:true});
   function skH(e){if(currentTab!=="shorts")return;if(e.key==="ArrowDown")goNext();if(e.key==="ArrowUp")goPrev();}
   document.addEventListener("keydown",skH); shortsPageEl._cleanup=()=>document.removeEventListener("keydown",skH);
@@ -1995,11 +2006,17 @@ async function loadMoreVideos() {
   if (!nextPageToken) return;
   let data;
   const vt = nextPageToken !== "seed" ? nextPageToken : undefined;
-  if (currentTab === "home") data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, pageToken: vt, _: Date.now() });
+  if (currentTab === "home") {
+    // Rotate categories so every batch feels different — never dead-ends
+    data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+    if (!data || !data.items || !data.items.length) data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+  }
   if (currentTab === "movies") {
-    data = vt ? await fetchYouTube("search", { part: "snippet", q: lastMovieQuery||"full movie", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 20, pageToken: vt, _: Date.now() }) : { items: [] };
-    if (!data||!data.items||!data.items.length) { const q=MOVIE_QUERIES[movieQIdx%MOVIE_QUERIES.length]; movieQIdx++; lastMovieQuery=q; data=await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:20,_:Date.now()}); if(!data.nextPageToken) data.nextPageToken="seed"; }
-    if (data&&data.items) data.items=data.items.filter(v=>v.id&&v.id.videoId).map(v=>({id:v.id.videoId,snippet:v.snippet}));
+    // Always rotate to a new query for movies — pageTokens expire quickly
+    const q = MOVIE_QUERIES[movieQIdx%MOVIE_QUERIES.length]; movieQIdx++; lastMovieQuery = q;
+    data = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
+    if (data&&data.items) data.items = data.items.filter(v=>v.id&&v.id.videoId).map(v=>({id:v.id.videoId,snippet:v.snippet}));
+    if (!data.nextPageToken) data.nextPageToken = "seed";
   }
   if (currentTab === "trending") { data=await fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:getTopCategoryId()||undefined,maxResults:20,pageToken:vt,_:Date.now()}); }
   if (currentTab === "search") data = await fetchYouTube("search", { part: "snippet", q: lastSearchQuery, type: "video", maxResults: 20, pageToken: vt, _: Date.now() });
