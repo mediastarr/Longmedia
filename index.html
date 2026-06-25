@@ -27,9 +27,23 @@
   --shadow-glow: 0 0 40px rgba(60,242,255,0.65);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-*:focus { outline: 2px solid rgba(60,242,255,0.7); outline-offset: -2px; }
+/* Official Meta MRBD focus spec */
+.focusable {
+  transition: all 150ms ease;
+  border: 2px solid transparent;
+}
+.focusable:focus {
+  outline: none;
+  border-color: #00d4ff;
+  box-shadow: 0 0 20px rgba(0,212,255,0.4);
+}
+/* 88px min tap target only for video cards, not nav buttons */
+.video-card.focusable {
+  min-height: 88px;
+}
+*:focus { outline: 2px solid rgba(0,212,255,0.6); outline-offset: -2px; }
 *:focus:not(:focus-visible) { outline: none; }
-*:focus-visible { outline: 2px solid rgba(60,242,255,0.7); outline-offset: -2px; }
+*:focus-visible { outline: 2px solid rgba(0,212,255,0.6); outline-offset: -2px; }
 html { background: #000; }
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
@@ -1491,7 +1505,7 @@ function appendFeed(items) {
     const videoId = item.id?.videoId || item.id;
     if (!videoId) return;
     const card = document.createElement("div");
-    card.className = "video-card parallax";
+    card.className = "video-card parallax focusable";
     card.dataset.videoid = videoId;
     const thumb = snippet.thumbnails?.medium?.url || snippet.thumbnails?.high?.url || "";
     const views = formatViews(stats.viewCount);
@@ -1516,6 +1530,8 @@ function setActiveTab(tab) {
   if (tab === "channel") channelTab.classList.add("active");
   if (tab === "subs") subsTab.classList.add("active");
   if (tab === "playlists") playlistTab.classList.add("active");
+  // Cleanup shorts listeners when leaving shorts
+  if (typeof shortsPageEl !== 'undefined' && shortsPageEl._cleanup && tab !== 'shorts') { try { shortsPageEl._cleanup(); shortsPageEl._cleanup = null; } catch(e) {} }
   feedEl.style.display = (["home","movies","history","trending","search"].includes(tab)) ? "block" : "none";
   channelPageEl.style.display = (tab === "channel") ? "block" : "none";
   subsPageEl.style.display = (tab === "subs") ? "block" : "none";
@@ -1594,6 +1610,19 @@ shortsTab.addEventListener("click", async () => {
 
   // Wire back button immediately before any async work
   backBtn2.addEventListener("click", () => { shortsIframe.src = "about:blank"; shortsPageEl.style.display = "none"; setActiveTab("home"); homeTab.click(); showHUD("Home"); });
+  // Neural Band arrow key events for shorts
+  const onShortsNext = () => { if (typeof transitionTo === 'function') transitionTo(shortsIndex + 1); };
+  const onShortsPrev = () => { if (typeof transitionTo === 'function') transitionTo(shortsIndex - 1); };
+  const onShortsBack = () => { backBtn2.click(); };
+  document.addEventListener('shorts-next', onShortsNext);
+  document.addEventListener('shorts-prev', onShortsPrev);
+  document.addEventListener('shorts-back', onShortsBack);
+  // Cleanup listeners when leaving shorts
+  shortsPageEl._cleanup = () => {
+    document.removeEventListener('shorts-next', onShortsNext);
+    document.removeEventListener('shorts-prev', onShortsPrev);
+    document.removeEventListener('shorts-back', onShortsBack);
+  };
 
   const token = await getValidToken();
   let data = { items: [] };
@@ -1801,7 +1830,7 @@ historyTab.addEventListener("click", async () => {
       const snippet = h.snippet || {};
       const diff = now - (h.watchedAt || 0);
       const ago = diff < 3600000 ? Math.floor(diff/60000)+"m ago" : diff < DAY ? Math.floor(diff/3600000)+"h ago" : diff < 2*DAY ? "yesterday" : Math.floor(diff/DAY)+"d ago";
-      const card = document.createElement("div"); card.className = "video-card parallax"; card.dataset.videoid = h.id;
+      const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = h.id;
       card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"Untitled")+'</div><div class="video-channel">'+(snippet.channelTitle||"")+'</div><div class="video-meta">Watched '+ago+'</div></div>';
       const resumeT = getResumePosition(h.id);
       const resumeLabel = resumeT > 5 ? " ▶ "+Math.floor(resumeT/60)+":"+(String(Math.floor(resumeT%60)).padStart(2,"0")) : "";
@@ -1825,7 +1854,7 @@ historyTab.addEventListener("click", async () => {
         addHeader("♥ Liked Videos");
         llData.items.forEach(it => {
           const snippet = it.snippet || {}; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
-          const card = document.createElement("div"); card.className = "video-card parallax"; card.dataset.videoid = videoId;
+          const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = videoId;
           card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Liked</div></div>';
           card.onclick = () => { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); };
           feedEl.appendChild(card);
@@ -1839,7 +1868,7 @@ historyTab.addEventListener("click", async () => {
         addHeader("⏱ Watch Later");
         wlData.items.forEach(it => {
           const snippet = it.snippet || {}; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
-          const card = document.createElement("div"); card.className = "video-card parallax"; card.dataset.videoid = videoId;
+          const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = videoId;
           card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Watch Later</div></div>';
           card.onclick = () => { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); };
           feedEl.appendChild(card);
@@ -1951,7 +1980,7 @@ async function loadSubscriptions() {
     if (!data.items || !data.items.length) { subsFeedEl.innerHTML = `<div style="font-size:12px;opacity:0.8;">No subscriptions found.</div>`; return; }
     data.items.forEach(item => {
       const ch = item.snippet; const channelId = ch.resourceId.channelId;
-      const card = document.createElement("div"); card.className = "video-card parallax";
+      const card = document.createElement("div"); card.className = "video-card parallax focusable";
       card.innerHTML = `<div class="video-thumb"><img src="${ch.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${ch.title}</div><div class="video-channel">${ch.channelTitle || "Channel"}</div><div class="video-meta">Tap to open channel</div></div>`;
       card.onclick = () => { currentChannelId = channelId; subsPageEl.style.display = "none"; setActiveTab("channel"); loadChannelPage(channelId); };
       subsFeedEl.appendChild(card);
@@ -2005,7 +2034,7 @@ async function openPlaylist(playlistId, title) {
     data.items.forEach((item, i) => {
       const snippet = item.snippet; const videoId = snippet.resourceId?.videoId || item.contentDetails?.videoId; if (!videoId) return;
       const thumb = snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || "";
-      const card = document.createElement("div"); card.className = "video-card parallax";
+      const card = document.createElement("div"); card.className = "video-card parallax focusable";
       card.innerHTML = `<div class="video-thumb"><img src="${thumb}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.videoOwnerChannelTitle || snippet.channelTitle || ""}</div><div class="video-meta">#${i + 1} in playlist</div></div>`;
       card.onclick = () => { setPlayerVideo(videoId, snippet); showHUD("Playing: " + snippet.title); };
       playlistItemsList.appendChild(card); rendered++;
@@ -2043,7 +2072,7 @@ async function loadMoreVideos() {
   if (currentTab === "channel") {
     (data.items || []).forEach(item => {
       const snippet = item.snippet; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
-      const card = document.createElement("div"); card.className = "video-card parallax";
+      const card = document.createElement("div"); card.className = "video-card parallax focusable";
       card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle || ""}</div></div>`;
       card.onclick = () => setPlayerVideo(videoId, snippet); channelPageEl.appendChild(card);
     });
@@ -2057,7 +2086,7 @@ async function loadMoreSubs() {
   const data = await res.json(); subsNextPageToken = data.nextPageToken || null;
   (data.items || []).forEach(item => {
     const ch = item.snippet; const channelId = ch.resourceId.channelId;
-    const card = document.createElement("div"); card.className = "video-card parallax";
+    const card = document.createElement("div"); card.className = "video-card parallax focusable";
     card.innerHTML = `<div class="video-thumb"><img src="${ch.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${ch.title}</div><div class="video-channel">${ch.channelTitle || "Channel"}</div><div class="video-meta">Tap to open channel</div></div>`;
     card.onclick = () => { currentChannelId = channelId; subsPageEl.style.display = "none"; setActiveTab("channel"); loadChannelPage(channelId); };
     subsFeedEl.appendChild(card);
@@ -2075,6 +2104,95 @@ scrollTopBtn.addEventListener("click", () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 });
+
+
+/* ================================================================
+   OFFICIAL META MRBD KEYBOARD / NEURAL BAND NAVIGATION
+   Neural Band → Arrow keys + Enter + Escape
+================================================================ */
+(function() {
+  const DPAD = {
+    UP:    'ArrowUp',
+    DOWN:  'ArrowDown',
+    LEFT:  'ArrowLeft',
+    RIGHT: 'ArrowRight',
+    SELECT:'Enter',
+    BACK:  'Escape',
+  };
+
+  // Move focus among all visible focusable elements
+  function moveFocus(direction) {
+    const focusables = Array.from(
+      document.querySelectorAll('.focusable:not([disabled]):not([style*="display:none"]):not([style*="display: none"])')
+    ).filter(el => {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+    if (!focusables.length) return;
+    const idx = focusables.indexOf(document.activeElement);
+    if (idx === -1) { focusables[0].focus(); return; }
+    const next = (direction === 'up' || direction === 'left')
+      ? (idx > 0 ? idx - 1 : focusables.length - 1)
+      : (idx < focusables.length - 1 ? idx + 1 : 0);
+    focusables[next].focus();
+    focusables[next].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  document.addEventListener('keydown', function(e) {
+    // Shorts tab — arrow keys control swipe
+    if (typeof currentTab !== 'undefined' && currentTab === 'shorts') {
+      if (e.key === DPAD.DOWN) { e.preventDefault(); document.dispatchEvent(new CustomEvent('shorts-next')); }
+      if (e.key === DPAD.UP)   { e.preventDefault(); document.dispatchEvent(new CustomEvent('shorts-prev')); }
+      if (e.key === DPAD.BACK) { e.preventDefault(); document.dispatchEvent(new CustomEvent('shorts-back')); }
+      return;
+    }
+
+    switch(e.key) {
+      case DPAD.DOWN:
+        e.preventDefault();
+        // If on a scrollable feed, scroll down; else move focus
+        if (document.activeElement && document.activeElement.classList.contains('focusable')) {
+          moveFocus('down');
+        } else {
+          window.scrollBy({ top: 200, behavior: 'smooth' });
+        }
+        break;
+      case DPAD.UP:
+        e.preventDefault();
+        if (document.activeElement && document.activeElement.classList.contains('focusable')) {
+          moveFocus('up');
+        } else {
+          window.scrollBy({ top: -200, behavior: 'smooth' });
+        }
+        break;
+      case DPAD.LEFT:
+        e.preventDefault();
+        moveFocus('left');
+        break;
+      case DPAD.RIGHT:
+        e.preventDefault();
+        moveFocus('right');
+        break;
+      case DPAD.SELECT:
+        // Enter activates focused element
+        if (document.activeElement && document.activeElement !== document.body) {
+          document.activeElement.click();
+        }
+        break;
+      case DPAD.BACK:
+        e.preventDefault();
+        // Escape = back / close player
+        const closeBtn = document.getElementById('closeMini');
+        const exitBtn = document.getElementById('exitFullBtn');
+        if (exitBtn && document.body.classList.contains('fullscreen-active')) {
+          exitBtn.click();
+        } else if (closeBtn && typeof playerSection !== 'undefined' && playerSection.style.display !== 'none') {
+          closeBtn.click();
+        }
+        break;
+    }
+  });
+})();
 
 /* === SCROLL DIRECTION LOCK ===
    Prevents horizontal/diagonal swipes from triggering vertical scroll.
@@ -2134,7 +2252,7 @@ async function loadChannelPage(channelId) {
   channelNextPageToken = uploads.nextPageToken || null; nextPageToken = uploads.nextPageToken || null;
   (uploads.items || []).forEach(item => {
     const snippet = item.snippet; const videoId = snippet.resourceId.videoId;
-    const card = document.createElement("div"); card.className = "video-card parallax";
+    const card = document.createElement("div"); card.className = "video-card parallax focusable";
     card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails.medium.url}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle}</div></div>`;
     card.onclick = () => setPlayerVideo(videoId, snippet); channelPageEl.appendChild(card);
   });
@@ -2593,6 +2711,8 @@ async function silentSync(token){
     const splash = document.getElementById("bootSplash");
     if (splash) { splash.classList.add("fade-out"); setTimeout(() => splash.remove(), 800); }
   }, 1400);
+  // Set initial focus per Meta MRBD spec
+  setTimeout(() => { const first = document.querySelector('.focusable'); if (first) first.focus(); }, 200);
   showSkeletons(6);
   // Start token refresh AND feed fetch in parallel — don't wait for auth before loading
   const hasRefresh = localStorage.getItem("yt_refresh_token");
