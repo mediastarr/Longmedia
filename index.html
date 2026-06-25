@@ -1530,8 +1530,6 @@ function setActiveTab(tab) {
   if (tab === "channel") channelTab.classList.add("active");
   if (tab === "subs") subsTab.classList.add("active");
   if (tab === "playlists") playlistTab.classList.add("active");
-  // Cleanup shorts listeners when leaving shorts
-  if (typeof shortsPageEl !== 'undefined' && shortsPageEl._cleanup && tab !== 'shorts') { try { shortsPageEl._cleanup(); shortsPageEl._cleanup = null; } catch(e) {} }
   feedEl.style.display = (["home","movies","history","trending","search"].includes(tab)) ? "block" : "none";
   channelPageEl.style.display = (tab === "channel") ? "block" : "none";
   subsPageEl.style.display = (tab === "subs") ? "block" : "none";
@@ -1610,19 +1608,6 @@ shortsTab.addEventListener("click", async () => {
 
   // Wire back button immediately before any async work
   backBtn2.addEventListener("click", () => { shortsIframe.src = "about:blank"; shortsPageEl.style.display = "none"; setActiveTab("home"); homeTab.click(); showHUD("Home"); });
-  // Neural Band arrow key events for shorts
-  const onShortsNext = () => { if (typeof transitionTo === 'function') transitionTo(shortsIndex + 1); };
-  const onShortsPrev = () => { if (typeof transitionTo === 'function') transitionTo(shortsIndex - 1); };
-  const onShortsBack = () => { backBtn2.click(); };
-  document.addEventListener('shorts-next', onShortsNext);
-  document.addEventListener('shorts-prev', onShortsPrev);
-  document.addEventListener('shorts-back', onShortsBack);
-  // Cleanup listeners when leaving shorts
-  shortsPageEl._cleanup = () => {
-    document.removeEventListener('shorts-next', onShortsNext);
-    document.removeEventListener('shorts-prev', onShortsPrev);
-    document.removeEventListener('shorts-back', onShortsBack);
-  };
 
   const token = await getValidToken();
   let data = { items: [] };
@@ -2105,129 +2090,6 @@ scrollTopBtn.addEventListener("click", () => {
   }
 });
 
-
-/* ================================================================
-   OFFICIAL META MRBD KEYBOARD / NEURAL BAND NAVIGATION
-   Neural Band → Arrow keys + Enter + Escape
-================================================================ */
-(function() {
-  const DPAD = {
-    UP:    'ArrowUp',
-    DOWN:  'ArrowDown',
-    LEFT:  'ArrowLeft',
-    RIGHT: 'ArrowRight',
-    SELECT:'Enter',
-    BACK:  'Escape',
-  };
-
-  // Move focus among all visible focusable elements in a given scope
-  function moveFocus(direction, scope) {
-    const selector = scope || '.focusable';
-    const focusables = Array.from(
-      document.querySelectorAll(selector + ':not([disabled])')
-    ).filter(el => {
-      const rect = el.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
-    });
-    if (!focusables.length) return false;
-    const idx = focusables.indexOf(document.activeElement);
-    if (idx === -1) { focusables[0].focus(); return true; }
-    const next = (direction === 'up' || direction === 'left')
-      ? (idx > 0 ? idx - 1 : 0)   // don't wrap — stop at ends
-      : (idx < focusables.length - 1 ? idx + 1 : focusables.length - 1);
-    if (next === idx) return false; // already at end
-    focusables[next].focus();
-    focusables[next].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    return true;
-  }
-
-  document.addEventListener('keydown', function(e) {
-    // Shorts tab — arrow keys control swipe only
-    if (typeof currentTab !== 'undefined' && currentTab === 'shorts') {
-      if (e.key === DPAD.DOWN) { e.preventDefault(); document.dispatchEvent(new CustomEvent('shorts-next')); }
-      if (e.key === DPAD.UP)   { e.preventDefault(); document.dispatchEvent(new CustomEvent('shorts-prev')); }
-      if (e.key === DPAD.BACK) { e.preventDefault(); document.dispatchEvent(new CustomEvent('shorts-back')); }
-      return;
-    }
-
-    // Player open — arrow keys navigate player buttons only
-    if (typeof playerSection !== 'undefined' && playerSection.style.display !== 'none') {
-      switch(e.key) {
-        case DPAD.LEFT:
-        case DPAD.RIGHT:
-          e.preventDefault();
-          moveFocus(e.key === DPAD.LEFT ? 'left' : 'right', '#playerControls button, #closeMini');
-          break;
-        case DPAD.SELECT:
-          if (document.activeElement && document.activeElement !== document.body) {
-            document.activeElement.click();
-          } else {
-            // Default: toggle play/pause
-            const ppBtn = document.getElementById('playPauseBtn');
-            if (ppBtn) ppBtn.click();
-          }
-          break;
-        case DPAD.BACK:
-          e.preventDefault();
-          const exitBtn = document.getElementById('exitFullBtn');
-          const closeBtn = document.getElementById('closeMini');
-          if (exitBtn && document.body.classList.contains('fullscreen-active')) exitBtn.click();
-          else if (closeBtn) closeBtn.click();
-          break;
-        case DPAD.UP:
-        case DPAD.DOWN:
-          // Up/down in player = volume or nothing — don't scroll feed
-          e.preventDefault();
-          break;
-      }
-      return;
-    }
-
-    // Feed / tabs view
-    switch(e.key) {
-      case DPAD.DOWN:
-        e.preventDefault();
-        // Move focus down through video cards only
-        if (!moveFocus('down', '.video-card.focusable')) {
-          // At last card — scroll more
-          window.scrollBy({ top: 300, behavior: 'smooth' });
-        }
-        break;
-      case DPAD.UP:
-        e.preventDefault();
-        // If on first card or no card focused — jump focus to tabs
-        const onCard = document.activeElement && document.activeElement.classList.contains('video-card');
-        if (onCard) {
-          const moved = moveFocus('up', '.video-card.focusable');
-          if (!moved) {
-            // At first card — jump to tabs row
-            const tabsRow = document.getElementById('homeTab');
-            if (tabsRow) tabsRow.focus();
-          }
-        } else {
-          window.scrollBy({ top: -300, behavior: 'smooth' });
-        }
-        break;
-      case DPAD.LEFT:
-        e.preventDefault();
-        // Left/Right only cycle through tabs
-        moveFocus('left', '#tabs button');
-        break;
-      case DPAD.RIGHT:
-        e.preventDefault();
-        moveFocus('right', '#tabs button');
-        break;
-      case DPAD.SELECT:
-        if (document.activeElement && document.activeElement !== document.body) {
-          document.activeElement.click();
-        }
-        break;
-      case DPAD.BACK:
-        e.preventDefault();
-        break;
-    }
-  });
-})();
 
 /* === SCROLL DIRECTION LOCK ===
    Prevents horizontal/diagonal swipes from triggering vertical scroll.
@@ -2746,8 +2608,6 @@ async function silentSync(token){
     const splash = document.getElementById("bootSplash");
     if (splash) { splash.classList.add("fade-out"); setTimeout(() => splash.remove(), 800); }
   }, 1400);
-  // Set initial focus per Meta MRBD spec
-  setTimeout(() => { const first = document.querySelector('.focusable'); if (first) first.focus(); }, 200);
   showSkeletons(6);
   // Start token refresh AND feed fetch in parallel — don't wait for auth before loading
   const hasRefresh = localStorage.getItem("yt_refresh_token");
