@@ -387,7 +387,12 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 #playerSection.player-mini .player-controls button { padding: 5px 7px; font-size: 10px; min-height: 28px; min-width: unset; }
 #playerSection.player-mini #closeMini { padding: 4px 7px; font-size: 10px; min-height: 28px; min-width: unset; top: 6px; right: 6px; }
 #shortsPage { display: none; position: fixed; inset: 0; z-index: 5000; background: #000; overflow: hidden; touch-action: none; }
-#shortsIframe { width: 100%; height: 100%; border: none; display: block; background: #000; }
+#shortsIframe, #shortsIframeNext {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border: none; background: #000;
+}
+#shortsIframe { z-index: 1; opacity: 1; }
+#shortsIframeNext { z-index: 0; opacity: 0; pointer-events: none; }
 #shortsPage::before {
   content: ""; position: absolute; inset: -40px; pointer-events: none; z-index: 0;
   background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.28), transparent 55%), radial-gradient(circle at 0% 100%, rgba(120,80,255,0.22), transparent 60%), radial-gradient(circle at 100% 100%, rgba(0,255,180,0.22), transparent 60%);
@@ -1580,6 +1585,7 @@ shortsTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("shorts"); showHUD("Shorts");
   shortsPageEl.innerHTML = `
     <iframe id="shortsIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    <iframe id="shortsIframeNext" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
     <button id="shortsBackBtn" tabindex="0">← Back</button>
     <div id="shortsCounter">Loading…</div>
     <div id="shortsHint"><div class="shorts-arrow up">▼</div><div class="shorts-hint-text">swipe up/down</div><div class="shorts-arrow down">▼</div></div>
@@ -1587,13 +1593,14 @@ shortsTab.addEventListener("click", async () => {
   `;
   shortsPageEl.classList.add("shorts-bloom");
   const shortsIframe = document.getElementById("shortsIframe");
+  const shortsIframeNext = document.getElementById("shortsIframeNext");
   const shortsCounter = document.getElementById("shortsCounter");
   const shortsHint = document.getElementById("shortsHint");
   const shortsTrans = document.getElementById("shortsTransition");
   const backBtn2 = document.getElementById("shortsBackBtn");
 
   // Wire back button immediately before any async work
-  backBtn2.addEventListener("click", () => { shortsIframe.src = ""; shortsPageEl.style.display = "none"; setActiveTab("home"); homeTab.click(); showHUD("Home"); });
+  backBtn2.addEventListener("click", () => { shortsIframe.src = ""; shortsIframeNext.src = ""; shortsPageEl.style.display = "none"; setActiveTab("home"); homeTab.click(); showHUD("Home"); });
 
   const token = await getValidToken();
   let data = { items: [] };
@@ -1635,12 +1642,26 @@ shortsTab.addEventListener("click", async () => {
   const viralQueries = ["shorts viral 2024","shorts trending now","shorts funny viral","shorts satisfying trending","shorts amazing moments"];
   const viralQ = viralQueries[Math.floor(Math.random()*viralQueries.length)];
 
+  // Build search queries from taste profile for richer discovery
+  const searchQueries = [];
+  // Taste-based (what you like)
+  if (sBI.length>0) searchQueries.push({q:sBI[0]+" shorts", order:"date"});
+  if (sKW.length>0) searchQueries.push({q:sKW.slice(0,2).join(" ")+" shorts", order:"date"});
+  if (recentS.length>0) searchQueries.push({q:recentS[0]+" shorts", order:"date"});
+  // Search-based discovery (trending in your topics)
+  if (sBI.length>1) searchQueries.push({q:sBI[1]+" viral shorts", order:"viewCount"});
+  if (sKW.length>2) searchQueries.push({q:sKW[2]+" short video", order:"relevance"});
+
   const parallelFetches = [
-    sBI.length>0 ? fetchYouTube("search",{part:"snippet",q:sBI[0]+" shorts",type:"video",videoDuration:"short",videoEmbeddable:"true",order:"date",maxResults:7,_:Date.now()}) : Promise.resolve({items:[]}),
-    sKW.length>0 ? fetchYouTube("search",{part:"snippet",q:sKW.slice(0,2).join(" ")+" shorts",type:"video",videoDuration:"short",videoEmbeddable:"true",order:"date",maxResults:7,_:Date.now()}) : Promise.resolve({items:[]}),
-    recentS.length>0 ? fetchYouTube("search",{part:"snippet",q:recentS[0]+" shorts",type:"video",videoDuration:"short",videoEmbeddable:"true",order:"date",maxResults:7,_:Date.now()}) : Promise.resolve({items:[]}),
+    // Taste + search queries (all parallel)
+    ...searchQueries.map(({q,order}) =>
+      fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",order,maxResults:8,_:Date.now()})
+    ),
+    // Generic rotation
     fetchYouTube("search",{part:"snippet",q:genericQ,type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:"US",maxResults:10,_:Date.now()}),
+    // Discovery: trending in your category
     fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:catToSearch,videoDuration:"short",maxResults:10,_:Date.now()}),
+    // Discovery: viral
     fetchYouTube("search",{part:"snippet",q:viralQ,type:"video",videoDuration:"short",videoEmbeddable:"true",order:"viewCount",maxResults:10,_:Date.now()}),
   ];
   const parallelResults = await Promise.allSettled(parallelFetches);
@@ -1672,14 +1693,50 @@ shortsTab.addEventListener("click", async () => {
 
   if (!shortsItems.length) { shortsCounter.textContent="No shorts — tap Back"; return; }
 
+  const EMBED = id => `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=0&controls=0&origin=${location.origin}`;
+  const PRELOAD = id => `https://www.youtube.com/embed/${id}?autoplay=0&playsinline=1&rel=0&modestbranding=1&fs=0&controls=0&mute=1&origin=${location.origin}`;
+
   function updateCounter() { shortsCounter.textContent=`${shortsIndex+1} / ${shortsItems.length}`; }
-  function playShort(index) {
-    const item=shortsItems[index]; if(!item) return;
-    // Load directly — transition overlay covers while loading
-    shortsIframe.src=`https://www.youtube.com/embed/${item.id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=0&controls=0&origin=${location.origin}`;
-    updateCounter();
-    if (index>=shortsItems.length-6&&!shortsLoadingMore) loadMoreShorts();
+
+  function preloadNext(index) {
+    const next = shortsItems[index];
+    if (!next || shortsIframeNext.dataset.preloaded === next.id) return;
+    shortsIframeNext.src = PRELOAD(next.id);
+    shortsIframeNext.dataset.preloaded = next.id;
   }
+
+  function playShort(index) {
+    const item = shortsItems[index]; if (!item) return;
+    // If next iframe already has this video preloaded — swap instantly
+    if (shortsIframeNext.dataset.preloaded === item.id) {
+      // Swap: make next the active one
+      shortsIframe.style.zIndex = "0"; shortsIframe.style.opacity = "0";
+      shortsIframeNext.style.zIndex = "1"; shortsIframeNext.style.opacity = "1";
+      shortsIframeNext.style.pointerEvents = "auto";
+      // Reload preloaded iframe with autoplay now active
+      shortsIframeNext.src = EMBED(item.id);
+      // Reset old iframe for next preload
+      shortsIframe.src = "about:blank"; shortsIframe.dataset.preloaded = "";
+      // Swap references
+      const tmp = shortsIframe; 
+      // Can't reassign const — use dataset flag to track which is "active"
+      shortsIframe.dataset.active = ""; shortsIframeNext.dataset.active = "1";
+    } else {
+      // Cold load — find the active iframe and load into it
+      const activeEl = document.querySelector('#shortsPage iframe[data-active="1"]') || shortsIframe;
+      activeEl.src = EMBED(item.id);
+      activeEl.dataset.active = "1"; activeEl.style.zIndex = "1"; activeEl.style.opacity = "1"; activeEl.style.pointerEvents = "auto";
+      const inactiveEl = activeEl === shortsIframe ? shortsIframeNext : shortsIframe;
+      inactiveEl.dataset.active = ""; inactiveEl.style.zIndex = "0"; inactiveEl.style.opacity = "0"; inactiveEl.style.pointerEvents = "none";
+    }
+    updateCounter();
+    // Preload the next one immediately
+    setTimeout(() => preloadNext(index + 1), 800);
+    if (index >= shortsItems.length - 6 && !shortsLoadingMore) loadMoreShorts();
+  }
+  // Initialize: first iframe is active
+  shortsIframe.dataset.active = "1";
+  shortsIframeNext.dataset.active = "";
   let shortsLoadingMore=false;
   async function loadMoreShorts() {
     if (shortsLoadingMore) return; shortsLoadingMore=true;
@@ -1698,14 +1755,17 @@ shortsTab.addEventListener("click", async () => {
   function transitionTo(index) {
     if (transitioning||index<0||index>=shortsItems.length) return;
     transitioning=true;
-    shortsIframe.src="about:blank";
+    // Check if next video is preloaded — if so, near-instant swap
+    const nextItem = shortsItems[index];
+    const isPreloaded = nextItem && (shortsIframe.dataset.preloaded === nextItem.id || shortsIframeNext.dataset.preloaded === nextItem.id);
+    const overlayDuration = isPreloaded ? 50 : 80;
+    const revealDelay = isPreloaded ? 200 : 400;
     shortsTrans.style.transition="none"; shortsTrans.style.opacity="1";
     setTimeout(()=>{
       shortsIndex=index; playShort(shortsIndex);
-      setTimeout(()=>{ shortsTrans.style.transition="opacity 0.25s ease"; shortsTrans.style.opacity="0"; transitioning=false; }, 400);
-    }, 80);
-    // Hard safety reset — if transitioning gets stuck, force-release after 1s
-    setTimeout(()=>{ transitioning=false; }, 1000);
+      setTimeout(()=>{ shortsTrans.style.transition="opacity 0.2s ease"; shortsTrans.style.opacity="0"; transitioning=false; }, revealDelay);
+    }, overlayDuration);
+    setTimeout(()=>{ transitioning=false; }, 1200);
   }
   function goNext() { transitionTo(shortsIndex+1); }
   function goPrev() { transitionTo(shortsIndex-1); }
