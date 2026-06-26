@@ -1553,15 +1553,16 @@ function isShort(videoId, snippet) {
   if (title.includes("#shorts") || title.includes("#short")) return true;
   if (desc.includes("#shorts")) return true;
   if (tags.includes("shorts") || tags.includes("#shorts")) return true;
-  // Duration signal — contentDetails.duration is ISO 8601 e.g. PT58S or PT1M2S
+  // Duration signal — any video under 3 minutes opens in Shorts player
   const dur = snippet.duration || "";
   if (dur) {
-    const m = dur.match(/PT(?:(\d+)M)?(?:(\d+)S)?/);
+    const m = dur.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
     if (m) {
-      const mins = parseInt(m[1] || "0");
-      const secs = parseInt(m[2] || "0");
-      if (mins === 0 && secs <= 61) return true;
-      if (mins === 1 && secs === 0) return true; // exactly 60s
+      const hrs  = parseInt(m[1] || "0");
+      const mins = parseInt(m[2] || "0");
+      const secs = parseInt(m[3] || "0");
+      const total = hrs * 3600 + mins * 60 + secs;
+      if (total > 0 && total < 180) return true; // under 3 minutes
     }
   }
   return false;
@@ -1569,20 +1570,21 @@ function isShort(videoId, snippet) {
 
 // Open a single video in the Shorts player (just like opening from Shorts tab)
 function openAsShort(videoId, snippet) {
-  // Save current scroll position and tab so we can return exactly here
   const returnScrollY = window.scrollY;
   const returnTab = currentTab;
 
-  // Build a one-item shorts pool and launch the shorts player
   shortsItems = [{ id: videoId, snippet }];
   shortsIndex = 0;
   shortsSeenIds = new Set([videoId]);
-  nextPageToken = null;
+  let persistentSeenIds = new Set();
+  try { persistentSeenIds = new Set(JSON.parse(localStorage.getItem("shortsSeenHistory") || "[]")); } catch(e) {}
+  function isNew(id) { return !persistentSeenIds.has(id) && !shortsSeenIds.has(id); }
+
   setActiveTab("shorts");
   shortsPageEl.innerHTML = `
     <iframe id="shortsIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
     <button id="shortsBackBtn" tabindex="0">← Back</button>
-    <div id="shortsCounter">1 / 1</div>
+    <div id="shortsCounter">Loading…</div>
     <div id="shortsHint"><div class="shorts-arrow up">▼</div><div class="shorts-hint-text">swipe up/down</div><div class="shorts-arrow down">▼</div></div>
     <div id="shortsActions">
       <div class="shorts-action-btn" id="shortsHeartBtn" tabindex="0">
@@ -1608,67 +1610,73 @@ function openAsShort(videoId, snippet) {
   backBtn2.addEventListener("click", () => {
     shortsIframe.src = "about:blank";
     shortsPageEl.style.display = "none";
-    // Restore previous tab without reloading — just show the feed again
     setActiveTab(returnTab);
     showHUD("Back");
-    // Restore exact scroll position
     requestAnimationFrame(() => window.scrollTo({ top: returnScrollY, behavior: "instant" }));
   });
 
-  // Heart button
   let likedShorts = new Set();
   try { likedShorts = new Set(JSON.parse(localStorage.getItem("likedShorts") || "[]")); } catch(e) {}
   function updateHeart() {
-    const liked = likedShorts.has(videoId);
+    const id = shortsItems[shortsIndex]?.id;
+    const liked = id && likedShorts.has(id);
     shortsHeartBtn.classList.toggle("hearted", liked);
     shortsHeartBtn.querySelector(".shorts-action-icon").textContent = liked ? "♥" : "♡";
     shortsHeartLabel.textContent = liked ? "Liked" : "Like";
   }
   shortsHeartBtn.addEventListener("click", () => {
-    if (likedShorts.has(videoId)) { likedShorts.delete(videoId); showHUD("Removed like"); }
-    else { likedShorts.add(videoId); showHUD("♥ Liked!"); const icon = shortsHeartBtn.querySelector(".shorts-action-icon"); icon.style.transform = "scale(1.4)"; setTimeout(() => { icon.style.transform = ""; }, 200); }
+    const id = shortsItems[shortsIndex]?.id; if (!id) return;
+    if (likedShorts.has(id)) { likedShorts.delete(id); showHUD("Removed like"); }
+    else { likedShorts.add(id); showHUD("♥ Liked!"); const icon = shortsHeartBtn.querySelector(".shorts-action-icon"); icon.style.transform = "scale(1.4)"; setTimeout(() => { icon.style.transform = ""; }, 200); }
     try { localStorage.setItem("likedShorts", JSON.stringify([...likedShorts].slice(0, 500))); } catch(e) {}
     updateHeart();
   });
 
-  // Clear mode
   let clearMode = false;
   shortsClearBtn.addEventListener("click", () => { clearMode = true; shortsPageEl.classList.add("clear-mode"); showHUD("Clear Mode — tap to exit"); });
   shortsPageEl.addEventListener("click", (e) => { if (clearMode && !e.target.closest(".shorts-action-btn") && !e.target.closest("#shortsBackBtn")) { clearMode = false; shortsPageEl.classList.remove("clear-mode"); } });
 
-  // Play the short — more related shorts will load when pool runs out
   const EMBED = id => `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=1&origin=${location.origin}`;
-  shortsIframe.src = EMBED(videoId);
-  updateHeart();
 
-  // After a moment, load more shorts in background so user can swipe
-  setTimeout(async () => {
+  function updateCounter() { const el = document.getElementById("shortsCounter"); if (el) el.textContent = shortsIndex + 1 + " / " + shortsItems.length; }
+
+  let shortsLoadingMore = false;
+  async function loadMore() {
+    if (shortsLoadingMore) return; shortsLoadingMore = true;
     try {
-      const q = (snippet.title || "").toLowerCase().replace(/#\w+/g, "").trim().split(" ").slice(0, 3).join(" ") + " shorts";
-      const more = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "short", videoEmbeddable: "true", maxResults: 20, _: Date.now() });
-      const fresh = (more.items || []).filter(v => v.id?.videoId && v.id.videoId !== videoId && !shortsSeenIds.has(v.id.videoId));
+      const q = SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length]; shortQIdx++;
+      const vt = nextPageToken && nextPageToken !== "seed" ? nextPageToken : undefined;
+      const more = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "short", videoEmbeddable: "true", maxResults: 20, pageToken: vt, _: Date.now() });
+      nextPageToken = more.nextPageToken || "seed";
+      const fresh = (more.items || []).filter(v => v.id && v.id.videoId && isNew(v.id.videoId));
       fresh.forEach(v => shortsSeenIds.add(v.id.videoId));
       shortsItems = shortsItems.concat(fresh.map(v => ({ id: v.id.videoId, snippet: v.snippet })));
-      document.getElementById("shortsCounter").textContent = `1 / ${shortsItems.length}`;
-      nextPageToken = more.nextPageToken || "seed";
-    } catch(e) {}
-  }, 1500);
+      updateCounter();
+    } finally { shortsLoadingMore = false; }
+  }
 
-  // Swipe handlers — reuse same logic
-  let swY = 0, swX = 0, swT = 0, transitioning = false;
+  function playShortItem(index) {
+    const item = shortsItems[index]; if (!item) return;
+    shortsIframe.src = EMBED(item.id);
+    updateCounter();
+    updateHeart();
+    if (index >= shortsItems.length - 6 && !shortsLoadingMore) loadMore();
+  }
+
+  let transitioning = false;
   function transitionTo(index) {
     if (transitioning || index < 0 || index >= shortsItems.length) return;
     transitioning = true;
     shortsTrans.style.transition = "none"; shortsTrans.style.opacity = "1";
     shortsIframe.src = "about:blank";
     setTimeout(() => {
-      shortsIndex = index;
-      const item = shortsItems[index];
-      if (item) { shortsIframe.src = EMBED(item.id); document.getElementById("shortsCounter").textContent = `${index + 1} / ${shortsItems.length}`; updateHeart(); }
+      shortsIndex = index; playShortItem(shortsIndex);
       setTimeout(() => { shortsTrans.style.transition = "opacity 0.35s ease"; shortsTrans.style.opacity = "0"; transitioning = false; }, 700);
     }, 100);
     setTimeout(() => { transitioning = false; }, 2500);
   }
+
+  let swY = 0, swX = 0, swT = 0;
   shortsPageEl.addEventListener("touchstart", (e) => { swY = e.touches[0].clientY; swX = e.touches[0].clientX; swT = Date.now(); }, { passive: true });
   shortsPageEl.addEventListener("touchend", (e) => {
     if (transitioning) return;
@@ -1679,8 +1687,47 @@ function openAsShort(videoId, snippet) {
     if (dy > 0) transitionTo(shortsIndex + 1); else transitionTo(shortsIndex - 1);
   }, { passive: true });
   shortsPageEl.addEventListener("wheel", (e) => { if (transitioning) return; if (e.deltaY > 0) transitionTo(shortsIndex + 1); else transitionTo(shortsIndex - 1); }, { passive: true });
-  showHUD("Shorts ✦");
+
+  // Play tapped video immediately
+  playShortItem(0);
+
+  // Load full pool in background — parallel fetches same as real Shorts tab
+  (async () => {
+    try {
+      const topKW = getTopKeywords(4), topBI = getTopBigrams(3);
+      const sKW = [...topKW].sort(() => Math.random() - 0.5);
+      const sBI = [...topBI].sort(() => Math.random() - 0.5);
+      const recentS = getRecentSearches(1);
+      const titleQ = (snippet.title || "").toLowerCase().replace(/#\w+/g, "").trim().split(" ").filter(w => w.length > 3).slice(0, 3).join(" ");
+      const catToSearch = getTopCategories(1)[0] || "0";
+      const viralQ = ["shorts viral 2024","shorts trending now","shorts funny viral"][Math.floor(Math.random() * 3)];
+
+      const fetches = [
+        titleQ ? fetchYouTube("search", { part: "snippet", q: titleQ + " shorts", type: "video", videoDuration: "short", videoEmbeddable: "true", order: "relevance", maxResults: 15, _: Date.now() }) : null,
+        sBI.length > 0 ? fetchYouTube("search", { part: "snippet", q: sBI[0] + " shorts", type: "video", videoDuration: "short", videoEmbeddable: "true", order: "date", maxResults: 10, _: Date.now() }) : null,
+        sKW.length > 0 ? fetchYouTube("search", { part: "snippet", q: sKW.slice(0, 2).join(" ") + " shorts", type: "video", videoDuration: "short", videoEmbeddable: "true", order: "date", maxResults: 10, _: Date.now() }) : null,
+        recentS.length > 0 ? fetchYouTube("search", { part: "snippet", q: recentS[0] + " shorts", type: "video", videoDuration: "short", videoEmbeddable: "true", order: "date", maxResults: 8, _: Date.now() }) : null,
+        fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: catToSearch, videoDuration: "short", maxResults: 10, _: Date.now() }),
+        fetchYouTube("search", { part: "snippet", q: viralQ, type: "video", videoDuration: "short", videoEmbeddable: "true", order: "viewCount", maxResults: 10, _: Date.now() }),
+      ].filter(Boolean);
+
+      const results = await Promise.allSettled(fetches);
+      results.forEach(r => {
+        if (r.status === "fulfilled") {
+          (r.value.items || []).forEach(v => {
+            const id = v.id && v.id.videoId ? v.id.videoId : v.id;
+            if (id && isNew(id)) { shortsSeenIds.add(id); shortsItems.push({ id, snippet: v.snippet }); }
+          });
+        }
+      });
+      const seed = await fetchYouTube("search", { part: "snippet", q: SHORT_QUERIES[shortQIdx % SHORT_QUERIES.length], type: "video", videoDuration: "short", videoEmbeddable: "true", maxResults: 1, _: Date.now() });
+      nextPageToken = seed.nextPageToken || "seed";
+      updateCounter();
+      try { localStorage.setItem("shortsSeenHistory", JSON.stringify([...shortsSeenIds, ...persistentSeenIds].slice(0, 50))); } catch(e) {}
+    } catch(e) {}
+  })();
 }
+
 
 function appendFeed(items) {
   const frag = document.createDocumentFragment();
