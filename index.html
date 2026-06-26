@@ -1546,24 +1546,28 @@ function formatViews(n) {
 // Signals: #shorts in title/description, or video duration ≤ 61s (from contentDetails)
 function isShort(videoId, snippet) {
   if (!snippet) return false;
+  // _isShort flag set when we explicitly know it came from a shorts source
+  if (snippet._isShort) return true;
   const title = (snippet.title || "").toLowerCase();
-  const desc = (snippet.description || "").toLowerCase();
-  const tags = (snippet.tags || []).map(t => t.toLowerCase());
-  // Explicit shorts signals
+  const desc  = (snippet.description || "").toLowerCase();
+  const tags  = (snippet.tags || []).map(t => t.toLowerCase());
   if (title.includes("#shorts") || title.includes("#short")) return true;
   if (desc.includes("#shorts")) return true;
   if (tags.includes("shorts") || tags.includes("#shorts")) return true;
-  // Duration signal — any video under 3 minutes opens in Shorts player
+  // Duration from contentDetails (available when part=contentDetails is fetched)
   const dur = snippet.duration || "";
   if (dur) {
     const m = dur.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
     if (m) {
-      const hrs  = parseInt(m[1] || "0");
-      const mins = parseInt(m[2] || "0");
-      const secs = parseInt(m[3] || "0");
-      const total = hrs * 3600 + mins * 60 + secs;
-      if (total > 0 && total < 180) return true; // under 3 minutes
+      const total = parseInt(m[1]||0)*3600 + parseInt(m[2]||0)*60 + parseInt(m[3]||0);
+      if (total > 0 && total < 180) return true;
     }
+  }
+  // Portrait thumbnail = strong short signal (shorts are vertical 9:16)
+  const thumb = snippet.thumbnails;
+  if (thumb) {
+    const t = thumb.default || thumb.medium || thumb.high;
+    if (t && t.width && t.height && t.height > t.width) return true;
   }
   return false;
 }
@@ -1583,6 +1587,7 @@ function openAsShort(videoId, snippet) {
   setActiveTab("shorts");
   shortsPageEl.innerHTML = `
     <iframe id="shortsIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    <div id="shortsSwipeOverlay" style="position:absolute;inset:0;z-index:8;pointer-events:auto;background:transparent;touch-action:none;"></div>
     <button id="shortsBackBtn" tabindex="0">← Back</button>
     <div id="shortsCounter">Loading…</div>
     <div id="shortsHint"><div class="shorts-arrow up">▼</div><div class="shorts-hint-text">swipe up/down</div><div class="shorts-arrow down">▼</div></div>
@@ -1602,6 +1607,7 @@ function openAsShort(videoId, snippet) {
   shortsPageEl.classList.add("shorts-bloom");
   const shortsIframe = document.getElementById("shortsIframe");
   const shortsTrans = document.getElementById("shortsTransition");
+  const shortsSwipeOverlay = document.getElementById("shortsSwipeOverlay");
   const backBtn2 = document.getElementById("shortsBackBtn");
   const shortsHeartBtn = document.getElementById("shortsHeartBtn");
   const shortsHeartLabel = document.getElementById("shortsHeartLabel");
@@ -1634,7 +1640,7 @@ function openAsShort(videoId, snippet) {
 
   let clearMode = false;
   shortsClearBtn.addEventListener("click", () => { clearMode = true; shortsPageEl.classList.add("clear-mode"); showHUD("Clear Mode — tap to exit"); });
-  shortsPageEl.addEventListener("click", (e) => { if (clearMode && !e.target.closest(".shorts-action-btn") && !e.target.closest("#shortsBackBtn")) { clearMode = false; shortsPageEl.classList.remove("clear-mode"); } });
+  // Clear mode exit handled by overlay click above
 
   const EMBED = id => `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=1&origin=${location.origin}`;
 
@@ -1677,8 +1683,10 @@ function openAsShort(videoId, snippet) {
   }
 
   let swY = 0, swX = 0, swT = 0;
-  shortsPageEl.addEventListener("touchstart", (e) => { swY = e.touches[0].clientY; swX = e.touches[0].clientX; swT = Date.now(); }, { passive: true });
-  shortsPageEl.addEventListener("touchend", (e) => {
+  // Listen on overlay div — it sits above the iframe so it catches touch events
+  // The iframe itself swallows all touches and prevents swipe detection
+  shortsSwipeOverlay.addEventListener("touchstart", (e) => { swY = e.touches[0].clientY; swX = e.touches[0].clientX; swT = Date.now(); }, { passive: true });
+  shortsSwipeOverlay.addEventListener("touchend", (e) => {
     if (transitioning) return;
     const dy = swY - e.changedTouches[0].clientY, dx = swX - e.changedTouches[0].clientX, dt = Date.now() - swT;
     if (Math.abs(dx) > Math.abs(dy) * 0.7) return;
@@ -1687,6 +1695,10 @@ function openAsShort(videoId, snippet) {
     if (dy > 0) transitionTo(shortsIndex + 1); else transitionTo(shortsIndex - 1);
   }, { passive: true });
   shortsPageEl.addEventListener("wheel", (e) => { if (transitioning) return; if (e.deltaY > 0) transitionTo(shortsIndex + 1); else transitionTo(shortsIndex - 1); }, { passive: true });
+  // Clear mode: tap overlay exits
+  shortsSwipeOverlay.addEventListener("click", () => {
+    if (clearMode) { clearMode = false; shortsPageEl.classList.remove("clear-mode"); }
+  });
 
   // Play tapped video immediately
   playShortItem(0);
