@@ -1544,60 +1544,90 @@ function formatViews(n) {
 
 // Detect if a video is a YouTube Short
 // Signals: #shorts in title/description, or video duration ≤ 61s (from contentDetails)
-// Cache of confirmed shorts/non-shorts so we only check each video once
+// Cache of confirmed shorts — keyed by videoId, value is boolean
 const _shortsCache = {};
 
-// Check if a video is a YouTube Short by fetching its /shorts/ URL.
-// YouTube redirects /shorts/ID → /shorts/ID (stays) if it IS a short,
-// or /shorts/ID → /watch?v=ID if it is NOT a short.
-// We use a no-cors fetch — if it doesn't throw it means the /shorts/ URL is valid.
-// Falls back to metadata signals if the network check fails.
+// Parse ISO 8601 duration string to total seconds
+// e.g. "PT58S" → 58, "PT1M2S" → 62, "PT3M" → 180
+function parseDuration(dur) {
+  if (!dur) return null;
+  const m = dur.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!m) return null;
+  return parseInt(m[1]||0)*3600 + parseInt(m[2]||0)*60 + parseInt(m[3]||0);
+}
+
+// Batch fetch contentDetails for multiple videoIds at once.
+// Returns a map of { videoId: { duration, dimension } }
+async function fetchContentDetails(videoIds) {
+  if (!videoIds.length) return {};
+  try {
+    const data = await fetchYouTube("videos", {
+      part: "contentDetails",
+      id: videoIds.join(","),
+      maxResults: 50,
+      _: Date.now()
+    });
+    const map = {};
+    (data.items || []).forEach(item => {
+      map[item.id] = item.contentDetails || {};
+    });
+    return map;
+  } catch(e) { return {}; }
+}
+
+// Check if a single video is a Short using YouTube API contentDetails.
+// A Short is: duration ≤ 60s AND dimension is "2d" vertical (no dimension check
+// available in API, but duration ≤ 60s is the primary signal YouTube uses).
+// Also accepts explicit _isShort flag set by the Shorts tab pipeline.
 async function checkIsShort(videoId, snippet) {
   if (_shortsCache[videoId] !== undefined) return _shortsCache[videoId];
+
+  // Explicit flag from Shorts tab
+  if (snippet && snippet._isShort) {
+    _shortsCache[videoId] = true;
+    return true;
+  }
+
   try {
-    // Fetch the shorts URL with no-cors — YouTube returns opaque response for shorts,
-    // throws/fails differently for non-shorts. Use a 2s timeout.
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 2000);
-    const res = await fetch(`https://www.youtube.com/shorts/${videoId}`, {
-      method: 'HEAD',
-      mode: 'no-cors',
-      signal: controller.signal
-    });
-    clearTimeout(t);
-    // An opaque response (type==='opaque') means the request succeeded —
-    // YouTube accepted the /shorts/ URL → it IS a short
-    const result = res.type === 'opaque' || res.ok;
+    const details = await fetchContentDetails([videoId]);
+    const cd = details[videoId];
+    if (!cd) { _shortsCache[videoId] = false; return false; }
+
+    const secs = parseDuration(cd.duration);
+    // YouTube Short = 60 seconds or less
+    const result = secs !== null && secs > 0 && secs <= 60;
     _shortsCache[videoId] = result;
     return result;
   } catch(e) {
-    // Network failed — fall back to metadata signals
-    const result = isShortByMetadata(videoId, snippet);
-    _shortsCache[videoId] = result;
-    return result;
+    _shortsCache[videoId] = false;
+    return false;
   }
 }
 
-// Metadata-only fallback (no network) — only used when /shorts/ check fails
-function isShortByMetadata(videoId, snippet) {
-  if (!snippet) return false;
-  if (snippet._isShort) return true;
-  const title = snippet.title || "";
-  const desc  = snippet.description || "";
-  // #hashtag or @mention in title/desc
-  if (/#\w+/.test(title) || /#\w+/.test(desc)) return true;
-  if (/@\w+/.test(title) || /@\w+/.test(desc)) return true;
-  // Emoji in title
-  if (/[\u{1F300}-\u{1FFFF}\u{2600}-\u{27FF}]/u.test(title)) return true;
-  // YouTube hashtag links
-  if (desc.includes("youtube.com/hashtag/")) return true;
-  return false;
+// Pre-check a batch of videos in one API call and populate cache.
+// Called when a feed page loads so taps are instant (cache already warm).
+async function preCacheShorts(items) {
+  const uncached = items
+    .map(item => item.id?.videoId || item.id)
+    .filter(id => id && _shortsCache[id] === undefined);
+  if (!uncached.length) return;
+
+  try {
+    const details = await fetchContentDetails(uncached);
+    uncached.forEach(id => {
+      const cd = details[id];
+      if (!cd) { _shortsCache[id] = false; return; }
+      const secs = parseDuration(cd.duration);
+      _shortsCache[id] = secs !== null && secs > 0 && secs <= 60;
+    });
+  } catch(e) {}
 }
 
-// Sync version used for badge display only — uses cache or metadata fallback
+// Sync check — only true if already confirmed by API. Used for badge display.
 function isShort(videoId, snippet) {
   if (_shortsCache[videoId] !== undefined) return _shortsCache[videoId];
-  return isShortByMetadata(videoId, snippet);
+  if (snippet && snippet._isShort) return true;
+  return false;
 }
 
 // Open a single video in the Shorts player (just like opening from Shorts tab)
@@ -1657,22 +1687,6 @@ function appendFeed(items) {
     const ago = timeAgo(snippet.publishedAt);
     const meta = [views, ago].filter(Boolean).join(" · ");
     card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title || ""}</div><div class="video-channel">${snippet.channelTitle || ""}</div><div class="video-meta">${meta}</div></div>`;
-
-    // Pre-check in background so tap is instant
-    checkIsShort(videoId, snippet).then(result => {
-      if (result) {
-        // Add ▶ SHORT badge
-        const titleEl = card.querySelector(".video-title");
-        if (titleEl && !titleEl.querySelector(".short-badge")) {
-          const badge = document.createElement("span");
-          badge.className = "short-badge";
-          badge.style.cssText = "font-size:10px;color:rgba(60,242,255,0.7);font-weight:600;margin-left:4px;";
-          badge.textContent = "▶ SHORT";
-          titleEl.appendChild(badge);
-        }
-      }
-    }).catch(() => {});
-
     card.onclick = async () => {
       const short = await checkIsShort(videoId, snippet);
       if (short) {
@@ -1685,6 +1699,25 @@ function appendFeed(items) {
     frag.appendChild(card);
   });
   feedEl.appendChild(frag);
+  // Pre-warm the shorts cache for this batch in background —
+  // one API call for up to 50 videos so taps are instant
+  preCacheShorts(items).then(() => {
+    // Add ▶ SHORT badge on cards now confirmed as shorts
+    items.forEach(item => {
+      const id = item.id?.videoId || item.id;
+      if (!id || !_shortsCache[id]) return;
+      const card = feedEl.querySelector(`[data-videoid="${id}"]`);
+      if (!card) return;
+      const titleEl = card.querySelector(".video-title");
+      if (titleEl && !titleEl.querySelector(".short-badge")) {
+        const badge = document.createElement("span");
+        badge.className = "short-badge";
+        badge.style.cssText = "font-size:10px;color:rgba(60,242,255,0.7);font-weight:600;margin-left:4px;";
+        badge.textContent = "▶ SHORT";
+        titleEl.appendChild(badge);
+      }
+    });
+  }).catch(() => {});
 }
 
 function setActiveTab(tab) {
