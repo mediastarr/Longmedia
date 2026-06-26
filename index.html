@@ -1550,42 +1550,19 @@ function isShort(videoId, snippet) {
 
   const title = snippet.title || "";
   const desc  = snippet.description || "";
-  const tags  = (snippet.tags || []).map(t => t.toLowerCase());
-  const titleLow = title.toLowerCase();
-  const descLow  = desc.toLowerCase();
 
-  // Any #hashtag in title or description = short
-  // Covers #shorts, #short, #fyp, #foryou, #viral, #reels, #storytime,
-  // #detailing, #satisfying, #asmr, #trending, #funny, etc.
+  // Any #hashtag in title or description
   if (/#\w+/.test(title) || /#\w+/.test(desc)) return true;
 
-  // Any @mention in title or description (e.g. @cooksbatata)
+  // Any @mention in title or description
   if (/@\w+/.test(title) || /@\w+/.test(desc)) return true;
 
-  // YouTube hashtag links in description: https://www.youtube.com/hashtag/...
+  // Any emoji in title — only actual emoji characters (not numbers/punctuation)
+  // Using a tight emoji range to avoid false positives
+  if (/[\u{1F300}-\u{1FFFF}\u{2600}-\u{27FF}]/u.test(title)) return true;
+
+  // YouTube hashtag links in description
   if (desc.includes("youtube.com/hashtag/")) return true;
-
-  // Common short-form tags
-  const shortTags = ["shorts","short","fyp","foryou","foryoupage","viral","reels","reel",
-    "storytime","asmr","satisfying","trending","funny","meme","tiktok","explore"];
-  if (tags.some(t => shortTags.includes(t))) return true;
-
-  // Duration from contentDetails when available
-  const dur = snippet.duration || "";
-  if (dur) {
-    const m = dur.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-    if (m) {
-      const total = parseInt(m[1]||0)*3600 + parseInt(m[2]||0)*60 + parseInt(m[3]||0);
-      if (total > 0 && total < 180) return true;
-    }
-  }
-
-  // Portrait thumbnail (vertical video = short)
-  const thumb = snippet.thumbnails;
-  if (thumb) {
-    const t = thumb.default || thumb.medium || thumb.high;
-    if (t && t.width && t.height && t.height > t.width) return true;
-  }
 
   return false;
 }
