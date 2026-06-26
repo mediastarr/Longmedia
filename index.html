@@ -1542,6 +1542,146 @@ function formatViews(n) {
   return n.toLocaleString() + " views";
 }
 
+// Detect if a video is a YouTube Short
+// Signals: #shorts in title/description, or video duration ≤ 61s (from contentDetails)
+function isShort(videoId, snippet) {
+  if (!snippet) return false;
+  const title = (snippet.title || "").toLowerCase();
+  const desc = (snippet.description || "").toLowerCase();
+  const tags = (snippet.tags || []).map(t => t.toLowerCase());
+  // Explicit shorts signals
+  if (title.includes("#shorts") || title.includes("#short")) return true;
+  if (desc.includes("#shorts")) return true;
+  if (tags.includes("shorts") || tags.includes("#shorts")) return true;
+  // Duration signal — contentDetails.duration is ISO 8601 e.g. PT58S or PT1M2S
+  const dur = snippet.duration || "";
+  if (dur) {
+    const m = dur.match(/PT(?:(\d+)M)?(?:(\d+)S)?/);
+    if (m) {
+      const mins = parseInt(m[1] || "0");
+      const secs = parseInt(m[2] || "0");
+      if (mins === 0 && secs <= 61) return true;
+      if (mins === 1 && secs === 0) return true; // exactly 60s
+    }
+  }
+  return false;
+}
+
+// Open a single video in the Shorts player (just like opening from Shorts tab)
+function openAsShort(videoId, snippet) {
+  // Save current scroll position and tab so we can return exactly here
+  const returnScrollY = window.scrollY;
+  const returnTab = currentTab;
+
+  // Build a one-item shorts pool and launch the shorts player
+  shortsItems = [{ id: videoId, snippet }];
+  shortsIndex = 0;
+  shortsSeenIds = new Set([videoId]);
+  nextPageToken = null;
+  setActiveTab("shorts");
+  shortsPageEl.innerHTML = `
+    <iframe id="shortsIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    <button id="shortsBackBtn" tabindex="0">← Back</button>
+    <div id="shortsCounter">1 / 1</div>
+    <div id="shortsHint"><div class="shorts-arrow up">▼</div><div class="shorts-hint-text">swipe up/down</div><div class="shorts-arrow down">▼</div></div>
+    <div id="shortsActions">
+      <div class="shorts-action-btn" id="shortsHeartBtn" tabindex="0">
+        <div class="shorts-action-icon">♡</div>
+        <div class="shorts-action-label" id="shortsHeartLabel">Like</div>
+      </div>
+      <div class="shorts-action-btn" id="shortsClearBtn" tabindex="0">
+        <div class="shorts-action-icon">⊘</div>
+        <div class="shorts-action-label">Clear</div>
+      </div>
+    </div>
+    <div id="shortsClearHint">Tap to exit clear mode</div>
+    <div id="shortsTransition"></div>
+  `;
+  shortsPageEl.classList.add("shorts-bloom");
+  const shortsIframe = document.getElementById("shortsIframe");
+  const shortsTrans = document.getElementById("shortsTransition");
+  const backBtn2 = document.getElementById("shortsBackBtn");
+  const shortsHeartBtn = document.getElementById("shortsHeartBtn");
+  const shortsHeartLabel = document.getElementById("shortsHeartLabel");
+  const shortsClearBtn = document.getElementById("shortsClearBtn");
+
+  backBtn2.addEventListener("click", () => {
+    shortsIframe.src = "about:blank";
+    shortsPageEl.style.display = "none";
+    // Restore previous tab without reloading — just show the feed again
+    setActiveTab(returnTab);
+    showHUD("Back");
+    // Restore exact scroll position
+    requestAnimationFrame(() => window.scrollTo({ top: returnScrollY, behavior: "instant" }));
+  });
+
+  // Heart button
+  let likedShorts = new Set();
+  try { likedShorts = new Set(JSON.parse(localStorage.getItem("likedShorts") || "[]")); } catch(e) {}
+  function updateHeart() {
+    const liked = likedShorts.has(videoId);
+    shortsHeartBtn.classList.toggle("hearted", liked);
+    shortsHeartBtn.querySelector(".shorts-action-icon").textContent = liked ? "♥" : "♡";
+    shortsHeartLabel.textContent = liked ? "Liked" : "Like";
+  }
+  shortsHeartBtn.addEventListener("click", () => {
+    if (likedShorts.has(videoId)) { likedShorts.delete(videoId); showHUD("Removed like"); }
+    else { likedShorts.add(videoId); showHUD("♥ Liked!"); const icon = shortsHeartBtn.querySelector(".shorts-action-icon"); icon.style.transform = "scale(1.4)"; setTimeout(() => { icon.style.transform = ""; }, 200); }
+    try { localStorage.setItem("likedShorts", JSON.stringify([...likedShorts].slice(0, 500))); } catch(e) {}
+    updateHeart();
+  });
+
+  // Clear mode
+  let clearMode = false;
+  shortsClearBtn.addEventListener("click", () => { clearMode = true; shortsPageEl.classList.add("clear-mode"); showHUD("Clear Mode — tap to exit"); });
+  shortsPageEl.addEventListener("click", (e) => { if (clearMode && !e.target.closest(".shorts-action-btn") && !e.target.closest("#shortsBackBtn")) { clearMode = false; shortsPageEl.classList.remove("clear-mode"); } });
+
+  // Play the short — more related shorts will load when pool runs out
+  const EMBED = id => `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=1&origin=${location.origin}`;
+  shortsIframe.src = EMBED(videoId);
+  updateHeart();
+
+  // After a moment, load more shorts in background so user can swipe
+  setTimeout(async () => {
+    try {
+      const q = (snippet.title || "").toLowerCase().replace(/#\w+/g, "").trim().split(" ").slice(0, 3).join(" ") + " shorts";
+      const more = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "short", videoEmbeddable: "true", maxResults: 20, _: Date.now() });
+      const fresh = (more.items || []).filter(v => v.id?.videoId && v.id.videoId !== videoId && !shortsSeenIds.has(v.id.videoId));
+      fresh.forEach(v => shortsSeenIds.add(v.id.videoId));
+      shortsItems = shortsItems.concat(fresh.map(v => ({ id: v.id.videoId, snippet: v.snippet })));
+      document.getElementById("shortsCounter").textContent = `1 / ${shortsItems.length}`;
+      nextPageToken = more.nextPageToken || "seed";
+    } catch(e) {}
+  }, 1500);
+
+  // Swipe handlers — reuse same logic
+  let swY = 0, swX = 0, swT = 0, transitioning = false;
+  function transitionTo(index) {
+    if (transitioning || index < 0 || index >= shortsItems.length) return;
+    transitioning = true;
+    shortsTrans.style.transition = "none"; shortsTrans.style.opacity = "1";
+    shortsIframe.src = "about:blank";
+    setTimeout(() => {
+      shortsIndex = index;
+      const item = shortsItems[index];
+      if (item) { shortsIframe.src = EMBED(item.id); document.getElementById("shortsCounter").textContent = `${index + 1} / ${shortsItems.length}`; updateHeart(); }
+      setTimeout(() => { shortsTrans.style.transition = "opacity 0.35s ease"; shortsTrans.style.opacity = "0"; transitioning = false; }, 700);
+    }, 100);
+    setTimeout(() => { transitioning = false; }, 2500);
+  }
+  shortsPageEl.addEventListener("touchstart", (e) => { swY = e.touches[0].clientY; swX = e.touches[0].clientX; swT = Date.now(); }, { passive: true });
+  shortsPageEl.addEventListener("touchend", (e) => {
+    if (transitioning) return;
+    const dy = swY - e.changedTouches[0].clientY, dx = swX - e.changedTouches[0].clientX, dt = Date.now() - swT;
+    if (Math.abs(dx) > Math.abs(dy) * 0.7) return;
+    const v = Math.abs(dy) / Math.max(dt, 1);
+    if (Math.abs(dy) < (v > 0.3 ? 20 : 50)) return;
+    if (dy > 0) transitionTo(shortsIndex + 1); else transitionTo(shortsIndex - 1);
+  }, { passive: true });
+  shortsPageEl.addEventListener("wheel", (e) => { if (transitioning) return; if (e.deltaY > 0) transitionTo(shortsIndex + 1); else transitionTo(shortsIndex - 1); }, { passive: true });
+  showHUD("Shorts ✦");
+}
+
 function appendFeed(items) {
   const frag = document.createDocumentFragment();
   items.forEach((item) => {
@@ -1556,8 +1696,17 @@ function appendFeed(items) {
     const views = formatViews(stats.viewCount);
     const ago = timeAgo(snippet.publishedAt);
     const meta = [views, ago].filter(Boolean).join(" · ");
-    card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title || ""}</div><div class="video-channel">${snippet.channelTitle || ""}</div><div class="video-meta">${meta}</div></div>`;
-    card.onclick = () => { setPlayerVideo(videoId, snippet); showHUD("Playing: " + (snippet.title || "")); };
+    // Mark short videos visually
+    const shortMark = isShort(videoId, snippet) ? ' <span style="font-size:10px;color:rgba(60,242,255,0.7);font-weight:600;">▶ SHORT</span>' : '';
+    card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title || ""}${shortMark}</div><div class="video-channel">${snippet.channelTitle || ""}</div><div class="video-meta">${meta}</div></div>`;
+    card.onclick = () => {
+      if (isShort(videoId, snippet)) {
+        openAsShort(videoId, snippet);
+      } else {
+        setPlayerVideo(videoId, snippet);
+        showHUD("Playing: " + (snippet.title || ""));
+      }
+    };
     frag.appendChild(card);
   });
   feedEl.appendChild(frag);
