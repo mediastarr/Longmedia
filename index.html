@@ -1260,7 +1260,7 @@ closeMini.addEventListener("click", () => {
   document.body.classList.remove("ui-hidden");
   hideUIBtn.textContent = "Hide UI";
   playerSection.style.display = "none";
-  if (ytPlayer) { try { ytPlayer.stopVideo(); ytPlayer.destroy(); } catch(e) {} ytPlayer = null; }
+  if (ytPlayer) { try { ytPlayer.stopVideo(); ytPlayer.destroy(); } catch(e) {} ytPlayer = null; isPlayerReady = false; }
   showUIWithMiniPlayer();
   showHUD("Player closed");
 });
@@ -1331,23 +1331,23 @@ const ytScript = document.createElement("script");
 ytScript.src = "https://www.youtube.com/iframe_api";
 document.head.appendChild(ytScript);
 
+let isPlayerReady = false;
+
 window.onYouTubeIframeAPIReady = function () {
   ytReady = true;
   if (pendingVideoId) {
     createYTPlayer(pendingVideoId, pendingStartSeconds);
     pendingVideoId = null; pendingStartSeconds = 0;
   } else {
-    // Pre-warm the player immediately so first tap is instant
-    // Use a silent placeholder — player exists but no video loaded yet
+    // Pre-warm: create player with no video so first tap uses loadVideoById (instant)
     const container = document.getElementById("playerSection");
     let div = document.getElementById("playerFrame");
     if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
     ytPlayer = new YT.Player("playerFrame", {
-      videoId: "",
+      width: "100%", height: "100%",
       playerVars: { autoplay: 0, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin },
-      // No vq — let YouTube ABR choose quality freely like real YouTube
       events: {
-        onReady: () => { /* player warmed up, ready for instant loadVideoById */ },
+        onReady: () => { isPlayerReady = true; },
         onStateChange: (e) => {
           if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "Pause";
           if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "Play";
@@ -1360,8 +1360,8 @@ window.onYouTubeIframeAPIReady = function () {
 
 function createYTPlayer(videoId, startSeconds) {
   const start = (startSeconds && startSeconds > 5) ? Math.floor(startSeconds) : 0;
-  // Player already exists (either pre-warmed or from previous video) — just swap video
-  if (ytPlayer) {
+  // Player exists and is ready — use loadVideoById (no recreate, no black flash)
+  if (ytPlayer && isPlayerReady) {
     try {
       if (start > 0) {
         ytPlayer.loadVideoById({ videoId, startSeconds: start });
@@ -1369,27 +1369,31 @@ function createYTPlayer(videoId, startSeconds) {
       } else {
         ytPlayer.loadVideoById(videoId);
       }
-      // Only force quality if user manually selected one (not auto)
       if (currentQuality !== "auto") { try { ytPlayer.setPlaybackQuality(currentQuality); } catch(e) {} }
       playPauseBtn.textContent = "Pause";
       return;
     } catch(e) {
       try { ytPlayer.destroy(); } catch(e2) {}
-      ytPlayer = null;
+      ytPlayer = null; isPlayerReady = false;
     }
   }
-  // Fallback: create from scratch
+  // Fallback: create from scratch (first tap if pre-warm failed, or after close)
+  isPlayerReady = false;
   const container = document.getElementById("playerSection");
   let div = document.getElementById("playerFrame");
   if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
   const pv = { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin };
-  if (currentQuality !== "auto") pv.vq = currentQuality; // only hint quality if user chose one
+  if (currentQuality !== "auto") pv.vq = currentQuality;
   if (start > 0) { pv.start = start; showHUD("Resuming ▶"); }
   ytPlayer = new YT.Player("playerFrame", {
     videoId,
     playerVars: pv,
     events: {
-      onReady: (e) => { if (currentQuality !== "auto") e.target.setPlaybackQuality(currentQuality); playPauseBtn.textContent = "Pause"; },
+      onReady: (e) => {
+        isPlayerReady = true;
+        if (currentQuality !== "auto") e.target.setPlaybackQuality(currentQuality);
+        playPauseBtn.textContent = "Pause";
+      },
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "Pause";
         if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "Play";
