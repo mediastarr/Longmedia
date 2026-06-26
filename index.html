@@ -1548,18 +1548,27 @@ function isShort(videoId, snippet) {
   if (!snippet) return false;
   if (snippet._isShort) return true;
 
-  const title = (snippet.title || "").toLowerCase();
-  const desc  = (snippet.description || "").toLowerCase();
+  const title = snippet.title || "";
+  const desc  = snippet.description || "";
   const tags  = (snippet.tags || []).map(t => t.toLowerCase());
+  const titleLow = title.toLowerCase();
+  const descLow  = desc.toLowerCase();
 
-  // Explicit hashtag signals
-  if (title.includes("#shorts") || title.includes("#short")) return true;
-  if (title.includes("#reels") || title.includes("#viral")) return true;
-  if (desc.includes("#shorts") || desc.includes("#short")) return true;
-  if (tags.some(t => t === "shorts" || t === "short" || t === "#shorts")) return true;
+  // Any #hashtag in title or description = short
+  // Covers #shorts, #short, #fyp, #foryou, #viral, #reels, #storytime,
+  // #detailing, #satisfying, #asmr, #trending, #funny, etc.
+  if (/#\w+/.test(title) || /#\w+/.test(desc)) return true;
 
-  // @ mention in title — common in Shorts (e.g. "@MrBeast reacts")
-  if (/@\w/.test(snippet.title || "")) return true;
+  // Any @mention in title or description (e.g. @cooksbatata)
+  if (/@\w+/.test(title) || /@\w+/.test(desc)) return true;
+
+  // YouTube hashtag links in description: https://www.youtube.com/hashtag/...
+  if (desc.includes("youtube.com/hashtag/")) return true;
+
+  // Common short-form tags
+  const shortTags = ["shorts","short","fyp","foryou","foryoupage","viral","reels","reel",
+    "storytime","asmr","satisfying","trending","funny","meme","tiktok","explore"];
+  if (tags.some(t => shortTags.includes(t))) return true;
 
   // Duration from contentDetails when available
   const dur = snippet.duration || "";
@@ -1571,15 +1580,12 @@ function isShort(videoId, snippet) {
     }
   }
 
-  // Portrait thumbnail — shorts are vertical (height > width)
+  // Portrait thumbnail (vertical video = short)
   const thumb = snippet.thumbnails;
   if (thumb) {
     const t = thumb.default || thumb.medium || thumb.high;
     if (t && t.width && t.height && t.height > t.width) return true;
   }
-
-  // Short title + no views often = short (heuristic, low confidence)
-  // Skip this — too many false positives
 
   return false;
 }
