@@ -1544,27 +1544,60 @@ function formatViews(n) {
 
 // Detect if a video is a YouTube Short
 // Signals: #shorts in title/description, or video duration ≤ 61s (from contentDetails)
-function isShort(videoId, snippet) {
+// Cache of confirmed shorts/non-shorts so we only check each video once
+const _shortsCache = {};
+
+// Check if a video is a YouTube Short by fetching its /shorts/ URL.
+// YouTube redirects /shorts/ID → /shorts/ID (stays) if it IS a short,
+// or /shorts/ID → /watch?v=ID if it is NOT a short.
+// We use a no-cors fetch — if it doesn't throw it means the /shorts/ URL is valid.
+// Falls back to metadata signals if the network check fails.
+async function checkIsShort(videoId, snippet) {
+  if (_shortsCache[videoId] !== undefined) return _shortsCache[videoId];
+  try {
+    // Fetch the shorts URL with no-cors — YouTube returns opaque response for shorts,
+    // throws/fails differently for non-shorts. Use a 2s timeout.
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch(`https://www.youtube.com/shorts/${videoId}`, {
+      method: 'HEAD',
+      mode: 'no-cors',
+      signal: controller.signal
+    });
+    clearTimeout(t);
+    // An opaque response (type==='opaque') means the request succeeded —
+    // YouTube accepted the /shorts/ URL → it IS a short
+    const result = res.type === 'opaque' || res.ok;
+    _shortsCache[videoId] = result;
+    return result;
+  } catch(e) {
+    // Network failed — fall back to metadata signals
+    const result = isShortByMetadata(videoId, snippet);
+    _shortsCache[videoId] = result;
+    return result;
+  }
+}
+
+// Metadata-only fallback (no network) — only used when /shorts/ check fails
+function isShortByMetadata(videoId, snippet) {
   if (!snippet) return false;
   if (snippet._isShort) return true;
-
   const title = snippet.title || "";
   const desc  = snippet.description || "";
-
-  // Any #hashtag in title or description
+  // #hashtag or @mention in title/desc
   if (/#\w+/.test(title) || /#\w+/.test(desc)) return true;
-
-  // Any @mention in title or description
   if (/@\w+/.test(title) || /@\w+/.test(desc)) return true;
-
-  // Any emoji in title — only actual emoji characters (not numbers/punctuation)
-  // Using a tight emoji range to avoid false positives
+  // Emoji in title
   if (/[\u{1F300}-\u{1FFFF}\u{2600}-\u{27FF}]/u.test(title)) return true;
-
-  // YouTube hashtag links in description
+  // YouTube hashtag links
   if (desc.includes("youtube.com/hashtag/")) return true;
-
   return false;
+}
+
+// Sync version used for badge display only — uses cache or metadata fallback
+function isShort(videoId, snippet) {
+  if (_shortsCache[videoId] !== undefined) return _shortsCache[videoId];
+  return isShortByMetadata(videoId, snippet);
 }
 
 // Open a single video in the Shorts player (just like opening from Shorts tab)
@@ -1623,11 +1656,26 @@ function appendFeed(items) {
     const views = formatViews(stats.viewCount);
     const ago = timeAgo(snippet.publishedAt);
     const meta = [views, ago].filter(Boolean).join(" · ");
-    // Mark short videos visually
-    const shortMark = isShort(videoId, snippet) ? ' <span style="font-size:10px;color:rgba(60,242,255,0.7);font-weight:600;">▶ SHORT</span>' : '';
-    card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title || ""}${shortMark}</div><div class="video-channel">${snippet.channelTitle || ""}</div><div class="video-meta">${meta}</div></div>`;
-    card.onclick = () => {
-      if (isShort(videoId, snippet)) {
+    card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title || ""}</div><div class="video-channel">${snippet.channelTitle || ""}</div><div class="video-meta">${meta}</div></div>`;
+
+    // Pre-check in background so tap is instant
+    checkIsShort(videoId, snippet).then(result => {
+      if (result) {
+        // Add ▶ SHORT badge
+        const titleEl = card.querySelector(".video-title");
+        if (titleEl && !titleEl.querySelector(".short-badge")) {
+          const badge = document.createElement("span");
+          badge.className = "short-badge";
+          badge.style.cssText = "font-size:10px;color:rgba(60,242,255,0.7);font-weight:600;margin-left:4px;";
+          badge.textContent = "▶ SHORT";
+          titleEl.appendChild(badge);
+        }
+      }
+    }).catch(() => {});
+
+    card.onclick = async () => {
+      const short = await checkIsShort(videoId, snippet);
+      if (short) {
         openAsShort(videoId, snippet);
       } else {
         setPlayerVideo(videoId, snippet);
