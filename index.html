@@ -435,6 +435,47 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 #shortsTransition { position: absolute; inset: 0; z-index: 9; background: #000; opacity: 0; pointer-events: none; }
 #shortsTransition.flash { opacity: 1; }
 
+/* Right-side action bar — TikTok style */
+#shortsActions {
+  position: absolute; right: 14px; bottom: 100px; z-index: 10;
+  display: flex; flex-direction: column; align-items: center; gap: 18px;
+}
+.shorts-action-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  cursor: pointer; touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(60,242,255,0.25);
+}
+.shorts-action-icon {
+  width: 44px; height: 44px; border-radius: 999px;
+  background: rgba(10,12,20,0.65); border: 1px solid rgba(255,255,255,0.2);
+  backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; transition: transform 0.15s ease, background 0.2s ease;
+}
+.shorts-action-icon:active { transform: scale(0.88); }
+.shorts-action-label { font-size: 10px; color: rgba(255,255,255,0.75); letter-spacing: 0.03em; }
+#shortsHeartBtn .shorts-action-icon { font-size: 22px; }
+#shortsHeartBtn.hearted .shorts-action-icon {
+  background: rgba(255,40,80,0.35);
+  border-color: rgba(255,40,80,0.6);
+  box-shadow: 0 0 18px rgba(255,40,80,0.5);
+}
+
+/* Clear Mode — hides all UI overlays */
+#shortsPage.clear-mode #shortsBackBtn,
+#shortsPage.clear-mode #shortsCounter,
+#shortsPage.clear-mode #shortsHint,
+#shortsPage.clear-mode #shortsActions { opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+#shortsPage.clear-mode #shortsClearHint {
+  opacity: 1; pointer-events: none;
+}
+#shortsClearHint {
+  position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+  z-index: 10; font-size: 11px; color: rgba(255,255,255,0.45);
+  letter-spacing: 0.05em; opacity: 0; transition: opacity 0.3s ease;
+  pointer-events: none; white-space: nowrap;
+}
+
 /* Scroll to top button */
 #scrollTopBtn {
   position: fixed; right: 16px; bottom: 90px; z-index: 200;
@@ -1594,9 +1635,20 @@ shortsTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("shorts"); showHUD("Shorts");
   shortsPageEl.innerHTML = `
     <iframe id="shortsIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-<button id="shortsBackBtn" tabindex="0">← Back</button>
+    <button id="shortsBackBtn" tabindex="0">← Back</button>
     <div id="shortsCounter">Loading…</div>
     <div id="shortsHint"><div class="shorts-arrow up">▼</div><div class="shorts-hint-text">swipe up/down</div><div class="shorts-arrow down">▼</div></div>
+    <div id="shortsActions">
+      <div class="shorts-action-btn" id="shortsHeartBtn" tabindex="0">
+        <div class="shorts-action-icon">♡</div>
+        <div class="shorts-action-label" id="shortsHeartLabel">Like</div>
+      </div>
+      <div class="shorts-action-btn" id="shortsClearBtn" tabindex="0">
+        <div class="shorts-action-icon">⊘</div>
+        <div class="shorts-action-label">Clear</div>
+      </div>
+    </div>
+    <div id="shortsClearHint">Tap to exit clear mode</div>
     <div id="shortsTransition"></div>
   `;
   shortsPageEl.classList.add("shorts-bloom");
@@ -1605,9 +1657,54 @@ shortsTab.addEventListener("click", async () => {
   const shortsHint = document.getElementById("shortsHint");
   const shortsTrans = document.getElementById("shortsTransition");
   const backBtn2 = document.getElementById("shortsBackBtn");
+  const shortsHeartBtn = document.getElementById("shortsHeartBtn");
+  const shortsHeartLabel = document.getElementById("shortsHeartLabel");
+  const shortsClearBtn = document.getElementById("shortsClearBtn");
 
   // Wire back button immediately before any async work
   backBtn2.addEventListener("click", () => { shortsIframe.src = "about:blank"; shortsPageEl.style.display = "none"; setActiveTab("home"); homeTab.click(); showHUD("Home"); });
+
+  // Heart / Like button — tracks liked shorts locally
+  let likedShorts = new Set();
+  try { likedShorts = new Set(JSON.parse(localStorage.getItem("likedShorts") || "[]")); } catch(e) {}
+  function updateHeart() {
+    const id = shortsItems[shortsIndex]?.id;
+    const liked = id && likedShorts.has(id);
+    shortsHeartBtn.classList.toggle("hearted", liked);
+    shortsHeartBtn.querySelector(".shorts-action-icon").textContent = liked ? "♥" : "♡";
+    shortsHeartLabel.textContent = liked ? "Liked" : "Like";
+  }
+  shortsHeartBtn.addEventListener("click", () => {
+    const id = shortsItems[shortsIndex]?.id; if (!id) return;
+    if (likedShorts.has(id)) {
+      likedShorts.delete(id); showHUD("Removed like");
+    } else {
+      likedShorts.add(id); showHUD("♥ Liked!");
+      // Animate heart
+      const icon = shortsHeartBtn.querySelector(".shorts-action-icon");
+      icon.style.transform = "scale(1.4)";
+      setTimeout(() => { icon.style.transform = ""; }, 200);
+    }
+    try { localStorage.setItem("likedShorts", JSON.stringify([...likedShorts].slice(0, 500))); } catch(e) {}
+    updateHeart();
+  });
+
+  // Clear Mode — tap Clear to hide UI, tap video to exit
+  let clearMode = false;
+  shortsClearBtn.addEventListener("click", () => {
+    clearMode = true;
+    shortsPageEl.classList.add("clear-mode");
+    showHUD("Clear Mode — tap to exit");
+  });
+  shortsIframe.addEventListener("click", () => {
+    if (clearMode) { clearMode = false; shortsPageEl.classList.remove("clear-mode"); }
+  });
+  // Also tap anywhere on page (outside buttons) to exit clear mode
+  shortsPageEl.addEventListener("click", (e) => {
+    if (clearMode && !e.target.closest(".shorts-action-btn") && !e.target.closest("#shortsBackBtn")) {
+      clearMode = false; shortsPageEl.classList.remove("clear-mode");
+    }
+  });
 
   const token = await getValidToken();
   let data = { items: [] };
@@ -1709,6 +1806,7 @@ function playShort(index) {
     const item = shortsItems[index]; if (!item) return;
     shortsIframe.src = EMBED(item.id);
     updateCounter();
+    updateHeart();
     if (index >= shortsItems.length - 6 && !shortsLoadingMore) loadMoreShorts();
   }
   let shortsLoadingMore=false;
