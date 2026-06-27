@@ -1591,79 +1591,62 @@ async function loadVideoInfoPanel(videoId, snippet) {
   // Suggested videos — show skeletons while loading
   sugFeed.innerHTML = Array(4).fill('<div class="skeleton"><div class="skeleton-thumb"></div><div class="skeleton-info"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>').join("");
 
-  // Build queries from multiple signals — current video + watch history + taste profile
+  // Build queries from multiple signals
   const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","||","ft","ep","m/v","official","video","full"]);
   const titleWords = title.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w)).slice(0, 4);
-
-  // Pull from taste profile for personalization
-  const topKW  = getTopKeywords(4);
+  const topKW  = getTopKeywords(3);
   const topBI  = getTopBigrams(2);
   const topCat = getTopCategoryId();
 
-  // 5 parallel fetches — at least 3 will succeed even with quota pressure
-  const fetches = [
-    // 1. Channel's other videos — most relevant
-    channelId
-      ? fetchYouTube("search", { part: "snippet", channelId, type: "video", order: "date", maxResults: 8, _: Date.now() })
-      : null,
-    // 2. Title keywords + taste bigram combined
-    (titleWords.length || topBI.length)
-      ? fetchYouTube("search", { part: "snippet", type: "video", q: [...titleWords.slice(0,2), ...(topBI[0]||"").split(" ")].filter(Boolean).slice(0,4).join(" "), maxResults: 8, _: Date.now() })
-      : null,
-    // 3. Taste keywords search
-    topKW.length
-      ? fetchYouTube("search", { part: "snippet", type: "video", q: topKW.slice(0,3).join(" "), maxResults: 8, _: Date.now() })
-      : null,
-    // 4. Trending in matching category
-    fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: topCat || "0", maxResults: 10, _: Date.now() }),
-    // 5. Title words alone as fallback
-    titleWords.length
-      ? fetchYouTube("search", { part: "snippet", type: "video", q: titleWords.join(" "), maxResults: 8, _: Date.now() })
-      : fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 10, _: Date.now() }),
-  ].filter(Boolean);
-
-  const results = await Promise.allSettled(fetches);
   const seen = new Set([videoId]);
   const allItems = [];
-  results.forEach(r => {
-    if (r.status !== "fulfilled") return;
-    (r.value.items || []).forEach(item => {
-      const vid = item.id?.videoId || item.id;
+
+  function addItems(items) {
+    (items || []).forEach(item => {
+      // Handle both search results (id.videoId) and videos endpoint (id as string)
+      const vid = (typeof item.id === "string") ? item.id : item.id?.videoId;
       if (!vid || seen.has(vid)) return;
       seen.add(vid);
-      allItems.push(item);
+      allItems.push({ ...item, _vid: vid });
     });
-  });
+  }
+
+  // Run all fetches — guaranteed at least trending will work
+  const fetches = [];
+  // 1. Channel's other videos
+  if (channelId) fetches.push(fetchYouTube("search", { part: "snippet", channelId, type: "video", order: "date", maxResults: 8, _: Date.now() }));
+  // 2. Title keywords
+  if (titleWords.length) fetches.push(fetchYouTube("search", { part: "snippet", type: "video", q: titleWords.join(" "), maxResults: 10, _: Date.now() }));
+  // 3. Taste keywords from watch history
+  if (topKW.length) fetches.push(fetchYouTube("search", { part: "snippet", type: "video", q: topKW.slice(0,3).join(" "), maxResults: 8, _: Date.now() }));
+  // 4. Taste bigram
+  if (topBI.length) fetches.push(fetchYouTube("search", { part: "snippet", type: "video", q: topBI[0], maxResults: 8, _: Date.now() }));
+  // 5. Trending in your top category — always works, no search quota
+  fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: topCat || "0", maxResults: 15, _: Date.now() }));
+  // 6. General trending — ultimate fallback
+  fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 15, _: Date.now() }));
+
+  const results = await Promise.allSettled(fetches);
+  results.forEach(r => { if (r.status === "fulfilled") addItems(r.value.items); });
 
   sugFeed.innerHTML = "";
 
   if (!allItems.length) {
-    // Last resort — just show trending
-    try {
-      const trending = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 12, _: Date.now() });
-      (trending.items || []).forEach(item => {
-        const vid = item.id?.videoId || item.id;
-        if (!vid || seen.has(vid)) return;
-        seen.add(vid);
-        allItems.push(item);
-      });
-    } catch(e) {}
-  }
-
-  if (!allItems.length) {
-    sugFeed.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;opacity:0.6;">Tap Trending tab for more videos.</div>';
+    sugFeed.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;opacity:0.6;">No suggestions — check connection.</div>';
     return;
   }
   allItems.forEach(item => {
     const s = item.snippet || {};
-    const vid = item.id?.videoId || item.id;
+    const vid = item._vid || item.id?.videoId || item.id;
     if (!vid) return;
-    const thumb = s.thumbnails?.medium?.url || s.thumbnails?.default?.url || "";
+    const thumb = s.thumbnails?.medium?.url || s.thumbnails?.high?.url || s.thumbnails?.default?.url || "";
+    const views = item.statistics ? formatViews(item.statistics.viewCount) : "";
     const ago = timeAgo(s.publishedAt);
+    const meta = [views, ago].filter(Boolean).join(" · ");
     const card = document.createElement("div");
     card.className = "video-card parallax";
     card.dataset.videoid = vid;
-    card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${s.title || ""}</div><div class="video-channel">${s.channelTitle || ""}</div><div class="video-meta">${ago}</div></div>`;
+    card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${s.title || ""}</div><div class="video-channel">${s.channelTitle || ""}</div><div class="video-meta">${meta}</div></div>`;
     card.onclick = async () => {
       const short = await checkIsShort(vid, s);
       if (short) openAsShort(vid, s);
