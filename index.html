@@ -1847,23 +1847,21 @@ async function checkIsShort(videoId, snippet) {
       _shortsCache[videoId] = result;
       return result;
     }
-    // API didn't return this video — fall back to metadata
-    const result = isShortByMetadata(videoId, snippet);
-    _shortsCache[videoId] = result;
-    return result;
+    // Not in API response — not a short
+    _shortsCache[videoId] = false;
+    return false;
   } catch(e) {
-    // Network/quota failure — fall back to metadata signals
-    const result = isShortByMetadata(videoId, snippet);
-    _shortsCache[videoId] = result;
-    return result;
+    // API failed — safe default
+    _shortsCache[videoId] = false;
+    return false;
   }
 }
 
-// Sync check — only true if already confirmed. Used for badge display.
+// Sync check — only true if API confirmed ≤60s
 function isShort(videoId, snippet) {
   if (_shortsCache[videoId] !== undefined) return _shortsCache[videoId];
   if (snippet && snippet._isShort) return true;
-  return isShortByMetadata(videoId, snippet);
+  return false;
 }
 
 // Pre-check a batch of videos in one API call and populate cache.
@@ -1874,50 +1872,23 @@ async function preCacheShorts(items) {
     .filter(id => id && _shortsCache[id] === undefined);
   if (!uncached.length) return;
 
-  // Also build a metadata map for fallback (no API call needed)
-  const metaMap = {};
-  items.forEach(item => {
-    const id = item.id?.videoId || item.id;
-    if (id) metaMap[id] = item.snippet || {};
-  });
-
   try {
     const details = await fetchContentDetails(uncached);
-    const apiReturned = Object.keys(details).length > 0;
-
     uncached.forEach(id => {
       const cd = details[id];
       if (cd) {
-        // API returned contentDetails — use duration
         const secs = parseDuration(cd.duration);
+        // Only ≤60s videos are Shorts — never guess, never false-positive
         _shortsCache[id] = secs !== null && secs > 0 && secs <= 60;
-      } else if (!apiReturned) {
-        // API returned nothing (quota/error) — fall back to metadata signals
-        _shortsCache[id] = isShortByMetadata(id, metaMap[id]);
       } else {
-        // API returned results but this video wasn't in them — not a short
+        // Not in API response = not a short
         _shortsCache[id] = false;
       }
     });
   } catch(e) {
-    // Complete failure — fall back to metadata for all
-    uncached.forEach(id => {
-      _shortsCache[id] = isShortByMetadata(id, metaMap[id]);
-    });
+    // API failed — safe default: not a short
+    uncached.forEach(id => { _shortsCache[id] = false; });
   }
-}
-
-// Metadata-only fallback — used when API is unavailable
-function isShortByMetadata(videoId, snippet) {
-  if (!snippet) return false;
-  if (snippet._isShort) return true;
-  const title = snippet.title || "";
-  const desc  = snippet.description || "";
-  if (/#\w+/.test(title) || /#\w+/.test(desc)) return true;
-  if (/@\w+/.test(title) || /@\w+/.test(desc)) return true;
-  if (/[\u{1F300}-\u{1FFFF}\u{2600}-\u{27FF}]/u.test(title)) return true;
-  if (desc.includes("youtube.com/hashtag/")) return true;
-  return false;
 }
 
 // Open a single video in the Shorts player (just like opening from Shorts tab)
