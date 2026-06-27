@@ -2364,7 +2364,7 @@ historyTab.addEventListener("click", async () => {
       const resumeT = getResumePosition(h.id);
       const resumeLabel = resumeT > 5 ? " ▶ "+Math.floor(resumeT/60)+":"+(String(Math.floor(resumeT%60)).padStart(2,"0")) : "";
       card.querySelector(".video-meta").textContent = "Watched "+ago+resumeLabel;
-      card.onclick = () => { setPlayerVideo(h.id, snippet, resumeT); showHUD(resumeT > 5 ? "Resuming ▶" : "Playing: "+(snippet.title||"")); };
+      card.onclick = async () => { const short = await checkIsShort(h.id, snippet); if (short) openAsShort(h.id, snippet); else { setPlayerVideo(h.id, snippet, resumeT); showHUD(resumeT > 5 ? "Resuming ▶" : "Playing: "+(snippet.title||"")); } };
       feedEl.appendChild(card);
     });
   }
@@ -2385,7 +2385,7 @@ historyTab.addEventListener("click", async () => {
           const snippet = it.snippet || {}; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
           const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = videoId;
           card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Liked</div></div>';
-          card.onclick = () => { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); };
+          card.onclick = async () => { const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); } };
           feedEl.appendChild(card);
         });
       }
@@ -2399,7 +2399,7 @@ historyTab.addEventListener("click", async () => {
           const snippet = it.snippet || {}; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
           const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = videoId;
           card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Watch Later</div></div>';
-          card.onclick = () => { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); };
+          card.onclick = async () => { const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); } };
           feedEl.appendChild(card);
         });
       }
@@ -2565,7 +2565,7 @@ async function openPlaylist(playlistId, title) {
       const thumb = snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || "";
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
       card.innerHTML = `<div class="video-thumb"><img src="${thumb}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.videoOwnerChannelTitle || snippet.channelTitle || ""}</div><div class="video-meta">#${i + 1} in playlist</div></div>`;
-      card.onclick = () => { setPlayerVideo(videoId, snippet); showHUD("Playing: " + snippet.title); };
+      card.onclick = async () => { const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: " + snippet.title); } };
       playlistItemsList.appendChild(card); rendered++;
     });
     if (rendered === 0) playlistItemsList.innerHTML = `<div style="font-size:12px;opacity:0.6;padding:8px 0;">This playlist is empty.</div>`;
@@ -2603,7 +2603,7 @@ async function loadMoreVideos() {
       const snippet = item.snippet; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
       card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle || ""}</div></div>`;
-      card.onclick = () => setPlayerVideo(videoId, snippet); channelPageEl.appendChild(card);
+      card.onclick = async () => { const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet); }; channelPageEl.appendChild(card);
     });
   } else { appendFeed(data.items || []); }
 }
@@ -2703,7 +2703,7 @@ async function loadChannelPage(channelId) {
     const snippet = item.snippet; const videoId = snippet.resourceId.videoId;
     const card = document.createElement("div"); card.className = "video-card parallax focusable";
     card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails.medium.url}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle}</div></div>`;
-    card.onclick = () => setPlayerVideo(videoId, snippet); channelPageEl.appendChild(card);
+    card.onclick = async () => { const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet); }; channelPageEl.appendChild(card);
   });
   showHUD("Channel Loaded");
 }
