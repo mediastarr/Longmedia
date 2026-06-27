@@ -2599,9 +2599,15 @@ scrollTopBtn.addEventListener("click", () => {
    Prevents horizontal/diagonal swipes from triggering vertical scroll.
    On glasses, swiping left/right or at an angle often reads as scroll-down. */
 (function() {
+  function isInfoPanelOpen() {
+    var p = document.getElementById("videoInfoPanel");
+    return p && p.style.display !== "none";
+  }
+
   // Wheel: block horizontal component
   window.addEventListener("wheel", function(e) {
     if (currentTab === "shorts") return;
+    if (isInfoPanelOpen()) return;
     if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 0.5) { e.preventDefault(); }
   }, { passive: false });
 
@@ -2609,12 +2615,14 @@ scrollTopBtn.addEventListener("click", () => {
   var tStartX = 0, tStartY = 0, dirLock = null;
   document.addEventListener("touchstart", function(e) {
     if (currentTab === "shorts") return;
+    if (isInfoPanelOpen()) return;
     tStartX = e.touches[0].clientX;
     tStartY = e.touches[0].clientY;
     dirLock = null;
   }, { passive: true });
   document.addEventListener("touchmove", function(e) {
     if (currentTab === "shorts") return;
+    if (isInfoPanelOpen()) return;
     if (!dirLock) {
       var dx = Math.abs(e.touches[0].clientX - tStartX);
       var dy = Math.abs(e.touches[0].clientY - tStartY);
