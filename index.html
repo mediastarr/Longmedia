@@ -1591,36 +1591,69 @@ async function loadVideoInfoPanel(videoId, snippet) {
   // Suggested videos — show skeletons while loading
   sugFeed.innerHTML = Array(4).fill('<div class="skeleton"><div class="skeleton-thumb"></div><div class="skeleton-info"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>').join("");
 
-  // Build smart query: use channel name + key title words, strip special chars
-  const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","||","ft","ep","m/v"]);
-  const titleWords = title.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w)).slice(0, 5);
-  const q1 = titleWords.join(" ") || channel;
-  const q2 = channel || titleWords.slice(0, 3).join(" ");
+  // Build queries from multiple signals — current video + watch history + taste profile
+  const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","||","ft","ep","m/v","official","video","full"]);
+  const titleWords = title.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w)).slice(0, 4);
 
-  // Fetch 2 queries in parallel for better coverage
-  const [res1, res2] = await Promise.allSettled([
-    fetchYouTube("search", { part: "snippet", type: "video", q: q1, maxResults: 10, _: Date.now() }),
-    q2 && q2 !== q1 ? fetchYouTube("search", { part: "snippet", type: "video", q: q2, maxResults: 8, _: Date.now() }) : Promise.resolve({ items: [] }),
-  ]);
+  // Pull from taste profile for personalization
+  const topKW  = getTopKeywords(4);
+  const topBI  = getTopBigrams(2);
+  const topCat = getTopCategoryId();
 
+  // 5 parallel fetches — at least 3 will succeed even with quota pressure
+  const fetches = [
+    // 1. Channel's other videos — most relevant
+    channelId
+      ? fetchYouTube("search", { part: "snippet", channelId, type: "video", order: "date", maxResults: 8, _: Date.now() })
+      : null,
+    // 2. Title keywords + taste bigram combined
+    (titleWords.length || topBI.length)
+      ? fetchYouTube("search", { part: "snippet", type: "video", q: [...titleWords.slice(0,2), ...(topBI[0]||"").split(" ")].filter(Boolean).slice(0,4).join(" "), maxResults: 8, _: Date.now() })
+      : null,
+    // 3. Taste keywords search
+    topKW.length
+      ? fetchYouTube("search", { part: "snippet", type: "video", q: topKW.slice(0,3).join(" "), maxResults: 8, _: Date.now() })
+      : null,
+    // 4. Trending in matching category
+    fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: topCat || "0", maxResults: 10, _: Date.now() }),
+    // 5. Title words alone as fallback
+    titleWords.length
+      ? fetchYouTube("search", { part: "snippet", type: "video", q: titleWords.join(" "), maxResults: 8, _: Date.now() })
+      : fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 10, _: Date.now() }),
+  ].filter(Boolean);
+
+  const results = await Promise.allSettled(fetches);
   const seen = new Set([videoId]);
   const allItems = [];
-  [res1, res2].forEach(r => {
-    if (r.status === "fulfilled") {
-      (r.value.items || []).forEach(item => {
-        const vid = item.id?.videoId || item.id;
-        if (vid && !seen.has(vid)) { seen.add(vid); allItems.push(item); }
-      });
-    }
+  results.forEach(r => {
+    if (r.status !== "fulfilled") return;
+    (r.value.items || []).forEach(item => {
+      const vid = item.id?.videoId || item.id;
+      if (!vid || seen.has(vid)) return;
+      seen.add(vid);
+      allItems.push(item);
+    });
   });
 
   sugFeed.innerHTML = "";
 
   if (!allItems.length) {
-    sugFeed.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;opacity:0.6;">No suggestions found.</div>';
-    return;
+    // Last resort — just show trending
+    try {
+      const trending = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 12, _: Date.now() });
+      (trending.items || []).forEach(item => {
+        const vid = item.id?.videoId || item.id;
+        if (!vid || seen.has(vid)) return;
+        seen.add(vid);
+        allItems.push(item);
+      });
+    } catch(e) {}
   }
 
+  if (!allItems.length) {
+    sugFeed.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;opacity:0.6;">Tap Trending tab for more videos.</div>';
+    return;
+  }
   allItems.forEach(item => {
     const s = item.snippet || {};
     const vid = item.id?.videoId || item.id;
