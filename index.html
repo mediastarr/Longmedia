@@ -594,8 +594,8 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
       </div>
     </div>
   </div>
-  <div id="plOverlay" style="display:none; position:fixed; inset:0; z-index:100002; background:rgba(0,0,0,0.88); align-items:center; justify-content:center; padding:16px 12px; overflow:hidden;">
-    <div id="plBox" style="width:100%; max-width:340px; border-radius:18px; background:linear-gradient(135deg,rgba(10,12,20,0.98),rgba(20,24,40,0.98)); border:1px solid rgba(60,242,255,0.35); box-shadow:0 0 30px rgba(60,242,255,0.2); padding:16px; max-height:80vh; display:flex; flex-direction:column;">
+  <div id="plOverlay" style="display:none; position:fixed; inset:0; z-index:100002; background:rgba(0,0,0,0.88); align-items:flex-start; justify-content:center; padding:16px 12px; overflow:hidden;">
+    <div id="plBox" style="width:100%; max-width:340px; border-radius:18px; background:linear-gradient(135deg,rgba(10,12,20,0.98),rgba(20,24,40,0.98)); border:1px solid rgba(60,242,255,0.35); box-shadow:0 0 30px rgba(60,242,255,0.2); padding:16px; max-height:calc(100vh - 32px); display:flex; flex-direction:column;">
       <div style="font-size:13px; font-weight:700; letter-spacing:0.05em; margin-bottom:4px; color:#f5f7ff; flex-shrink:0;">+ Add to Playlist</div>
       <div style="font-size:10px; opacity:0.65; margin-bottom:12px; line-height:1.4; flex-shrink:0;">Choose a playlist to add this video to.</div>
       <div id="plPickerList" style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch;"></div>
@@ -2737,6 +2737,8 @@ const plPickerList = document.getElementById("plPickerList");
 const plPickerStatus = document.getElementById("plPickerStatus");
 function openPicker() {
   plOverlay.style.display="flex";
+  const list = document.getElementById("plPickerList");
+  if (list) list.scrollTop = 0;
 }
 function closePicker() {
   plOverlay.style.display="none";
