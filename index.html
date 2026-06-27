@@ -285,6 +285,7 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
 .pl-pick-item:active { transform:scale(0.97); box-shadow:0 0 18px rgba(60,242,255,0.4); }
 .pl-pick-item:hover { box-shadow:0 0 16px rgba(60,242,255,0.25); border-color:rgba(60,242,255,0.35); }
 .pl-pick-item:focus { box-shadow:0 0 18px rgba(60,242,255,0.5); border-color:rgba(60,242,255,0.6); outline:none; }
+.pl-pick-item.pl-nav-focus { box-shadow:0 0 20px rgba(60,242,255,0.7); border-color:#00d4ff; outline:none; background:radial-gradient(circle at 0% 0%,rgba(60,242,255,0.18),rgba(8,10,16,0.96)); }
 .pl-pick-thumb { width:48px; height:36px; border-radius:8px; overflow:hidden; background:#11131c; flex-shrink:0; }
 .pl-pick-thumb img { width:100%; height:100%; object-fit:cover; }
 .pl-pick-info { flex:1; min-width:0; }
@@ -1318,7 +1319,42 @@ setInterval(() => {
 }, 150);
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") { playerSection.classList.remove("player-fullscreen"); document.body.classList.remove("fullscreen-active"); disableCinemaMode(); showUIWithMiniPlayer(); showHUD("Exited Fullscreen"); }
+  if (e.key === "Escape") {
+    // Close playlist overlay if open
+    if (plOverlay && plOverlay.style.display === "flex") { closePicker(); return; }
+    playerSection.classList.remove("player-fullscreen"); document.body.classList.remove("fullscreen-active"); disableCinemaMode(); showUIWithMiniPlayer(); showHUD("Exited Fullscreen");
+  }
+  // When playlist overlay is open, arrow keys navigate the list
+  if (plOverlay && plOverlay.style.display === "flex") {
+    const list = document.getElementById("plPickerList");
+    const items = list ? list.querySelectorAll(".pl-pick-item") : [];
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      // Find currently highlighted item
+      let cur = -1;
+      items.forEach((item, i) => { if (item.classList.contains("pl-nav-focus")) cur = i; });
+      // Remove highlight from current
+      items.forEach(item => item.classList.remove("pl-nav-focus"));
+      // Move to next/prev
+      let next = e.key === "ArrowDown" ? cur + 1 : cur - 1;
+      if (next < 0) next = 0;
+      if (next >= items.length) {
+        // At end of list — focus Cancel button
+        document.getElementById("plPickerClose").focus();
+        return;
+      }
+      items[next].classList.add("pl-nav-focus");
+      items[next].scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      // Activate highlighted item or focused button
+      const focused = list ? list.querySelector(".pl-nav-focus") : null;
+      if (focused) { focused.click(); return; }
+      if (document.activeElement && document.activeElement !== document.body) document.activeElement.click();
+    }
+    return; // block all other keys from reaching page handlers
+  }
 });
 
 let ytPlayer = null;
@@ -2738,7 +2774,14 @@ const plPickerStatus = document.getElementById("plPickerStatus");
 function openPicker() {
   plOverlay.style.display="flex";
   const list = document.getElementById("plPickerList");
-  if (list) list.scrollTop = 0;
+  if (list) {
+    list.scrollTop = 0;
+    // Clear any previous highlight
+    list.querySelectorAll(".pl-nav-focus").forEach(el => el.classList.remove("pl-nav-focus"));
+    // Highlight first item
+    const first = list.querySelector(".pl-pick-item");
+    if (first) first.classList.add("pl-nav-focus");
+  }
 }
 function closePicker() {
   plOverlay.style.display="none";
@@ -2788,6 +2831,9 @@ async function openPickerWithToken(token) {
       item.onclick=(function(pid,ptitle,tok){return function(){insertVideoToPlaylist(pid,ptitle,tok);};})(pl.id,s.title,token);
       plPickerList.appendChild(item);
     });
+    // Highlight first item for Neural Band navigation
+    const firstItem = plPickerList.querySelector(".pl-pick-item");
+    if (firstItem) firstItem.classList.add("pl-nav-focus");
   } catch(e){plPickerList.innerHTML='<div class="pl-pick-msg">Network error. Try again.</div>';}
 }
 async function insertVideoToPlaylist(playlistId,playlistTitle,token) {
