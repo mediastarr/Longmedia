@@ -1518,10 +1518,10 @@ async function loadVideoInfoPanel(videoId, snippet) {
   document.getElementById("vipSubs").textContent = "";
 
   // Fetch full video details (stats + channel info) in parallel with suggested
-  const [videoData, channelData, suggestedData] = await Promise.allSettled([
+
+  const [videoData, channelData] = await Promise.allSettled([
     fetchYouTube("videos", { part: "snippet,statistics", id: videoId, _: Date.now() }),
     channelId ? fetchYouTube("channels", { part: "snippet,statistics", id: channelId, _: Date.now() }) : Promise.resolve(null),
-    fetchYouTube("search", { part: "snippet", type: "video", q: title.split(" ").slice(0, 4).join(" "), maxResults: 15, _: Date.now() }),
   ]);
 
   // Video stats
@@ -1532,7 +1532,6 @@ async function loadVideoInfoPanel(videoId, snippet) {
     const likes = formatViews(stats.likeCount);
     const ago = timeAgo(v.snippet?.publishedAt || publishedAt);
     document.getElementById("vipStats").textContent = [views && views + " views", likes && likes + " likes", ago].filter(Boolean).join("  ·  ");
-    // Like button count
     document.getElementById("vipLikeCount").textContent = likes || "";
   }
 
@@ -1589,29 +1588,58 @@ async function loadVideoInfoPanel(videoId, snippet) {
     });
   };
 
-  // Suggested videos
-  if (suggestedData.status === "fulfilled") {
-    const items = (suggestedData.value.items || []).filter(v => (v.id?.videoId || v.id) !== videoId);
-    items.forEach(item => {
-      const s = item.snippet || {};
-      const vid = item.id?.videoId || item.id;
-      if (!vid) return;
-      const thumb = s.thumbnails?.medium?.url || s.thumbnails?.default?.url || "";
-      const ago = timeAgo(s.publishedAt);
-      const card = document.createElement("div");
-      card.className = "video-card parallax";
-      card.style.marginBottom = "10px";
-      card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${s.title || ""}</div><div class="video-channel">${s.channelTitle || ""}</div><div class="video-meta">${ago}</div></div>`;
-      card.onclick = async () => {
-        const short = await checkIsShort(vid, s);
-        if (short) openAsShort(vid, s);
-        else { setPlayerVideo(vid, s); showHUD("Playing: " + (s.title || "")); }
-      };
-      sugFeed.appendChild(card);
-    });
-  }
-}
+  // Suggested videos — show skeletons while loading
+  sugFeed.innerHTML = Array(4).fill('<div class="skeleton"><div class="skeleton-thumb"></div><div class="skeleton-info"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>').join("");
 
+  // Build smart query: use channel name + key title words, strip special chars
+  const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","||","ft","ep","m/v"]);
+  const titleWords = title.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w)).slice(0, 5);
+  const q1 = titleWords.join(" ") || channel;
+  const q2 = channel || titleWords.slice(0, 3).join(" ");
+
+  // Fetch 2 queries in parallel for better coverage
+  const [res1, res2] = await Promise.allSettled([
+    fetchYouTube("search", { part: "snippet", type: "video", q: q1, maxResults: 10, _: Date.now() }),
+    q2 && q2 !== q1 ? fetchYouTube("search", { part: "snippet", type: "video", q: q2, maxResults: 8, _: Date.now() }) : Promise.resolve({ items: [] }),
+  ]);
+
+  const seen = new Set([videoId]);
+  const allItems = [];
+  [res1, res2].forEach(r => {
+    if (r.status === "fulfilled") {
+      (r.value.items || []).forEach(item => {
+        const vid = item.id?.videoId || item.id;
+        if (vid && !seen.has(vid)) { seen.add(vid); allItems.push(item); }
+      });
+    }
+  });
+
+  sugFeed.innerHTML = "";
+
+  if (!allItems.length) {
+    sugFeed.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;opacity:0.6;">No suggestions found.</div>';
+    return;
+  }
+
+  allItems.forEach(item => {
+    const s = item.snippet || {};
+    const vid = item.id?.videoId || item.id;
+    if (!vid) return;
+    const thumb = s.thumbnails?.medium?.url || s.thumbnails?.default?.url || "";
+    const ago = timeAgo(s.publishedAt);
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
+    card.dataset.videoid = vid;
+    card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${s.title || ""}</div><div class="video-channel">${s.channelTitle || ""}</div><div class="video-meta">${ago}</div></div>`;
+    card.onclick = async () => {
+      const short = await checkIsShort(vid, s);
+      if (short) openAsShort(vid, s);
+      else { setPlayerVideo(vid, s); showHUD("Playing: " + (s.title || "")); }
+    };
+    sugFeed.appendChild(card);
+  });
+
+}
 function postToPlayer(cmd) {
   const frame = document.querySelector("#playerFrame iframe");
   if (frame && frame.contentWindow) frame.contentWindow.postMessage(JSON.stringify(cmd), "*");
