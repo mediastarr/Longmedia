@@ -286,6 +286,17 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
 .pl-pick-item:hover { box-shadow:0 0 16px rgba(60,242,255,0.25); border-color:rgba(60,242,255,0.35); }
 .pl-pick-item:focus { box-shadow:0 0 18px rgba(60,242,255,0.5); border-color:rgba(60,242,255,0.6); outline:none; }
 .pl-pick-item.pl-nav-focus { box-shadow:0 0 20px rgba(60,242,255,0.7); border-color:#00d4ff; outline:none; background:radial-gradient(circle at 0% 0%,rgba(60,242,255,0.18),rgba(8,10,16,0.96)); }
+
+.vip-action-btn {
+  border-radius:999px; border:1px solid rgba(120,130,160,0.5);
+  padding:8px 14px; font-size:12px; font-weight:500;
+  background:radial-gradient(circle at 0% 0%,rgba(60,242,255,0.1),rgba(10,12,20,0.9));
+  color:#f5f7ff; cursor:pointer; white-space:nowrap;
+  touch-action:manipulation; -webkit-tap-highlight-color:rgba(60,242,255,0.25);
+  flex-shrink:0;
+}
+.vip-action-btn:active { background:radial-gradient(circle at 0% 0%,rgba(60,242,255,0.3),rgba(10,12,20,0.9)); transform:scale(0.95); }
+.vip-action-btn.active { border-color:var(--accent); color:var(--accent); box-shadow:0 0 12px rgba(60,242,255,0.4); }
 .pl-pick-thumb { width:48px; height:36px; border-radius:8px; overflow:hidden; background:#11131c; flex-shrink:0; }
 .pl-pick-thumb img { width:100%; height:100%; object-fit:cover; }
 .pl-pick-info { flex:1; min-width:0; }
@@ -631,6 +642,34 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
     <div id="suggestions"></div>
   </div>
   <div id="feed"></div>
+
+  <!-- Video info panel — shown below medium player -->
+  <div id="videoInfoPanel" style="display:none; margin-top:12px; position:relative; z-index:10;">
+    <!-- Title -->
+    <div id="vipTitle" style="font-size:15px; font-weight:600; line-height:1.35; padding:0 2px 8px; color:#f5f7ff;"></div>
+    <!-- Stats row: views · likes · age -->
+    <div id="vipStats" style="font-size:12px; opacity:0.7; padding-bottom:10px; border-bottom:1px solid rgba(60,242,255,0.12);"></div>
+    <!-- Channel row + Subscribe -->
+    <div id="vipChannel" style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid rgba(60,242,255,0.12);">
+      <div id="vipAvatar" style="width:36px; height:36px; border-radius:999px; background:rgba(60,242,255,0.2); flex-shrink:0; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:16px;">📺</div>
+      <div style="flex:1; min-width:0;">
+        <div id="vipChannelName" style="font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+        <div id="vipSubs" style="font-size:11px; opacity:0.6; margin-top:1px;"></div>
+      </div>
+      <button id="vipSubscribeBtn" style="border-radius:999px; border:none; padding:8px 14px; font-size:12px; font-weight:600; background:#f5f7ff; color:#000; cursor:pointer; touch-action:manipulation; flex-shrink:0;">Subscribe</button>
+    </div>
+    <!-- Action buttons: Like · Dislike · Share · Save -->
+    <div style="display:flex; gap:6px; padding:10px 0; border-bottom:1px solid rgba(60,242,255,0.12); overflow-x:auto; -webkit-overflow-scrolling:touch;">
+      <button id="vipLikeBtn" class="vip-action-btn">👍 <span id="vipLikeCount"></span></button>
+      <button id="vipDislikeBtn" class="vip-action-btn">👎</button>
+      <button id="vipShareBtn" class="vip-action-btn">↗ Share</button>
+      <button id="vipSaveBtn" class="vip-action-btn">🔖 Save</button>
+    </div>
+    <!-- Suggested videos label -->
+    <div style="font-size:12px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:rgba(60,242,255,0.7); padding:10px 2px 6px;">Up Next</div>
+    <!-- Suggested feed -->
+    <div id="suggestedFeed"></div>
+  </div>
   <div id="channelPage"></div>
   <div id="subsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
     <div class="channel-banner">
@@ -1211,6 +1250,7 @@ function hideUIForVideo() {
   keyboardEl.style.display = "none";
   suggestionsEl.style.display = "none";
   playlistPageEl.style.display = "none";
+  document.getElementById("videoInfoPanel").style.display = "none";
 }
 
 function showUIWithMiniPlayer() {
@@ -1222,6 +1262,7 @@ function showUIWithMiniPlayer() {
   subsPageEl.style.display = "none";
   playlistPageEl.style.display = "none";
   shortsPageEl.style.display = "none";
+  document.getElementById("videoInfoPanel").style.display = "none";
   if (currentTab === "channel") channelPageEl.style.display = "block";
   else if (currentTab === "subs") subsPageEl.style.display = "block";
   else if (currentTab === "playlists") playlistPageEl.style.display = "block";
@@ -1449,12 +1490,126 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   playerSection.classList.remove("player-mini", "player-fullscreen");
   saveToHistory({ id: videoId, snippet });
   hideUIForVideo();
+  // Show info panel below medium player
+  loadVideoInfoPanel(videoId, snippet);
   playPauseBtn.textContent = "Pause";
   initAudioGlow();
-  // Use provided startSeconds, or check for saved resume position
   const resumeAt = startSeconds || getResumePosition(videoId);
   if (ytReady) createYTPlayer(videoId, resumeAt);
   else { pendingVideoId = videoId; pendingStartSeconds = resumeAt; }
+}
+
+async function loadVideoInfoPanel(videoId, snippet) {
+  const panel = document.getElementById("videoInfoPanel");
+  const sugFeed = document.getElementById("suggestedFeed");
+  panel.style.display = "block";
+  sugFeed.innerHTML = "";
+  window.scrollTo({ top: 0, behavior: "instant" });
+
+  // Fill from snippet immediately (fast)
+  const title = snippet.title || "";
+  const channel = snippet.channelTitle || "";
+  const channelId = snippet.channelId || "";
+  const publishedAt = snippet.publishedAt || "";
+
+  document.getElementById("vipTitle").textContent = title;
+  document.getElementById("vipChannelName").textContent = channel;
+  document.getElementById("vipStats").textContent = timeAgo(publishedAt);
+  document.getElementById("vipSubs").textContent = "";
+
+  // Fetch full video details (stats + channel info) in parallel with suggested
+  const [videoData, channelData, suggestedData] = await Promise.allSettled([
+    fetchYouTube("videos", { part: "snippet,statistics", id: videoId, _: Date.now() }),
+    channelId ? fetchYouTube("channels", { part: "snippet,statistics", id: channelId, _: Date.now() }) : Promise.resolve(null),
+    fetchYouTube("search", { part: "snippet", type: "video", q: title.split(" ").slice(0, 4).join(" "), maxResults: 15, _: Date.now() }),
+  ]);
+
+  // Video stats
+  if (videoData.status === "fulfilled" && videoData.value.items?.[0]) {
+    const v = videoData.value.items[0];
+    const stats = v.statistics || {};
+    const views = formatViews(stats.viewCount);
+    const likes = formatViews(stats.likeCount);
+    const ago = timeAgo(v.snippet?.publishedAt || publishedAt);
+    document.getElementById("vipStats").textContent = [views && views + " views", likes && likes + " likes", ago].filter(Boolean).join("  ·  ");
+    // Like button count
+    document.getElementById("vipLikeCount").textContent = likes || "";
+  }
+
+  // Channel info + avatar
+  if (channelData.status === "fulfilled" && channelData.value?.items?.[0]) {
+    const ch = channelData.value.items[0];
+    const subs = formatViews(ch.statistics?.subscriberCount);
+    document.getElementById("vipSubs").textContent = subs ? subs + " subscribers" : "";
+    const avatarUrl = ch.snippet?.thumbnails?.default?.url;
+    const avatarEl = document.getElementById("vipAvatar");
+    if (avatarUrl) avatarEl.innerHTML = `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+  }
+
+  // Subscribe button
+  const subBtn = document.getElementById("vipSubscribeBtn");
+  let subscribed = false;
+  subBtn.onclick = async () => {
+    subscribed = !subscribed;
+    subBtn.textContent = subscribed ? "Subscribed ✓" : "Subscribe";
+    subBtn.style.background = subscribed ? "rgba(60,242,255,0.2)" : "#f5f7ff";
+    subBtn.style.color = subscribed ? "#3cf2ff" : "#000";
+    showHUD(subscribed ? "Subscribed ✓" : "Unsubscribed");
+  };
+
+  // Like / Dislike
+  let liked = false, disliked = false;
+  document.getElementById("vipLikeBtn").onclick = () => {
+    liked = !liked; disliked = false;
+    document.getElementById("vipLikeBtn").classList.toggle("active", liked);
+    document.getElementById("vipDislikeBtn").classList.remove("active");
+    showHUD(liked ? "👍 Liked!" : "Like removed");
+  };
+  document.getElementById("vipDislikeBtn").onclick = () => {
+    disliked = !disliked; liked = false;
+    document.getElementById("vipDislikeBtn").classList.toggle("active", disliked);
+    document.getElementById("vipLikeBtn").classList.remove("active");
+    showHUD(disliked ? "👎 Noted" : "Dislike removed");
+  };
+  document.getElementById("vipShareBtn").onclick = () => {
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    if (navigator.share) navigator.share({ title, url }).catch(() => {});
+    else navigator.clipboard?.writeText(url).then(() => showHUD("Link copied!")).catch(() => showHUD("youtube.com/watch?v=" + videoId));
+  };
+  document.getElementById("vipSaveBtn").onclick = () => {
+    if (!currentVideoId) { showHUD("No video playing"); return; }
+    openPicker();
+    plPickerStatus.style.display = "none";
+    plPickerList.innerHTML = '<div class="pl-pick-msg">Loading playlists…</div>';
+    getValidToken().then(token => {
+      if (!token) {
+        plPickerList.innerHTML = '<div class="pl-pick-msg"><div>Login to save videos to playlists.</div><button id="plPickerLoginBtn" class="topbar-btn" style="margin-top:8px;">Login to YouTube</button></div>';
+        document.getElementById("plPickerLoginBtn").addEventListener("click", async () => { const t = await startWriteLogin(); if (t) openPickerWithToken(t); });
+      } else openPickerWithToken(token);
+    });
+  };
+
+  // Suggested videos
+  if (suggestedData.status === "fulfilled") {
+    const items = (suggestedData.value.items || []).filter(v => (v.id?.videoId || v.id) !== videoId);
+    items.forEach(item => {
+      const s = item.snippet || {};
+      const vid = item.id?.videoId || item.id;
+      if (!vid) return;
+      const thumb = s.thumbnails?.medium?.url || s.thumbnails?.default?.url || "";
+      const ago = timeAgo(s.publishedAt);
+      const card = document.createElement("div");
+      card.className = "video-card parallax";
+      card.style.marginBottom = "10px";
+      card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${s.title || ""}</div><div class="video-channel">${s.channelTitle || ""}</div><div class="video-meta">${ago}</div></div>`;
+      card.onclick = async () => {
+        const short = await checkIsShort(vid, s);
+        if (short) openAsShort(vid, s);
+        else { setPlayerVideo(vid, s); showHUD("Playing: " + (s.title || "")); }
+      };
+      sugFeed.appendChild(card);
+    });
+  }
 }
 
 function postToPlayer(cmd) {
