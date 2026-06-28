@@ -1568,9 +1568,15 @@ async function loadVideoInfoPanel(videoId, snippet) {
   // Subscribe button
   const subBtn = document.getElementById("vipSubscribeBtn");
   let subscribed = false;
-  let subscriptionId = null; // needed to delete (unsubscribe)
+  let subscriptionId = null;
 
-  // Check if already subscribed on load
+  // Reset button to unsubscribed state immediately — never assume subscribed
+  subBtn.textContent = "Subscribe";
+  subBtn.style.background = "#f5f7ff";
+  subBtn.style.color = "#000";
+  subBtn.disabled = false;
+
+  // Then check actual subscription status via API
   if (channelId) {
     getValidToken().then(async token => {
       if (!token) return;
@@ -1587,6 +1593,7 @@ async function loadVideoInfoPanel(videoId, snippet) {
           subBtn.style.background = "rgba(60,242,255,0.2)";
           subBtn.style.color = "#3cf2ff";
         }
+        // If no items — remains "Subscribe" (already set above)
       } catch(e) {}
     });
   }
@@ -2126,10 +2133,10 @@ homeTab.addEventListener("click", async () => {
     const items = await fetchPersonalizedFeed();
     renderFeed(items);
     showHUD("For You ✦");
-    const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+    const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: new Date(Date.now()-172800000).toISOString(), _: Date.now() });
     nextPageToken = seed.nextPageToken || null;
   } else {
-    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: new Date(Date.now()-172800000).toISOString(), _: Date.now() });
     nextPageToken = data.nextPageToken || null; renderFeed(data.items || []); showHUD("Home");
   }
 });
@@ -2145,7 +2152,7 @@ trendingTab.addEventListener("click", async () => {
   const tRecent = hasTaste ? new Set(tShown.filter(e=>e.ts>sixAgo).map(e=>e.id)) : new Set();
   function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id)||tRecent.has(id))return; seen.add(id); allItems.push(item); }); }
   const fetches = [];
-  if (myCat) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:15,_:Date.now()}));
+  if (myCat) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:15,_:Date.now()+Math.random()}));
   if (cats.length>1) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:cats[1],maxResults:10,_:Date.now()}));
   if (cats.length>2) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:cats[2],maxResults:8,_:Date.now()}));
   fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",maxResults:15,_:Date.now()}));
@@ -2687,7 +2694,7 @@ async function loadMoreVideos() {
   const vt = nextPageToken !== "seed" ? nextPageToken : undefined;
   if (currentTab === "home") {
     // Rotate categories so every batch feels different — never dead-ends
-    data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+    data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: new Date(Date.now()-172800000).toISOString(), _: Date.now() });
     if (!data || !data.items || !data.items.length) data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
   }
   if (currentTab === "movies") {
@@ -2741,32 +2748,49 @@ scrollTopBtn.addEventListener("click", () => {
 
 /* === SCROLL DIRECTION LOCK ===
    Prevents horizontal/diagonal swipes from triggering vertical scroll.
-   On glasses, swiping left/right or at an angle often reads as scroll-down. */
+   Completely disabled when info panel is open — user needs free scrolling there.
+   dirLock auto-resets after 20s of inactivity to prevent stuck scroll. */
 (function() {
   function isInfoPanelOpen() {
     var p = document.getElementById("videoInfoPanel");
     return p && p.style.display !== "none";
   }
 
-  // Wheel: block horizontal component
+  // Wheel: block horizontal component (only on home/trending/movies/etc)
   window.addEventListener("wheel", function(e) {
     if (currentTab === "shorts") return;
     if (isInfoPanelOpen()) return;
     if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 0.5) { e.preventDefault(); }
   }, { passive: false });
 
-  // Touch: lock direction after first 10px of movement
-  var tStartX = 0, tStartY = 0, dirLock = null;
+  // Touch direction lock with auto-reset after 20s inactivity
+  var tStartX = 0, tStartY = 0, dirLock = null, lockTimer = null;
+
+  function resetLock() {
+    dirLock = null;
+  }
+
   document.addEventListener("touchstart", function(e) {
     if (currentTab === "shorts") return;
-    if (isInfoPanelOpen()) return;
+    if (isInfoPanelOpen()) { dirLock = null; return; }
     tStartX = e.touches[0].clientX;
     tStartY = e.touches[0].clientY;
     dirLock = null;
+    // Reset lock timer on each new touch
+    if (lockTimer) clearTimeout(lockTimer);
   }, { passive: true });
+
+  document.addEventListener("touchend", function(e) {
+    if (isInfoPanelOpen()) return;
+    // Auto-reset dirLock after 20s of no new touches
+    if (lockTimer) clearTimeout(lockTimer);
+    lockTimer = setTimeout(resetLock, 20000);
+  }, { passive: true });
+
   document.addEventListener("touchmove", function(e) {
     if (currentTab === "shorts") return;
-    if (isInfoPanelOpen()) return;
+    // When info panel is open — never block any direction
+    if (isInfoPanelOpen()) { dirLock = null; return; }
     if (!dirLock) {
       var dx = Math.abs(e.touches[0].clientX - tStartX);
       var dy = Math.abs(e.touches[0].clientY - tStartY);
@@ -3313,10 +3337,10 @@ async function silentSync(token){
       const items = await fetchPersonalizedFeed();
       renderFeed(items);
       showHUD("For You ✦");
-      const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+      const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: new Date(Date.now()-172800000).toISOString(), _: Date.now() });
       nextPageToken = seed.nextPageToken || null;
     } else {
-      const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+      const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: new Date(Date.now()-172800000).toISOString(), _: Date.now() });
       nextPageToken = data.nextPageToken || null;
       renderFeed(data.items || []);
     }
@@ -3330,7 +3354,14 @@ async function silentSync(token){
 
   // Silent background sync every 6 hours
   const tkn = await getValidToken();
-  if (tkn) { const p = getTasteProfile(); if (Date.now() - (p.syncedAt||0) > 7200000) { silentSync(tkn).then(()=>showHUD("Feed updated ✦")).catch(()=>{}); } }
+  // Sync on startup always, then repeat every 5 minutes
+  if (tkn) {
+    silentSync(tkn).then(() => showHUD("Feed updated ✦")).catch(() => {});
+    setInterval(async () => {
+      const t = await getValidToken();
+      if (t) silentSync(t).catch(() => {});
+    }, 300000); // every 5 minutes
+  }
 })();
 </script>
 </body>
