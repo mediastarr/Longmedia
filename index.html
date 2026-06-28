@@ -1952,14 +1952,39 @@ async function fetchContentDetails(videoIds) {
   } catch(e) { return {}; }
 }
 
-// Check if a single video is a Short using YouTube API contentDetails.
-// A Short is: duration ≤ 60s AND dimension is "2d" vertical (no dimension check
-// available in API, but duration ≤ 60s is the primary signal YouTube uses).
-// Also accepts explicit _isShort flag set by the Shorts tab pipeline.
+// Check thumbnail aspect ratio by loading the image and reading naturalWidth/Height
+// YouTube Shorts thumbnails are portrait (height > width), regular videos are landscape
+// Uses a 3s timeout to avoid blocking on slow connections
+function checkThumbnailAspectRatio(videoId, snippet) {
+  return new Promise(resolve => {
+    // Try to get thumbnail URL from snippet first, fall back to standard URL
+    const thumbUrl = snippet?.thumbnails?.medium?.url ||
+      snippet?.thumbnails?.default?.url ||
+      `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+
+    const img = new Image();
+    const timer = setTimeout(() => { img.src = ''; resolve(null); }, 3000);
+
+    img.onload = () => {
+      clearTimeout(timer);
+      const ratio = img.naturalWidth / img.naturalHeight;
+      // Portrait (9:16 ≈ 0.5625) or Square (1:1 = 1.0)
+      // Standard landscape (16:9 ≈ 1.777)
+      // Use 1.2 as threshold — anything below is portrait/square = Short
+      resolve(ratio < 1.2 ? 'portrait' : 'landscape');
+    };
+    img.onerror = () => { clearTimeout(timer); resolve(null); };
+    img.src = thumbUrl;
+  });
+}
+
+// Check if a single video is a Short:
+// PRIMARY:   Duration ≤ 2:44 (164s) from YouTube API contentDetails
+// SECONDARY: Thumbnail aspect ratio < 1.2 (portrait/square) as confirmation
+// Both signals must agree for a confident Short detection
 async function checkIsShort(videoId, snippet) {
   if (_shortsCache[videoId] !== undefined) return _shortsCache[videoId];
 
-  // Explicit flag from Shorts tab
   if (snippet && snippet._isShort) {
     _shortsCache[videoId] = true;
     return true;
@@ -1968,31 +1993,50 @@ async function checkIsShort(videoId, snippet) {
   try {
     const details = await fetchContentDetails([videoId]);
     const cd = details[videoId];
+
     if (cd) {
       const secs = parseDuration(cd.duration);
-      const result = secs !== null && secs > 0 && secs <= 180; // YouTube Shorts: up to 3 minutes
-      _shortsCache[videoId] = result;
-      return result;
+      const durationOk = secs !== null && secs > 0 && secs <= 164;
+
+      if (!durationOk) {
+        // Duration too long — definitely not a Short regardless of thumbnail
+        _shortsCache[videoId] = false;
+        return false;
+      }
+
+      // Duration qualifies — now check thumbnail aspect ratio
+      const thumbResult = await checkThumbnailAspectRatio(videoId, snippet);
+      if (thumbResult === 'portrait') {
+        // Both duration AND portrait thumbnail → confirmed Short
+        _shortsCache[videoId] = true;
+        return true;
+      } else if (thumbResult === 'landscape') {
+        // Duration ok but landscape thumbnail → horizontal video, not a Short
+        _shortsCache[videoId] = false;
+        return false;
+      } else {
+        // Thumbnail check failed/timeout — trust duration alone
+        _shortsCache[videoId] = true;
+        return true;
+      }
     }
     // Not in API response — not a short
     _shortsCache[videoId] = false;
     return false;
   } catch(e) {
-    // API failed — safe default
     _shortsCache[videoId] = false;
     return false;
   }
 }
 
-// Sync check — only true if API confirmed ≤60s
+// Sync check — only true if API confirmed
 function isShort(videoId, snippet) {
   if (_shortsCache[videoId] !== undefined) return _shortsCache[videoId];
   if (snippet && snippet._isShort) return true;
   return false;
 }
 
-// Pre-check a batch of videos in one API call and populate cache.
-// Called when a feed page loads so taps are instant (cache already warm).
+// Pre-check a batch of videos — duration check first, then thumbnail for borderline cases
 async function preCacheShorts(items) {
   const uncached = items
     .map(item => item.id?.videoId || item.id)
@@ -2001,19 +2045,46 @@ async function preCacheShorts(items) {
 
   try {
     const details = await fetchContentDetails(uncached);
+
+    // Split into: definitely not shorts (duration too long), and candidates (duration ok)
+    const candidates = [];
     uncached.forEach(id => {
       const cd = details[id];
       if (cd) {
         const secs = parseDuration(cd.duration);
-        // Only ≤60s videos are Shorts — never guess, never false-positive
-        _shortsCache[id] = secs !== null && secs > 0 && secs <= 180; // YouTube Shorts: up to 3 minutes
+        if (secs !== null && secs > 0 && secs <= 164) {
+          candidates.push(id); // Duration qualifies — check thumbnail
+        } else {
+          _shortsCache[id] = false; // Too long — done
+        }
       } else {
-        // Not in API response = not a short
-        _shortsCache[id] = false;
+        _shortsCache[id] = false; // Not in API — done
       }
     });
+
+    // For duration candidates, check thumbnail aspect ratio in parallel
+    if (candidates.length > 0) {
+      const snippetMap = {};
+      items.forEach(item => {
+        const id = item.id?.videoId || item.id;
+        if (id) snippetMap[id] = item.snippet || {};
+      });
+
+      const thumbChecks = candidates.map(id =>
+        checkThumbnailAspectRatio(id, snippetMap[id])
+          .then(result => {
+            if (result === 'portrait') {
+              _shortsCache[id] = true;  // Portrait → Short
+            } else if (result === 'landscape') {
+              _shortsCache[id] = false; // Landscape → not a Short
+            } else {
+              _shortsCache[id] = true;  // Timeout/fail → trust duration
+            }
+          })
+      );
+      await Promise.allSettled(thumbChecks);
+    }
   } catch(e) {
-    // API failed — safe default: not a short
     uncached.forEach(id => { _shortsCache[id] = false; });
   }
 }
