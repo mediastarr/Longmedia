@@ -1953,11 +1953,13 @@ async function fetchContentDetails(videoIds) {
 }
 
 // Check if a single video is a Short using YouTube API contentDetails.
-// Duration ≤ 2:44 (164s) = Short. Duration only — thumbnail check removed
-// because YouTube generates landscape thumbnails for many real Shorts.
+// A Short is: duration ≤ 60s AND dimension is "2d" vertical (no dimension check
+// available in API, but duration ≤ 60s is the primary signal YouTube uses).
+// Also accepts explicit _isShort flag set by the Shorts tab pipeline.
 async function checkIsShort(videoId, snippet) {
   if (_shortsCache[videoId] !== undefined) return _shortsCache[videoId];
 
+  // Explicit flag from Shorts tab
   if (snippet && snippet._isShort) {
     _shortsCache[videoId] = true;
     return true;
@@ -1968,19 +1970,21 @@ async function checkIsShort(videoId, snippet) {
     const cd = details[videoId];
     if (cd) {
       const secs = parseDuration(cd.duration);
-      const result = secs !== null && secs > 0 && secs <= 164;
+      const result = secs !== null && secs > 0 && secs <= 180; // YouTube Shorts: up to 3 minutes
       _shortsCache[videoId] = result;
       return result;
     }
+    // Not in API response — not a short
     _shortsCache[videoId] = false;
     return false;
   } catch(e) {
+    // API failed — safe default
     _shortsCache[videoId] = false;
     return false;
   }
 }
 
-// Sync check — only true if API confirmed
+// Sync check — only true if API confirmed ≤60s
 function isShort(videoId, snippet) {
   if (_shortsCache[videoId] !== undefined) return _shortsCache[videoId];
   if (snippet && snippet._isShort) return true;
@@ -1988,6 +1992,7 @@ function isShort(videoId, snippet) {
 }
 
 // Pre-check a batch of videos in one API call and populate cache.
+// Called when a feed page loads so taps are instant (cache already warm).
 async function preCacheShorts(items) {
   const uncached = items
     .map(item => item.id?.videoId || item.id)
@@ -2000,12 +2005,15 @@ async function preCacheShorts(items) {
       const cd = details[id];
       if (cd) {
         const secs = parseDuration(cd.duration);
-        _shortsCache[id] = secs !== null && secs > 0 && secs <= 164;
+        // Only ≤60s videos are Shorts — never guess, never false-positive
+        _shortsCache[id] = secs !== null && secs > 0 && secs <= 180; // YouTube Shorts: up to 3 minutes
       } else {
+        // Not in API response = not a short
         _shortsCache[id] = false;
       }
     });
   } catch(e) {
+    // API failed — safe default: not a short
     uncached.forEach(id => { _shortsCache[id] = false; });
   }
 }
