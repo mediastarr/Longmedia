@@ -1568,27 +1568,146 @@ async function loadVideoInfoPanel(videoId, snippet) {
   // Subscribe button
   const subBtn = document.getElementById("vipSubscribeBtn");
   let subscribed = false;
+  let subscriptionId = null; // needed to delete (unsubscribe)
+
+  // Check if already subscribed on load
+  if (channelId) {
+    getValidToken().then(async token => {
+      if (!token) return;
+      try {
+        const res = await fetch(
+          `https://www.googleapis.com/youtube/v3/subscriptions?part=id&mine=true&forChannelId=${channelId}`,
+          { headers: { Authorization: "Bearer " + token } }
+        );
+        const d = await res.json();
+        if (d.items && d.items.length > 0) {
+          subscribed = true;
+          subscriptionId = d.items[0].id;
+          subBtn.textContent = "Subscribed ✓";
+          subBtn.style.background = "rgba(60,242,255,0.2)";
+          subBtn.style.color = "#3cf2ff";
+        }
+      } catch(e) {}
+    });
+  }
+
   subBtn.onclick = async () => {
-    subscribed = !subscribed;
-    subBtn.textContent = subscribed ? "Subscribed ✓" : "Subscribe";
-    subBtn.style.background = subscribed ? "rgba(60,242,255,0.2)" : "#f5f7ff";
-    subBtn.style.color = subscribed ? "#3cf2ff" : "#000";
-    showHUD(subscribed ? "Subscribed ✓" : "Unsubscribed");
+    const token = await getValidToken();
+    if (!token) { showHUD("Login required to subscribe"); return; }
+    if (!channelId) { showHUD("Channel not available"); return; }
+
+    if (!subscribed) {
+      // Subscribe
+      subBtn.textContent = "Subscribing…"; subBtn.disabled = true;
+      try {
+        const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+          body: JSON.stringify({ snippet: { resourceId: { kind: "youtube#channel", channelId } } })
+        });
+        const d = await res.json();
+        if (d.id) {
+          subscribed = true;
+          subscriptionId = d.id;
+          subBtn.textContent = "Subscribed ✓";
+          subBtn.style.background = "rgba(60,242,255,0.2)";
+          subBtn.style.color = "#3cf2ff";
+          showHUD("✓ Subscribed!");
+        } else {
+          subBtn.textContent = "Subscribe";
+          showHUD("Subscribe failed — try again");
+        }
+      } catch(e) {
+        subBtn.textContent = "Subscribe";
+        showHUD("Subscribe failed");
+      }
+      subBtn.disabled = false;
+    } else {
+      // Unsubscribe
+      if (!subscriptionId) { showHUD("Cannot unsubscribe — ID not found"); return; }
+      subBtn.textContent = "Unsubscribing…"; subBtn.disabled = true;
+      try {
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/subscriptions?id=${subscriptionId}`, {
+          method: "DELETE",
+          headers: { Authorization: "Bearer " + token }
+        });
+        if (res.status === 204) {
+          subscribed = false;
+          subscriptionId = null;
+          subBtn.textContent = "Subscribe";
+          subBtn.style.background = "#f5f7ff";
+          subBtn.style.color = "#000";
+          showHUD("Unsubscribed");
+        } else {
+          subBtn.textContent = "Subscribed ✓";
+          showHUD("Unsubscribe failed — try again");
+        }
+      } catch(e) {
+        subBtn.textContent = "Subscribed ✓";
+        showHUD("Unsubscribe failed");
+      }
+      subBtn.disabled = false;
+    }
   };
 
-  // Like / Dislike
+  // Like / Dislike — calls YouTube Ratings API for real
   let liked = false, disliked = false;
-  document.getElementById("vipLikeBtn").onclick = () => {
+
+  // Check existing rating on load
+  getValidToken().then(token => {
+    if (!token) return;
+    fetch(`https://www.googleapis.com/youtube/v3/videos/getRating?id=${videoId}`, {
+      headers: { Authorization: "Bearer " + token }
+    }).then(r => r.json()).then(d => {
+      const rating = d.items?.[0]?.rating;
+      if (rating === "like")    { liked = true;    document.getElementById("vipLikeBtn").classList.add("active"); }
+      if (rating === "dislike") { disliked = true; document.getElementById("vipDislikeBtn").classList.add("active"); }
+    }).catch(() => {});
+  });
+
+  async function setRating(rating) {
+    const token = await getValidToken();
+    if (!token) { showHUD("Login required to rate videos"); return false; }
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos/rate?id=${videoId}&rating=${rating}`,
+        { method: "POST", headers: { Authorization: "Bearer " + token } }
+      );
+      return res.status === 204 || res.ok;
+    } catch(e) { return false; }
+  }
+
+  document.getElementById("vipLikeBtn").onclick = async () => {
+    const wasLiked = liked;
     liked = !liked; disliked = false;
     document.getElementById("vipLikeBtn").classList.toggle("active", liked);
     document.getElementById("vipDislikeBtn").classList.remove("active");
-    showHUD(liked ? "👍 Liked!" : "Like removed");
+    showHUD(liked ? "👍 Liking…" : "Removing like…");
+    const ok = await setRating(liked ? "like" : "none");
+    if (ok) {
+      showHUD(liked ? "👍 Liked!" : "Like removed");
+    } else {
+      // Revert on failure
+      liked = wasLiked;
+      document.getElementById("vipLikeBtn").classList.toggle("active", liked);
+      showHUD("Login required to like videos");
+    }
   };
-  document.getElementById("vipDislikeBtn").onclick = () => {
+
+  document.getElementById("vipDislikeBtn").onclick = async () => {
+    const wasDisliked = disliked;
     disliked = !disliked; liked = false;
     document.getElementById("vipDislikeBtn").classList.toggle("active", disliked);
     document.getElementById("vipLikeBtn").classList.remove("active");
-    showHUD(disliked ? "👎 Noted" : "Dislike removed");
+    showHUD(disliked ? "👎 Rating…" : "Removing rating…");
+    const ok = await setRating(disliked ? "dislike" : "none");
+    if (ok) {
+      showHUD(disliked ? "👎 Disliked" : "Rating removed");
+    } else {
+      disliked = wasDisliked;
+      document.getElementById("vipDislikeBtn").classList.toggle("active", disliked);
+      showHUD("Login required to rate videos");
+    }
   };
   document.getElementById("vipShareBtn").onclick = () => {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
