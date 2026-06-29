@@ -2627,35 +2627,44 @@ async function getValidToken() {
 }
 
 async function loadSubscriptions() {
-  // Always get a fresh token — never use a cached one from before re-login
-  let token = await getValidToken();
-  if (!token) {
-    // Try one refresh before giving up
+  // Show skeletons immediately so user sees activity
+  subsFeedEl.innerHTML = Array(6).fill('<div class="skeleton"><div class="skeleton-thumb"></div><div class="skeleton-info"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>').join("");
+  subsNextPageToken = null;
+
+  let token = localStorage.getItem("yt_access_token");
+  // Refresh if expired
+  if (!token || isTokenExpired()) {
     const ok = await refreshAccessToken();
     token = ok ? localStorage.getItem("yt_access_token") : null;
   }
-  if (!token) { deviceLoginStatusEl.textContent = "Login required — tap Login to YouTube."; return; }
-  subsFeedEl.innerHTML = ""; subsNextPageToken = null; showHUD("Loading subscriptions…");
+  if (!token) { subsFeedEl.innerHTML = ""; deviceLoginStatusEl.textContent = "Login required — tap Login to YouTube."; return; }
+
   try {
-    const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20&order=relevance", { headers: { Authorization: "Bearer " + token } });
+    const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance", { headers: { Authorization: "Bearer " + token } });
     const data = await res.json();
     if (data.error) {
-      // Token rejected — try refresh once
       const ok = await refreshAccessToken();
       if (ok) { loadSubscriptions(); return; }
+      subsFeedEl.innerHTML = "";
       deviceLoginStatusEl.textContent = "Session expired — tap Login to YouTube.";
       clearTokens(); return;
     }
     subsNextPageToken = data.nextPageToken || null;
-    if (!data.items || !data.items.length) { subsFeedEl.innerHTML = `<div style="font-size:12px;opacity:0.8;">No subscriptions found. Make sure you are subscribed to channels on YouTube.</div>`; return; }
+    subsFeedEl.innerHTML = "";
+    if (!data.items || !data.items.length) {
+      subsFeedEl.innerHTML = '<div style="font-size:12px;opacity:0.8;">No subscriptions found.</div>'; return;
+    }
+    const frag = document.createDocumentFragment();
     data.items.forEach(item => {
       const ch = item.snippet; const channelId = ch.resourceId.channelId;
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
       card.innerHTML = `<div class="video-thumb"><img src="${ch.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${ch.title}</div><div class="video-channel">${ch.channelTitle || "Channel"}</div><div class="video-meta">Tap to open channel</div></div>`;
       card.onclick = () => { currentChannelId = channelId; subsPageEl.style.display = "none"; setActiveTab("channel"); loadChannelPage(channelId); };
-      subsFeedEl.appendChild(card);
+      frag.appendChild(card);
     });
-  } catch (e) { subsFeedEl.innerHTML = `<div style="font-size:12px;opacity:0.8;">Error loading subscriptions.</div>`; }
+    subsFeedEl.appendChild(frag);
+    showHUD("Subscriptions loaded ✓");
+  } catch(e) { subsFeedEl.innerHTML = '<div style="font-size:12px;opacity:0.8;">Error loading subscriptions.</div>'; }
 }
 
 playlistTab.addEventListener("click", async () => {
@@ -2667,30 +2676,50 @@ playlistTab.addEventListener("click", async () => {
 playlistLoginBtn.addEventListener("click", () => startDeviceLogin("playlists"));
 
 async function loadPlaylists() {
-  const token = await getValidToken(); if (!token) return;
-  playlistLoginPanel.style.display = "none"; playlistGrid.style.display = "none"; playlistItemsView.style.display = "none";
-  playlistGrid.innerHTML = ""; showHUD("Loading playlists…");
+  // Show skeletons immediately
+  playlistLoginPanel.style.display = "none";
+  playlistItemsView.style.display = "none";
+  playlistGrid.style.display = "grid";
+  playlistGrid.innerHTML = Array(6).fill('<div class="skeleton" style="border-radius:16px;min-height:140px;"><div class="skeleton-thumb" style="width:100%;height:90px;border-radius:12px 12px 0 0;flex:none;"></div><div class="skeleton-info" style="padding:8px;"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>').join("");
+
+  let token = localStorage.getItem("yt_access_token");
+  if (!token || isTokenExpired()) {
+    const ok = await refreshAccessToken();
+    token = ok ? localStorage.getItem("yt_access_token") : null;
+  }
+  if (!token) { playlistGrid.innerHTML = ""; playlistLoginPanel.style.display = "block"; return; }
+
   try {
     const res = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
     const data = await res.json();
     if (data.error) {
-      // Try refreshing token once before giving up
       const refreshed = await refreshAccessToken();
       if (refreshed) { loadPlaylists(); return; }
+      playlistGrid.innerHTML = "";
       playlistLoginPanel.style.display = "block";
       playlistLoginStatus.textContent = "Session expired. Please login again.";
       clearTokens(); return;
     }
-    if (!data.items || !data.items.length) { playlistGrid.innerHTML = `<div style="font-size:12px;opacity:0.8;grid-column:1/-1;">No playlists found.</div>`; playlistGrid.style.display = "grid"; return; }
+    playlistGrid.innerHTML = "";
+    if (!data.items || !data.items.length) {
+      playlistGrid.innerHTML = `<div style="font-size:12px;opacity:0.8;grid-column:1/-1;">No playlists found.</div>`;
+      return;
+    }
+    const frag = document.createDocumentFragment();
     data.items.forEach(pl => {
       const snippet = pl.snippet; const count = pl.contentDetails?.itemCount || 0;
-      const thumb = snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || ""; const title = snippet.title;
+      const thumb = snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || "";
+      const title = snippet.title;
       const card = document.createElement("div"); card.className = "playlist-card";
       card.innerHTML = `<div class="playlist-thumb-wrap">${thumb ? `<img src="${thumb}" alt="${title}">` : ""}<div class="playlist-count-badge"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><rect x="0" y="1" width="8" height="2" rx="1" fill="white" opacity="0.8"/><rect x="0" y="5" width="10" height="2" rx="1" fill="white" opacity="0.8"/><rect x="0" y="9" width="6" height="2" rx="1" fill="white" opacity="0.8"/></svg>${count}</div></div><div class="playlist-info"><div class="playlist-title">${title}</div><div class="playlist-sub">${count} video${count !== 1 ? "s" : ""}</div></div>`;
-      card.onclick = () => openPlaylist(pl.id, title); playlistGrid.appendChild(card);
+      card.onclick = () => openPlaylist(pl.id, title);
+      frag.appendChild(card);
     });
-    playlistGrid.style.display = "grid"; showHUD("Playlists loaded");
-  } catch (e) { playlistGrid.innerHTML = `<div style="font-size:12px;opacity:0.8;grid-column:1/-1;">Error loading playlists.</div>`; playlistGrid.style.display = "grid"; showHUD("Playlist error"); }
+    playlistGrid.appendChild(frag);
+    showHUD("Playlists loaded ✓");
+  } catch(e) {
+    playlistGrid.innerHTML = `<div style="font-size:12px;opacity:0.8;grid-column:1/-1;">Error loading playlists.</div>`;
+  }
 }
 
 async function openPlaylist(playlistId, title) {
