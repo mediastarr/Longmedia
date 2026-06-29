@@ -142,7 +142,7 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
 }
 /* CHANGE: sticky so medium player stays visible in viewport */
 #playerSection {
-  margin-top: 16px; border-radius: 22px; overflow: hidden; position: sticky; top: 12px; z-index: 30;
+  margin-top: 16px; border-radius: 22px; overflow: hidden; position: relative; z-index: 30;
   background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.18), rgba(5,6,12,0.98));
   height: 260px; display: none;
 }
@@ -1701,7 +1701,7 @@ async function loadVideoInfoPanel(videoId, snippet) {
   const sugFeed = document.getElementById("suggestedFeed");
   panel.style.display = "block";
   sugFeed.innerHTML = "";
-  window.scrollTo({ top: 0, behavior: "instant" });
+  // Don't force scroll to top — let user stay at their position
 
   // Fill from snippet immediately (fast)
   const title = snippet.title || "";
@@ -2995,9 +2995,20 @@ async function loadMoreVideos() {
   let data;
   const vt = nextPageToken !== "seed" ? nextPageToken : undefined;
   if (currentTab === "home") {
-    // Rotate categories so every batch feels different — never dead-ends
-    data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
-    if (!data || !data.items || !data.items.length) data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+    // Mix fresh (order:date) + popular for infinite scroll batches
+    const since48h = new Date(Date.now() - 172800000).toISOString();
+    const cat = freshCategory();
+    const topKW = getTopKeywords(3);
+    const seen2 = new Set(); const batch = [];
+    const [r1, r2] = await Promise.allSettled([
+      topKW.length >= 2
+        ? fetchYouTube("search", { part: "snippet", type: "video", q: topKW.slice(0,3).join(" "), order: "date", maxResults: 10, publishedAfter: since48h, _: Date.now() })
+        : fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 10, publishedAfter: since48h, _: Date.now() }),
+      fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 12, _: Date.now() })
+    ]);
+    [r1, r2].forEach(r => { if (r.status === "fulfilled") (r.value.items||[]).forEach(item => { const id = item.id?.videoId||item.id; if(!id||seen2.has(id)){return;} seen2.add(id); batch.push(item); }); });
+    data = { items: batch, nextPageToken: (r2.status==="fulfilled"&&r2.value.nextPageToken)||"seed" };
+    if (!data.items.length) data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
   }
   if (currentTab === "movies") {
     // Always rotate to a new query for movies — pageTokens expire quickly
@@ -3006,7 +3017,17 @@ async function loadMoreVideos() {
     if (data&&data.items) data.items = data.items.filter(v=>v.id&&v.id.videoId).map(v=>({id:v.id.videoId,snippet:v.snippet}));
     if (!data.nextPageToken) data.nextPageToken = "seed";
   }
-  if (currentTab === "trending") { data=await fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:getTopCategoryId()||undefined,maxResults:20,pageToken:vt,_:Date.now()}); }
+  if (currentTab === "trending") {
+    const since48h2 = new Date(Date.now()-172800000).toISOString();
+    const tcat = getTopCategoryId();
+    const [tr1, tr2] = await Promise.allSettled([
+      fetchYouTube("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:tcat||undefined,maxResults:10,publishedAfter:since48h2,_:Date.now()}),
+      fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:tcat||undefined,maxResults:12,pageToken:vt,_:Date.now()})
+    ]);
+    const tseen = new Set(); const tbatch = [];
+    [tr1,tr2].forEach(r=>{if(r.status==="fulfilled")(r.value.items||[]).forEach(item=>{const id=item.id?.videoId||item.id;if(!id||tseen.has(id))return;tseen.add(id);tbatch.push(item);});});
+    data = {items:tbatch, nextPageToken:(tr2.status==="fulfilled"&&tr2.value.nextPageToken)||"seed"};
+  }
   if (currentTab === "search") data = await fetchYouTube("search", { part: "snippet", q: lastSearchQuery, type: "video", maxResults: 20, pageToken: vt, _: Date.now() });
   if (currentTab === "channel") data = await fetchYouTube("playlistItems", { part: "snippet", playlistId: channelUploadsId, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
   if (!data) return;
@@ -3056,35 +3077,44 @@ scrollTopBtn.addEventListener("click", () => {
     var p = document.getElementById("videoInfoPanel");
     return p && p.style.display !== "none";
   }
+  function isPlayerVisible() {
+    var ps = document.getElementById("playerSection");
+    return ps && ps.style.display !== "none";
+  }
 
-  // Wheel: block horizontal component only — never block vertical
+  // Wheel: only block if CLEARLY horizontal (3x more X than Y)
   window.addEventListener("wheel", function(e) {
     if (currentTab === "shorts") return;
     if (isInfoPanelOpen()) return;
-    if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 0.5) { e.preventDefault(); }
+    if (isPlayerVisible()) return; // never intercept when player is showing
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 3) { e.preventDefault(); }
   }, { passive: false });
 
-  // Touch direction lock — completely disabled when info panel is open
-  // so suggested feed scrolls freely in any direction
-  var tStartX = 0, tStartY = 0, dirLock = null;
+  var tStartX = 0, tStartY = 0, dirLock = null, totalDx = 0, totalDy = 0;
+
   document.addEventListener("touchstart", function(e) {
-    // Always reset on new touch — prevents stale lock from previous gesture
-    dirLock = null;
+    dirLock = null; totalDx = 0; totalDy = 0;
     tStartX = e.touches[0].clientX;
     tStartY = e.touches[0].clientY;
   }, { passive: true });
+
   document.addEventListener("touchmove", function(e) {
     if (currentTab === "shorts") return;
-    // Info panel open = free scroll in all directions, no locking
-    if (isInfoPanelOpen()) { dirLock = null; return; }
-    // Player fullscreen = no direction interference
+    // Never lock when info panel or player is visible — user needs free vertical scroll
+    if (isInfoPanelOpen()) return;
+    if (isPlayerVisible()) return;
+
     var ps = document.getElementById("playerSection");
     if (ps && ps.classList.contains("player-fullscreen")) return;
+
     if (!dirLock) {
-      var dx = Math.abs(e.touches[0].clientX - tStartX);
-      var dy = Math.abs(e.touches[0].clientY - tStartY);
-      // Require stronger horizontal signal (1.5x) before locking — reduces false positives
-      if (dx + dy > 12) dirLock = dx > dy * 1.5 ? "h" : "v";
+      totalDx += Math.abs(e.touches[0].clientX - tStartX);
+      totalDy += Math.abs(e.touches[0].clientY - tStartY);
+      // Only lock horizontal if STRONGLY horizontal: 3x more X movement than Y
+      // This prevents diagonal Neural Band swipes from locking vertical scroll
+      if (totalDx + totalDy > 20) {
+        dirLock = totalDx > totalDy * 3 ? "h" : "v";
+      }
     }
     if (dirLock === "h") e.preventDefault();
   }, { passive: false });
@@ -3095,9 +3125,9 @@ window.addEventListener("scroll", async () => {
   scrollTopBtn.classList.toggle("visible", window.scrollY > 600);
   if (isLoadingMore || scrollCooldown) return;
   const scrollPos = window.innerHeight + window.scrollY;
-  const bottom = document.body.offsetHeight - 400;
+  const bottom = document.body.offsetHeight - 600;
   if (scrollPos < bottom) return;
-  scrollCooldown = true; setTimeout(() => { scrollCooldown = false; }, 1500);
+  scrollCooldown = true; setTimeout(() => { scrollCooldown = false; }, 800);
   if (currentTab === "subs" && subsNextPageToken) {
     isLoadingMore = true;
     try { await loadMoreSubs(); } catch(e) {} finally { isLoadingMore = false; }
