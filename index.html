@@ -534,6 +534,20 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
     <div id="suggestions"></div>
   </div>
   <div id="feed"></div>
+  <!-- Video info panel — shown below medium player -->
+  <div id="videoInfoPanel" style="display:none; margin-top:12px; position:relative; z-index:10;">
+    <div id="vipTitle" style="font-size:15px; font-weight:600; line-height:1.35; padding:0 2px 8px; color:#f5f7ff;"></div>
+    <div id="vipStats" style="font-size:12px; opacity:0.7; padding-bottom:10px; border-bottom:1px solid rgba(60,242,255,0.12);"></div>
+    <div id="vipChannel" style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid rgba(60,242,255,0.12);">
+      <div id="vipAvatar" style="width:36px; height:36px; border-radius:999px; background:rgba(60,242,255,0.2); flex-shrink:0; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:16px;">📺</div>
+      <div style="flex:1; min-width:0;">
+        <div id="vipChannelName" style="font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+        <div id="vipSubs" style="font-size:11px; opacity:0.6; margin-top:1px;"></div>
+      </div>
+    </div>
+    <div style="font-size:12px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:rgba(60,242,255,0.7); padding:10px 2px 6px;">Up Next</div>
+    <div id="suggestedFeed"></div>
+  </div>
   <div id="channelPage"></div>
   <div id="subsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
     <div class="channel-banner">
@@ -956,6 +970,29 @@ function hasEnoughHistory() { return historyList.length >= 3; }
 
    Phase 3: MERGE — interleave scored candidates into a unified stream
 ----------------------------------------------------------- */
+
+function timeAgo(dateStr) {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff/60000), h = Math.floor(diff/3600000), d = Math.floor(diff/86400000);
+  const w = Math.floor(d/7), mo = Math.floor(d/30), y = Math.floor(d/365);
+  if (m < 1) return "just now";
+  if (m < 60) return m + " minute" + (m>1?"s":"") + " ago";
+  if (h < 24) return h + " hour" + (h>1?"s":"") + " ago";
+  if (d < 7) return d + " day" + (d>1?"s":"") + " ago";
+  if (w < 4) return w + " week" + (w>1?"s":"") + " ago";
+  if (mo < 12) return mo + " month" + (mo>1?"s":"") + " ago";
+  return y + " year" + (y>1?"s":"") + " ago";
+}
+
+function formatViews(n) {
+  if (!n || n === "0" || n === 0) return "";
+  n = parseInt(n); if (!n) return "";
+  if (n >= 1000000) return (n/1000000).toFixed(1).replace(/\.0$/,"") + "M";
+  if (n >= 1000) return (n/1000).toFixed(1).replace(/\.0$/,"") + "K";
+  return n.toLocaleString();
+}
+
 async function fetchPersonalizedFeed() {
   const topChannels = getTopChannels(6);
   const topKeywords = getTopKeywords(6);
@@ -1103,6 +1140,7 @@ function hideUIForVideo() {
   keyboardEl.style.display = "none";
   suggestionsEl.style.display = "none";
   playlistPageEl.style.display = "none";
+  document.getElementById("videoInfoPanel").style.display = "none";
 }
 
 function showUIWithMiniPlayer() {
@@ -1114,6 +1152,7 @@ function showUIWithMiniPlayer() {
   subsPageEl.style.display = "none";
   playlistPageEl.style.display = "none";
   shortsPageEl.style.display = "none";
+  document.getElementById("videoInfoPanel").style.display = "none";
   if (currentTab === "channel") channelPageEl.style.display = "block";
   else if (currentTab === "subs") subsPageEl.style.display = "block";
   else if (currentTab === "playlists") playlistPageEl.style.display = "block";
@@ -1148,6 +1187,7 @@ closeMini.addEventListener("click", () => {
   document.body.classList.remove("ui-hidden");
   hideUIBtn.textContent = "Hide UI";
   playerSection.style.display = "none";
+  document.getElementById("videoInfoPanel").style.display = "none";
   if (ytPlayer) { try { ytPlayer.stopVideo(); ytPlayer.destroy(); } catch(e) {} ytPlayer = null; }
   showUIWithMiniPlayer();
   showHUD("Player closed");
@@ -1244,6 +1284,7 @@ function setPlayerVideo(videoId, snippet) {
   playerSection.classList.remove("player-mini", "player-fullscreen");
   saveToHistory({ id: videoId, snippet });
   hideUIForVideo();
+  loadVideoInfoPanel(videoId, snippet);
   playPauseBtn.textContent = "Pause";
   initAudioGlow();
   if (ytReady) createYTPlayer(videoId);
@@ -1599,7 +1640,7 @@ async function startDeviceLogin(source) {
   const statusEl = source === "playlists" ? playlistLoginStatus : deviceLoginStatusEl;
   const res = await fetch("https://oauth2.googleapis.com/device/code", {
     method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube.readonly" })
+    body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube" })
   });
   const data = await res.json();
   codeEl.textContent = "Code: " + data.user_code;
@@ -2125,6 +2166,95 @@ document.getElementById("reloginBtn").addEventListener("click", () => { clearTok
 function buildExtract(profile){const sw=new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","this","that","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","have","has","he","she","they","do","did","new","vs","ep","ft","official","video","full","2024","2025","2026","part","episode"]);return function(title,chId,chTitle,weight){weight=weight||1;if(chId){profile.channels[chId]=profile.channels[chId]||{title:chTitle,weight:0,lastWatch:0,watches:[]};profile.channels[chId].weight+=weight;if(chTitle)profile.channels[chId].title=chTitle;if(!profile.channels[chId].lastWatch)profile.channels[chId].lastWatch=Date.now();}if(title){const words=title.toLowerCase().replace(/[^a-z0-9\s]/g,"").split(/\s+/).filter(word=>word.length>2&&!sw.has(word));words.forEach(word=>{profile.keywords[word]=(profile.keywords[word]||0)+weight;});for(let i=0;i<words.length-1;i++){const bi=words[i]+" "+words[i+1];profile.bigrams[bi]=(profile.bigrams[bi]||0)+weight;}}};}
 syncStartBtn.onclick=async function(){const token=await getValidToken();if(!token){syncStatus.textContent="Not logged in — login via Subscriptions first.";return;}syncStartBtn.disabled=true;syncStartBtn.textContent="Syncing…";syncProgress.style.display="block";const profile=getTasteProfile();profile.channels=profile.channels||{};profile.categories=profile.categories||{};profile.keywords=profile.keywords||{};profile.bigrams=profile.bigrams||{};profile.recentVideoIds=profile.recentVideoIds||[];const extract=buildExtract(profile);const isFirst=!profile.syncedAt;let total=0;function sp(pct,msg){syncProgressFill.style.width=pct+"%";syncStatus.textContent=msg;}sp(5,isFirst?"Deep syncing liked videos…":"Reading liked videos…");try{let pt="",pages=0,max=isFirst?25:10;while(pages<max){const url="https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=20"+(pt?"&pageToken="+pt:"");const r=await fetch(url,{headers:{Authorization:"Bearer "+token}});const d=await r.json();if(d.error||!d.items)break;d.items.forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,3);const vid=s.resourceId?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);total++;});pt=d.nextPageToken||"";pages++;if(!pt)break;sp(5+Math.round((pages/max)*15),"Liked: "+total+" so far…");}sp(20,"Liked videos: "+total+" signals");}catch(e){}sp(22,"Reading Watch Later…");try{const r=await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=50",{headers:{Authorization:"Bearer "+token}});const d=await r.json();(d.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,2);total++;});sp(30,"Watch Later: "+total+" signals");}catch(e){}sp(52,"Reading subscriptions…");try{const sr=await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});const sd=await sr.json();const cids=(sd.items||[]).map(s=>{extract(null,s.snippet.resourceId.channelId,s.snippet.title,1);return s.snippet.resourceId.channelId;});if(cids.length){const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,50).join(",")});const ups=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);const sc=isFirst?20:5;for(const plId of ups.sort(()=>Math.random()-0.5).slice(0,sc)){try{const ur=await fetchYouTube("playlistItems",{part:"snippet",playlistId:plId,maxResults:8,_:Date.now()});(ur.items||[]).forEach(it=>{extract(it.snippet?.title,null,null,1);total++;});}catch(e){}}}sp(75,"Subscriptions: "+total+" signals");}catch(e){}profile.recentVideoIds=profile.recentVideoIds.slice(0,50);profile.syncedAt=Date.now();localStorage.setItem("tasteProfile",JSON.stringify(profile));localStorage.removeItem("feedShownTimed");localStorage.removeItem("feedShownIds");sp(100,"✓ Sync complete — "+total+" signals");syncStartBtn.textContent="Sync Again";syncStartBtn.disabled=false;showHUD("YouTube synced ✦");setTimeout(()=>{syncOverlay.style.display="none";homeTab.click();},1500);};
 async function silentSync(token){const profile=getTasteProfile();profile.channels=profile.channels||{};profile.categories=profile.categories||{};profile.keywords=profile.keywords||{};profile.bigrams=profile.bigrams||{};profile.recentVideoIds=profile.recentVideoIds||[];const extract=buildExtract(profile);const isFirst=!profile.syncedAt,maxPages=isFirst?10:5;try{let pt="";for(let p=0;p<maxPages;p++){const url="https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=20"+(pt?"&pageToken="+pt:"");const r=await fetch(url,{headers:{Authorization:"Bearer "+token}});const d=await r.json();if(d.error||!d.items)break;d.items.forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,3);});pt=d.nextPageToken||"";if(!pt)break;}}catch(e){}try{const sr=await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});const sd=await sr.json();const cids=(sd.items||[]).map(s=>{extract(null,s.snippet.resourceId.channelId,s.snippet.title,1);return s.snippet.resourceId.channelId;});if(cids.length){const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,50).join(",")});const ups=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);for(const plId of ups.sort(()=>Math.random()-0.5).slice(0,isFirst?15:5)){try{const ur=await fetchYouTube("playlistItems",{part:"snippet",playlistId:plId,maxResults:8,_:Date.now()});(ur.items||[]).forEach(it=>{extract(it.snippet?.title,null,null,1);});}catch(e){}}}}catch(e){}profile.recentVideoIds=profile.recentVideoIds.slice(0,50);profile.syncedAt=Date.now();localStorage.setItem("tasteProfile",JSON.stringify(profile));}
+
+
+async function loadVideoInfoPanel(videoId, snippet) {
+  const panel = document.getElementById("videoInfoPanel");
+  const sugFeed = document.getElementById("suggestedFeed");
+  panel.style.display = "block";
+  sugFeed.innerHTML = "";
+  window.scrollTo({ top: 0, behavior: "instant" });
+
+  const title = snippet.title || "";
+  const channelId = snippet.channelId || "";
+  const publishedAt = snippet.publishedAt || "";
+
+  document.getElementById("vipTitle").textContent = title;
+  document.getElementById("vipChannelName").textContent = snippet.channelTitle || "";
+  document.getElementById("vipStats").textContent = timeAgo(publishedAt);
+  document.getElementById("vipSubs").textContent = "";
+
+  // Fetch video stats + channel info in parallel
+  const [videoData, channelData] = await Promise.allSettled([
+    fetchYouTube("videos", { part: "snippet,statistics", id: videoId, _: Date.now() }),
+    channelId ? fetchYouTube("channels", { part: "snippet,statistics", id: channelId, _: Date.now() }) : Promise.resolve(null),
+  ]);
+
+  if (videoData.status === "fulfilled" && videoData.value.items?.[0]) {
+    const v = videoData.value.items[0];
+    const stats = v.statistics || {};
+    const views = formatViews(stats.viewCount);
+    const likes = formatViews(stats.likeCount);
+    const ago = timeAgo(v.snippet?.publishedAt || publishedAt);
+    document.getElementById("vipStats").textContent = [views && views + " views", likes && likes + " likes", ago].filter(Boolean).join("  ·  ");
+  }
+
+  if (channelData.status === "fulfilled" && channelData.value?.items?.[0]) {
+    const ch = channelData.value.items[0];
+    const subs = formatViews(ch.statistics?.subscriberCount);
+    document.getElementById("vipSubs").textContent = subs ? subs + " subscribers" : "";
+    const avatarUrl = ch.snippet?.thumbnails?.default?.url;
+    if (avatarUrl) document.getElementById("vipAvatar").innerHTML = `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+  }
+
+  // Suggested videos — skeletons while loading
+  sugFeed.innerHTML = Array(4).fill('<div class="skeleton"><div class="skeleton-thumb"></div><div class="skeleton-info"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>').join("");
+
+  const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","ft","ep","official","video","full"]);
+  const titleWords = title.toLowerCase().replace(/[^a-z0-9\s]/g," ").split(/\s+/).filter(w=>w.length>2&&!stopwords.has(w)).slice(0,4);
+  const topKW = getTopKeywords(3);
+  const topCat = getTopCategoryId();
+  const seen = new Set([videoId]);
+  const allItems = [];
+
+  function addItems(items) {
+    (items||[]).forEach(item => {
+      const vid = (typeof item.id==="string") ? item.id : item.id?.videoId;
+      if (!vid||seen.has(vid)) return;
+      seen.add(vid);
+      allItems.push({...item, _vid: vid});
+    });
+  }
+
+  const fetches = [];
+  if (channelId) fetches.push(fetchYouTube("search",{part:"snippet",channelId,type:"video",order:"date",maxResults:6,_:Date.now()}));
+  if (titleWords.length) fetches.push(fetchYouTube("search",{part:"snippet",type:"video",q:titleWords.join(" "),maxResults:8,_:Date.now()}));
+  if (topKW.length) fetches.push(fetchYouTube("search",{part:"snippet",type:"video",q:topKW.slice(0,3).join(" "),maxResults:6,_:Date.now()}));
+  fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:topCat||"0",maxResults:12,_:Date.now()}));
+  fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",maxResults:12,_:Date.now()}));
+
+  const results = await Promise.allSettled(fetches);
+  results.forEach(r => { if (r.status==="fulfilled") addItems(r.value.items); });
+
+  sugFeed.innerHTML = "";
+  if (!allItems.length) { sugFeed.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;opacity:0.6;">No suggestions available.</div>'; return; }
+
+  allItems.forEach(item => {
+    const s = item.snippet || {};
+    const vid = item._vid;
+    if (!vid) return;
+    const thumb = s.thumbnails?.medium?.url || s.thumbnails?.default?.url || "";
+    const views = item.statistics ? formatViews(item.statistics.viewCount) : "";
+    const ago = timeAgo(s.publishedAt);
+    const meta = [views && views+" views", ago].filter(Boolean).join(" · ");
+    const card = document.createElement("div");
+    card.className = "video-card parallax";
+    card.dataset.videoid = vid;
+    card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${s.title||""}</div><div class="video-channel">${s.channelTitle||""}</div><div class="video-meta">${meta}</div></div>`;
+    card.onclick = () => { setPlayerVideo(vid, s); showHUD("Playing: "+(s.title||"")); };
+    sugFeed.appendChild(card);
+  });
+}
 
 (async function init() {
   setTimeout(() => {
