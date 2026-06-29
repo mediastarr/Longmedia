@@ -1054,7 +1054,19 @@ const API_KEYS = [
   "AIzaSyClCermv6tii5xRnSst-5i-q1K_ytEB3nw",
   "AIzaSyAgNr0Pb8SJ16TtJ22J9AmOWR1Lm9MxHPc",
   "AIzaSyCxeRhm_E4meK59JHYFici67dF0q7i4gbs",
-  "AIzaSyAPXOQIVcdza66-tfeFUigOejEicvgdcas"
+  "AIzaSyAPXOQIVcdza66-tfeFUigOejEicvgdcas",
+  "AIzaSyCcJWHWaiorqj8Qpjb5AUYXT44XGxGxNeI",
+  "AIzaSyCILq9ctqaP60rD7P0ldHplc3Zljh55Mvk",
+  "AIzaSyDslyHBxTIaEFPWwowYOhUG39dP8VXERKs",
+  "AIzaSyDM5JjKJk1oOTWT7JafHycQ0YDfnCOVBhI",
+  "AIzaSyDFeSO31B744w9qG4Mos8bmQhxumuZqAlk",
+  "AIzaSyCxRkHWkD3dEZ7bu0KImsB6P8PHrVj2AFA",
+  "AIzaSyAp7n-yoWUh0iQEgiqZDqieUCbItWkaAC8",
+  "AIzaSyD8SGI3BxP-pPcsLmG5a_NBDR7YJa7tnuE",
+  "AIzaSyABp0mrVw1nX_Nukn8JFwdQTnPnqJwvZtY",
+  "AIzaSyCDnNSQVHwLWNyny_XSbiR0azQq6y3THvE",
+  "AIzaSyDCNpDnHN4dQFjco8glxAey6JaHCPaByA8",
+  "AIzaSyAeqrFuzZ8xkZ5kLZjRZyJeYJxSJ9dhr1M"
 ];
 
 let keyIndex = 0;
@@ -1360,8 +1372,11 @@ async function fetchPersonalizedFeed() {
         const uploadResults = await Promise.allSettled(uploadFetches);
         uploadResults.forEach(r => {
           if (r.status === "fulfilled") {
-            const sorted = (r.value.items || []).sort((a, b) => new Date(b.contentDetails?.videoPublishedAt || b.snippet?.publishedAt || 0) - new Date(a.contentDetails?.videoPublishedAt || a.snippet?.publishedAt || 0));
-            addItems(sorted.slice(0, 4).map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } })), 6);
+            const pf48h = Date.now() - 172800000;
+        const sorted = (r.value.items || []).sort((a, b) => new Date(b.contentDetails?.videoPublishedAt || b.snippet?.publishedAt || 0) - new Date(a.contentDetails?.videoPublishedAt || a.snippet?.publishedAt || 0));
+        const fresh = sorted.filter(it => new Date(it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt || 0).getTime() > pf48h);
+        const toAdd = fresh.length > 0 ? fresh : sorted; // fallback to all if nothing in 48h
+            addItems(toAdd.slice(0, 4).map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } })), 6);
           }
         });
       }
@@ -1948,10 +1963,11 @@ async function loadVideoInfoPanel(videoId, snippet) {
     card.className = "video-card parallax";
     card.dataset.videoid = vid;
     card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${s.title || ""}</div><div class="video-channel">${s.channelTitle || ""}</div><div class="video-meta">${meta}</div></div>`;
-    card.onclick = async () => {
-      const short = await checkIsShort(vid, s);
-      if (short) openAsShort(vid, s);
-      else { setPlayerVideo(vid, s); showHUD("Playing: " + (s.title || "")); }
+    card.onclick = () => {
+      // Always open suggested videos in medium player — never route to shorts player
+      // This prevents audio bleed from the medium player when tapping suggestions
+      setPlayerVideo(vid, s);
+      showHUD("Playing: " + (s.title || ""));
     };
     sugFeed.appendChild(card);
   });
@@ -2201,6 +2217,9 @@ function openAsShort(videoId, snippet) {
     showHUD("Back");
   };
 
+  // Stop medium player audio before opening shorts
+  if (ytPlayer) { try { ytPlayer.pauseVideo(); } catch(e) {} }
+
   // Trigger the real Shorts tab — it has working swipe, infinite scroll, everything
   shortsTab.click();
 
@@ -2292,15 +2311,25 @@ function setActiveTab(tab) {
 /* CHANGE: home tab uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
 homeTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("home"); showSkeletons(6);
-  if (hasEnoughHistory()) {
+  const token = await getValidToken();
+  const since48h = new Date(Date.now() - 172800000).toISOString();
+  if (token && hasEnoughHistory()) {
+    // Logged in: fetch personalized feed (subscription uploads + taste) filtered to 48h
     const items = await fetchPersonalizedFeed();
     renderFeed(items);
     showHUD("For You ✦");
-    const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+    const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: since48h, _: Date.now() });
     nextPageToken = seed.nextPageToken || null;
   } else {
-    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
-    nextPageToken = data.nextPageToken || null; renderFeed(data.items || []); showHUD("Home");
+    // Not logged in: trending videos from last 48h
+    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: since48h, _: Date.now() });
+    if (data && data.items && data.items.length) {
+      nextPageToken = data.nextPageToken || null; renderFeed(data.items); showHUD("Home");
+    } else {
+      // Fallback without date filter if 48h returns nothing
+      const data2 = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+      nextPageToken = data2.nextPageToken || null; renderFeed(data2.items || []); showHUD("Home");
+    }
   }
 });
 
@@ -2318,7 +2347,8 @@ trendingTab.addEventListener("click", async () => {
   if (myCat) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:15,_:Date.now()}));
   if (cats.length>1) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:cats[1],maxResults:10,_:Date.now()}));
   if (cats.length>2) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:cats[2],maxResults:8,_:Date.now()}));
-  fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",maxResults:15,_:Date.now()}));
+  const tSince48h = new Date(Date.now()-172800000).toISOString();
+  fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",maxResults:15,publishedAfter:tSince48h,_:Date.now()}));
   if (token) {
     fetches.push((async()=>{ try {
       const sr=await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=30&order=relevance",{headers:{Authorization:"Bearer "+token}});
@@ -2474,7 +2504,7 @@ shortsTab.addEventListener("click", async () => {
       fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",order,maxResults:8,_:Date.now()})
     ),
     // Generic rotation
-    fetchYouTube("search",{part:"snippet",q:genericQ,type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:"US",maxResults:10,_:Date.now()}),
+    fetchYouTube("search",{part:"snippet",q:genericQ,type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:"US",order:"date",maxResults:10,_:Date.now()}),
     // Discovery: trending in your category
     fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:catToSearch,videoDuration:"short",maxResults:10,_:Date.now()}),
     // Discovery: viral
@@ -2794,8 +2824,29 @@ async function refreshAccessToken() {
       body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, client_secret: OAUTH_CLIENT_SECRET, refresh_token: refreshToken, grant_type: "refresh_token" })
     });
     const data = await res.json();
-    if (data.access_token) { saveTokens(data); return true; }
-    clearTokens(); return false;
+    if (data.access_token) {
+      saveTokens(data);
+      // Clear any "needs relogin" flag since we just refreshed successfully
+      localStorage.removeItem("yt_needs_relogin");
+      return true;
+    }
+    // Refresh token expired (7-day testing mode limit hit) or revoked
+    // Don't clear tokens yet — keep the refresh token so we can detect this state
+    // and show a re-login prompt instead of silently failing
+    if (data.error === "invalid_grant" || data.error === "token_expired") {
+      localStorage.setItem("yt_needs_relogin", "1");
+      localStorage.removeItem("yt_access_token");
+      localStorage.removeItem("yt_token_expiry");
+      // Show re-login prompt on subs panel
+      const dls = document.getElementById("deviceLoginStatus");
+      if (dls) dls.textContent = "Session expired (7-day limit) — tap Login to YouTube to reconnect";
+      const pls = document.getElementById("playlistLoginStatus");
+      if (pls) pls.textContent = "Session expired — tap Login to YouTube to reconnect";
+      showHUD("Session expired — please re-login");
+    } else {
+      clearTokens();
+    }
+    return false;
   } catch (e) { return false; }
 }
 function clearTokens() { localStorage.removeItem("yt_access_token"); localStorage.removeItem("yt_refresh_token"); localStorage.removeItem("yt_token_expiry"); }
@@ -2964,29 +3015,34 @@ scrollTopBtn.addEventListener("click", () => {
     return p && p.style.display !== "none";
   }
 
-  // Wheel: block horizontal component
+  // Wheel: block horizontal component only — never block vertical
   window.addEventListener("wheel", function(e) {
     if (currentTab === "shorts") return;
     if (isInfoPanelOpen()) return;
     if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 0.5) { e.preventDefault(); }
   }, { passive: false });
 
-  // Touch: lock direction after first 10px of movement
+  // Touch direction lock — completely disabled when info panel is open
+  // so suggested feed scrolls freely in any direction
   var tStartX = 0, tStartY = 0, dirLock = null;
   document.addEventListener("touchstart", function(e) {
-    if (currentTab === "shorts") return;
-    if (isInfoPanelOpen()) return;
+    // Always reset on new touch — prevents stale lock from previous gesture
+    dirLock = null;
     tStartX = e.touches[0].clientX;
     tStartY = e.touches[0].clientY;
-    dirLock = null;
   }, { passive: true });
   document.addEventListener("touchmove", function(e) {
     if (currentTab === "shorts") return;
-    if (isInfoPanelOpen()) return;
+    // Info panel open = free scroll in all directions, no locking
+    if (isInfoPanelOpen()) { dirLock = null; return; }
+    // Player fullscreen = no direction interference
+    var ps = document.getElementById("playerSection");
+    if (ps && ps.classList.contains("player-fullscreen")) return;
     if (!dirLock) {
       var dx = Math.abs(e.touches[0].clientX - tStartX);
       var dy = Math.abs(e.touches[0].clientY - tStartY);
-      if (dx + dy > 10) dirLock = dx > dy ? "h" : "v";
+      // Require stronger horizontal signal (1.5x) before locking — reduces false positives
+      if (dx + dy > 12) dirLock = dx > dy * 1.5 ? "h" : "v";
     }
     if (dirLock === "h") e.preventDefault();
   }, { passive: false });
@@ -3524,11 +3580,11 @@ async function silentSync(token){
   const authPromise = hasRefresh ? refreshAccessToken() : Promise.resolve(false);
 
   // Fetch feed immediately without waiting for auth
-  // Always start with trending (1 quota unit) not personalized feed (800+ quota units)
+  // Startup: trending videos from last 48h — fast (1 quota unit)
   try {
-    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
-    nextPageToken = data.nextPageToken || null;
-    if (data.items && data.items.length) { renderFeed(data.items); showHUD("Home"); }
+    const since48h = new Date(Date.now() - 172800000).toISOString();
+    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: since48h, _: Date.now() });
+    if (data && data.items && data.items.length) { nextPageToken = data.nextPageToken || null; renderFeed(data.items); showHUD("Home"); }
     else throw new Error("empty");
   } catch(e) {
     try { const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() }); nextPageToken = data.nextPageToken || null; renderFeed(data.items || []); } catch(e2) {}
@@ -3551,6 +3607,17 @@ async function silentSync(token){
   // Silent background sync every 6 hours
   const tkn = await getValidToken();
   if (tkn) { const p = getTasteProfile(); if (Date.now() - (p.syncedAt||0) > 7200000) { silentSync(tkn).then(()=>showHUD("Feed updated ✦")).catch(()=>{}); } }
+
+  // Proactive token refresh every 55 minutes — keeps session alive indefinitely
+  // Access tokens expire in 60 min; this refreshes before they expire
+  setInterval(async () => {
+    const rt = localStorage.getItem("yt_refresh_token");
+    if (!rt) return;
+    const expiry = parseInt(localStorage.getItem("yt_token_expiry") || "0");
+    if (expiry - Date.now() < 600000) { // refresh if expiring within 10 min
+      await refreshAccessToken();
+    }
+  }, 55 * 60 * 1000);
 })();
 </script>
 </body>
