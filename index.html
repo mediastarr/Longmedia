@@ -548,6 +548,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
     <div id="subsLoginPanel" style="margin-top:12px; padding:12px; border-radius:16px; background:linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));">
       <div style="font-size:13px; opacity:0.85; margin-bottom:6px;">Sign in to load your YouTube subscriptions</div>
       <button id="startLoginBtn" class="topbar-btn" style="margin-bottom:8px;">Login to YouTube</button>
+      <button id="reloginBtn" class="topbar-btn" style="margin-bottom:8px; background:radial-gradient(circle at 0% 0%,rgba(255,80,80,0.2),rgba(10,12,20,0.9));">Clear &amp; Re-login</button>
       <div id="deviceUserCode" style="font-size:12px; margin-top:6px; opacity:0.8;"></div>
       <div id="deviceLoginStatus" style="font-size:12px; margin-top:4px; opacity:0.8;"></div>
     </div>
@@ -1560,6 +1561,12 @@ const OAUTH_CLIENT_ID = "153049037088-10qnschnsie4mqpdsdscd0uk2auqogdt.apps.goog
 const OAUTH_CLIENT_SECRET = "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";
 
 startLoginBtn.addEventListener("click", () => startDeviceLogin("subs"));
+document.getElementById("reloginBtn").addEventListener("click", () => {
+  clearTokens();
+  document.getElementById("deviceUserCode").textContent = "";
+  document.getElementById("deviceLoginStatus").textContent = "Tokens cleared — tap Login to YouTube";
+  showHUD("Ready to re-login");
+});
 
 async function startDeviceLogin(source) {
   showHUD("Requesting login code…");
