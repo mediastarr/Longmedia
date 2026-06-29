@@ -922,7 +922,7 @@ function getTopCategories(n = 3) {
 
 function getTopCategoryId() { const cats = getTopCategories(1); return cats[0] || null; }
 function getRecentVideoIds(n = 5) { return (getTasteProfile().recentVideoIds || []).slice(0, n); }
-function hasEnoughHistory() { return historyList.length >= 3; }
+function hasEnoughHistory() { const p = getTasteProfile(); return historyList.length >= 5 || !!p.syncedAt || Object.keys(p.channels || {}).length >= 3; }
 
 /* -----------------------------------------------------------
    PERSONALIZED FEED — YouTube-style candidate generation + ranking
@@ -991,11 +991,11 @@ async function fetchPersonalizedFeed() {
     }
   }
 
-  // SOURCE C: Collaborative filtering — "viewers of X also watched Y"
-  recentIds.slice(0, 3).forEach(videoId => {
-    fetches.push(fetchYouTube("search", { part: "snippet", type: "video", relatedToVideoId: videoId, maxResults: 5, _: Date.now() }));
+  // SOURCE C: Collaborative filtering via keyword/bigram overlap (relatedToVideoId deprecated Aug 2023)
+  if (topKeywords.length >= 1) {
+    fetches.push(fetchYouTube("search", { part: "snippet", q: topKeywords.slice(0,2).join(" "), type: "video", order: "date", maxResults: 8, _: Date.now() }));
     fetchMeta.push({ source: "collaborative", weight: 3 });
-  });
+  }
 
   // SOURCE D: Category trending — popular in YOUR preferred categories (not random)
   topCats.slice(0, 2).forEach(catId => {
