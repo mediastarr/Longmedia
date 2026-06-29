@@ -1988,53 +1988,55 @@ rewindBtn.addEventListener("click", () => { if (!ytPlayer) return; ytPlayer.seek
 
 const resBtn = document.getElementById("resBtn");
 resBtn.addEventListener("click", () => {
-  if (!ytPlayer || !currentVideoId) return;
+  if (!currentVideoId) return;
   qualityIndex = (qualityIndex + 1) % QUALITY_CYCLE.length;
   currentQuality = QUALITY_CYCLE[qualityIndex];
   resBtn.textContent = QUALITY_LABELS[currentQuality];
   showHUD(QUALITY_LABELS[currentQuality]);
 
-  const resumeTime = Math.floor(ytPlayer.getCurrentTime() || 0);
+  const resumeTime = ytPlayer ? Math.floor(ytPlayer.getCurrentTime() || 0) : 0;
 
-  if (currentQuality === "auto") {
-    // Auto: reload without vq so YouTube ABR takes over
-    ytPlayer.loadVideoById({ videoId: currentVideoId, startSeconds: resumeTime });
-    showHUD("Auto ✦");
-    return;
-  }
+  // The only reliable way to force quality in the YT IFrame API is to
+  // destroy the player and rebuild with vq= in the embed URL
+  // setPlaybackQuality() was fully deprecated and ignored since 2021
+  try { if (ytPlayer) { ytPlayer.stopVideo(); ytPlayer.destroy(); } } catch(e) {}
+  ytPlayer = null; isPlayerReady = false;
 
-  // Forced quality: must reload with vq — setPlaybackQuality() was deprecated in 2021
-  // Use loadVideoById with suggested quality (most reliable method still working)
-  try {
-    ytPlayer.loadVideoById({
-      videoId: currentVideoId,
-      startSeconds: resumeTime,
-      suggestedQuality: currentQuality
-    });
-    // Also try setPlaybackQuality as belt-and-suspenders
-    setTimeout(() => {
-      try { ytPlayer.setPlaybackQuality(currentQuality); } catch(e) {}
-    }, 500);
-  } catch(e) {
-    // Final fallback: recreate player with vq param
-    const start = resumeTime;
-    try { ytPlayer.destroy(); } catch(e2) {} ytPlayer = null;
-    const container = document.getElementById("playerSection");
-    let div = document.getElementById("playerFrame");
-    if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
-    ytPlayer = new YT.Player("playerFrame", {
-      videoId: currentVideoId,
-      playerVars: { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin, vq: currentQuality, start },
-      events: {
-        onReady: (e) => { e.target.setPlaybackQuality(currentQuality); playPauseBtn.textContent = "Pause"; },
-        onStateChange: (e) => {
-          if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "Pause";
-          if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "Play";
-          if (e.data === YT.PlayerState.ENDED && currentVideoId) clearResumePosition(currentVideoId);
+  const container = document.getElementById("playerSection");
+  let div = document.getElementById("playerFrame");
+  if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
+
+  const pv = { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin };
+  if (currentQuality !== "auto") pv.vq = currentQuality;
+  if (resumeTime > 5) pv.start = resumeTime;
+
+  ytPlayer = new YT.Player("playerFrame", {
+    videoId: currentVideoId,
+    playerVars: pv,
+    events: {
+      onReady: (e) => {
+        isPlayerReady = true;
+        if (currentQuality !== "auto") {
+          // Belt-and-suspenders: try both API methods
+          try { e.target.setPlaybackQuality(currentQuality); } catch(err) {}
+          try { e.target.setPlaybackQualityRange(currentQuality, currentQuality); } catch(err) {}
         }
+        e.target.playVideo();
+        playPauseBtn.textContent = "Pause";
+      },
+      onStateChange: (e) => {
+        if (e.data === YT.PlayerState.PLAYING) {
+          playPauseBtn.textContent = "Pause";
+          // Re-apply quality after playback starts (some players need this)
+          if (currentQuality !== "auto") {
+            try { e.target.setPlaybackQuality(currentQuality); } catch(err) {}
+          }
+        }
+        if (e.data === YT.PlayerState.PAUSED) playPauseBtn.textContent = "Play";
+        if (e.data === YT.PlayerState.ENDED && currentVideoId) clearResumePosition(currentVideoId);
       }
-    });
-  }
+    }
+  });
 });
 
 let uiHidden = false;
@@ -2313,22 +2315,44 @@ homeTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("home"); showSkeletons(6);
   const token = await getValidToken();
   const since48h = new Date(Date.now() - 172800000).toISOString();
+  const cat = freshCategory();
   if (token && hasEnoughHistory()) {
-    // Logged in: fetch personalized feed (subscription uploads + taste) filtered to 48h
+    // Logged in: personalized feed first, then supplement with fresh + trending
     const items = await fetchPersonalizedFeed();
     renderFeed(items);
     showHUD("For You ✦");
-    const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: since48h, _: Date.now() });
+    const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 20, _: Date.now() });
     nextPageToken = seed.nextPageToken || null;
   } else {
-    // Not logged in: trending videos from last 48h
-    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: since48h, _: Date.now() });
-    if (data && data.items && data.items.length) {
-      nextPageToken = data.nextPageToken || null; renderFeed(data.items); showHUD("Home");
+    // Not logged in: use local taste profile (watch history, keywords, searches) + fresh + popular
+    const seen = new Set();
+    const allItems = [];
+    function addU(items) { (items||[]).forEach(item => { const id = item.id?.videoId||item.id; if(!id||seen.has(id)) return; seen.add(id); allItems.push(item); }); }
+    const topKW = getTopKeywords(4);
+    const topBI = getTopBigrams(2);
+    const topCats = getTopCategories(2);
+    const recentS = getRecentSearches(2);
+    const myCatId = topCats.length ? topCats[0] : cat;
+    const fetches = [];
+    // 1. Fresh videos from your taste keywords (order:date)
+    if (topKW.length >= 2) fetches.push(fetchYouTube("search", { part: "snippet", type: "video", q: topKW.slice(0,3).join(" "), order: "date", maxResults: 10, publishedAfter: since48h, _: Date.now() }));
+    if (topBI.length) fetches.push(fetchYouTube("search", { part: "snippet", type: "video", q: topBI[0], order: "date", maxResults: 8, publishedAfter: since48h, _: Date.now() }));
+    if (recentS.length) fetches.push(fetchYouTube("search", { part: "snippet", type: "video", q: recentS[0], order: "date", maxResults: 8, publishedAfter: since48h, _: Date.now() }));
+    // 2. Fresh general videos in your top category (order:date)
+    fetches.push(fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: myCatId, maxResults: 10, publishedAfter: since48h, _: Date.now() }));
+    // 3. mostPopular in your category fills in after
+    fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: myCatId, maxResults: 12, _: Date.now() }));
+    fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 10, _: Date.now() }));
+    const results = await Promise.allSettled(fetches);
+    results.forEach(r => { if (r.status === "fulfilled") addU(r.value.items); });
+    if (allItems.length) {
+      renderFeed(allItems);
+      showHUD(topKW.length ? "For You ✦" : "Home");
+      const seed = results.find(r => r.status === "fulfilled" && r.value.nextPageToken);
+      nextPageToken = seed ? seed.value.nextPageToken : null;
     } else {
-      // Fallback without date filter if 48h returns nothing
-      const data2 = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
-      nextPageToken = data2.nextPageToken || null; renderFeed(data2.items || []); showHUD("Home");
+      const fallback = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+      nextPageToken = fallback.nextPageToken || null; renderFeed(fallback.items || []); showHUD("Home");
     }
   }
 });
@@ -2344,11 +2368,14 @@ trendingTab.addEventListener("click", async () => {
   const tRecent = hasTaste ? new Set(tShown.filter(e=>e.ts>sixAgo).map(e=>e.id)) : new Set();
   function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id)||tRecent.has(id))return; seen.add(id); allItems.push(item); }); }
   const fetches = [];
-  if (myCat) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:15,_:Date.now()}));
-  if (cats.length>1) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:cats[1],maxResults:10,_:Date.now()}));
-  if (cats.length>2) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:cats[2],maxResults:8,_:Date.now()}));
   const tSince48h = new Date(Date.now()-172800000).toISOString();
-  fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",maxResults:15,publishedAfter:tSince48h,_:Date.now()}));
+  // order:date first — freshest videos (last 48h)
+  if (myCat) fetches.push(fetchYouTube("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:myCat,maxResults:12,publishedAfter:tSince48h,_:Date.now()}));
+  fetches.push(fetchYouTube("search",{part:"snippet",type:"video",order:"date",regionCode:"US",maxResults:10,publishedAfter:tSince48h,_:Date.now()}));
+  // mostPopular after — proven trending videos
+  if (myCat) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:12,_:Date.now()+Math.random()}));
+  if (cats.length>1) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:cats[1],maxResults:8,_:Date.now()}));
+  fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",maxResults:12,_:Date.now()}));
   if (token) {
     fetches.push((async()=>{ try {
       const sr=await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=30&order=relevance",{headers:{Authorization:"Bearer "+token}});
@@ -2614,20 +2641,38 @@ moviesTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("movies"); showSkeletons(6);
   try {
   const allItems=[]; const seen=new Set();
-  // No 6h dedup on movies — it caused empty feed on every open
   function addU(items){ (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); }); }
   movieQIdx=Math.floor(Math.random()*MOVIE_QUERIES.length);
   const usedQ=MOVIE_QUERIES[movieQIdx%MOVIE_QUERIES.length]; movieQIdx++;
   const q2=MOVIE_QUERIES[movieQIdx%MOVIE_QUERIES.length]; movieQIdx++;
   lastMovieQuery=usedQ;
+  const since48h = new Date(Date.now()-172800000).toISOString();
+  const topKW=getTopKeywords(6), topBI=getTopBigrams(3), recentS=getRecentSearches(3);
+  const sKW=[...topKW].sort(()=>Math.random()-0.5), sBI=[...topBI].sort(()=>Math.random()-0.5);
   const fetches=[
-    fetchYouTube("search",{part:"snippet",q:usedQ,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:15,order:"date",_:Date.now()}),
-    fetchYouTube("search",{part:"snippet",q:q2,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:10,order:"date",_:Date.now()})
+    // 1. Fresh movies based on YOUR taste keywords (order:date)
+    ...(sKW.length>=2 ? [fetchYouTube("search",{part:"snippet",q:sKW.slice(0,2).join(" ")+" full movie",type:"video",videoDuration:"long",videoEmbeddable:"true",order:"date",maxResults:10,publishedAfter:since48h,_:Date.now()})] : []),
+    ...(sBI.length>0 ? [fetchYouTube("search",{part:"snippet",q:sBI[0]+" full movie",type:"video",videoDuration:"long",videoEmbeddable:"true",order:"date",maxResults:8,publishedAfter:since48h,_:Date.now()})] : []),
+    ...(recentS.length>0 ? [fetchYouTube("search",{part:"snippet",q:recentS[0]+" full movie",type:"video",videoDuration:"long",videoEmbeddable:"true",order:"date",maxResults:8,_:Date.now()})] : []),
+    // 2. Fresh general movies (order:date)
+    fetchYouTube("search",{part:"snippet",q:usedQ,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:10,order:"date",publishedAfter:since48h,_:Date.now()}),
+    fetchYouTube("search",{part:"snippet",q:q2,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:8,order:"date",publishedAfter:since48h,_:Date.now()}),
+    // 3. Popular movies after
+    fetchYouTube("search",{part:"snippet",q:usedQ,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:8,order:"viewCount",_:Date.now()}),
+    fetchYouTube("search",{part:"snippet",q:q2,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:6,order:"relevance",_:Date.now()})
   ];
-  const topKW=getTopKeywords(6),topBI=getTopBigrams(3);
-  const sKW=[...topKW].sort(()=>Math.random()-0.5),sBI=[...topBI].sort(()=>Math.random()-0.5);
-  if (sKW.length>=2) fetches.push(fetchYouTube("search",{part:"snippet",q:sKW.slice(0,2).join(" ")+" full movie",type:"video",videoDuration:"long",videoEmbeddable:"true",maxResults:8,_:Date.now()}));
-  if (sBI.length>0) fetches.push(fetchYouTube("search",{part:"snippet",q:sBI[0]+" full movie",type:"video",videoDuration:"long",videoEmbeddable:"true",maxResults:8,_:Date.now()}));
+  // 4. If logged in — pull from Watch Later and liked videos for movie taste signals
+  const movToken = await getValidToken();
+  if (movToken) {
+    fetches.push(
+      fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=20", { headers: { Authorization: "Bearer " + movToken } })
+        .then(r=>r.json()).then(d=>{
+          const wlKW = (d.items||[]).map(it=>it.snippet?.title||"").join(" ").toLowerCase().replace(/[^a-z0-9\s]/g,"").split(/\s+/).filter(w=>w.length>3).slice(0,4).join(" ");
+          if (!wlKW) return {items:[]};
+          return fetchYouTube("search",{part:"snippet",q:wlKW+" full movie",type:"video",videoDuration:"long",videoEmbeddable:"true",order:"date",maxResults:8,_:Date.now()});
+        }).catch(()=>({items:[]}))
+    );
+  }
   const results=await Promise.allSettled(fetches);
   results.forEach(r=>{ if(r.status==="fulfilled") addU(r.value.items||[]); });
   for (let i=allItems.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [allItems[i],allItems[j]]=[allItems[j],allItems[i]]; }
@@ -2837,12 +2882,9 @@ async function refreshAccessToken() {
       localStorage.setItem("yt_needs_relogin", "1");
       localStorage.removeItem("yt_access_token");
       localStorage.removeItem("yt_token_expiry");
-      // Show re-login prompt on subs panel
-      const dls = document.getElementById("deviceLoginStatus");
-      if (dls) dls.textContent = "Session expired (7-day limit) — tap Login to YouTube to reconnect";
-      const pls = document.getElementById("playlistLoginStatus");
-      if (pls) pls.textContent = "Session expired — tap Login to YouTube to reconnect";
-      showHUD("Session expired — please re-login");
+      showHUD("Session expired — reconnecting…");
+      // Auto-trigger re-auth loop after 2 seconds
+      setTimeout(() => triggerReAuthFlow(), 2000);
     } else {
       clearTokens();
     }
@@ -3568,6 +3610,70 @@ async function silentSync(token){
   localStorage.setItem("tasteProfile",JSON.stringify(profile));
 }
 
+
+/* ================================================================
+   AUTO RE-AUTH FLOW — handles 7-day testing token expiry
+   Shows a persistent banner and auto-starts device login
+================================================================ */
+let reAuthBanner = null;
+async function triggerReAuthFlow() {
+  // Remove any existing banner
+  if (reAuthBanner) { reAuthBanner.remove(); reAuthBanner = null; }
+
+  // Create persistent re-auth banner at top of screen
+  reAuthBanner = document.createElement("div");
+  reAuthBanner.id = "reAuthBanner";
+  reAuthBanner.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:999999;background:linear-gradient(135deg,rgba(255,80,80,0.95),rgba(180,20,20,0.95));color:#fff;padding:12px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:10px;";
+  reAuthBanner.innerHTML = '<span>🔄 Session expired — reconnecting your YouTube account</span><button id="reAuthNowBtn" style="border-radius:999px;border:none;background:#fff;color:#c00;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;">Reconnect Now</button>';
+  document.body.appendChild(reAuthBanner);
+
+  // Update subs/playlists panels
+  const dls = document.getElementById("deviceLoginStatus");
+  if (dls) dls.textContent = "Session expired — tap Reconnect in the banner above";
+  const pls = document.getElementById("playlistLoginStatus");
+  if (pls) pls.textContent = "Session expired — tap Reconnect in the banner above";
+
+  // Wire the button
+  document.getElementById("reAuthNowBtn").addEventListener("click", async () => {
+    if (reAuthBanner) { reAuthBanner.querySelector("span").textContent = "🔄 Starting reconnect — check Subscriptions tab for the code"; }
+    // Navigate to subs tab and start login
+    setActiveTab("subs");
+    subsPageEl.style.display = "block";
+    document.getElementById("subsLoginPanel").style.display = "block";
+    await startDeviceLogin("subs");
+    // Once login completes, remove the banner
+    const checkLoggedIn = setInterval(async () => {
+      const t = await getValidToken();
+      if (t) {
+        clearInterval(checkLoggedIn);
+        if (reAuthBanner) { reAuthBanner.remove(); reAuthBanner = null; }
+        localStorage.removeItem("yt_needs_relogin");
+        showHUD("Reconnected ✓");
+        // Reload home feed
+        homeTab.click();
+      }
+    }, 3000);
+  });
+
+  // Also auto-start login silently after 5 seconds if user doesn't tap
+  setTimeout(async () => {
+    const stillNeeds = localStorage.getItem("yt_needs_relogin");
+    if (!stillNeeds) return;
+    if (reAuthBanner) reAuthBanner.querySelector("span").textContent = "🔄 Auto-reconnecting — check Subscriptions tab for your code";
+    setActiveTab("subs");
+    subsPageEl.style.display = "block";
+    document.getElementById("subsLoginPanel").style.display = "block";
+    await startDeviceLogin("subs");
+  }, 5000);
+}
+
+// On startup, check if we need re-auth from a previous session
+(function checkReAuthOnLoad() {
+  if (localStorage.getItem("yt_needs_relogin") === "1") {
+    setTimeout(() => triggerReAuthFlow(), 2000);
+  }
+})();
+
 (async function init() {
   // Dismiss boot splash after loading bar completes
   setTimeout(() => {
@@ -3580,12 +3686,21 @@ async function silentSync(token){
   const authPromise = hasRefresh ? refreshAccessToken() : Promise.resolve(false);
 
   // Fetch feed immediately without waiting for auth
-  // Startup: trending videos from last 48h — fast (1 quota unit)
+  // Startup: order:date first (freshest), mostPopular after
   try {
     const since48h = new Date(Date.now() - 172800000).toISOString();
-    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: since48h, _: Date.now() });
-    if (data && data.items && data.items.length) { nextPageToken = data.nextPageToken || null; renderFeed(data.items); showHUD("Home"); }
-    else throw new Error("empty");
+    const cat = freshCategory();
+    const seen = new Set(); const allItems = [];
+    const [fresh, popular] = await Promise.allSettled([
+      fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 12, publishedAfter: since48h, _: Date.now() }),
+      fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 12, _: Date.now() })
+    ]);
+    if (fresh.status === "fulfilled") (fresh.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
+    if (popular.status === "fulfilled") (popular.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
+    if (allItems.length) {
+      nextPageToken = (popular.status==="fulfilled"&&popular.value.nextPageToken)||null;
+      renderFeed(allItems); showHUD("Home");
+    } else throw new Error("empty");
   } catch(e) {
     try { const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() }); nextPageToken = data.nextPageToken || null; renderFeed(data.items || []); } catch(e2) {}
   }
@@ -3594,13 +3709,23 @@ async function silentSync(token){
   const ok = await authPromise;
   if (ok) {
     showHUD("Signed in ✓");
-    // Update login status panels so they don't show "Login required" after auto-refresh
     const autoTkn = await getValidToken();
     if (autoTkn) {
+      // Update login status panels
       const dls = document.getElementById("deviceLoginStatus");
       if (dls && !dls.textContent.includes("Logged in")) dls.textContent = "Logged in ✓";
       const pls = document.getElementById("playlistLoginStatus");
       if (pls) pls.textContent = "Logged in ✓";
+      // Reload home feed with personalized content now that we're logged in
+      if (hasEnoughHistory()) {
+        showSkeletons(6);
+        const since48h = new Date(Date.now() - 172800000).toISOString();
+        const items = await fetchPersonalizedFeed();
+        renderFeed(items);
+        showHUD("For You ✦");
+        const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: since48h, _: Date.now() });
+        nextPageToken = seed.nextPageToken || null;
+      }
     }
   }
 
