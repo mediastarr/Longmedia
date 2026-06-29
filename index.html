@@ -145,6 +145,8 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
   margin-top: 16px; border-radius: 22px; overflow: hidden; position: sticky; top: 12px; z-index: 30;
   background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.18), rgba(5,6,12,0.98));
   height: 260px; display: none;
+  will-change: transform;
+  transform: translateZ(0);
 }
 /* CHANGE: top:auto so mini player anchors to bottom-right correctly */
 #playerSection.player-mini { position: fixed; right: 16px; bottom: 16px; top: auto; width: 260px; height: 150px; z-index: 40; }
@@ -200,6 +202,8 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
   min-height: 52px;
   touch-action: manipulation;
   -webkit-tap-highlight-color: rgba(60,242,255,0.2);
+  will-change: transform;
+  transform: translateZ(0);
 }
 .skeleton {
   display: flex; gap: 10px; padding: 14px; border-radius: 18px;
@@ -346,6 +350,7 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
 #keyboard {
   margin-top: 10px; display: none; padding: 10px; border-radius: 18px;
   background: linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95)); width: 100%;
+  content-visibility: auto;
 }
 .keyboard-row { display: flex; width: 100%; gap: 6px; margin-bottom: 6px; }
 .key-btn {
@@ -371,6 +376,9 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
   background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.25), transparent 60%), radial-gradient(circle at 0% 100%, rgba(120,80,255,0.18), transparent 70%), radial-gradient(circle at 100% 100%, rgba(0,255,180,0.18), transparent 70%), radial-gradient(circle at 50% 50%, rgba(5,6,12,0.98), rgba(2,3,8,1));
 }
 #playerSection.fx-glass { backdrop-filter: blur(18px) saturate(1.4); border: 1px solid rgba(120,130,160,0.7); }
+/* Disable expensive backdrop-filter while video is playing — saves GPU for playback */
+#playerSection.video-playing.fx-glass { backdrop-filter: none; }
+#playerSection.video-playing::after { opacity: 0 !important; }
 #playerSection.fx-chroma::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   mix-blend-mode: screen; opacity: var(--chroma-opacity, 0.25); filter: blur(var(--chroma-blur, 4px));
@@ -424,7 +432,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 #playerSection.player-mini .player-controls { gap: 4px; bottom: 6px; left: 6px; }
 #playerSection.player-mini .player-controls button { padding: 5px 7px; font-size: 10px; min-height: 28px; min-width: unset; }
 #playerSection.player-mini #closeMini { padding: 4px 7px; font-size: 10px; min-height: 28px; min-width: unset; top: 6px; right: 6px; }
-#shortsPage { display: none; position: fixed; inset: 0; z-index: 5000; background: #000; overflow: hidden; touch-action: none; }
+#shortsPage { display: none; position: fixed; inset: 0; z-index: 5000; background: #000; overflow: hidden; touch-action: none; content-visibility: auto; }
 #shortsIframe { width: 100%; height: 100%; border: none; display: block; background: #000; }
 #shortsPage::before {
   content: ""; position: absolute; inset: -40px; pointer-events: none; z-index: 0;
@@ -1449,9 +1457,18 @@ window.onYouTubeIframeAPIReady = function () {
       events: {
         onReady: () => { isPlayerReady = true; },
         onStateChange: (e) => {
-          if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "Pause";
-          if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "Play";
-          if (e.data === YT.PlayerState.ENDED && currentVideoId) clearResumePosition(currentVideoId);
+          if (e.data === YT.PlayerState.PLAYING) {
+            playPauseBtn.textContent = "Pause";
+            playerSection.classList.add("video-playing"); // disable backdrop-filter during playback
+          }
+          if (e.data === YT.PlayerState.PAUSED) {
+            playPauseBtn.textContent = "Play";
+            playerSection.classList.remove("video-playing");
+          }
+          if (e.data === YT.PlayerState.ENDED && currentVideoId) {
+            clearResumePosition(currentVideoId);
+            playerSection.classList.remove("video-playing");
+          }
         }
       }
     });
@@ -2869,7 +2886,15 @@ function closeKeyboard() { keyboardEl.style.display = "none"; searchPanelEl.styl
 searchTabEl.addEventListener("click", openKeyboard);
 searchBack.addEventListener("click", closeKeyboard);
 searchGo.addEventListener("click", () => { const q = searchInput.value.trim() || "music"; triggerSearch(q); });
-searchInput.addEventListener("input", async () => { const q = searchInput.value.trim(); showSuggestions(await fetchSuggestions(q)); });
+let _suggestDebounce = null;
+searchInput.addEventListener("input", () => {
+  clearTimeout(_suggestDebounce);
+  _suggestDebounce = setTimeout(async () => {
+    const q = searchInput.value.trim();
+    if (q) showSuggestions(await fetchSuggestions(q));
+    else { suggestionsEl.style.display = "none"; suggestionsEl.innerHTML = ""; }
+  }, 250);
+});
 keyboardEl.addEventListener("click", async (e) => {
   const btn = e.target.closest(".key-btn"); if (!btn) return;
   const key = btn.dataset.key;
