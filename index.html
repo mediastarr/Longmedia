@@ -2402,21 +2402,53 @@ async function startDeviceLogin(source) {
 async function pollForToken(deviceCode, intervalSeconds, source) {
   const statusEl = source === "playlists" ? playlistLoginStatus : deviceLoginStatusEl;
   let authorized = false;
+  let attempts = 0;
   while (!authorized) {
     await new Promise(r => setTimeout(r, intervalSeconds * 1000));
-    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, client_secret: OAUTH_CLIENT_SECRET, device_code: deviceCode, grant_type: "urn:ietf:params:oauth:grant-type:device_code" })
-    });
-    const tokenData = await tokenRes.json();
+    attempts++;
+    let tokenData;
+    try {
+      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, client_secret: OAUTH_CLIENT_SECRET, device_code: deviceCode, grant_type: "urn:ietf:params:oauth:grant-type:device_code" })
+      });
+      tokenData = await tokenRes.json();
+      // Show full response so we can debug
+      statusEl.textContent = "Attempt " + attempts + ": " + JSON.stringify(tokenData).slice(0, 120);
+    } catch(e) {
+      statusEl.textContent = "Network error: " + e.message;
+      continue;
+    }
     if (tokenData.error) {
-      if (tokenData.error === "authorization_pending") { statusEl.textContent = "Waiting for authorization…"; continue; }
-      else { statusEl.textContent = "Error: " + tokenData.error; showHUD("Login error"); break; }
+      if (tokenData.error === "authorization_pending") {
+        statusEl.textContent = "Waiting… (attempt " + attempts + "). Enter code at google.com/device";
+        continue;
+      } else if (tokenData.error === "slow_down") {
+        intervalSeconds += 5;
+        statusEl.textContent = "Slowing down polling… (" + tokenData.error + ")";
+        continue;
+      } else if (tokenData.error === "expired_token") {
+        statusEl.textContent = "Code expired — tap Login again to get a new code";
+        showHUD("Code expired — retry");
+        break;
+      } else if (tokenData.error === "access_denied") {
+        statusEl.textContent = "Access denied — did you approve on google.com/device?";
+        showHUD("Access denied");
+        break;
+      } else {
+        statusEl.textContent = "Error: " + tokenData.error + " — " + (tokenData.error_description || "");
+        showHUD("Login error: " + tokenData.error);
+        break;
+      }
+    }
+    if (!tokenData.access_token) {
+      statusEl.textContent = "No token received: " + JSON.stringify(tokenData).slice(0, 100);
+      continue;
     }
     authorized = true;
     saveTokens(tokenData);
-    statusEl.textContent = "Logged in!";
-    showHUD("YouTube logged in");
+    statusEl.textContent = "Logged in ✓";
+    showHUD("YouTube logged in ✓");
     if (source === "playlists") loadPlaylists();
     else loadSubscriptions();
   }
@@ -2476,13 +2508,19 @@ playlistTab.addEventListener("click", async () => {
 playlistLoginBtn.addEventListener("click", () => startDeviceLogin("playlists"));
 
 async function loadPlaylists() {
-  const token = await getValidToken(); if (!token) return;
+  const token = await getValidToken();
+  if (!token) {
+    playlistLoginPanel.style.display = "block";
+    playlistGrid.style.display = "none";
+    playlistItemsView.style.display = "none";
+    return;
+  }
   playlistLoginPanel.style.display = "none"; playlistGrid.style.display = "none"; playlistItemsView.style.display = "none";
   playlistGrid.innerHTML = ""; showHUD("Loading playlists…");
   try {
     const res = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
     const data = await res.json();
-    if (data.error) { playlistLoginPanel.style.display = "block"; playlistLoginStatus.textContent = "Session expired. Please login again."; clearTokens(); return; }
+    if (data.error) { clearTokens(); playlistLoginPanel.style.display = "block"; playlistLoginStatus.textContent = "Session expired — tap Login to YouTube below to re-login."; return; }
     if (!data.items || !data.items.length) { playlistGrid.innerHTML = `<div style="font-size:12px;opacity:0.8;grid-column:1/-1;">No playlists found.</div>`; playlistGrid.style.display = "grid"; return; }
     data.items.forEach(pl => {
       const snippet = pl.snippet; const count = pl.contentDetails?.itemCount || 0;
@@ -3166,7 +3204,17 @@ async function silentSync(token){
 
   // Wait for auth to complete (was running in parallel)
   const ok = await authPromise;
-  if (ok) showHUD("Signed in ✓");
+  if (ok) {
+    showHUD("Signed in ✓");
+    // Update login status panels so they don't show "Login required" after auto-refresh
+    const autoTkn = await getValidToken();
+    if (autoTkn) {
+      const dls = document.getElementById("deviceLoginStatus");
+      if (dls && !dls.textContent.includes("Logged in")) dls.textContent = "Logged in ✓";
+      const pls = document.getElementById("playlistLoginStatus");
+      if (pls) pls.textContent = "Logged in ✓";
+    }
+  }
 
   // Silent background sync every 6 hours
   const tkn = await getValidToken();
