@@ -379,6 +379,10 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
 /* Disable expensive backdrop-filter while video is playing — saves GPU for playback */
 #playerSection.video-playing.fx-glass { backdrop-filter: none; }
 #playerSection.video-playing::after { opacity: 0 !important; }
+/* Also kill ambient and chroma shaders during playback — frees GPU for video decoding */
+#playerSection.video-playing.fx-ambient { background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.08), rgba(5,6,12,0.98)); }
+#playerSection.video-playing.fx-chroma::before { display: none; }
+#playerSection.video-playing.fx-audio::after { display: none; }
 #playerSection.fx-chroma::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   mix-blend-mode: screen; opacity: var(--chroma-opacity, 0.25); filter: blur(var(--chroma-blur, 4px));
@@ -2147,15 +2151,26 @@ function setActiveTab(tab) {
 homeTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("home"); showSkeletons(6);
   if (hasEnoughHistory()) {
-    const items = await fetchPersonalizedFeed();
-    renderFeed(items);
-    showHUD("For You ✦");
-    const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
-    nextPageToken = seed.nextPageToken || null;
-  } else {
-    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
-    nextPageToken = data.nextPageToken || null; renderFeed(data.items || []); showHUD("Home");
+    try {
+      const items = await fetchPersonalizedFeed();
+      if (items && items.length > 0) {
+        renderFeed(items); showHUD("For You ✦");
+        const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+        nextPageToken = seed.nextPageToken || null;
+        return;
+      }
+    } catch(e) {}
   }
+  // Fallback 1: mostPopular with category
+  try {
+    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+    if (data && data.items && data.items.length > 0) { nextPageToken = data.nextPageToken || null; renderFeed(data.items); showHUD("Home"); return; }
+  } catch(e) {}
+  // Fallback 2: mostPopular no category
+  try {
+    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+    nextPageToken = data.nextPageToken || null; renderFeed(data.items || []); showHUD("Home");
+  } catch(e) { feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home to retry.</div>'; }
 });
 
 trendingTab.addEventListener("click", async () => {
@@ -2189,6 +2204,15 @@ trendingTab.addEventListener("click", async () => {
   renderFeed(allItems);
   const shownNow=allItems.map(item=>item.id?.videoId||item.id).filter(Boolean);
   // No trending dedup cache — always show fresh results
+  if (allItems.length > 0) {
+    renderFeed(allItems);
+  } else {
+    try {
+      const fb = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+      renderFeed(fb.items || []); nextPageToken = fb.nextPageToken || null;
+    } catch(e) { feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Trending to retry.</div>'; }
+    showHUD("Trending"); return;
+  }
   const seed=await fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat||undefined,maxResults:20,_:Date.now()});
   nextPageToken=seed.nextPageToken||null;
   showHUD(token?"Trending For You ✦":"Trending");
@@ -2454,7 +2478,14 @@ moviesTab.addEventListener("click", async () => {
   results.forEach(r=>{ if(r.status==="fulfilled") addU(r.value.items||[]); });
   for (let i=allItems.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [allItems[i],allItems[j]]=[allItems[j],allItems[i]]; }
   const items=allItems.filter(v=>v.id?.videoId||v.id).map(v=>({id:v.id?.videoId||v.id,snippet:v.snippet}));
-  if (!items.length) { feedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies again to retry.</div>'; isLoadingMovies=false; return; }
+  if (!items.length) {
+    // Fallback: simple movie search
+    try {
+      const fb = await fetchYouTube("search", { part: "snippet", q: "full movie", type: "video", videoDuration: "long", videoEmbeddable: "true", maxResults: 20, _: Date.now() });
+      if (fb.items && fb.items.length) { nextPageToken = "seed"; renderFeed(fb.items.map(v=>({id:v.id?.videoId||v.id,snippet:v.snippet}))); showHUD("Movies"); isLoadingMovies=false; return; }
+    } catch(e2) {}
+    feedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies again to retry.</div>'; isLoadingMovies=false; return;
+  }
   nextPageToken="seed";
   renderFeed(items); showHUD("Movies");
   } catch(e) { feedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies to retry.</div>'; } finally { isLoadingMovies = false; }
@@ -3368,10 +3399,10 @@ syncStartBtn.onclick=async function(){
   let total=0;
   function sp(pct,msg){syncProgressFill.style.width=pct+"%";syncStatus.textContent=msg;}
   sp(5,isFirst?"Deep syncing liked videos (up to 500)…":"Reading liked videos…");
-  try{let pt="",pages=0,max=isFirst?25:10;while(pages<max){const url="https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=20"+(pt?"&pageToken="+pt:"");const r=await fetch(url,{headers:{Authorization:"Bearer "+token}});const d=await r.json();if(d.error||!d.items)break;d.items.forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,3);const vid=s.resourceId?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);total++;});pt=d.nextPageToken||"";pages++;if(!pt)break;sp(5+Math.round((pages/max)*15),"Liked: "+total+" so far…");}sp(20,"Liked videos: "+total+" signals");}catch(e){}
+  try{let pt="",pages=0,max=isFirst?25:10;while(pages<max){const url="https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=20"+(pt?"&pageToken="+pt:"");const r=await fetch(url,{headers:{Authorization:"Bearer "+token}});const d=await r.json();if(d.error){sp(5,"Liked videos: "+( d.error.message||d.error.status||"access denied")+". Continuing…");break;}if(!d.items)break;d.items.forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,3);const vid=s.resourceId?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);total++;});pt=d.nextPageToken||"";pages++;if(!pt)break;sp(5+Math.round((pages/max)*15),"Liked: "+total+" so far…");}sp(20,"Liked videos: "+total+" signals");}catch(e){}
   sp(22,"Reading Watch Later…");try{const r=await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=50",{headers:{Authorization:"Bearer "+token}});const d=await r.json();(d.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,2);total++;});sp(30,"Watch Later: "+total+" signals");}catch(e){}
   sp(32,"Reading playlists…");try{const pr=await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});const pd=await pr.json();const plLimit=isFirst?(pd.items||[]).length:8,iPerPl=isFirst?20:10;for(const pl of(pd.items||[]).slice(0,plLimit)){try{const ir=await fetchYouTube("playlistItems",{part:"snippet",playlistId:pl.id,maxResults:iPerPl,_:Date.now()});(ir.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,2);total++;});}catch(e){}}sp(50,"Playlists: "+total+" signals");}catch(e){}
-  sp(52,"Reading subscriptions…");try{const sr=await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});const sd=await sr.json();const cids=(sd.items||[]).map(s=>{extract(null,s.snippet.resourceId.channelId,s.snippet.title,1);return s.snippet.resourceId.channelId;});if(cids.length){const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,50).join(",")});const ups=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);const sc=isFirst?20:5;for(const plId of ups.sort(()=>Math.random()-0.5).slice(0,sc)){try{const ur=await fetchYouTube("playlistItems",{part:"snippet",playlistId:plId,maxResults:8,_:Date.now()});(ur.items||[]).forEach(it=>{extract(it.snippet?.title,null,null,1);total++;});}catch(e){}}}sp(75,"Subscriptions: "+total+" signals");}catch(e){}
+  sp(52,"Reading subscriptions…");try{const sr=await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});const sd=await sr.json();const cids=(sd.items||[]).map(s=>{extract(null,s.snippet.resourceId.channelId,s.snippet.title,1);total++;return s.snippet.resourceId.channelId;});if(cids.length){const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,50).join(",")});const ups=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);const sc=isFirst?20:5;for(const plId of ups.sort(()=>Math.random()-0.5).slice(0,sc)){try{const ur=await fetchYouTube("playlistItems",{part:"snippet",playlistId:plId,maxResults:8,_:Date.now()});(ur.items||[]).forEach(it=>{extract(it.snippet?.title,null,null,1);total++;});}catch(e){}}}sp(75,"Subscriptions: "+total+" signals");}catch(e){}
   sp(77,"Reading activity…");try{const ar=await fetch("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});const ad=await ar.json();(ad.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.channelId,s.channelTitle,2);const vid=it.contentDetails?.upload?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);total++;});sp(90,"Activity: "+total+" signals");}catch(e){}
   profile.recentVideoIds=profile.recentVideoIds.slice(0,50);profile.syncedAt=Date.now();
   localStorage.setItem("tasteProfile",JSON.stringify(profile));
@@ -3405,22 +3436,38 @@ async function silentSync(token){
   const hasRefresh = localStorage.getItem("yt_refresh_token");
   const authPromise = hasRefresh ? refreshAccessToken() : Promise.resolve(false);
 
-  // Fetch feed immediately without waiting for auth
-  try {
+  // Load home feed — always try trending as guaranteed fallback
+  async function loadHomeFeed() {
+    // Try personalized first if we have history
     if (hasEnoughHistory()) {
-      const items = await fetchPersonalizedFeed();
-      renderFeed(items);
-      showHUD("For You ✦");
-      const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
-      nextPageToken = seed.nextPageToken || null;
-    } else {
+      try {
+        const items = await fetchPersonalizedFeed();
+        if (items && items.length > 0) {
+          renderFeed(items); showHUD("For You ✦");
+          const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+          nextPageToken = seed.nextPageToken || null;
+          return;
+        }
+      } catch(e) {}
+    }
+    // Fallback 1: trending by category
+    try {
       const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+      if (data && data.items && data.items.length > 0) {
+        nextPageToken = data.nextPageToken || null;
+        renderFeed(data.items); return;
+      }
+    } catch(e) {}
+    // Fallback 2: general trending (no category filter)
+    try {
+      const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
       nextPageToken = data.nextPageToken || null;
       renderFeed(data.items || []);
+    } catch(e) {
+      feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home to retry.</div>';
     }
-  } catch(e) {
-    try { const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() }); nextPageToken = data.nextPageToken || null; renderFeed(data.items || []); } catch(e2) {}
   }
+  await loadHomeFeed();
 
   // Wait for auth to complete (was running in parallel)
   const ok = await authPromise;
