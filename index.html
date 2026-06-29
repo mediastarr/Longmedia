@@ -2485,10 +2485,18 @@ async function loadSubscriptions() {
   if (!token) { deviceLoginStatusEl.textContent = "Login required."; return; }
   subsFeedEl.innerHTML = ""; subsNextPageToken = null; showHUD("Loading subscriptions…");
   try {
-    const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20", { headers: { Authorization: "Bearer " + token } });
+    const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
     const data = await res.json();
+    if (data.error) {
+      subsFeedEl.innerHTML = '<div style="font-size:12px;color:#ff6b6b;">API Error ' + data.error.code + ': ' + data.error.message + '</div>';
+      deviceLoginStatusEl.textContent = "Error: " + data.error.message;
+      return;
+    }
     subsNextPageToken = data.nextPageToken || null;
-    if (!data.items || !data.items.length) { subsFeedEl.innerHTML = `<div style="font-size:12px;opacity:0.8;">No subscriptions found.</div>`; return; }
+    if (!data.items || !data.items.length) {
+      subsFeedEl.innerHTML = '<div style="font-size:12px;opacity:0.8;">No subscriptions found. totalResults=' + (data.pageInfo && data.pageInfo.totalResults) + '</div>';
+      return;
+    }
     data.items.forEach(item => {
       const ch = item.snippet; const channelId = ch.resourceId.channelId;
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
