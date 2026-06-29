@@ -2150,10 +2150,10 @@ homeTab.addEventListener("click", async () => {
     const items = await fetchPersonalizedFeed();
     renderFeed(items);
     showHUD("For You ✦");
-    const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: new Date(Date.now()-172800000).toISOString(), _: Date.now() });
+    const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
     nextPageToken = seed.nextPageToken || null;
   } else {
-    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: new Date(Date.now()-172800000).toISOString(), _: Date.now() });
+    const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
     nextPageToken = data.nextPageToken || null; renderFeed(data.items || []); showHUD("Home");
   }
 });
@@ -2163,11 +2163,9 @@ trendingTab.addEventListener("click", async () => {
   const token = await getValidToken();
   const myCat = getTopCategoryId(); const cats = getTopCategories(3);
   const allItems = []; const seen = new Set();
-  let tShown = []; try { tShown = JSON.parse(localStorage.getItem("trendingShownTimed")||"[]"); } catch(e) {}
-  const sixAgo = Date.now()-6*3600000;
-  const hasTaste = getTopChannels(1).length > 0 || getTopKeywords(1).length > 0;
-  const tRecent = hasTaste ? new Set(tShown.filter(e=>e.ts>sixAgo).map(e=>e.id)) : new Set();
-  function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id)||tRecent.has(id))return; seen.add(id); allItems.push(item); }); }
+  // No aggressive dedup — just dedup within this single load (seen set)
+  // Trending should always show fresh content every tap
+  function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); }); }
   const fetches = [];
   if (myCat) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:15,_:Date.now()+Math.random()}));
   if (cats.length>1) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:cats[1],maxResults:10,_:Date.now()}));
@@ -2190,7 +2188,7 @@ trendingTab.addEventListener("click", async () => {
   results.forEach(r=>{ if(r.status==="fulfilled") addU(r.value.items); });
   renderFeed(allItems);
   const shownNow=allItems.map(item=>item.id?.videoId||item.id).filter(Boolean);
-  try { localStorage.setItem("trendingShownTimed",JSON.stringify([...shownNow.map(id=>({id,ts:Date.now()})),...tShown].filter(e=>e.ts>sixAgo).slice(0,200))); } catch(e) {}
+  // No trending dedup cache — always show fresh results
   const seed=await fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat||undefined,maxResults:20,_:Date.now()});
   nextPageToken=seed.nextPageToken||null;
   showHUD(token?"Trending For You ✦":"Trending");
@@ -2594,7 +2592,9 @@ async function pollForToken(deviceCode, intervalSeconds, source) {
     authorized = true;
     saveTokens(tokenData);
     statusEl.textContent = "Logged in!";
-    showHUD("YouTube logged in");
+    showHUD("YouTube logged in ✓");
+    // Small delay to ensure token is saved to localStorage before tab functions read it
+    await new Promise(r => setTimeout(r, 300));
     if (source === "playlists") loadPlaylists();
     else loadSubscriptions();
   }
@@ -2627,14 +2627,27 @@ async function getValidToken() {
 }
 
 async function loadSubscriptions() {
-  const token = await getValidToken();
-  if (!token) { deviceLoginStatusEl.textContent = "Login required."; return; }
+  // Always get a fresh token — never use a cached one from before re-login
+  let token = await getValidToken();
+  if (!token) {
+    // Try one refresh before giving up
+    const ok = await refreshAccessToken();
+    token = ok ? localStorage.getItem("yt_access_token") : null;
+  }
+  if (!token) { deviceLoginStatusEl.textContent = "Login required — tap Login to YouTube."; return; }
   subsFeedEl.innerHTML = ""; subsNextPageToken = null; showHUD("Loading subscriptions…");
   try {
-    const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20", { headers: { Authorization: "Bearer " + token } });
+    const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20&order=relevance", { headers: { Authorization: "Bearer " + token } });
     const data = await res.json();
+    if (data.error) {
+      // Token rejected — try refresh once
+      const ok = await refreshAccessToken();
+      if (ok) { loadSubscriptions(); return; }
+      deviceLoginStatusEl.textContent = "Session expired — tap Login to YouTube.";
+      clearTokens(); return;
+    }
     subsNextPageToken = data.nextPageToken || null;
-    if (!data.items || !data.items.length) { subsFeedEl.innerHTML = `<div style="font-size:12px;opacity:0.8;">No subscriptions found.</div>`; return; }
+    if (!data.items || !data.items.length) { subsFeedEl.innerHTML = `<div style="font-size:12px;opacity:0.8;">No subscriptions found. Make sure you are subscribed to channels on YouTube.</div>`; return; }
     data.items.forEach(item => {
       const ch = item.snippet; const channelId = ch.resourceId.channelId;
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
@@ -2660,7 +2673,14 @@ async function loadPlaylists() {
   try {
     const res = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
     const data = await res.json();
-    if (data.error) { playlistLoginPanel.style.display = "block"; playlistLoginStatus.textContent = "Session expired. Please login again."; clearTokens(); return; }
+    if (data.error) {
+      // Try refreshing token once before giving up
+      const refreshed = await refreshAccessToken();
+      if (refreshed) { loadPlaylists(); return; }
+      playlistLoginPanel.style.display = "block";
+      playlistLoginStatus.textContent = "Session expired. Please login again.";
+      clearTokens(); return;
+    }
     if (!data.items || !data.items.length) { playlistGrid.innerHTML = `<div style="font-size:12px;opacity:0.8;grid-column:1/-1;">No playlists found.</div>`; playlistGrid.style.display = "grid"; return; }
     data.items.forEach(pl => {
       const snippet = pl.snippet; const count = pl.contentDetails?.itemCount || 0;
@@ -2711,7 +2731,7 @@ async function loadMoreVideos() {
   const vt = nextPageToken !== "seed" ? nextPageToken : undefined;
   if (currentTab === "home") {
     // Rotate categories so every batch feels different — never dead-ends
-    data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: new Date(Date.now()-172800000).toISOString(), _: Date.now() });
+    data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
     if (!data || !data.items || !data.items.length) data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
   }
   if (currentTab === "movies") {
@@ -3362,10 +3382,10 @@ async function silentSync(token){
       const items = await fetchPersonalizedFeed();
       renderFeed(items);
       showHUD("For You ✦");
-      const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: new Date(Date.now()-172800000).toISOString(), _: Date.now() });
+      const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
       nextPageToken = seed.nextPageToken || null;
     } else {
-      const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: new Date(Date.now()-172800000).toISOString(), _: Date.now() });
+      const data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
       nextPageToken = data.nextPageToken || null;
       renderFeed(data.items || []);
     }
