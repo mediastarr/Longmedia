@@ -747,7 +747,7 @@ async function fetchYouTube(endpoint, params = {}, retries = 2) {
   const p = Object.assign({}, params, { key });
   Object.entries(p).forEach(([k, v]) => { if (v !== undefined && v !== null) url.searchParams.append(k, v); });
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const timeout = setTimeout(() => controller.abort(), 3500);
   try {
     const res = await fetch(url.toString(), { signal: controller.signal });
     clearTimeout(timeout);
@@ -1572,11 +1572,17 @@ historyTab.addEventListener("click", () => {
 
 channelTab.addEventListener("click", () => loadChannelPage(currentChannelId));
 
-subsTab.addEventListener("click", async () => {
+subsTab.addEventListener("click", () => {
   setActiveTab("subs"); showHUD("Subscriptions");
-  const token = await getValidToken();
-  if (token) loadSubscriptions();
-  else deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
+  document.getElementById("subsLoginPanel").style.display = "block";
+  const token = localStorage.getItem("yt_access_token");
+  const expired = isTokenExpired();
+  if (token && !expired) {
+    deviceLoginStatusEl.textContent = "Logged in ✓";
+    loadSubscriptions();
+  } else {
+    deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
+  }
 });
 
 const OAUTH_CLIENT_ID = "153049037088-10qnschnsie4mqpdsdscd0uk2auqogdt.apps.googleusercontent.com";
@@ -1658,7 +1664,10 @@ async function loadSubscriptions() {
   }
   if (!token) { subsFeedEl.innerHTML = ""; deviceLoginStatusEl.textContent = "Login required — tap Login to YouTube."; return; }
   try {
-    const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
+    const subsCtrl = new AbortController();
+    const subsTimeout = setTimeout(() => subsCtrl.abort(), 8000);
+    const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token }, signal: subsCtrl.signal });
+    clearTimeout(subsTimeout);
     const data = await res.json();
     if (data.error) { const ok = await refreshAccessToken(); if (ok) { loadSubscriptions(); return; } subsFeedEl.innerHTML = ""; deviceLoginStatusEl.textContent = "Session expired — tap Login."; clearTokens(); return; }
     subsNextPageToken = data.nextPageToken || null;
@@ -1695,7 +1704,10 @@ async function loadPlaylists() {
   if (!token || isTokenExpired()) { const ok = await refreshAccessToken(); token = ok ? localStorage.getItem("yt_access_token") : null; }
   if (!token) { playlistGrid.innerHTML = ""; playlistLoginPanel.style.display = "block"; return; }
   try {
-    const res = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
+    const plCtrl = new AbortController();
+    const plTimeout = setTimeout(() => plCtrl.abort(), 8000);
+    const res = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token }, signal: plCtrl.signal });
+    clearTimeout(plTimeout);
     const data = await res.json();
     if (data.error) {
       const ok = await refreshAccessToken();
@@ -2197,12 +2209,6 @@ async function silentSync(token) {
   const hasRefresh = localStorage.getItem("yt_refresh_token");
   if (hasRefresh) { const ok = await refreshAccessToken(); if (ok) showHUD("Signed in ✓"); }
 
-  // Sync on startup, then every 5 minutes
-  const tkn = await getValidToken();
-  if (tkn) {
-    silentSync(tkn).then(() => showHUD("Feed updated ✦")).catch(() => {});
-    setInterval(async () => { const t = await getValidToken(); if (t) silentSync(t).catch(() => {}); }, 300000);
-  }
   try {
     if (hasEnoughHistory()) {
       const items = await fetchPersonalizedFeed();
@@ -2222,6 +2228,14 @@ async function silentSync(token) {
       nextPageToken = data.nextPageToken || null; renderFeed(data.items || []);
     } catch(e2) { feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home to load feed.</div>'; }
   }
+  // Sync after feed loads — fully non-blocking, doesn't delay UI
+  setTimeout(async () => {
+    const tkn = await getValidToken();
+    if (tkn) {
+      silentSync(tkn).catch(() => {});
+      setInterval(async () => { const t = await getValidToken(); if (t) silentSync(t).catch(() => {}); }, 300000);
+    }
+  }, 3000);
 })();
 </script>
 </body>
