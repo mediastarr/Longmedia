@@ -476,6 +476,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
     </div>
     <div class="topbar-right">
       <button id="themeToggle" class="topbar-btn">Theme</button>
+      <button id="syncBtn" class="topbar-btn">⟳ Sync</button>
       <button id="backBtn" class="topbar-btn">Mini</button>
     </div>
   </div>
@@ -542,6 +543,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
     <div id="subsLoginPanel" style="margin-top:12px; padding:12px; border-radius:16px; background:linear-gradient(135deg, rgba(8,10,18,0.95), rgba(16,20,32,0.95));">
       <div style="font-size:13px; opacity:0.85; margin-bottom:6px;">Sign in to load your YouTube subscriptions</div>
       <button id="startLoginBtn" class="topbar-btn" style="margin-bottom:8px;">Login to YouTube</button>
+      <button id="reloginBtn" class="topbar-btn" style="margin-bottom:8px; background:radial-gradient(circle at 0% 0%,rgba(255,80,80,0.2),rgba(10,12,20,0.9));">Clear &amp; Re-login</button>
       <div id="deviceUserCode" style="font-size:12px; margin-top:6px; opacity:0.8;"></div>
       <div id="deviceLoginStatus" style="font-size:12px; margin-top:4px; opacity:0.8;"></div>
     </div>
@@ -569,6 +571,18 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
     </div>
   </div>
 </div>
+  <div id="syncOverlay" style="display:none; position:fixed; inset:0; z-index:100001; background:rgba(0,0,0,0.88); align-items:flex-start; justify-content:center; overflow-y:auto; padding:16px 12px;">
+    <div id="syncBox" style="width:100%; max-width:340px; margin:0 auto; border-radius:18px; background:linear-gradient(135deg,rgba(10,12,20,0.98),rgba(20,24,40,0.98)); border:1px solid rgba(60,242,255,0.35); box-shadow:0 0 30px rgba(60,242,255,0.2); padding:16px;">
+      <div style="font-size:13px; font-weight:700; letter-spacing:0.05em; margin-bottom:4px; color:#f5f7ff;">⟳ Sync from YouTube</div>
+      <div style="font-size:10px; opacity:0.65; margin-bottom:12px; line-height:1.4;">Reads your liked videos, playlists, subscriptions and activity to build a taste profile.</div>
+      <div id="syncStatus" style="font-size:10px; color:rgba(60,242,255,0.9); min-height:14px; margin-bottom:10px;"></div>
+      <div id="syncProgress" style="width:100%; height:3px; background:rgba(60,242,255,0.12); border-radius:3px; margin-bottom:12px; display:none;"><div id="syncProgressFill" style="height:100%; width:0%; background:linear-gradient(90deg,rgba(60,242,255,0.9),rgba(0,255,180,0.7)); border-radius:3px; transition:width 0.4s ease;"></div></div>
+      <div style="display:flex; gap:8px;">
+        <button id="syncStartBtn" class="topbar-btn" style="flex:1; font-size:11px; padding:6px 10px; min-height:32px;">Start Sync</button>
+        <button id="syncCloseBtn" class="topbar-btn" style="flex:0 0 auto; font-size:11px; padding:6px 10px; min-height:32px;">Close</button>
+      </div>
+    </div>
+  </div>
 
 <script>
 const API_KEYS = [
@@ -2082,6 +2096,76 @@ initAmbientLighting();
 themeToggle.addEventListener("click", () => { isLight = !isLight; document.body.classList.toggle("light", isLight); showHUD(isLight ? "Light Mode" : "Dark Mode"); });
 
 /* CHANGE: init uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
+/* ================================================================
+   SYNC FROM YOUTUBE
+================================================================ */
+const syncBtn = document.getElementById("syncBtn");
+const syncOverlay = document.getElementById("syncOverlay");
+const syncBox = document.getElementById("syncBox");
+const syncStatus = document.getElementById("syncStatus");
+const syncProgress = document.getElementById("syncProgress");
+const syncProgressFill = document.getElementById("syncProgressFill");
+const syncStartBtn = document.getElementById("syncStartBtn");
+const syncCloseBtn = document.getElementById("syncCloseBtn");
+
+syncBtn.onclick = function() { syncOverlay.style.display="flex"; syncStatus.textContent=""; syncProgressFill.style.width="0%"; syncProgress.style.display="none"; syncStartBtn.textContent="Start Sync"; syncStartBtn.disabled=false; };
+syncCloseBtn.onclick = function() { syncOverlay.style.display="none"; };
+syncOverlay.onclick = function(e) { if(e.target===syncOverlay) syncOverlay.style.display="none"; };
+syncBox.onclick = function(e) { e.stopPropagation(); };
+
+// Clear & Re-login button
+document.getElementById("reloginBtn").addEventListener("click", () => {
+  clearTokens();
+  document.getElementById("deviceUserCode").textContent = "";
+  document.getElementById("deviceLoginStatus").textContent = "Tokens cleared — tap Login to YouTube";
+  showHUD("Ready to re-login");
+});
+
+function buildExtract(profile) {
+  const sw = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","this","that","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","have","has","he","she","they","do","did","new","vs","ep","ft","official","video","full","2024","2025","2026","part","episode"]);
+  return function(title, chId, chTitle, weight) {
+    weight = weight || 1;
+    if (chId) { profile.channels[chId] = profile.channels[chId] || {title:chTitle,weight:0,lastWatch:0}; profile.channels[chId].weight += weight; if (chTitle) profile.channels[chId].title = chTitle; if (!profile.channels[chId].lastWatch) profile.channels[chId].lastWatch = Date.now(); }
+    if (title) { const words = title.toLowerCase().replace(/[^a-z0-9\s]/g,"").split(/\s+/).filter(w=>w.length>2&&!sw.has(w)); words.forEach(w=>{profile.keywords[w]=(profile.keywords[w]||0)+weight;}); for(let i=0;i<words.length-1;i++){const bi=words[i]+" "+words[i+1];profile.bigrams[bi]=(profile.bigrams[bi]||0)+weight;} }
+  };
+}
+
+syncStartBtn.onclick = async function() {
+  const token = await getValidToken();
+  if (!token) { syncStatus.textContent="Not logged in — login via Subscriptions first."; return; }
+  syncStartBtn.disabled=true; syncStartBtn.textContent="Syncing…"; syncProgress.style.display="block";
+  const profile = getTasteProfile();
+  profile.channels=profile.channels||{}; profile.categories=profile.categories||{}; profile.keywords=profile.keywords||{}; profile.bigrams=profile.bigrams||{}; profile.recentVideoIds=profile.recentVideoIds||[];
+  const extract = buildExtract(profile);
+  const isFirst = !profile.syncedAt;
+  let total = 0;
+  function sp(pct,msg){syncProgressFill.style.width=pct+"%"; syncStatus.textContent=msg;}
+  sp(5, isFirst?"Deep syncing liked videos…":"Reading liked videos…");
+  try { let pt="",pages=0,max=isFirst?25:10; while(pages<max){const url="https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=20"+(pt?"&pageToken="+pt:""); const r=await fetch(url,{headers:{Authorization:"Bearer "+token}}); const d=await r.json(); if(d.error||!d.items)break; d.items.forEach(it=>{const s=it.snippet||{}; extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,3); const vid=s.resourceId?.videoId; if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid); total++;}); pt=d.nextPageToken||""; pages++; if(!pt)break; sp(5+Math.round((pages/max)*15),"Liked: "+total+" so far…");} sp(20,"Liked videos: "+total+" signals"); } catch(e){}
+  sp(22,"Reading Watch Later…"); try{const r=await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=50",{headers:{Authorization:"Bearer "+token}}); const d=await r.json(); (d.items||[]).forEach(it=>{const s=it.snippet||{}; extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,2); total++;}); sp(30,"Watch Later: "+total+" signals");}catch(e){}
+  sp(32,"Reading playlists…"); try{const pr=await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}}); const pd=await pr.json(); const plLimit=isFirst?(pd.items||[]).length:8,iPerPl=isFirst?20:10; for(const pl of(pd.items||[]).slice(0,plLimit)){try{const ir=await fetchYouTube("playlistItems",{part:"snippet",playlistId:pl.id,maxResults:iPerPl,_:Date.now()}); (ir.items||[]).forEach(it=>{const s=it.snippet||{}; extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,2); total++;});}catch(e){}} sp(50,"Playlists: "+total+" signals");}catch(e){}
+  sp(52,"Reading subscriptions…"); try{const sr=await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}}); const sd=await sr.json(); const cids=(sd.items||[]).map(s=>{extract(null,s.snippet.resourceId.channelId,s.snippet.title,1); total++; return s.snippet.resourceId.channelId;}); if(cids.length){const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,50).join(",")}); const ups=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean); const sc=isFirst?20:5; for(const plId of ups.sort(()=>Math.random()-0.5).slice(0,sc)){try{const ur=await fetchYouTube("playlistItems",{part:"snippet",playlistId:plId,maxResults:8,_:Date.now()}); (ur.items||[]).forEach(it=>{extract(it.snippet?.title,null,null,1); total++;});}catch(e){}}} sp(75,"Subscriptions: "+total+" signals");}catch(e){}
+  sp(77,"Reading activity…"); try{const ar=await fetch("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}}); const ad=await ar.json(); (ad.items||[]).forEach(it=>{const s=it.snippet||{}; extract(s.title,s.channelId,s.channelTitle,2); const vid=it.contentDetails?.upload?.videoId; if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid); total++;}); sp(90,"Activity: "+total+" signals");}catch(e){}
+  profile.recentVideoIds=profile.recentVideoIds.slice(0,50); profile.syncedAt=Date.now();
+  localStorage.setItem("tasteProfile",JSON.stringify(profile));
+  localStorage.removeItem("feedShownTimed"); localStorage.removeItem("feedShownIds");
+  sp(100,"✓ Sync complete — "+total+" signals from your account");
+  syncStartBtn.textContent="Sync Again"; syncStartBtn.disabled=false; showHUD("YouTube synced ✦");
+  setTimeout(()=>{syncOverlay.style.display="none"; homeTab.click();},1500);
+};
+
+async function silentSync(token) {
+  const profile = getTasteProfile();
+  profile.channels=profile.channels||{}; profile.categories=profile.categories||{}; profile.keywords=profile.keywords||{}; profile.bigrams=profile.bigrams||{}; profile.recentVideoIds=profile.recentVideoIds||[];
+  const extract = buildExtract(profile);
+  const isFirst = !profile.syncedAt, maxPages = isFirst?10:5;
+  try{let pt=""; for(let p=0;p<maxPages;p++){const url="https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=20"+(pt?"&pageToken="+pt:""); const r=await fetch(url,{headers:{Authorization:"Bearer "+token}}); const d=await r.json(); if(d.error||!d.items)break; d.items.forEach(it=>{const s=it.snippet||{}; extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,3); const vid=s.resourceId?.videoId; if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);}); pt=d.nextPageToken||""; if(!pt)break;}}catch(e){}
+  try{const r=await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=50",{headers:{Authorization:"Bearer "+token}}); const d=await r.json(); (d.items||[]).forEach(it=>{const s=it.snippet||{}; extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,2);});}catch(e){}
+  try{const sr=await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}}); const sd=await sr.json(); const cids=(sd.items||[]).map(s=>{extract(null,s.snippet.resourceId.channelId,s.snippet.title,1); return s.snippet.resourceId.channelId;}); if(cids.length){const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,50).join(",")}); const ups=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean); for(const plId of ups.sort(()=>Math.random()-0.5).slice(0,isFirst?15:5)){try{const ur=await fetchYouTube("playlistItems",{part:"snippet",playlistId:plId,maxResults:8,_:Date.now()}); (ur.items||[]).forEach(it=>{extract(it.snippet?.title,null,null,1);});}catch(e){}}}}catch(e){}
+  profile.recentVideoIds=profile.recentVideoIds.slice(0,50); profile.syncedAt=Date.now();
+  localStorage.setItem("tasteProfile",JSON.stringify(profile));
+}
+
 (async function init() {
   // Dismiss boot splash after loading bar completes
   setTimeout(() => {
@@ -2091,6 +2175,13 @@ themeToggle.addEventListener("click", () => { isLight = !isLight; document.body.
   showSkeletons(8);
   const hasRefresh = localStorage.getItem("yt_refresh_token");
   if (hasRefresh) { const ok = await refreshAccessToken(); if (ok) showHUD("Signed in ✓"); }
+
+  // Sync on startup, then every 5 minutes
+  const tkn = await getValidToken();
+  if (tkn) {
+    silentSync(tkn).then(() => showHUD("Feed updated ✦")).catch(() => {});
+    setInterval(async () => { const t = await getValidToken(); if (t) silentSync(t).catch(() => {}); }, 300000);
+  }
   try {
     if (hasEnoughHistory()) {
       const items = await fetchPersonalizedFeed();
