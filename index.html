@@ -1572,17 +1572,12 @@ historyTab.addEventListener("click", () => {
 
 channelTab.addEventListener("click", () => loadChannelPage(currentChannelId));
 
-subsTab.addEventListener("click", () => {
+subsTab.addEventListener("click", async () => {
   setActiveTab("subs"); showHUD("Subscriptions");
   document.getElementById("subsLoginPanel").style.display = "block";
-  const token = localStorage.getItem("yt_access_token");
-  const expired = isTokenExpired();
-  if (token && !expired) {
-    deviceLoginStatusEl.textContent = "Logged in ✓";
-    loadSubscriptions();
-  } else {
-    deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
-  }
+  const token = await getValidToken();
+  if (token) { deviceLoginStatusEl.textContent = "Logged in ✓"; loadSubscriptions(); }
+  else deviceLoginStatusEl.textContent = "Login required to load subscriptions.";
 });
 
 const OAUTH_CLIENT_ID = "153049037088-10qnschnsie4mqpdsdscd0uk2auqogdt.apps.googleusercontent.com";
@@ -2228,14 +2223,18 @@ async function silentSync(token) {
       nextPageToken = data.nextPageToken || null; renderFeed(data.items || []);
     } catch(e2) { feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home to load feed.</div>'; }
   }
-  // Sync after feed loads — fully non-blocking, doesn't delay UI
-  setTimeout(async () => {
-    const tkn = await getValidToken();
-    if (tkn) {
-      silentSync(tkn).catch(() => {});
-      setInterval(async () => { const t = await getValidToken(); if (t) silentSync(t).catch(() => {}); }, 300000);
+  // Silent background sync — only if >1 hour since last sync, never blocks UI
+  const tkn = await getValidToken();
+  if (tkn) {
+    const p = getTasteProfile();
+    if (Date.now() - (p.syncedAt || 0) > 3600000) {
+      silentSync(tkn).then(() => showHUD("Feed updated ✦")).catch(() => {});
     }
-  }, 3000);
+    setInterval(async () => {
+      const t = await getValidToken();
+      if (t) { const pr = getTasteProfile(); if (Date.now() - (pr.syncedAt||0) > 3600000) silentSync(t).catch(() => {}); }
+    }, 300000);
+  }
 })();
 </script>
 </body>
