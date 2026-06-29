@@ -1544,15 +1544,24 @@ shortsTab.addEventListener("click", async () => {
 
 moviesTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("movies"); showSkeletons(8);
-  // Try queries until one returns movies (handles quota errors / empty results)
-  let data = { items: [] };
-  for (let attempt = 0; attempt < MOVIE_QUERIES.length; attempt++) {
-    const q = MOVIE_QUERIES[movieQIdx % MOVIE_QUERIES.length]; movieQIdx++;
-    data = await fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 20, _: Date.now() });
-    if (data.items && data.items.length) break;
-  }
-  const items = (data.items || []).filter(v => v.id && v.id.videoId).map(v => ({ id: v.id.videoId, snippet: v.snippet }));
-  nextPageToken = data.nextPageToken || null; renderFeed(items); showHUD("Movies");
+  try {
+    // Fire all movie queries in parallel — take first that returns results
+    const queries = MOVIE_QUERIES.map(q =>
+      fetchYouTube("search", { part: "snippet", q, type: "video", videoDuration: "long", videoEmbeddable: "true", regionCode: "US", maxResults: 15, _: Date.now() })
+    );
+    const results = await Promise.allSettled(queries);
+    const seen = new Set(); const allItems = [];
+    results.forEach(r => {
+      if (r.status === "fulfilled") {
+        (r.value.items || []).forEach(v => {
+          const id = v.id?.videoId; if (!id || seen.has(id)) return;
+          seen.add(id); allItems.push({ id, snippet: v.snippet });
+        });
+      }
+    });
+    if (allItems.length) { nextPageToken = null; renderFeed(allItems); showHUD("Movies"); }
+    else { feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies to retry.</div>'; }
+  } catch(e) { feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies to retry.</div>'; }
 });
 
 historyTab.addEventListener("click", () => {
@@ -1642,8 +1651,12 @@ async function loadSubscriptions() {
   subsFeedEl.innerHTML = Array(4).fill('<div class="skeleton"><div class="skeleton-thumb"></div><div class="skeleton-info"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>').join("");
   subsNextPageToken = null;
   let token = localStorage.getItem("yt_access_token");
-  if (!token || isTokenExpired()) { const ok = await refreshAccessToken(); token = ok ? localStorage.getItem("yt_access_token") : null; }
-  if (!token) { subsFeedEl.innerHTML = ""; deviceLoginStatusEl.textContent = "Login required."; return; }
+  // Only refresh if actually expired — skip if fresh token exists
+  if (!token || isTokenExpired()) {
+    const ok = await refreshAccessToken();
+    token = ok ? localStorage.getItem("yt_access_token") : null;
+  }
+  if (!token) { subsFeedEl.innerHTML = ""; deviceLoginStatusEl.textContent = "Login required — tap Login to YouTube."; return; }
   try {
     const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
     const data = await res.json();
@@ -1663,16 +1676,24 @@ async function loadSubscriptions() {
 
 playlistTab.addEventListener("click", async () => {
   setActiveTab("playlists"); showHUD("Playlists");
-  const token = await getValidToken();
+  // If playlists already loaded and visible, don't reload
+  if (playlistGrid.childElementCount > 0 && playlistGrid.style.display === "grid") return;
+  // Use cached token directly — avoid getValidToken() async delay
+  let token = localStorage.getItem("yt_access_token");
+  if (!token || isTokenExpired()) { const ok = await refreshAccessToken(); token = ok ? localStorage.getItem("yt_access_token") : null; }
   if (token) loadPlaylists();
   else { playlistLoginPanel.style.display = "block"; playlistGrid.style.display = "none"; playlistItemsView.style.display = "none"; }
 });
 playlistLoginBtn.addEventListener("click", () => startDeviceLogin("playlists"));
 
 async function loadPlaylists() {
-  const token = await getValidToken(); if (!token) return;
-  playlistLoginPanel.style.display = "none"; playlistGrid.style.display = "none"; playlistItemsView.style.display = "none";
-  playlistGrid.innerHTML = ""; showHUD("Loading playlists…");
+  // Show skeletons immediately while fetching
+  playlistLoginPanel.style.display = "none"; playlistItemsView.style.display = "none";
+  playlistGrid.style.display = "grid";
+  playlistGrid.innerHTML = Array(4).fill('<div class="skeleton" style="border-radius:16px;min-height:140px;"><div class="skeleton-thumb" style="width:100%;height:90px;border-radius:12px 12px 0 0;flex:none;"></div><div class="skeleton-info" style="padding:8px;"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>').join("");
+  let token = localStorage.getItem("yt_access_token");
+  if (!token || isTokenExpired()) { const ok = await refreshAccessToken(); token = ok ? localStorage.getItem("yt_access_token") : null; }
+  if (!token) { playlistGrid.innerHTML = ""; playlistLoginPanel.style.display = "block"; return; }
   try {
     const res = await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=50", { headers: { Authorization: "Bearer " + token } });
     const data = await res.json();
