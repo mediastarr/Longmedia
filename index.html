@@ -2071,6 +2071,42 @@ function setActiveTab(tab) {
 homeTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("home"); showSkeletons(6);
   _pollClearBadge(); // clear new content badge when user opens home
+  // If Worker sent us new videos, show them at top of feed
+  try {
+    const hubRaw = localStorage.getItem("hubNewVideos");
+    if (hubRaw) {
+      const hubVideos = JSON.parse(hubRaw);
+      if (hubVideos && hubVideos.length) {
+        localStorage.removeItem("hubNewVideos");
+        // Fetch full details for hub videos (title/thumb from Worker is basic)
+        const ids = hubVideos.map(v => v.videoId).join(",");
+        fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() })
+          .then(data => {
+            if (data.items && data.items.length) {
+              // Prepend to feed after it loads
+              setTimeout(() => {
+                const frag = document.createDocumentFragment();
+                data.items.forEach(item => {
+                  const snippet = item.snippet || {};
+                  const videoId = item.id;
+                  const card = document.createElement("div");
+                  card.className = "video-card parallax focusable";
+                  card.dataset.videoid = videoId;
+                  card.style.border = "1px solid rgba(255,68,68,0.6)";
+                  card.style.boxShadow = "0 0 12px rgba(255,68,68,0.3)";
+                  const thumb = snippet.thumbnails?.medium?.url || "";
+                  const ago = timeAgo(snippet.publishedAt);
+                  card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title||""}</div><div class="video-channel">${snippet.channelTitle||""}</div><div class="video-meta" style="color:rgba(255,100,100,0.9);">🔴 New · ${ago}</div></div>`;
+                  card.onclick = async () => { const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); } };
+                  frag.appendChild(card);
+                });
+                feedEl.insertBefore(frag, feedEl.firstChild);
+              }, 500);
+            }
+          }).catch(() => {});
+      }
+    }
+  } catch(e) {}
   const token = await getValidToken();
   const since48h = new Date(Date.now() - 172800000).toISOString();
   const cat = freshCategory();
@@ -2527,6 +2563,8 @@ subsTab.addEventListener("click", async () => {
 
 const OAUTH_CLIENT_ID = "153049037088-10qnschnsie4mqpdsdscd0uk2auqogdt.apps.googleusercontent.com";
 const OAUTH_CLIENT_SECRET = "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";
+const HUB_WORKER_URL = "https://viewtube-hub.mediastarr86.workers.dev";
+const HUB_SECRET = "viewtube-hub-secret-2024";
 
 startLoginBtn.addEventListener("click", () => startDeviceLogin("subs"));
 document.getElementById("reloginBtn").addEventListener("click", () => {
@@ -3410,6 +3448,24 @@ async function silentSync(token){
   try{const ar=await fetch("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});const ad=await ar.json();(ad.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.channelId,s.channelTitle,2);const vid=it.contentDetails?.upload?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);});}catch(e){}
   profile.recentVideoIds=profile.recentVideoIds.slice(0,50);profile.syncedAt=Date.now();
   localStorage.setItem("tasteProfile",JSON.stringify(profile));
+
+  // Send channel IDs to Worker for PubSubHubbub subscriptions
+  // This is automatic — no user action needed
+  try {
+    const channelIds = Object.keys(profile.channels || {});
+    if (channelIds.length > 0) {
+      fetch(HUB_WORKER_URL + "/subscribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-ViewTube-Secret": HUB_SECRET
+        },
+        body: JSON.stringify({ channelIds: channelIds.slice(0, 100) })
+      }).then(r => r.json()).then(d => {
+        if (d.subscribed > 0) console.log("Hub: subscribed", d.subscribed, "channels for real-time notifications");
+      }).catch(() => {});
+    }
+  } catch(e) {}
 }
 
 
@@ -3485,6 +3541,7 @@ async function triggerReAuthFlow() {
 let _pollKnownIds = null; // null = not initialized yet
 let _pollBadgeCount = 0;
 let _pollTimer = null;
+let _pollLastCheck = null; // timestamp of last successful poll
 
 function _pollSetBadge(count) {
   _pollBadgeCount = count;
@@ -3509,80 +3566,40 @@ function _pollClearBadge() {
 }
 
 async function _pollCheckNewContent() {
-  // Only poll if we have a valid token (logged in) or have subscribed channels in taste profile
-  const token = await getValidToken();
-  const topCh = getTopChannels(5);
-  if (!token && !topCh.length) return;
-
   try {
-    const since = new Date(Date.now() - 900000).toISOString(); // last 15 min
-    const newIds = new Set();
+    // Poll the Cloudflare Worker — zero YouTube API quota cost
+    const since = _pollLastCheck || (Date.now() - 900000);
+    const res = await fetch(
+      HUB_WORKER_URL + "/poll?since=" + since,
+      { headers: { "X-ViewTube-Secret": HUB_SECRET } }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    _pollLastCheck = data.serverTime || Date.now();
 
-    if (token) {
-      // Logged in: check actual subscription uploads
-      const subsRes = await fetch(
-        "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20&order=relevance",
-        { headers: { Authorization: "Bearer " + token } }
-      );
-      const subsData = await subsRes.json();
-      const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId).slice(0, 10);
+    if (!data.videos || !data.videos.length) return;
 
-      if (channelIds.length) {
-        // Check each channel's UUSH playlist for videos published in last 15 min
-        const checks = channelIds.map(cid =>
-          fetchYouTube("search", {
-            part: "snippet", channelId: cid, type: "video",
-            order: "date", maxResults: 3, publishedAfter: since, _: Date.now()
-          })
-        );
-        const results = await Promise.allSettled(checks);
-        results.forEach(r => {
-          if (r.status === "fulfilled") {
-            (r.value.items || []).forEach(item => {
-              const id = item.id?.videoId || item.id;
-              if (id) newIds.add(id);
-            });
-          }
-        });
-      }
-    } else {
-      // Not logged in: check top channels from taste profile
-      const checks = topCh.slice(0, 5).map(ch =>
-        fetchYouTube("search", {
-          part: "snippet", channelId: ch.id, type: "video",
-          order: "date", maxResults: 2, publishedAfter: since, _: Date.now()
-        })
-      );
-      const results = await Promise.allSettled(checks);
-      results.forEach(r => {
-        if (r.status === "fulfilled") {
-          (r.value.items || []).forEach(item => {
-            const id = item.id?.videoId || item.id;
-            if (id) newIds.add(id);
-          });
-        }
-      });
-    }
-
-    if (newIds.size === 0) return;
-
-    // First poll: just initialize the known set, don't show badge yet
+    // First poll: just initialize, don't badge yet
     if (_pollKnownIds === null) {
-      _pollKnownIds = newIds;
+      _pollKnownIds = new Set(data.videos.map(v => v.videoId));
       return;
     }
 
-    // Find truly new videos not seen in previous poll
-    const trulyNew = [...newIds].filter(id => !_pollKnownIds.has(id));
+    // Find truly new videos
+    const trulyNew = data.videos.filter(v => !_pollKnownIds.has(v.videoId));
+    if (!trulyNew.length) return;
 
-    if (trulyNew.length > 0) {
-      // Add to known set
-      trulyNew.forEach(id => _pollKnownIds.add(id));
-      // Only show badge if user is NOT already on the home tab looking at fresh content
-      if (currentTab !== "home") {
-        _pollSetBadge(_pollBadgeCount + trulyNew.length);
-        showHUD("🔴 " + (_pollBadgeCount) + " new video" + (_pollBadgeCount > 1 ? "s" : "") + " available");
-      }
+    trulyNew.forEach(v => _pollKnownIds.add(v.videoId));
+
+    // Store them so home tab can show them immediately when tapped
+    try {
+      localStorage.setItem("hubNewVideos", JSON.stringify(trulyNew));
+    } catch(e) {}
+
+    // Show badge if not on home tab
+    if (currentTab !== "home") {
+      _pollSetBadge(_pollBadgeCount + trulyNew.length);
+      showHUD("🔴 " + _pollBadgeCount + " new video" + (_pollBadgeCount > 1 ? "s" : "") + " from your subscriptions");
     }
 
   } catch(e) {
