@@ -1745,29 +1745,44 @@ async function loadVideoInfoPanel(videoId, snippet) {
     if (avatarUrl) avatarEl.innerHTML = `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;">`;
   }
 
-  // Subscribe button
+  // Subscribe button — ALWAYS reset to default first, every single video
   const subBtn = document.getElementById("vipSubscribeBtn");
   let subscribed = false;
-  let subscriptionId = null; // needed to delete (unsubscribe)
+  let subscriptionId = null;
+  subBtn.textContent = "Subscribe";
+  subBtn.style.background = "#f5f7ff";
+  subBtn.style.color = "#000";
+  subBtn.disabled = false;
 
-  // Check if already subscribed on load
-  if (channelId) {
+  // Now check the NEW video's channel — captures channelId for this call only
+  const checkChannelId = channelId;
+  if (checkChannelId) {
     getValidToken().then(async token => {
       if (!token) return;
+      // Guard: if user already tapped a different video before this resolved, abort
+      if (checkChannelId !== channelId) return;
       try {
         const res = await fetch(
-          `https://www.googleapis.com/youtube/v3/subscriptions?part=id&mine=true&forChannelId=${channelId}`,
+          `https://www.googleapis.com/youtube/v3/subscriptions?part=id&mine=true&forChannelId=${checkChannelId}`,
           { headers: { Authorization: "Bearer " + token } }
         );
         const d = await res.json();
+        if (checkChannelId !== channelId) return; // still guard after await
         if (d.items && d.items.length > 0) {
           subscribed = true;
           subscriptionId = d.items[0].id;
           subBtn.textContent = "Subscribed ✓";
           subBtn.style.background = "rgba(60,242,255,0.2)";
           subBtn.style.color = "#3cf2ff";
+        } else {
+          // Explicitly confirm unsubscribed state — don't leave it ambiguous
+          subBtn.textContent = "Subscribe";
+          subBtn.style.background = "#f5f7ff";
+          subBtn.style.color = "#000";
         }
-      } catch(e) {}
+      } catch(e) {
+        // On error, stay in default Subscribe state — never show false positive
+      }
     });
   }
 
