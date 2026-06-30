@@ -555,6 +555,24 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   60% { width: 75%; }
   100% { width: 100%; }
 }
+
+/* New content badge on Home tab */
+.tab-new-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #ff4444; color: #fff; font-size: 10px; font-weight: 700;
+  border-radius: 999px; min-width: 18px; height: 18px; padding: 0 5px;
+  margin-left: 5px; vertical-align: middle;
+  animation: badgePulse 1.8s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(255,68,68,0.8);
+}
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(255,68,68,0.8); }
+  50% { transform: scale(1.15); box-shadow: 0 0 16px rgba(255,68,68,1); }
+}
+#homeTab.has-new-content {
+  border-color: #ff4444;
+  box-shadow: 0 0 18px rgba(255,68,68,0.6);
+}
 </style>
 </head>
 <body>
@@ -2052,6 +2070,7 @@ function setActiveTab(tab) {
 /* CHANGE: home tab uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
 homeTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("home"); showSkeletons(6);
+  _pollClearBadge(); // clear new content badge when user opens home
   const token = await getValidToken();
   const since48h = new Date(Date.now() - 172800000).toISOString();
   const cat = freshCategory();
@@ -3457,6 +3476,136 @@ async function triggerReAuthFlow() {
   }
 })();
 
+
+/* ================================================================
+   SMART BACKGROUND POLLING — checks for new subscription uploads
+   every 5-15 minutes (randomized to avoid quota spikes)
+   Shows badge on Home tab when new videos found
+================================================================ */
+let _pollKnownIds = null; // null = not initialized yet
+let _pollBadgeCount = 0;
+let _pollTimer = null;
+
+function _pollSetBadge(count) {
+  _pollBadgeCount = count;
+  const btn = document.getElementById("homeTab");
+  if (!btn) return;
+  // Remove existing badge
+  const existing = btn.querySelector(".tab-new-badge");
+  if (existing) existing.remove();
+  if (count > 0) {
+    btn.classList.add("has-new-content");
+    const badge = document.createElement("span");
+    badge.className = "tab-new-badge";
+    badge.textContent = count > 99 ? "99+" : count;
+    btn.appendChild(badge);
+  } else {
+    btn.classList.remove("has-new-content");
+  }
+}
+
+function _pollClearBadge() {
+  _pollSetBadge(0);
+}
+
+async function _pollCheckNewContent() {
+  // Only poll if we have a valid token (logged in) or have subscribed channels in taste profile
+  const token = await getValidToken();
+  const topCh = getTopChannels(5);
+  if (!token && !topCh.length) return;
+
+  try {
+    const since = new Date(Date.now() - 900000).toISOString(); // last 15 min
+    const newIds = new Set();
+
+    if (token) {
+      // Logged in: check actual subscription uploads
+      const subsRes = await fetch(
+        "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20&order=relevance",
+        { headers: { Authorization: "Bearer " + token } }
+      );
+      const subsData = await subsRes.json();
+      const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId).slice(0, 10);
+
+      if (channelIds.length) {
+        // Check each channel's UUSH playlist for videos published in last 15 min
+        const checks = channelIds.map(cid =>
+          fetchYouTube("search", {
+            part: "snippet", channelId: cid, type: "video",
+            order: "date", maxResults: 3, publishedAfter: since, _: Date.now()
+          })
+        );
+        const results = await Promise.allSettled(checks);
+        results.forEach(r => {
+          if (r.status === "fulfilled") {
+            (r.value.items || []).forEach(item => {
+              const id = item.id?.videoId || item.id;
+              if (id) newIds.add(id);
+            });
+          }
+        });
+      }
+    } else {
+      // Not logged in: check top channels from taste profile
+      const checks = topCh.slice(0, 5).map(ch =>
+        fetchYouTube("search", {
+          part: "snippet", channelId: ch.id, type: "video",
+          order: "date", maxResults: 2, publishedAfter: since, _: Date.now()
+        })
+      );
+      const results = await Promise.allSettled(checks);
+      results.forEach(r => {
+        if (r.status === "fulfilled") {
+          (r.value.items || []).forEach(item => {
+            const id = item.id?.videoId || item.id;
+            if (id) newIds.add(id);
+          });
+        }
+      });
+    }
+
+    if (newIds.size === 0) return;
+
+    // First poll: just initialize the known set, don't show badge yet
+    if (_pollKnownIds === null) {
+      _pollKnownIds = newIds;
+      return;
+    }
+
+    // Find truly new videos not seen in previous poll
+    const trulyNew = [...newIds].filter(id => !_pollKnownIds.has(id));
+
+    if (trulyNew.length > 0) {
+      // Add to known set
+      trulyNew.forEach(id => _pollKnownIds.add(id));
+      // Only show badge if user is NOT already on the home tab looking at fresh content
+      if (currentTab !== "home") {
+        _pollSetBadge(_pollBadgeCount + trulyNew.length);
+        showHUD("🔴 " + (_pollBadgeCount) + " new video" + (_pollBadgeCount > 1 ? "s" : "") + " available");
+      }
+    }
+
+  } catch(e) {
+    // Silent fail — never interrupt the user
+  }
+}
+
+function _startPolling() {
+  // Initial poll after 2 minutes (let app settle first)
+  setTimeout(async () => {
+    await _pollCheckNewContent();
+    // Then repeat every 5-15 minutes (randomized)
+    function scheduleNext() {
+      const delay = (5 + Math.floor(Math.random() * 10)) * 60 * 1000; // 5-15 min
+      _pollTimer = setTimeout(async () => {
+        await _pollCheckNewContent();
+        scheduleNext();
+      }, delay);
+    }
+    scheduleNext();
+  }, 2 * 60 * 1000);
+}
+
 (async function init() {
   // Dismiss boot splash after loading bar completes
   setTimeout(() => {
@@ -3515,6 +3664,9 @@ async function triggerReAuthFlow() {
   // Silent background sync every 6 hours
   const tkn = await getValidToken();
   if (tkn) { const p = getTasteProfile(); if (Date.now() - (p.syncedAt||0) > 7200000) { silentSync(tkn).then(()=>showHUD("Feed updated ✦")).catch(()=>{}); } }
+
+  // Start background polling for new content
+  _startPolling();
 
   // Proactive token refresh every 55 minutes — keeps session alive indefinitely
   // Access tokens expire in 60 min; this refreshes before they expire
