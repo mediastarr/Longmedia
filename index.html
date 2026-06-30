@@ -1950,10 +1950,8 @@ async function preCacheShorts(items) {
       const cd = details[id];
       if (cd) {
         const secs = parseDuration(cd.duration);
-        // Only ≤60s videos are Shorts — never guess, never false-positive
-        _shortsCache[id] = secs !== null && secs > 0 && secs <= 180; // YouTube Shorts: up to 3 minutes
+        _shortsCache[id] = secs !== null && secs > 0 && secs <= 164;
       } else {
-        // Not in API response = not a short
         _shortsCache[id] = false;
       }
     });
@@ -3593,7 +3591,8 @@ function _pollClearBadge() {
 async function _pollCheckNewContent() {
   try {
     // Poll the Cloudflare Worker — zero YouTube API quota cost
-    const since = _pollLastCheck || (Date.now() - 900000);
+    // Use last check time, or go back 24h on first poll to catch recent uploads
+    const since = _pollLastCheck || (Date.now() - 86400000);
     const res = await fetch(
       HUB_WORKER_URL + "/poll?since=" + since,
       { headers: { "X-ViewTube-Secret": HUB_SECRET } }
@@ -3604,32 +3603,72 @@ async function _pollCheckNewContent() {
 
     if (!data.videos || !data.videos.length) return;
 
-    // First poll: just initialize, don't badge yet
+    // Initialize known IDs set on first poll
     if (_pollKnownIds === null) {
-      _pollKnownIds = new Set(data.videos.map(v => v.videoId));
-      return;
+      _pollKnownIds = new Set();
     }
 
-    // Find truly new videos
+    // Find videos not yet shown to user
     const trulyNew = data.videos.filter(v => !_pollKnownIds.has(v.videoId));
     if (!trulyNew.length) return;
 
     trulyNew.forEach(v => _pollKnownIds.add(v.videoId));
 
-    // Store them so home tab can show them immediately when tapped
+    // Store for home tab to display
     try {
-      localStorage.setItem("hubNewVideos", JSON.stringify(trulyNew));
+      const existing = JSON.parse(localStorage.getItem("hubNewVideos") || "[]");
+      // Merge, deduplicate, keep newest 20
+      const merged = [...trulyNew, ...existing]
+        .filter((v, i, a) => a.findIndex(x => x.videoId === v.videoId) === i)
+        .slice(0, 20);
+      localStorage.setItem("hubNewVideos", JSON.stringify(merged));
     } catch(e) {}
 
-    // Show badge if not on home tab
-    if (currentTab !== "home") {
-      _pollSetBadge(_pollBadgeCount + trulyNew.length);
-      showHUD("🔴 " + _pollBadgeCount + " new video" + (_pollBadgeCount > 1 ? "s" : "") + " from your subscriptions");
+    // Always show badge and HUD regardless of which tab user is on
+    _pollSetBadge(_pollBadgeCount + trulyNew.length);
+    showHUD("🔴 " + _pollBadgeCount + " new video" + (_pollBadgeCount > 1 ? "s" : "") + " from your subscriptions");
+
+    // If already on home tab, inject new videos at top immediately
+    if (currentTab === "home" && feedEl) {
+      _injectHubVideos(trulyNew);
     }
 
   } catch(e) {
     // Silent fail — never interrupt the user
   }
+}
+
+async function _injectHubVideos(hubVideos) {
+  if (!hubVideos || !hubVideos.length) return;
+  try {
+    const ids = hubVideos.map(v => v.videoId).join(",");
+    const data = await fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() });
+    if (!data.items || !data.items.length) return;
+    const frag = document.createDocumentFragment();
+    data.items.forEach(item => {
+      const snippet = item.snippet || {};
+      const videoId = item.id;
+      // Remove existing card for this video if present
+      const existing = feedEl.querySelector('[data-videoid="' + videoId + '"]');
+      if (existing) existing.remove();
+      const card = document.createElement("div");
+      card.className = "video-card parallax focusable";
+      card.dataset.videoid = videoId;
+      card.style.border = "1px solid rgba(255,68,68,0.7)";
+      card.style.boxShadow = "0 0 14px rgba(255,68,68,0.35)";
+      const thumb = snippet.thumbnails?.medium?.url || "";
+      const ago = timeAgo(snippet.publishedAt);
+      card.innerHTML = '<div class="video-thumb"><img src="' + thumb + '" loading="lazy"></div><div class="video-info"><div class="video-title">' + (snippet.title||"") + '</div><div class="video-channel">' + (snippet.channelTitle||"") + '</div><div class="video-meta" style="color:rgba(255,100,100,0.9);">🔴 New · ' + ago + '</div></div>';
+      card.onclick = async () => {
+        const short = await checkIsShort(videoId, snippet);
+        if (short) openAsShort(videoId, snippet);
+        else { setPlayerVideo(videoId, snippet); showHUD("Playing: " + (snippet.title||"")); }
+      };
+      frag.appendChild(card);
+    });
+    feedEl.insertBefore(frag, feedEl.firstChild);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } catch(e) {}
 }
 
 function _startPolling() {
