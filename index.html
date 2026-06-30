@@ -3434,6 +3434,23 @@ syncStartBtn.onclick=async function(){
   // Clear feed dedup so synced content loads fresh on Home
   localStorage.removeItem("feedShownTimed"); localStorage.removeItem("feedShownIds");
   sp(100,"✓ Sync complete — "+total+" signals from your account");
+
+  // Register channels with Worker for real-time push notifications
+  try {
+    const channelIds = Object.keys(profile.channels || {});
+    if (channelIds.length > 0) {
+      const workerRes = await fetch(HUB_WORKER_URL + "/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-ViewTube-Secret": HUB_SECRET },
+        body: JSON.stringify({ channelIds: channelIds.slice(0, 100) })
+      });
+      const workerData = await workerRes.json();
+      if (workerData.subscribed > 0) {
+        sp(100, "✓ Sync complete — "+total+" signals · "+workerData.subscribed+" channels registered for real-time alerts ✦");
+      }
+    }
+  } catch(e) {}
+
   syncStartBtn.textContent="Sync Again";syncStartBtn.disabled=false;showHUD("YouTube synced ✦");
   setTimeout(()=>{syncOverlay.style.display="none";homeTab.click();},1500);
 };
