@@ -1687,6 +1687,9 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   playerSection.classList.remove("player-mini", "player-fullscreen");
   saveToHistory({ id: videoId, snippet });
   hideUIForVideo();
+  // Always scroll to top so player is visible — works whether opening from
+  // home feed or from suggested videos (which may be far down the page)
+  window.scrollTo({ top: 0, behavior: "instant" });
   // Show info panel below medium player
   loadVideoInfoPanel(videoId, snippet);
   playPauseBtn.textContent = "Pause";
