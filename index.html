@@ -664,7 +664,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   <div id="feed"></div>
 
   <!-- Video info panel — shown below medium player -->
-  <div id="videoInfoPanel" style="display:none; margin-top:12px; position:relative; z-index:10;">
+  <div id="videoInfoPanel" style="display:none; margin-top:12px; position:relative; z-index:10; touch-action:pan-y;">
     <!-- Title -->
     <div id="vipTitle" style="font-size:15px; font-weight:600; line-height:1.35; padding:0 2px 8px; color:#f5f7ff;"></div>
     <!-- Stats row: views · likes · age -->
@@ -688,7 +688,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
     <!-- Suggested videos label -->
     <div style="font-size:12px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:rgba(60,242,255,0.7); padding:10px 2px 6px;">Up Next</div>
     <!-- Suggested feed -->
-    <div id="suggestedFeed"></div>
+    <div id="suggestedFeed" style="touch-action:pan-y;"></div>
   </div>
   <div id="channelPage"></div>
   <div id="subsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
@@ -3277,18 +3277,24 @@ function applyDepthGlow(x, y, isFullscreen) {
 document.addEventListener("mousemove", (e) => {
   const x = (e.clientX / window.innerWidth) * 2 - 1;
   const y = (e.clientY / window.innerHeight) * 2 - 1;
-  if (!playerSection.classList.contains("player-fullscreen")) {
+  const isFS = playerSection.classList.contains("player-fullscreen");
+  const playerOpen = playerSection.style.display !== "none";
+  const infoPanelOpen = document.getElementById("videoInfoPanel")?.style.display !== "none";
+  if (!isFS && !playerOpen) {
     document.querySelectorAll(".parallax").forEach(el => { el.style.transform = `translate(${x*8}px, ${y*8}px)`; });
     document.querySelectorAll(".parallax-tab").forEach(el => { el.style.transform = `translate(${x*4}px, ${y*4}px)`; });
   }
-  applyDepthGlow(x, y, playerSection.classList.contains("player-fullscreen"));
-  document.querySelectorAll(".video-card").forEach(card => {
-    const isHover = card.matches(":hover"); const boost = isHover ? 1.6 : 1;
-    card.style.transform = `perspective(1100px) rotateX(${y*-8*boost}deg) rotateY(${x*8*boost}deg) translateX(${x*12}px) translateY(${y*12}px) translateZ(${isHover?18:0}px)`;
-    card.style.setProperty("--shadow-x", `${x*14}px`); card.style.setProperty("--shadow-y", `${y*14}px`);
-    card.style.setProperty("--shadow-blur", `${isHover?28:18}px`); card.style.setProperty("--shadow-opacity", isHover?0.75:0.55);
-    card.style.setProperty("--ao-opacity", isHover?0.22:0.35); card.style.setProperty("--ao-blur", `${isHover?32:22}px`);
-  });
+  applyDepthGlow(x, y, isFS);
+  // Disable card 3D transforms when player or info panel is open — causes scroll confusion
+  if (!playerOpen && !infoPanelOpen) {
+    document.querySelectorAll(".video-card").forEach(card => {
+      const isHover = card.matches(":hover"); const boost = isHover ? 1.6 : 1;
+      card.style.transform = `perspective(1100px) rotateX(${y*-8*boost}deg) rotateY(${x*8*boost}deg) translateX(${x*12}px) translateY(${y*12}px) translateZ(${isHover?18:0}px)`;
+      card.style.setProperty("--shadow-x", `${x*14}px`); card.style.setProperty("--shadow-y", `${y*14}px`);
+      card.style.setProperty("--shadow-blur", `${isHover?28:18}px`); card.style.setProperty("--shadow-opacity", isHover?0.75:0.55);
+      card.style.setProperty("--ao-opacity", isHover?0.22:0.35); card.style.setProperty("--ao-blur", `${isHover?32:22}px`);
+    });
+  }
   applyChroma(x, y);
 });
 
@@ -3303,16 +3309,16 @@ function initGyroscope() {
 
   function handleOrientation(e) {
     if (!gyroActive) gyroActive = true;
-    // beta = front-back tilt (-180..180), gamma = left-right tilt (-90..90)
     const beta = e.beta || 0;
     const gamma = e.gamma || 0;
-
-    // Normalize to -1..1 range (clamp tilt to ±30° for comfortable range)
     const x = Math.max(-1, Math.min(1, gamma / 30));
-    const y = Math.max(-1, Math.min(1, (beta - 45) / 30)); // 45° = neutral holding angle
+    const y = Math.max(-1, Math.min(1, (beta - 45) / 30));
+    const isFS = playerSection.classList.contains("player-fullscreen");
+    const playerOpen = playerSection.style.display !== "none";
+    const infoPanelOpen = document.getElementById("videoInfoPanel")?.style.display !== "none";
 
-    // Stop parallax in fullscreen so nothing bleeds behind player
-    if (!playerSection.classList.contains("player-fullscreen")) {
+    // Only apply UI parallax when no player/panel is open
+    if (!isFS && !playerOpen) {
       document.querySelectorAll(".parallax").forEach(el => {
         el.style.transform = `translate(${x * 12}px, ${y * 12}px)`;
       });
@@ -3321,12 +3327,20 @@ function initGyroscope() {
       });
     }
 
-    // Cards get full 3D rotation from head tilt
-    document.querySelectorAll(".video-card").forEach(card => {
-      card.style.transform = `perspective(1100px) rotateX(${y * -10}deg) rotateY(${x * 10}deg) translateX(${x * 14}px) translateY(${y * 14}px)`;
-    });
+    // Card 3D rotation: DISABLED when player or info panel is open
+    // because it physically moves cards and makes scroll feel reversed
+    if (!playerOpen && !infoPanelOpen) {
+      document.querySelectorAll(".video-card").forEach(card => {
+        card.style.transform = `perspective(1100px) rotateX(${y * -10}deg) rotateY(${x * 10}deg) translateX(${x * 14}px) translateY(${y * 14}px)`;
+      });
+    } else {
+      // Reset card transforms so they sit flat while reading suggestions
+      document.querySelectorAll(".video-card").forEach(card => {
+        card.style.transform = "none";
+      });
+    }
 
-    applyDepthGlow(x, y, playerSection.classList.contains("player-fullscreen"));
+    applyDepthGlow(x, y, isFS);
     applyChroma(x, y);
   }
 
