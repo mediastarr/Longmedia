@@ -225,10 +225,17 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
-.video-card:hover {
+.video-card:hover, .video-card:focus {
   transform: translateZ(22px) scale(1.03);
   box-shadow: 0 0 28px rgba(60,242,255,0.35), 0 0 55px rgba(60,242,255,0.18);
   transition: transform 0.15s ease-out, box-shadow 0.2s ease-out;
+  outline: 2px solid rgba(60,242,255,0.8);
+  outline-offset: 2px;
+}
+.video-card:active {
+  transform: translateZ(8px) scale(0.98);
+  box-shadow: 0 0 40px rgba(60,242,255,0.6);
+  outline: 2px solid #3cf2ff;
 }
 .video-card::after {
   content: ""; position: absolute; inset: 0; border-radius: 18px; z-index: -1;
@@ -2076,71 +2083,37 @@ function setActiveTab(tab) {
 /* CHANGE: home tab uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
 homeTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("home"); showSkeletons(6);
-  _pollClearBadge(); // clear new content badge when user opens home
-  // If Worker sent us new videos, show them at top of feed
+  _pollClearBadge();
+
+  // Grab hub new videos BEFORE feed loads
+  let hubVideos = [];
   try {
     const hubRaw = localStorage.getItem("hubNewVideos");
     if (hubRaw) {
-      const hubVideos = JSON.parse(hubRaw);
-      if (hubVideos && hubVideos.length) {
-        localStorage.removeItem("hubNewVideos");
-        // Fetch full details for hub videos (title/thumb from Worker is basic)
-        const ids = hubVideos.map(v => v.videoId).join(",");
-        fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() })
-          .then(data => {
-            if (data.items && data.items.length) {
-              // Prepend to feed after it loads
-              setTimeout(() => {
-                const frag = document.createDocumentFragment();
-                data.items.forEach(item => {
-                  const snippet = item.snippet || {};
-                  const videoId = item.id;
-                  const card = document.createElement("div");
-                  card.className = "video-card parallax focusable";
-                  card.dataset.videoid = videoId;
-                  card.style.border = "1px solid rgba(255,68,68,0.6)";
-                  card.style.boxShadow = "0 0 12px rgba(255,68,68,0.3)";
-                  const thumb = snippet.thumbnails?.medium?.url || "";
-                  const ago = timeAgo(snippet.publishedAt);
-                  card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title||""}</div><div class="video-channel">${snippet.channelTitle||""}</div><div class="video-meta" style="color:rgba(255,100,100,0.9);">🔴 New · ${ago}</div></div>`;
-                  card.onclick = async () => { const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); } };
-                  frag.appendChild(card);
-                });
-                feedEl.insertBefore(frag, feedEl.firstChild);
-              }, 500);
-            }
-          }).catch(() => {});
-      }
+      hubVideos = JSON.parse(hubRaw) || [];
+      localStorage.removeItem("hubNewVideos");
     }
   } catch(e) {}
+
   const token = await getValidToken();
   const since48h = new Date(Date.now() - 172800000).toISOString();
   const cat = freshCategory();
   if (token && hasEnoughHistory()) {
-    // Logged in: personalized feed first, then supplement with fresh + trending
     const items = await fetchPersonalizedFeed();
     renderFeed(items);
     showHUD("For You ✦");
     const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 20, _: Date.now() });
     nextPageToken = seed.nextPageToken || null;
   } else {
-    // Not logged in: use local taste profile (watch history, keywords, searches) + fresh + popular
-    const seen = new Set();
-    const allItems = [];
+    const seen = new Set(); const allItems = [];
     function addU(items) { (items||[]).forEach(item => { const id = item.id?.videoId||item.id; if(!id||seen.has(id)) return; seen.add(id); allItems.push(item); }); }
-    const topKW = getTopKeywords(4);
-    const topBI = getTopBigrams(2);
-    const topCats = getTopCategories(2);
-    const recentS = getRecentSearches(2);
+    const topKW = getTopKeywords(4), topBI = getTopBigrams(2), topCats = getTopCategories(2), recentS = getRecentSearches(2);
     const myCatId = topCats.length ? topCats[0] : cat;
     const fetches = [];
-    // 1. Fresh videos from your taste keywords (order:date)
     if (topKW.length >= 2) fetches.push(fetchYouTube("search", { part: "snippet", type: "video", q: topKW.slice(0,3).join(" "), order: "date", maxResults: 10, publishedAfter: since48h, _: Date.now() }));
     if (topBI.length) fetches.push(fetchYouTube("search", { part: "snippet", type: "video", q: topBI[0], order: "date", maxResults: 8, publishedAfter: since48h, _: Date.now() }));
     if (recentS.length) fetches.push(fetchYouTube("search", { part: "snippet", type: "video", q: recentS[0], order: "date", maxResults: 8, publishedAfter: since48h, _: Date.now() }));
-    // 2. Fresh general videos in your top category (order:date)
     fetches.push(fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: myCatId, maxResults: 10, publishedAfter: since48h, _: Date.now() }));
-    // 3. mostPopular in your category fills in after
     fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: myCatId, maxResults: 12, _: Date.now() }));
     fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 10, _: Date.now() }));
     const results = await Promise.allSettled(fetches);
@@ -2154,6 +2127,11 @@ homeTab.addEventListener("click", async () => {
       const fallback = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
       nextPageToken = fallback.nextPageToken || null; renderFeed(fallback.items || []); showHUD("Home");
     }
+  }
+
+  // Inject hub new videos at TOP after feed finishes loading
+  if (hubVideos.length) {
+    _injectHubVideos(hubVideos);
   }
 });
 
@@ -3567,17 +3545,17 @@ let _pollTimer = null;
 let _pollLastCheck = null; // timestamp of last successful poll
 
 function _pollSetBadge(count) {
-  _pollBadgeCount = count;
+  // Cap at 20 — more than that is noise not signal
+  _pollBadgeCount = Math.min(count, 20);
   const btn = document.getElementById("homeTab");
   if (!btn) return;
-  // Remove existing badge
   const existing = btn.querySelector(".tab-new-badge");
   if (existing) existing.remove();
-  if (count > 0) {
+  if (_pollBadgeCount > 0) {
     btn.classList.add("has-new-content");
     const badge = document.createElement("span");
     badge.className = "tab-new-badge";
-    badge.textContent = count > 99 ? "99+" : count;
+    badge.textContent = _pollBadgeCount;
     btn.appendChild(badge);
   } else {
     btn.classList.remove("has-new-content");
