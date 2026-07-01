@@ -1356,6 +1356,14 @@ backBtn.addEventListener("click", () => {
   showHUD("Mini-player");
 });
 
+// When focus is on closeMini (X) and user swipes down → go to play button
+closeMini.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown" || e.key === "Tab") {
+    e.preventDefault();
+    document.getElementById("playPauseBtn").focus();
+  }
+});
+
 closeMini.addEventListener("click", () => {
   // Save resume position before closing
   if (ytPlayer && currentVideoId) {
@@ -1956,6 +1964,14 @@ function postToPlayer(cmd) {
   const frame = document.querySelector("#playerFrame iframe");
   if (frame && frame.contentWindow) frame.contentWindow.postMessage(JSON.stringify(cmd), "*");
 }
+
+// When on playPauseBtn, swipe up → go to closeMini (X)
+playPauseBtn.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowUp") {
+    e.preventDefault();
+    closeMini.focus();
+  }
+});
 
 playPauseBtn.addEventListener("click", () => {
   if (!ytPlayer) return;
