@@ -637,8 +637,9 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
       <div style="font-size:10px; opacity:0.65; margin-bottom:12px; line-height:1.4;">Reads your liked videos, playlists, subscriptions and activity to build a taste profile.</div>
       <div id="syncStatus" style="font-size:10px; color:rgba(60,242,255,0.9); min-height:14px; margin-bottom:10px;"></div>
       <div id="syncProgress" style="width:100%; height:3px; background:rgba(60,242,255,0.12); border-radius:3px; margin-bottom:12px; display:none;"><div id="syncProgressFill" style="height:100%; width:0%; background:linear-gradient(90deg,rgba(60,242,255,0.9),rgba(0,255,180,0.7)); border-radius:3px; transition:width 0.4s ease;"></div></div>
-      <div style="display:flex; gap:8px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button id="syncStartBtn" class="topbar-btn" style="flex:1; font-size:11px; padding:6px 10px; min-height:32px;">Start Sync</button>
+        <button id="syncClearBtn" class="topbar-btn" style="flex:1; font-size:11px; padding:6px 10px; min-height:32px; background:radial-gradient(circle at 0% 0%,rgba(255,80,80,0.2),rgba(10,12,20,0.9));">🗑 Clear & Rebuild</button>
         <button id="syncCloseBtn" class="topbar-btn" style="flex:0 0 auto; font-size:11px; padding:6px 10px; min-height:32px;">Close</button>
       </div>
     </div>
@@ -3398,6 +3399,85 @@ const syncProgressFill = document.getElementById("syncProgressFill");
 const syncStartBtn = document.getElementById("syncStartBtn");
 const syncCloseBtn = document.getElementById("syncCloseBtn");
 syncBtn.onclick=function(){syncOverlay.style.display="flex";syncStatus.textContent="";syncProgressFill.style.width="0%";syncProgress.style.display="none";syncStartBtn.textContent="Start Sync";syncStartBtn.disabled=false;};
+
+document.getElementById("syncClearBtn").onclick = async function() {
+  const token = await getValidToken();
+  if (!token) { syncStatus.textContent = "Login required — go to Subscriptions tab first."; return; }
+
+  syncStatus.textContent = "Clearing taste profile…";
+  syncProgress.style.display = "block";
+  syncProgressFill.style.width = "10%";
+
+  // Clear existing taste profile completely
+  localStorage.removeItem("tasteProfile");
+  localStorage.removeItem("feedShownTimed");
+  localStorage.removeItem("feedShownIds");
+  localStorage.removeItem("trendingShownTimed");
+
+  syncStatus.textContent = "Fetching your actual YouTube subscriptions…";
+  syncProgressFill.style.width = "30%";
+
+  try {
+    // Fetch ONLY actual subscriptions — not watch history
+    const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50", {
+      headers: { Authorization: "Bearer " + token }
+    });
+    const data = await res.json();
+    const items = data.items || [];
+
+    if (!items.length) {
+      syncStatus.textContent = "No subscriptions found — make sure you're logged in.";
+      return;
+    }
+
+    syncProgressFill.style.width = "60%";
+    syncStatus.textContent = "Building taste profile from " + items.length + " subscriptions…";
+
+    // Build fresh profile from subscriptions only
+    const profile = { channels: {}, categories: {}, keywords: {}, bigrams: {}, recentVideoIds: [], syncedAt: Date.now() };
+    const extract = buildExtract(profile);
+
+    // Get channel uploads to learn taste from actual subscribed content
+    const channelIds = items.map(s => { extract(null, s.snippet.resourceId.channelId, s.snippet.title, 2); return s.snippet.resourceId.channelId; });
+
+    const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 50).join(",") });
+    const uploadPlaylists = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
+
+    syncProgressFill.style.width = "75%";
+
+    // Sample recent uploads from each subscribed channel for keyword extraction
+    for (const plId of uploadPlaylists.sort(() => Math.random() - 0.5).slice(0, 15)) {
+      try {
+        const ur = await fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 5, _: Date.now() });
+        (ur.items || []).forEach(it => extract(it.snippet?.title, null, null, 1));
+      } catch(e) {}
+    }
+
+    syncProgressFill.style.width = "90%";
+
+    // Save clean profile
+    localStorage.setItem("tasteProfile", JSON.stringify(profile));
+
+    // Register ONLY subscribed channels with Worker
+    fetch(HUB_WORKER_URL + "/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-ViewTube-Secret": HUB_SECRET },
+      body: JSON.stringify({ channelIds: channelIds.slice(0, 100) })
+    }).then(r => r.json()).then(d => {
+      syncProgressFill.style.width = "100%";
+      syncStatus.textContent = "✓ Done — " + channelIds.length + " subscriptions · " + (d.subscribed || 0) + " registered for real-time alerts";
+    }).catch(() => {
+      syncProgressFill.style.width = "100%";
+      syncStatus.textContent = "✓ Profile rebuilt from " + channelIds.length + " subscriptions";
+    });
+
+    showHUD("Taste profile rebuilt ✦");
+    setTimeout(() => { syncOverlay.style.display = "none"; homeTab.click(); }, 2000);
+
+  } catch(e) {
+    syncStatus.textContent = "Error: " + (e.message || "check connection");
+  }
+};
 syncCloseBtn.onclick=function(){syncOverlay.style.display="none";};
 syncOverlay.onclick=function(e){if(e.target===syncOverlay)syncOverlay.style.display="none";};
 syncBox.onclick=function(e){e.stopPropagation();};
