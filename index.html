@@ -3418,12 +3418,22 @@ document.getElementById("syncClearBtn").onclick = async function() {
   syncProgressFill.style.width = "30%";
 
   try {
-    // Fetch ONLY actual subscriptions — not watch history
-    const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50", {
-      headers: { Authorization: "Bearer " + token }
-    });
-    const data = await res.json();
-    const items = data.items || [];
+    // Fetch ALL subscriptions — paginate through all pages
+    let items = [];
+    let pageToken = "";
+    let page = 0;
+    while (true) {
+      const pageUrl = "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50" + (pageToken ? "&pageToken=" + pageToken : "");
+      const res = await fetch(pageUrl, { headers: { Authorization: "Bearer " + token } });
+      const data = await res.json();
+      if (data.error) break;
+      items = items.concat(data.items || []);
+      syncStatus.textContent = "Fetching subscriptions… " + items.length + " so far";
+      if (!data.nextPageToken) break;
+      pageToken = data.nextPageToken;
+      page++;
+      if (page > 10) break; // safety cap at 500 subscriptions
+    }
 
     if (!items.length) {
       syncStatus.textContent = "No subscriptions found — make sure you're logged in.";
