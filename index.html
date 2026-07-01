@@ -3724,7 +3724,8 @@ async function _pollCheckNewContent() {
     const allNew = [];
     if (_pollKnownIds === null) _pollKnownIds = new Set();
 
-    // ── SOURCE 1: Subscriptions via PubSubHubbub Worker (instant, zero quota) ──
+    // ── SOURCE 1: Subscriptions via PubSubHubbub Worker (instant, ZERO quota) ──
+    // Runs every poll cycle (5-15 min) — free
     try {
       const res = await fetch(HUB_WORKER_URL + "/poll?since=" + since, { headers: { "X-ViewTube-Secret": HUB_SECRET } });
       if (res.ok) {
@@ -3736,38 +3737,47 @@ async function _pollCheckNewContent() {
       }
     } catch(e) {}
 
-    // ── SOURCE 2: Channels you watch often (taste profile — not necessarily subscribed) ──
-    const topCh = getTopChannels(5);
-    if (topCh.length) {
-      const chResults = await Promise.allSettled(topCh.map(ch =>
-        fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 2, publishedAfter: since48h, _: Date.now() })
-      ));
-      chResults.forEach(r => {
-        if (r.status === "fulfilled") (r.value.items || []).forEach(item => {
-          const id = item.id?.videoId;
-          if (id && !_pollKnownIds.has(id)) {
-            _pollKnownIds.add(id);
-            allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "watched" });
-          }
-        });
-      });
-    }
+    // ── SOURCES 2 & 3: Only run every 30 minutes — costs quota ──
+    const now = Date.now();
+    const lastTasteCheck = parseInt(localStorage.getItem("_pollLastTasteCheck") || "0");
+    const tasteCheckDue = now - lastTasteCheck > 30 * 60 * 1000;
 
-    // ── SOURCE 3: Your top keywords/topics — fresh videos matching your interests ──
-    const topKW = getTopKeywords(4);
-    const topBI = getTopBigrams(2);
-    if (topKW.length >= 2 || topBI.length) {
-      const q = topBI.length ? topBI[0] : topKW.slice(0, 3).join(" ");
-      try {
-        const kwRes = await fetchYouTube("search", { part: "snippet", type: "video", q, order: "date", maxResults: 5, publishedAfter: since48h, _: Date.now() });
-        (kwRes.items || []).forEach(item => {
-          const id = item.id?.videoId;
-          if (id && !_pollKnownIds.has(id)) {
-            _pollKnownIds.add(id);
-            allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "topic" });
-          }
+    if (tasteCheckDue) {
+      localStorage.setItem("_pollLastTasteCheck", String(now));
+
+      // ── SOURCE 2: Channels you watch often (taste profile) ──
+      const topCh = getTopChannels(3); // reduced from 5 to 3
+      if (topCh.length) {
+        const chResults = await Promise.allSettled(topCh.map(ch =>
+          fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 2, publishedAfter: since48h, _: Date.now() })
+        ));
+        chResults.forEach(r => {
+          if (r.status === "fulfilled") (r.value.items || []).forEach(item => {
+            const id = item.id?.videoId;
+            if (id && !_pollKnownIds.has(id)) {
+              _pollKnownIds.add(id);
+              allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "watched" });
+            }
+          });
         });
-      } catch(e) {}
+      }
+
+      // ── SOURCE 3: Top keywords/topics ──
+      const topKW = getTopKeywords(3);
+      const topBI = getTopBigrams(1);
+      if (topKW.length >= 2 || topBI.length) {
+        const q = topBI.length ? topBI[0] : topKW.slice(0, 2).join(" ");
+        try {
+          const kwRes = await fetchYouTube("search", { part: "snippet", type: "video", q, order: "date", maxResults: 4, publishedAfter: since48h, _: Date.now() });
+          (kwRes.items || []).forEach(item => {
+            const id = item.id?.videoId;
+            if (id && !_pollKnownIds.has(id)) {
+              _pollKnownIds.add(id);
+              allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "topic" });
+            }
+          });
+        } catch(e) {}
+      }
     }
 
     if (!allNew.length) return;
