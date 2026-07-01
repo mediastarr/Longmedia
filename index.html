@@ -456,14 +456,18 @@ body#playerControls {
 }
 #playPauseBtn { width: 42px !important; height: 42px !important; font-size: 20px !important; color: #fff !important; }
 #playerControls > button:hover, #playerControls > button:focus {
-  color: #3cf2ff; outline: none; transform: scale(1.15);
+  color: #3cf2ff; outline: 2px solid rgba(60,242,255,0.6); outline-offset: 3px;
+  border-radius: 50%; transform: scale(1.15);
 }
-#playerControls > button:active { transform: scale(0.92); }
+#playerControls > button:active { transform: scale(0.92); opacity: 0.7; }
 #playerControls > button, #closeMini { transition: opacity 0.3s ease; }
 #playerSection.ui-hidden #playerControls > button:not(#hideUIBtn), #playerSection.ui-hidden #closeMini { opacity: 0; pointer-events: none; }
 body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer-events: none; transition: opacity 0.3s ease; }
-#playerSection.ui-hidden #hideUIBtn { opacity: 0.04 !important; }
-#playerSection.ui-hidden #hideUIBtn:hover, #playerSection.ui-hidden #hideUIBtn:focus, #playerSection.ui-hidden #hideUIBtn:active { opacity: 0.6 !important; }
+#playerSection.ui-hidden #hideUIBtn { opacity: 0.0 !important; }
+#playerSection.ui-hidden #hideUIBtn:hover, #playerSection.ui-hidden #hideUIBtn:focus, #playerSection.ui-hidden #hideUIBtn:active { opacity: 0.35 !important; }
+/* Even when UI visible, hide UI button should be subtle */
+#hideUIBtn { opacity: 0.45; font-size: 10px !important; }
+#hideUIBtn:hover, #hideUIBtn:focus { opacity: 0.9; }
 #resBtn { display: inline-block; }
 #playerSection.player-mini #resBtn { display: none; }
 #playerSection.player-fullscreen #resBtn { display: inline-block; }
@@ -1405,16 +1409,17 @@ exitFullBtn.addEventListener("click", () => {
   playerSection.classList.remove("ui-hidden");
   document.body.classList.remove("ui-hidden");
   hideUIBtn.textContent = "···";
-  // Show player + info panel + suggested videos
-  playerSection.style.display = "flex";
-  const vip = document.getElementById("videoInfoPanel");
-  if (vip) vip.style.display = "block";
+  // Restore exactly the state shown in medium player view (picture 2):
+  // topbar visible, player visible, feed hidden, info panel visible
   topbarEl.style.display = "flex";
   searchTabEl.style.display = "flex";
-  tabsEl.style.display = "flex";
+  tabsEl.style.display = "none"; // hide tab bar - not shown in medium player view
   feedEl.style.display = "none";
+  playerSection.style.display = "block";
+  const vip = document.getElementById("videoInfoPanel");
+  if (vip) vip.style.display = "block";
   window.scrollTo({ top: 0, behavior: "instant" });
-  showHUD("← Back to player");
+  showHUD("← Back");
 });
 
 setInterval(() => {
@@ -1938,8 +1943,14 @@ function postToPlayer(cmd) {
 
 playPauseBtn.addEventListener("click", () => {
   if (!ytPlayer) return;
-  if (playPauseBtn.textContent === "Pause") { ytPlayer.pauseVideo(); playPauseBtn.textContent = "▶"; }
-  else { ytPlayer.playVideo(); playPauseBtn.textContent = "⏸"; }
+  const state = ytPlayer.getPlayerState();
+  if (state === YT.PlayerState.PLAYING) {
+    ytPlayer.pauseVideo();
+    playPauseBtn.textContent = "▶";
+  } else {
+    ytPlayer.playVideo();
+    playPauseBtn.textContent = "⏸";
+  }
 });
 forwardBtn.addEventListener("click", () => { if (!ytPlayer) return; ytPlayer.seekTo(ytPlayer.getCurrentTime() + 10, true); });
 rewindBtn.addEventListener("click", () => { if (!ytPlayer) return; ytPlayer.seekTo(Math.max(0, ytPlayer.getCurrentTime() - 10), true); });
@@ -1953,7 +1964,8 @@ resBtn.addEventListener("click", () => {
   showHUD(QUALITY_LABELS[currentQuality]);
 
   const resumeTime = ytPlayer ? Math.floor(ytPlayer.getCurrentTime() || 0) : 0;
-  const wasPlaying = ytPlayer ? ytPlayer.getPlayerState() === YT.PlayerState.PLAYING : true;
+  const _wasPlaying = ytPlayer ? ytPlayer.getPlayerState() === YT.PlayerState.PLAYING : true;
+  const _resumePos = resumeTime; // capture before destroy
 
   // Rebuild player with new quality (setPlaybackQuality deprecated since 2021)
   try { if (ytPlayer) { ytPlayer.stopVideo(); ytPlayer.destroy(); } } catch(e) {}
@@ -1965,7 +1977,7 @@ resBtn.addEventListener("click", () => {
 
   const pv = { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin };
   if (currentQuality !== "auto") pv.vq = currentQuality;
-  if (resumeTime > 5) pv.start = resumeTime;
+  if (_resumePos > 5) pv.start = _resumePos;
 
   ytPlayer = new YT.Player("playerFrame", {
     videoId: currentVideoId,
@@ -1978,7 +1990,7 @@ resBtn.addEventListener("click", () => {
           try { e.target.setPlaybackQualityRange(currentQuality, currentQuality); } catch(err) {}
         }
         // Restore play/pause state from before quality change
-        if (wasPlaying !== false) { e.target.playVideo(); playPauseBtn.textContent = "⏸"; }
+        if (_wasPlaying !== false) { e.target.playVideo(); playPauseBtn.textContent = "⏸"; }
         else { e.target.pauseVideo(); playPauseBtn.textContent = "▶"; }
       },
       onStateChange: (e) => {
