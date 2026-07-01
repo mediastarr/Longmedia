@@ -1599,7 +1599,9 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   // Reset quality to auto for each new video — onReady will detect best quality
   currentQuality = "auto";
   qualityIndex = 0;
-  resBtn.textContent = "Auto";
+  // Use getElementById to safely reference resBtn (may not be in scope here)
+  const _resBtn = document.getElementById("resBtn");
+  if (_resBtn) _resBtn.textContent = "Auto";
   // Mark as seen in hubSeenIds so it never shows as new again
   try {
     const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
@@ -2406,22 +2408,16 @@ homeTab.addEventListener("click", async () => {
   } else {
     const seen = new Set(); const allItems = [];
     function addU(items) { (items||[]).forEach(item => { const id = item.id?.videoId||item.id; if(!id||seen.has(id)) return; seen.add(id); allItems.push(item); }); }
-    const topKW = getTopKeywords(4), topBI = getTopBigrams(2), topCats = getTopCategories(2), recentS = getRecentSearches(2);
-    const myCatId = topCats.length ? topCats[0] : cat;
-    const fetches = [];
-    if (topKW.length >= 2) fetches.push(fetchYouTube("search", { part: "snippet", type: "video", q: topKW.slice(0,3).join(" "), order: "date", maxResults: 10, publishedAfter: since48h, _: Date.now() }));
-    if (topBI.length) fetches.push(fetchYouTube("search", { part: "snippet", type: "video", q: topBI[0], order: "date", maxResults: 8, publishedAfter: since48h, _: Date.now() }));
-    if (recentS.length) fetches.push(fetchYouTube("search", { part: "snippet", type: "video", q: recentS[0], order: "date", maxResults: 8, publishedAfter: since48h, _: Date.now() }));
-    fetches.push(fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: myCatId, maxResults: 10, publishedAfter: since48h, _: Date.now() }));
-    fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: myCatId, maxResults: 12, _: Date.now() }));
-    fetches.push(fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 10, _: Date.now() }));
-    const results = await Promise.allSettled(fetches);
-    results.forEach(r => { if (r.status === "fulfilled") addU(r.value.items); });
+    // Simple 2-fetch: fresh videos + popular — fast and reliable
+    const [fresh, popular] = await Promise.allSettled([
+      fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 15, publishedAfter: since48h, _: Date.now() }),
+      fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 15, _: Date.now() })
+    ]);
+    if (fresh.status === "fulfilled") addU(fresh.value.items);
+    if (popular.status === "fulfilled") addU(popular.value.items);
     if (allItems.length) {
-      renderFeed(allItems);
-      showHUD(topKW.length ? "For You ✦" : "Home");
-      const seed = results.find(r => r.status === "fulfilled" && r.value.nextPageToken);
-      nextPageToken = seed ? seed.value.nextPageToken : null;
+      renderFeed(allItems); showHUD("Home");
+      nextPageToken = (popular.status === "fulfilled" && popular.value.nextPageToken) || null;
     } else {
       const fallback = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
       nextPageToken = fallback.nextPageToken || null; renderFeed(fallback.items || []); showHUD("Home");
@@ -2436,44 +2432,24 @@ homeTab.addEventListener("click", async () => {
 
 trendingTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("trending"); showSkeletons(6);
-  const token = await getValidToken();
-  const myCat = getTopCategoryId(); const cats = getTopCategories(3);
+  const myCat = getTopCategoryId();
   const allItems = []; const seen = new Set();
-  let tShown = []; try { tShown = JSON.parse(localStorage.getItem("trendingShownTimed")||"[]"); } catch(e) {}
-  const sixAgo = Date.now()-6*3600000;
-  const hasTaste = getTopChannels(1).length > 0 || getTopKeywords(1).length > 0;
-  const tRecent = hasTaste ? new Set(tShown.filter(e=>e.ts>sixAgo).map(e=>e.id)) : new Set();
-  function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id)||tRecent.has(id))return; seen.add(id); allItems.push(item); }); }
-  const fetches = [];
+  function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); }); }
   const tSince48h = new Date(Date.now()-172800000).toISOString();
-  // order:date first — freshest videos (last 48h)
-  if (myCat) fetches.push(fetchYouTube("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:myCat,maxResults:12,publishedAfter:tSince48h,_:Date.now()}));
-  fetches.push(fetchYouTube("search",{part:"snippet",type:"video",order:"date",regionCode:"US",maxResults:10,publishedAfter:tSince48h,_:Date.now()}));
-  // mostPopular after — proven trending videos
-  if (myCat) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:12,_:Date.now()+Math.random()}));
-  if (cats.length>1) fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:cats[1],maxResults:8,_:Date.now()}));
-  fetches.push(fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",maxResults:12,_:Date.now()}));
-  if (token) {
-    fetches.push((async()=>{ try {
-      const sr=await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=30&order=relevance",{headers:{Authorization:"Bearer "+token}});
-      const sd=await sr.json(); const cids=(sd.items||[]).map(s=>s.snippet.resourceId.channelId);
-      if(!cids.length) return {items:[]};
-      const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,30).join(",")});
-      const pls=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean).sort(()=>Math.random()-0.5);
-      const ur=await Promise.allSettled(pls.slice(0,8).map(plId=>fetchYouTube("playlistItems",{part:"snippet,contentDetails",playlistId:plId,maxResults:10,_:Date.now()})));
-      const items=[];
-      ur.forEach(r=>{ if(r.status==="fulfilled") { const sorted=(r.value.items||[]).sort((a,b)=>new Date(b.contentDetails?.videoPublishedAt||b.snippet?.publishedAt||0)-new Date(a.contentDetails?.videoPublishedAt||a.snippet?.publishedAt||0)); sorted.slice(0,3).forEach(it=>{ const vid=it.snippet?.resourceId?.videoId; if(vid) items.push({id:vid,snippet:{...it.snippet,publishedAt:it.contentDetails?.videoPublishedAt||it.snippet?.publishedAt}}); }); } });
-      return {items};
-    } catch(e){return{items:[]};} })());
+  // Fresh first, then popular
+  const [fresh, popular] = await Promise.allSettled([
+    fetchYouTube("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:myCat||undefined,maxResults:15,publishedAfter:tSince48h,_:Date.now()}),
+    fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat||undefined,maxResults:15,_:Date.now()})
+  ]);
+  if (fresh.status==="fulfilled") addU(fresh.value.items);
+  if (popular.status==="fulfilled") addU(popular.value.items);
+  if (!allItems.length) {
+    const fallback = await fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",maxResults:20,_:Date.now()});
+    addU(fallback.items||[]);
   }
-  const results = await Promise.allSettled(fetches);
-  results.forEach(r=>{ if(r.status==="fulfilled") addU(r.value.items); });
   renderFeed(allItems);
-  const shownNow=allItems.map(item=>item.id?.videoId||item.id).filter(Boolean);
-  try { localStorage.setItem("trendingShownTimed",JSON.stringify([...shownNow.map(id=>({id,ts:Date.now()})),...tShown].filter(e=>e.ts>sixAgo).slice(0,200))); } catch(e) {}
-  const seed=await fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat||undefined,maxResults:20,_:Date.now()});
-  nextPageToken=seed.nextPageToken||null;
-  showHUD(token?"Trending For You ✦":"Trending");
+  nextPageToken = (popular.status==="fulfilled" && popular.value.nextPageToken) || null;
+  showHUD("Trending");
 });
 
 shortsTab.addEventListener("click", async () => {
