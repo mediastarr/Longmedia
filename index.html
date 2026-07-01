@@ -439,10 +439,10 @@ body.fullscreen-active .exit-full-btn {
 }
 .exit-full-btn:hover { box-shadow: 0 0 18px rgba(60,242,255,0.9), 0 0 30px rgba(60,242,255,0.5); transform: scale(1.08); }
 body#playerControls {
-  display: flex; gap: 14px; padding: 8px 4px;
+  display: flex; gap: 18px; padding: 10px 8px;
   justify-content: center; align-items: center;
   background: transparent; border: none;
-  position: absolute; bottom: 0; left: 0; right: 0;
+  position: absolute; bottom: 4px; left: 0; right: 0;
   z-index: 5;
 }
 #playerControls > button {
@@ -1557,7 +1557,19 @@ function createYTPlayer(videoId, startSeconds) {
     events: {
       onReady: (e) => {
         isPlayerReady = true;
-        if (currentQuality !== "auto") e.target.setPlaybackQuality(currentQuality);
+        // Auto-detect best available quality for this specific video
+        try {
+          const available = e.target.getAvailableQualityLevels() || [];
+          const preferred = ["hd1440", "hd1080", "hd720", "large", "medium"];
+          const best = preferred.find(q => available.includes(q));
+          if (best) {
+            currentQuality = best;
+            qualityIndex = QUALITY_CYCLE.indexOf(best);
+            if (resBtn) resBtn.textContent = QUALITY_LABELS[best] || best;
+            try { e.target.setPlaybackQuality(best); } catch(err) {}
+            try { e.target.setPlaybackQualityRange(best, best); } catch(err) {}
+          }
+        } catch(err) {}
         playPauseBtn.textContent = "⏸";
       },
       onStateChange: (e) => {
@@ -1576,6 +1588,10 @@ function createYTPlayer(videoId, startSeconds) {
 function setPlayerVideo(videoId, snippet, startSeconds) {
   savedScrollY = window.scrollY;
   currentVideoId = videoId;
+  // Reset quality to auto for each new video — onReady will detect best quality
+  currentQuality = "auto";
+  qualityIndex = 0;
+  resBtn.textContent = "Auto";
   // Mark as seen in hubSeenIds so it never shows as new again
   try {
     const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
