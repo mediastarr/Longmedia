@@ -3459,17 +3459,25 @@ document.getElementById("syncClearBtn").onclick = async function() {
     localStorage.setItem("tasteProfile", JSON.stringify(profile));
 
     // Register ONLY subscribed channels with Worker
-    fetch(HUB_WORKER_URL + "/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-ViewTube-Secret": HUB_SECRET },
-      body: JSON.stringify({ channelIds: channelIds.slice(0, 100) })
-    }).then(r => r.json()).then(d => {
+    // The Worker will replace the full channel list, removing old ones like Crunchyroll
+    try {
+      const workerRes = await fetch(HUB_WORKER_URL + "/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-ViewTube-Secret": HUB_SECRET },
+        body: JSON.stringify({ channelIds: channelIds.slice(0, 100), replaceAll: true })
+      });
+      const d = await workerRes.json();
       syncProgressFill.style.width = "100%";
       syncStatus.textContent = "✓ Done — " + channelIds.length + " subscriptions · " + (d.subscribed || 0) + " registered for real-time alerts";
-    }).catch(() => {
+    } catch(e) {
       syncProgressFill.style.width = "100%";
       syncStatus.textContent = "✓ Profile rebuilt from " + channelIds.length + " subscriptions";
-    });
+    }
+    // Also clear any cached new videos from old channels
+    localStorage.removeItem("hubNewVideos");
+    _pollKnownIds = null;
+    _pollBadgeCount = 0;
+    _pollClearBadge();
 
     showHUD("Taste profile rebuilt ✦");
     setTimeout(() => { syncOverlay.style.display = "none"; homeTab.click(); }, 2000);
@@ -3771,9 +3779,12 @@ function showAgeRestrictedOverlay(videoId) {
   overlay.innerHTML = '<div style="font-size:28px;">🔞</div>' +
     '<div style="font-size:13px;font-weight:600;color:#f5f7ff;line-height:1.4;margin-top:4px;">Age-restricted video</div>' +
     '<div style="font-size:11px;opacity:0.65;line-height:1.5;margin-top:4px;">This video cannot play here.<br>Watch it directly on YouTube.</div>' +
-    '<a href="https://www.youtube.com/watch?v=' + videoId + '" target="_blank" style="display:inline-block;margin-top:10px;padding:10px 20px;border-radius:999px;background:#ff0000;color:#fff;font-size:13px;font-weight:600;text-decoration:none;touch-action:manipulation;">▶ Watch on YouTube</a>' +
+    '<button id="ageWatchBtn" style="display:inline-block;margin-top:10px;padding:10px 20px;border-radius:999px;background:#ff0000;color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer;touch-action:manipulation;">▶ Watch on YouTube</button>' +
     '<button id="ageCloseBtn" style="margin-top:6px;padding:8px 16px;border-radius:999px;border:1px solid rgba(120,130,160,0.6);background:rgba(10,12,20,0.9);color:#f5f7ff;font-size:12px;cursor:pointer;touch-action:manipulation;">✕ Close</button>';
   overlay.querySelector('#ageCloseBtn').addEventListener('click', () => { overlay.remove(); document.getElementById('closeMini').click(); });
+  overlay.querySelector('#ageWatchBtn').addEventListener('click', () => {
+    window.open('https://www.youtube.com/watch?v=' + videoId, '_blank');
+  });
   container.appendChild(overlay);
   showHUD("Age-restricted — open on YouTube");
 }
