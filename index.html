@@ -3489,8 +3489,49 @@ document.getElementById("syncClearBtn").onclick = async function() {
     _pollBadgeCount = 0;
     _pollClearBadge();
 
+    // Catch-up: fetch recent uploads from subscribed channels
+    // that may have uploaded before the Worker was set up
+    syncStatus.textContent = "Catching up on recent uploads…";
+    try {
+      const since24h = new Date(Date.now() - 86400000).toISOString();
+      const catchUpItems = [];
+      const catchUpSeen = new Set();
+      const catchUpFetches = channelIds.slice(0, 35).map(cid =>
+        fetchYouTube("search", {
+          part: "snippet", channelId: cid, type: "video",
+          order: "date", maxResults: 3, publishedAfter: since24h, _: Date.now()
+        })
+      );
+      const catchUpResults = await Promise.allSettled(catchUpFetches);
+      catchUpResults.forEach(r => {
+        if (r.status === "fulfilled") {
+          (r.value.items || []).forEach(item => {
+            const id = item.id?.videoId;
+            if (id && !catchUpSeen.has(id)) {
+              catchUpSeen.add(id);
+              catchUpItems.push({
+                videoId: id,
+                channelId: item.snippet?.channelId || "",
+                title: item.snippet?.title || "",
+                publishedAt: item.snippet?.publishedAt || "",
+                receivedAt: Date.now()
+              });
+            }
+          });
+        }
+      });
+      if (catchUpItems.length) {
+        localStorage.setItem("hubNewVideos", JSON.stringify(catchUpItems));
+        _pollKnownIds = new Set(catchUpItems.map(v => v.videoId));
+        _pollSetBadge(catchUpItems.length);
+        syncStatus.textContent = "✓ Done — found " + catchUpItems.length + " recent video" + (catchUpItems.length > 1 ? "s" : "") + " from your subscriptions";
+      } else {
+        syncStatus.textContent = "✓ Done — all caught up. New uploads will appear automatically.";
+      }
+    } catch(e) {}
+
     showHUD("Taste profile rebuilt ✦");
-    setTimeout(() => { syncOverlay.style.display = "none"; homeTab.click(); }, 2000);
+    setTimeout(() => { syncOverlay.style.display = "none"; homeTab.click(); }, 2500);
 
   } catch(e) {
     syncStatus.textContent = "Error: " + (e.message || "check connection");
