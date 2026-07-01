@@ -3936,11 +3936,12 @@ async function triggerReAuthFlow() {
 }
 
 // On startup, check if we need re-auth from a previous session
-(function checkReAuthOnLoad() {
+// checkReAuthOnLoad fires after DOM ready, not immediately
+document.addEventListener("DOMContentLoaded", function checkReAuthOnLoad() {
   if (localStorage.getItem("yt_needs_relogin") === "1") {
-    setTimeout(() => triggerReAuthFlow(), 2000);
+    setTimeout(() => triggerReAuthFlow(), 3000);
   }
-})();
+});
 
 
 /* ================================================================
@@ -4173,11 +4174,24 @@ function showAgeRestrictedOverlay(videoId) {
 }
 
 (async function init() {
-  // Dismiss boot splash after loading bar completes
-  setTimeout(() => {
+  // Safety: always dismiss boot splash even if init crashes
+  const splashTimeout = setTimeout(() => {
     const splash = document.getElementById("bootSplash");
     if (splash) { splash.classList.add("fade-out"); setTimeout(() => splash.remove(), 800); }
   }, 1400);
+
+  // Global error catch — prevents stuck boot screen
+  window.onerror = function(msg, src, line) {
+    console.error("ViewTube error:", msg, src, line);
+    const splash = document.getElementById("bootSplash");
+    if (splash) { splash.classList.add("fade-out"); setTimeout(() => splash.remove(), 800); }
+    return false;
+  };
+  window.onunhandledrejection = function(e) {
+    console.error("ViewTube unhandled promise:", e.reason);
+    const splash = document.getElementById("bootSplash");
+    if (splash) { splash.classList.add("fade-out"); setTimeout(() => splash.remove(), 800); }
+  };
   showSkeletons(6);
   // Start token refresh AND feed fetch in parallel — don't wait for auth before loading
   const hasRefresh = localStorage.getItem("yt_refresh_token");
