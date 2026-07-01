@@ -156,6 +156,15 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
   transform: none;
   transition: none;
 }
+/* Hide topbar completely in fullscreen — prevents swipe-up hitting sync/theme/mini */
+body.fullscreen-active #topbarEl,
+body.fullscreen-active #searchTabEl,
+body.fullscreen-active #tabsEl,
+body.fullscreen-active #feedEl,
+body.fullscreen-active #videoInfoPanel {
+  display: none !important;
+  pointer-events: none !important;
+}
 #playerSection.player-fullscreen iframe { width: 100%; height: 100%; object-fit: contain; background: #000; }
 #playerSection.player-fullscreen #playerFrame { width: 100%; height: 100%; }
 #playerSection { --glow-strength: 0.35; --glow-blur: 22px; --glow-shift-x: 0px; --glow-shift-y: 0px; }
@@ -413,6 +422,28 @@ body.fullscreen-active .exit-full-btn { display: block; }
 }
 .exit-full-btn:hover { box-shadow: 0 0 18px rgba(60,242,255,0.9), 0 0 30px rgba(60,242,255,0.5); transform: scale(1.08); }
 body.fullscreen-active .exit-full-btn { display: block; }
+#playerControls {
+  display: flex; gap: 8px; padding: 10px 16px;
+  justify-content: center; align-items: center;
+  background: rgba(0,0,0,0.6);
+  border-radius: 999px; width: fit-content; margin: 8px auto;
+  border: 1px solid rgba(255,255,255,0.15);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+}
+#playerControls > button {
+  width: 44px; height: 44px; border-radius: 50%; border: none;
+  background: rgba(255,255,255,0.18); color: #fff;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  touch-action: manipulation; display: flex;
+  align-items: center; justify-content: center;
+  transition: all 0.15s ease; flex-shrink: 0;
+}
+#playPauseBtn { width: 52px !important; height: 52px !important; font-size: 20px !important; background: rgba(255,255,255,0.28) !important; }
+#playerControls > button:hover, #playerControls > button:focus {
+  background: rgba(255,255,255,0.35); outline: none; transform: scale(1.1);
+  box-shadow: 0 0 12px rgba(255,255,255,0.2);
+}
+#playerControls > button:active { transform: scale(0.95); }
 #playerControls > button, #closeMini { transition: opacity 0.3s ease; }
 #playerSection.ui-hidden #playerControls > button:not(#hideUIBtn), #playerSection.ui-hidden #closeMini { opacity: 0; pointer-events: none; }
 body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer-events: none; transition: opacity 0.3s ease; }
@@ -618,13 +649,14 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
     <div id="playerFrame"></div>
     <div class="player-controls" id="playerControls">
-      <button id="playPauseBtn" tabindex="0">Pause</button>
-      <button id="rewindBtn" tabindex="0">-10s</button>
-      <button id="forwardBtn" tabindex="0">+10s</button>
-      <button id="fullBtn" tabindex="0">Full</button>
-      <button id="hideUIBtn" tabindex="0">Hide UI</button>
-      <button id="resBtn" tabindex="0">Auto</button>
-      <button id="addToPlaylistBtn" tabindex="0">+ List</button>
+      <button id="playPauseBtn" tabindex="0" title="Play/Pause">⏸</button>
+      <button id="rewindBtn" tabindex="0" title="Rewind 10s">⏪10</button>
+      <button id="forwardBtn" tabindex="0" title="Forward 10s">10⏩</button>
+      <button id="ccBtn" tabindex="0" title="Captions">CC</button>
+      <button id="resBtn" tabindex="0" title="Quality">720p</button>
+      <button id="fullBtn" tabindex="0" title="Fullscreen">⛶</button>
+      <button id="hideUIBtn" tabindex="0" title="Hide UI">···</button>
+      <button id="addToPlaylistBtn" tabindex="0" title="Save">＋</button>
     </div>
     <button id="closeMini" tabindex="0">✕</button>
   </div>
@@ -1441,8 +1473,8 @@ window.onYouTubeIframeAPIReady = function () {
       events: {
         onReady: () => { isPlayerReady = true; },
         onStateChange: (e) => {
-          if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "Pause";
-          if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "Play";
+          if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "⏸";
+          if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "▶";
           if (e.data === YT.PlayerState.ENDED && currentVideoId) {
             clearResumePosition(currentVideoId);
             // Record full watch — video completed
@@ -1473,7 +1505,7 @@ function createYTPlayer(videoId, startSeconds) {
         ytPlayer.loadVideoById(videoId);
       }
       if (currentQuality !== "auto") { try { ytPlayer.setPlaybackQuality(currentQuality); } catch(e) {} }
-      playPauseBtn.textContent = "Pause";
+      playPauseBtn.textContent = "⏸";
       return;
     } catch(e) {
       try { ytPlayer.destroy(); } catch(e2) {}
@@ -1495,11 +1527,11 @@ function createYTPlayer(videoId, startSeconds) {
       onReady: (e) => {
         isPlayerReady = true;
         if (currentQuality !== "auto") e.target.setPlaybackQuality(currentQuality);
-        playPauseBtn.textContent = "Pause";
+        playPauseBtn.textContent = "⏸";
       },
       onStateChange: (e) => {
-        if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "Pause";
-        if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "Play";
+        if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "⏸";
+        if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "▶";
         if (e.data === YT.PlayerState.ENDED && currentVideoId) clearResumePosition(currentVideoId);
         },
         onError: (e) => {
@@ -1522,7 +1554,7 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   window.scrollTo({ top: 0, behavior: "instant" });
   // Show info panel below medium player
   loadVideoInfoPanel(videoId, snippet);
-  playPauseBtn.textContent = "Pause";
+  playPauseBtn.textContent = "⏸";
   initAudioGlow();
   const resumeAt = startSeconds || getResumePosition(videoId);
   if (ytReady) createYTPlayer(videoId, resumeAt);
@@ -1859,8 +1891,8 @@ function postToPlayer(cmd) {
 
 playPauseBtn.addEventListener("click", () => {
   if (!ytPlayer) return;
-  if (playPauseBtn.textContent === "Pause") { ytPlayer.pauseVideo(); playPauseBtn.textContent = "Play"; }
-  else { ytPlayer.playVideo(); playPauseBtn.textContent = "Pause"; }
+  if (playPauseBtn.textContent === "Pause") { ytPlayer.pauseVideo(); playPauseBtn.textContent = "▶"; }
+  else { ytPlayer.playVideo(); playPauseBtn.textContent = "⏸"; }
 });
 forwardBtn.addEventListener("click", () => { if (!ytPlayer) return; ytPlayer.seekTo(ytPlayer.getCurrentTime() + 10, true); });
 rewindBtn.addEventListener("click", () => { if (!ytPlayer) return; ytPlayer.seekTo(Math.max(0, ytPlayer.getCurrentTime() - 10), true); });
@@ -1901,17 +1933,17 @@ resBtn.addEventListener("click", () => {
           try { e.target.setPlaybackQualityRange(currentQuality, currentQuality); } catch(err) {}
         }
         e.target.playVideo();
-        playPauseBtn.textContent = "Pause";
+        playPauseBtn.textContent = "⏸";
       },
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.PLAYING) {
-          playPauseBtn.textContent = "Pause";
+          playPauseBtn.textContent = "⏸";
           // Re-apply quality after playback starts (some players need this)
           if (currentQuality !== "auto") {
             try { e.target.setPlaybackQuality(currentQuality); } catch(err) {}
           }
         }
-        if (e.data === YT.PlayerState.PAUSED) playPauseBtn.textContent = "Play";
+        if (e.data === YT.PlayerState.PAUSED) playPauseBtn.textContent = "▶";
         if (e.data === YT.PlayerState.ENDED && currentVideoId) clearResumePosition(currentVideoId);
         },
         onError: (e) => {
@@ -2235,6 +2267,40 @@ homeTab.addEventListener("click", async () => {
     if (hubRaw) {
       hubVideos = JSON.parse(hubRaw) || [];
       localStorage.removeItem("hubNewVideos");
+    }
+  } catch(e) {}
+
+  // Re-inject previously shown hub videos if user switched tabs and came back
+  try {
+    const prevIds = JSON.parse(sessionStorage.getItem("injectedHubIds") || "[]");
+    if (prevIds.length) {
+      setTimeout(async () => {
+        if (feedEl.querySelector('[data-hubvideo="1"]')) return; // already there
+        const data = await fetchYouTube("videos", { part: "snippet,statistics", id: prevIds.join(","), _: Date.now() });
+        if (!data.items || !data.items.length) return;
+        const frag = document.createDocumentFragment();
+        data.items.forEach(item => {
+          const snippet = item.snippet || {};
+          const videoId = item.id;
+          if (feedEl.querySelector('[data-videoid="' + videoId + '"]')) return;
+          const card = document.createElement("div");
+          card.className = "video-card parallax focusable";
+          card.dataset.videoid = videoId;
+          card.dataset.hubvideo = "1";
+          card.style.border = "1px solid rgba(255,68,68,0.7)";
+          card.style.boxShadow = "0 0 14px rgba(255,68,68,0.35)";
+          const thumb = snippet.thumbnails?.medium?.url || "";
+          card.innerHTML = '<div class="video-thumb"><img src="' + thumb + '" loading="lazy"></div><div class="video-info"><div class="video-title">' + (snippet.title||"") + '</div><div class="video-channel">' + (snippet.channelTitle||"") + '</div><div class="video-meta" style="color:rgba(255,100,100,0.9);">🔴 New · ' + timeAgo(snippet.publishedAt) + '</div></div>';
+          card.onclick = async () => {
+            sessionStorage.removeItem("injectedHubIds");
+            const short = await checkIsShort(videoId, snippet);
+            if (short) openAsShort(videoId, snippet);
+            else { setPlayerVideo(videoId, snippet); showHUD("Playing: " + (snippet.title||"")); }
+          };
+          frag.appendChild(card);
+        });
+        feedEl.insertBefore(frag, feedEl.firstChild);
+      }, 800);
     }
   } catch(e) {}
 
@@ -3887,7 +3953,14 @@ async function _pollCheckNewContent() {
     const since = _pollLastCheck || (Date.now() - 86400000);
     const since48h = new Date(Date.now() - 172800000).toISOString();
     const allNew = [];
-    if (_pollKnownIds === null) _pollKnownIds = new Set();
+    if (_pollKnownIds === null) {
+      _pollKnownIds = new Set();
+      // Pre-load permanently seen hub video IDs so they never show as new again
+      try {
+        const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
+        seenHub.forEach(id => _pollKnownIds.add(id));
+      } catch(e) {}
+    }
 
     // ── SOURCE 1: Subscriptions via PubSubHubbub Worker (instant, ZERO quota) ──
     // Runs every poll cycle (5-15 min) — free
@@ -3975,6 +4048,13 @@ async function _pollCheckNewContent() {
 async function _injectHubVideos(hubVideos) {
   if (!hubVideos || !hubVideos.length) return;
   try {
+    // Mark these videos as permanently seen — never show as new again
+    try {
+      const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
+      const newSeen = [...new Set([...seenHub, ...hubVideos.map(v => v.videoId)])].slice(0, 500);
+      localStorage.setItem("hubSeenIds", JSON.stringify(newSeen));
+    } catch(e) {}
+
     const ids = hubVideos.map(v => v.videoId).join(",");
     const data = await fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() });
     if (!data.items || !data.items.length) return;
@@ -4002,6 +4082,11 @@ async function _injectHubVideos(hubVideos) {
     });
     feedEl.insertBefore(frag, feedEl.firstChild);
     window.scrollTo({ top: 0, behavior: "smooth" });
+    // Save injected cards so they survive tab switching
+    try {
+      const injectedIds = hubVideos.map(v => v.videoId);
+      sessionStorage.setItem("injectedHubIds", JSON.stringify(injectedIds));
+    } catch(e) {}
   } catch(e) {}
 }
 
