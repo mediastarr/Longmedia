@@ -3783,7 +3783,21 @@ function showAgeRestrictedOverlay(videoId) {
     '<button id="ageCloseBtn" style="margin-top:6px;padding:8px 16px;border-radius:999px;border:1px solid rgba(120,130,160,0.6);background:rgba(10,12,20,0.9);color:#f5f7ff;font-size:12px;cursor:pointer;touch-action:manipulation;">✕ Close</button>';
   overlay.querySelector('#ageCloseBtn').addEventListener('click', () => { overlay.remove(); document.getElementById('closeMini').click(); });
   overlay.querySelector('#ageWatchBtn').addEventListener('click', () => {
-    window.open('https://www.youtube.com/watch?v=' + videoId, '_blank');
+    // Try multiple methods — glasses browser blocks window.open and target=_blank
+    const ytUrl = 'https://www.youtube.com/watch?v=' + videoId;
+    try { window.open(ytUrl, '_blank'); } catch(e) {}
+    // Fallback: copy link and show it
+    setTimeout(() => {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(ytUrl).then(() => {
+          overlay.querySelector('#ageWatchBtn').textContent = '✓ Link copied — open YouTube';
+        }).catch(() => {
+          overlay.querySelector('#ageWatchBtn').textContent = ytUrl;
+        });
+      } else {
+        overlay.querySelector('#ageWatchBtn').textContent = 'youtube.com/watch?v=' + videoId;
+      }
+    }, 300);
   });
   container.appendChild(overlay);
   showHUD("Age-restricted — open on YouTube");
