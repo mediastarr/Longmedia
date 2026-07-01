@@ -156,14 +156,26 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
   transform: none;
   transition: none;
 }
-/* Hide topbar completely in fullscreen — prevents swipe-up hitting sync/theme/mini */
+/* Hide everything behind fullscreen player — prevents swipe hitting topbar buttons */
 body.fullscreen-active #topbarEl,
 body.fullscreen-active #searchTabEl,
 body.fullscreen-active #tabsEl,
 body.fullscreen-active #feedEl,
-body.fullscreen-active #videoInfoPanel {
+body.fullscreen-active #videoInfoPanel,
+body.fullscreen-active .app-shell > *:not(#playerSection):not(#hud):not(#syncOverlay) {
   display: none !important;
   pointer-events: none !important;
+  visibility: hidden !important;
+}
+/* Full screen controls — slightly smaller */
+body.fullscreen-active #playerControls > button {
+  width: 32px !important; height: 32px !important; font-size: 13px !important;
+}
+body.fullscreen-active #playPauseBtn {
+  width: 38px !important; height: 38px !important; font-size: 18px !important;
+}
+body.fullscreen-active #playerControls {
+  gap: 18px !important;
 }
 #playerSection.player-fullscreen iframe { width: 100%; height: 100%; object-fit: contain; background: #000; }
 #playerSection.player-fullscreen #playerFrame { width: 100%; height: 100%; }
@@ -423,27 +435,25 @@ body.fullscreen-active .exit-full-btn { display: block; }
 .exit-full-btn:hover { box-shadow: 0 0 18px rgba(60,242,255,0.9), 0 0 30px rgba(60,242,255,0.5); transform: scale(1.08); }
 body.fullscreen-active .exit-full-btn { display: block; }
 #playerControls {
-  display: flex; gap: 8px; padding: 10px 16px;
+  display: flex; gap: 14px; padding: 8px 4px;
   justify-content: center; align-items: center;
-  background: rgba(0,0,0,0.6);
-  border-radius: 999px; width: fit-content; margin: 8px auto;
-  border: 1px solid rgba(255,255,255,0.15);
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  background: transparent; border: none;
+  width: 100%; margin: 6px 0 0 0;
 }
 #playerControls > button {
-  width: 44px; height: 44px; border-radius: 50%; border: none;
-  background: rgba(255,255,255,0.18); color: #fff;
-  font-size: 13px; font-weight: 700; cursor: pointer;
+  width: 36px; height: 36px; border-radius: 50%; border: none;
+  background: transparent; color: rgba(255,255,255,0.85);
+  font-size: 15px; font-weight: 700; cursor: pointer;
   touch-action: manipulation; display: flex;
   align-items: center; justify-content: center;
   transition: all 0.15s ease; flex-shrink: 0;
+  padding: 0;
 }
-#playPauseBtn { width: 52px !important; height: 52px !important; font-size: 20px !important; background: rgba(255,255,255,0.28) !important; }
+#playPauseBtn { width: 42px !important; height: 42px !important; font-size: 20px !important; color: #fff !important; }
 #playerControls > button:hover, #playerControls > button:focus {
-  background: rgba(255,255,255,0.35); outline: none; transform: scale(1.1);
-  box-shadow: 0 0 12px rgba(255,255,255,0.2);
+  color: #3cf2ff; outline: none; transform: scale(1.15);
 }
-#playerControls > button:active { transform: scale(0.95); }
+#playerControls > button:active { transform: scale(0.92); }
 #playerControls > button, #closeMini { transition: opacity 0.3s ease; }
 #playerSection.ui-hidden #playerControls > button:not(#hideUIBtn), #playerSection.ui-hidden #closeMini { opacity: 0; pointer-events: none; }
 body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer-events: none; transition: opacity 0.3s ease; }
@@ -656,7 +666,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
       <button id="resBtn" tabindex="0" title="Quality">720p</button>
       <button id="fullBtn" tabindex="0" title="Fullscreen">⛶</button>
       <button id="hideUIBtn" tabindex="0" title="Hide UI">···</button>
-      <button id="addToPlaylistBtn" tabindex="0" title="Save">＋</button>
+
     </div>
     <button id="closeMini" tabindex="0">✕</button>
   </div>
@@ -1545,6 +1555,23 @@ function createYTPlayer(videoId, startSeconds) {
 function setPlayerVideo(videoId, snippet, startSeconds) {
   savedScrollY = window.scrollY;
   currentVideoId = videoId;
+  // Mark as seen in hubSeenIds so it never shows as new again
+  try {
+    const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
+    if (!seenHub.includes(videoId)) {
+      seenHub.push(videoId);
+      localStorage.setItem("hubSeenIds", JSON.stringify(seenHub.slice(-500)));
+    }
+    // Remove red border from this card in feed immediately
+    const card = document.querySelector('[data-videoid="' + videoId + '"]');
+    if (card) {
+      card.style.border = "";
+      card.style.boxShadow = "";
+      card.dataset.hubvideo = "";
+      const meta = card.querySelector('.video-meta');
+      if (meta && meta.textContent.includes("🔴 New")) meta.style.color = "";
+    }
+  } catch(e) {}
   playerSection.style.display = "block";
   playerSection.classList.remove("player-mini", "player-fullscreen");
   saveToHistory({ id: videoId, snippet });
@@ -4048,12 +4075,13 @@ async function _pollCheckNewContent() {
 async function _injectHubVideos(hubVideos) {
   if (!hubVideos || !hubVideos.length) return;
   try {
-    // Mark these videos as permanently seen — never show as new again
+    // Filter out already-watched videos before injecting
     try {
       const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
-      const newSeen = [...new Set([...seenHub, ...hubVideos.map(v => v.videoId)])].slice(0, 500);
-      localStorage.setItem("hubSeenIds", JSON.stringify(newSeen));
+      const seenSet = new Set(seenHub);
+      hubVideos = hubVideos.filter(v => !seenSet.has(v.videoId));
     } catch(e) {}
+    if (!hubVideos.length) return;
 
     const ids = hubVideos.map(v => v.videoId).join(",");
     const data = await fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() });
