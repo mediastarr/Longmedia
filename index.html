@@ -1930,20 +1930,52 @@ async function checkIsShort(videoId, snippet) {
     return true;
   }
 
+  // Fast heuristic checks before hitting the API:
+
+  // 1. Title or description contains #shorts
+  if (snippet) {
+    const title = (snippet.title || "").toLowerCase();
+    const desc = (snippet.description || "").toLowerCase();
+    if (title.includes("#shorts") || title.includes("#short") || desc.includes("#shorts")) {
+      _shortsCache[videoId] = true;
+      return true;
+    }
+  }
+
+  // 2. Thumbnail is portrait (vertical) aspect ratio — strong shorts signal
+  // YouTube Shorts thumbnails use /hqdefault.jpg which is 16:9 BUT
+  // the maxresdefault for shorts is often 9:16 (720x1280)
+  // We can check via the thumbnail URL pattern for shorts
+  if (snippet && snippet.thumbnails) {
+    const thumb = snippet.thumbnails?.maxres || snippet.thumbnails?.standard || snippet.thumbnails?.high;
+    if (thumb && thumb.width && thumb.height && thumb.height > thumb.width) {
+      _shortsCache[videoId] = true;
+      return true;
+    }
+  }
+
+  // 3. API duration check (most reliable)
   try {
     const details = await fetchContentDetails([videoId]);
     const cd = details[videoId];
     if (cd) {
       const secs = parseDuration(cd.duration);
-      const result = secs !== null && secs > 0 && secs <= 180; // YouTube Shorts: up to 3 minutes
+      const result = secs !== null && secs > 0 && secs <= 180;
       _shortsCache[videoId] = result;
       return result;
     }
-    // Not in API response — not a short
     _shortsCache[videoId] = false;
     return false;
   } catch(e) {
-    // API failed — safe default
+    // API failed — use title heuristic as last resort
+    if (snippet) {
+      const title = (snippet.title || "").toLowerCase();
+      // Very short titles with common shorts patterns
+      if (title.includes("short") || title.includes("#")) {
+        _shortsCache[videoId] = true;
+        return true;
+      }
+    }
     _shortsCache[videoId] = false;
     return false;
   }
