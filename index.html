@@ -662,14 +662,14 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
       <button id="searchGo">Go</button>
     </div>
     <div id="keyboard">
-      <div class="keyboard-row">
-        <div class="key-btn" data-key="Q">Q</div><div class="key-btn" data-key="W">W</div><div class="key-btn" data-key="E">E</div><div class="key-btn" data-key="R">R</div><div class="key-btn" data-key="T">T</div><div class="key-btn" data-key="Y">Y</div><div class="key-btn" data-key="U">U</div><div class="key-btn" data-key="I">I</div><div class="key-btn" data-key="O">O</div><div class="key-btn" data-key="P">P</div>
+      <div class="keyboard-row" id="kbRow0">
+        <div class="key-btn focusable" tabindex="0" data-key="Q">Q</div><div class="key-btn focusable" tabindex="0" data-key="W">W</div><div class="key-btn focusable" tabindex="0" data-key="E">E</div><div class="key-btn focusable" tabindex="0" data-key="R">R</div><div class="key-btn focusable" tabindex="0" data-key="T">T</div><div class="key-btn focusable" tabindex="0" data-key="Y">Y</div><div class="key-btn focusable" tabindex="0" data-key="U">U</div><div class="key-btn focusable" tabindex="0" data-key="I">I</div><div class="key-btn focusable" tabindex="0" data-key="O">O</div><div class="key-btn focusable" tabindex="0" data-key="P">P</div>
       </div>
-      <div class="keyboard-row">
-        <div class="key-btn" data-key="A">A</div><div class="key-btn" data-key="S">S</div><div class="key-btn" data-key="D">D</div><div class="key-btn" data-key="F">F</div><div class="key-btn" data-key="G">G</div><div class="key-btn" data-key="H">H</div><div class="key-btn" data-key="J">J</div><div class="key-btn" data-key="K">K</div><div class="key-btn" data-key="L">L</div>
+      <div class="keyboard-row" id="kbRow1">
+        <div class="key-btn focusable" tabindex="0" data-key="A">A</div><div class="key-btn focusable" tabindex="0" data-key="S">S</div><div class="key-btn focusable" tabindex="0" data-key="D">D</div><div class="key-btn focusable" tabindex="0" data-key="F">F</div><div class="key-btn focusable" tabindex="0" data-key="G">G</div><div class="key-btn focusable" tabindex="0" data-key="H">H</div><div class="key-btn focusable" tabindex="0" data-key="J">J</div><div class="key-btn focusable" tabindex="0" data-key="K">K</div><div class="key-btn focusable" tabindex="0" data-key="L">L</div>
       </div>
-      <div class="keyboard-row">
-        <div class="key-btn" data-key="Z">Z</div><div class="key-btn" data-key="X">X</div><div class="key-btn" data-key="C">C</div><div class="key-btn" data-key="V">V</div><div class="key-btn" data-key="B">B</div><div class="key-btn" data-key="N">N</div><div class="key-btn" data-key="M">M</div>
+      <div class="keyboard-row" id="kbRow2">
+        <div class="key-btn focusable" tabindex="0" data-key="Z">Z</div><div class="key-btn focusable" tabindex="0" data-key="X">X</div><div class="key-btn focusable" tabindex="0" data-key="C">C</div><div class="key-btn focusable" tabindex="0" data-key="V">V</div><div class="key-btn focusable" tabindex="0" data-key="B">B</div><div class="key-btn focusable" tabindex="0" data-key="N">N</div><div class="key-btn focusable" tabindex="0" data-key="M">M</div>
       </div>
       <div class="keyboard-row">
         <div class="key-btn" data-key="123" id="numToggleBtn">123</div>
@@ -2983,6 +2983,33 @@ searchTabEl.addEventListener("click", openKeyboard);
 searchBack.addEventListener("click", closeKeyboard);
 searchGo.addEventListener("click", () => { const q = searchInput.value.trim() || "music"; triggerSearch(q); });
 searchInput.addEventListener("input", async () => { const q = searchInput.value.trim(); showSuggestions(await fetchSuggestions(q)); });
+// Keyboard wrap-around navigation
+// Swipe right at end of row → first key of next row
+// Swipe left at start of row → last key of previous row
+document.getElementById("keyboard").addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  const focused = document.activeElement;
+  if (!focused || !focused.classList.contains("key-btn")) return;
+
+  // Build flat ordered list of all visible key-btn elements
+  const allKeys = Array.from(document.querySelectorAll("#keyboard .key-btn")).filter(k => k.offsetParent !== null);
+  const idx = allKeys.indexOf(focused);
+  if (idx === -1) return;
+
+  let nextIdx;
+  if (e.key === "ArrowRight") {
+    // At last key? wrap to first
+    nextIdx = idx < allKeys.length - 1 ? idx + 1 : 0;
+  } else {
+    // At first key? wrap to last
+    nextIdx = idx > 0 ? idx - 1 : allKeys.length - 1;
+  }
+
+  e.preventDefault();
+  allKeys[nextIdx].focus();
+  allKeys[nextIdx].scrollIntoView({ block: "nearest", behavior: "smooth" });
+});
+
 keyboardEl.addEventListener("click", async (e) => {
   const btn = e.target.closest(".key-btn"); if (!btn) return;
   const key = btn.dataset.key;
