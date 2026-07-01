@@ -3015,31 +3015,39 @@ searchTabEl.addEventListener("click", openKeyboard);
 searchBack.addEventListener("click", closeKeyboard);
 searchGo.addEventListener("click", () => { const q = searchInput.value.trim() || "music"; triggerSearch(q); });
 searchInput.addEventListener("input", async () => { const q = searchInput.value.trim(); showSuggestions(await fetchSuggestions(q)); });
-// Keyboard wrap-around navigation
-// Swipe right at end of row → first key of next row
-// Swipe left at start of row → last key of previous row
+// Keyboard wrap-around navigation — within same row only
+// P swipe right → Q (wraps to start of same row)
+// L swipe right → A (wraps to start of same row)
+// M swipe right → Z (wraps to start of same row)
+// Q swipe left → P (wraps to end of same row)
+// A swipe left → L (wraps to end of same row)
+// Z swipe left → M (wraps to end of same row)
 document.getElementById("keyboard").addEventListener("keydown", (e) => {
   if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
   const focused = document.activeElement;
   if (!focused || !focused.classList.contains("key-btn")) return;
 
-  // Build flat ordered list of all visible key-btn elements
-  const allKeys = Array.from(document.querySelectorAll("#keyboard .key-btn")).filter(k => k.offsetParent !== null);
-  const idx = allKeys.indexOf(focused);
+  // Get the row this key belongs to
+  const row = focused.closest(".keyboard-row");
+  if (!row) return;
+
+  // Get all visible keys in THIS row only
+  const rowKeys = Array.from(row.querySelectorAll(".key-btn")).filter(k => k.offsetParent !== null);
+  const idx = rowKeys.indexOf(focused);
   if (idx === -1) return;
 
   let nextIdx;
   if (e.key === "ArrowRight") {
-    // At last key? wrap to first
-    nextIdx = idx < allKeys.length - 1 ? idx + 1 : 0;
+    // At last key of row? wrap to first key of same row
+    nextIdx = idx < rowKeys.length - 1 ? idx + 1 : 0;
   } else {
-    // At first key? wrap to last
-    nextIdx = idx > 0 ? idx - 1 : allKeys.length - 1;
+    // At first key of row? wrap to last key of same row
+    nextIdx = idx > 0 ? idx - 1 : rowKeys.length - 1;
   }
 
   e.preventDefault();
-  allKeys[nextIdx].focus();
-  allKeys[nextIdx].scrollIntoView({ block: "nearest", behavior: "smooth" });
+  rowKeys[nextIdx].focus();
+  rowKeys[nextIdx].scrollIntoView({ block: "nearest", behavior: "smooth" });
 });
 
 keyboardEl.addEventListener("click", async (e) => {
