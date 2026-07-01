@@ -142,9 +142,13 @@ body.light #searchTab { background: linear-gradient(135deg, rgba(238,240,255,0.9
 }
 /* CHANGE: sticky so medium player stays visible in viewport */
 #playerSection {
-  margin-top: 16px; border-radius: 22px; overflow: hidden; position: relative; z-index: 30;
+  margin-top: 16px; border-radius: 22px; overflow: visible; position: relative; z-index: 30;
   background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.18), rgba(5,6,12,0.98));
-  height: 260px; display: none;
+  display: none;
+}
+#playerFrame {
+  width: 100%; height: 260px; border-radius: 22px; overflow: hidden;
+  display: block;
 }
 /* CHANGE: top:auto so mini player anchors to bottom-right correctly */
 #playerSection.player-mini { position: fixed; right: 16px; bottom: 16px; top: auto; width: 260px; height: 150px; z-index: 40; }
@@ -424,13 +428,18 @@ body.cinema-mode #playerSection { transition: transform 0.55s cubic-bezier(0.22,
   100% { transform: scale(1) perspective(900px) rotateX(6deg); opacity: 1; filter: brightness(1); }
 }
 #playerSection.player-fullscreen.cinema.zoom-intro { animation: cinemaZoomIntro 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-body.fullscreen-active .exit-full-btn { display: block; }
-.exit-full-btn {
+body.fullscreen-active .exit-full-btn {
   position: fixed; left: 16px; top: 16px; border-radius: 999px;
-  border: 1px solid rgba(120,130,160,0.7); padding: 3px 8px; font-size: 9px;
-  background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.35), rgba(10,12,20,0.9));
-  color: #f5f7ff; cursor: pointer; z-index: 999999999 !important; pointer-events: auto; display: none;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  border: 1px solid rgba(120,130,160,0.7); padding: 8px 16px; font-size: 13px; font-weight: 600;
+  background: rgba(10,12,20,0.75);
+  color: #f5f7ff; cursor: pointer; z-index: 999999999 !important; pointer-events: auto !important;
+  display: none;
+  transition: box-shadow 0.2s ease, opacity 0.2s ease;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+body.fullscreen-active .exit-full-btn {
+  display: block !important;
+  pointer-events: auto !important;
 }
 .exit-full-btn:hover { box-shadow: 0 0 18px rgba(60,242,255,0.9), 0 0 30px rgba(60,242,255,0.5); transform: scale(1.08); }
 body.fullscreen-active .exit-full-btn { display: block; }
@@ -438,7 +447,17 @@ body.fullscreen-active .exit-full-btn { display: block; }
   display: flex; gap: 14px; padding: 8px 4px;
   justify-content: center; align-items: center;
   background: transparent; border: none;
-  width: 100%; margin: 6px 0 0 0;
+  width: 100%; margin: 0;
+  position: relative; z-index: 5;
+}
+/* playerSection needs flex column layout so controls stack below video */
+#playerSection {
+  display: none;
+  flex-direction: column;
+}
+#playerSection[style*="block"] {
+  display: flex !important;
+  flex-direction: column;
 }
 #playerControls > button {
   width: 36px; height: 36px; border-radius: 50%; border: none;
@@ -457,8 +476,8 @@ body.fullscreen-active .exit-full-btn { display: block; }
 #playerControls > button, #closeMini { transition: opacity 0.3s ease; }
 #playerSection.ui-hidden #playerControls > button:not(#hideUIBtn), #playerSection.ui-hidden #closeMini { opacity: 0; pointer-events: none; }
 body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer-events: none; transition: opacity 0.3s ease; }
-#playerSection.ui-hidden #hideUIBtn { opacity: 0.22; }
-#playerSection.ui-hidden #hideUIBtn:hover, #playerSection.ui-hidden #hideUIBtn:active { opacity: 1; }
+#playerSection.ui-hidden #hideUIBtn { opacity: 0.04 !important; }
+#playerSection.ui-hidden #hideUIBtn:hover, #playerSection.ui-hidden #hideUIBtn:focus, #playerSection.ui-hidden #hideUIBtn:active { opacity: 0.6 !important; }
 #resBtn { display: inline-block; }
 #playerSection.player-mini #resBtn { display: none; }
 #playerSection.player-fullscreen #resBtn { display: inline-block; }
@@ -1392,14 +1411,24 @@ exitFullBtn.addEventListener("click", () => {
   playerSection.classList.remove("player-fullscreen");
   document.body.classList.remove("fullscreen-active");
   disableCinemaMode();
-  if (miniActive) playerSection.classList.add("player-mini");
+  // Always return to medium player (not mini) with suggestions visible
+  playerSection.classList.remove("player-mini");
+  miniActive = false;
   playerSection.classList.remove("settled");
   uiHidden = false;
   playerSection.classList.remove("ui-hidden");
   document.body.classList.remove("ui-hidden");
-  hideUIBtn.textContent = "Hide UI";
-  showUIWithMiniPlayer();
-  showHUD("Exited Fullscreen");
+  hideUIBtn.textContent = "···";
+  // Show player + info panel + suggested videos
+  playerSection.style.display = "flex";
+  const vip = document.getElementById("videoInfoPanel");
+  if (vip) vip.style.display = "block";
+  topbarEl.style.display = "flex";
+  searchTabEl.style.display = "flex";
+  tabsEl.style.display = "flex";
+  feedEl.style.display = "none";
+  window.scrollTo({ top: 0, behavior: "instant" });
+  showHUD("← Back to player");
 });
 
 setInterval(() => {
@@ -1563,15 +1592,19 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
       seenHub.push(videoId);
       localStorage.setItem("hubSeenIds", JSON.stringify(seenHub.slice(-500)));
     }
-    // Remove red border from this card in feed immediately
-    const card = document.querySelector('[data-videoid="' + videoId + '"]');
-    if (card) {
+    // Remove red border from ALL cards with this videoId immediately
+    document.querySelectorAll('[data-videoid="' + videoId + '"]').forEach(card => {
       card.style.border = "";
       card.style.boxShadow = "";
       card.dataset.hubvideo = "";
+      card.style.removeProperty("border");
+      card.style.removeProperty("box-shadow");
       const meta = card.querySelector('.video-meta');
-      if (meta && meta.textContent.includes("🔴 New")) meta.style.color = "";
-    }
+      if (meta && meta.textContent.includes("🔴 New")) {
+        meta.style.color = "";
+        meta.textContent = meta.textContent.replace("🔴 New · ", "");
+      }
+    });
   } catch(e) {}
   playerSection.style.display = "block";
   playerSection.classList.remove("player-mini", "player-fullscreen");
@@ -1934,10 +1967,9 @@ resBtn.addEventListener("click", () => {
   showHUD(QUALITY_LABELS[currentQuality]);
 
   const resumeTime = ytPlayer ? Math.floor(ytPlayer.getCurrentTime() || 0) : 0;
+  const wasPlaying = ytPlayer ? ytPlayer.getPlayerState() === YT.PlayerState.PLAYING : true;
 
-  // The only reliable way to force quality in the YT IFrame API is to
-  // destroy the player and rebuild with vq= in the embed URL
-  // setPlaybackQuality() was fully deprecated and ignored since 2021
+  // Rebuild player with new quality (setPlaybackQuality deprecated since 2021)
   try { if (ytPlayer) { ytPlayer.stopVideo(); ytPlayer.destroy(); } } catch(e) {}
   ytPlayer = null; isPlayerReady = false;
 
@@ -1956,12 +1988,12 @@ resBtn.addEventListener("click", () => {
       onReady: (e) => {
         isPlayerReady = true;
         if (currentQuality !== "auto") {
-          // Belt-and-suspenders: try both API methods
           try { e.target.setPlaybackQuality(currentQuality); } catch(err) {}
           try { e.target.setPlaybackQualityRange(currentQuality, currentQuality); } catch(err) {}
         }
-        e.target.playVideo();
-        playPauseBtn.textContent = "⏸";
+        // Restore play/pause state from before quality change
+        if (wasPlaying !== false) { e.target.playVideo(); playPauseBtn.textContent = "⏸"; }
+        else { e.target.pauseVideo(); playPauseBtn.textContent = "▶"; }
       },
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.PLAYING) {
