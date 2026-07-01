@@ -1563,6 +1563,8 @@ async function loadVideoInfoPanel(videoId, snippet) {
     const ago = timeAgo(v.snippet?.publishedAt || publishedAt);
     document.getElementById("vipStats").textContent = [views && views + " Views", likes && likes + " Likes", ago].filter(Boolean).join("  ·  ");
     document.getElementById("vipLikeCount").textContent = likes || "";
+    // Store raw count for accurate incrementing
+    document.getElementById("vipLikeBtn").dataset.rawCount = stats.likeCount || "0";
   }
 
   // Channel info + avatar
@@ -1711,11 +1713,14 @@ async function loadVideoInfoPanel(videoId, snippet) {
     const ok = await setRating(liked ? "like" : "none");
     if (ok) {
       showHUD(liked ? "👍 Liked!" : "Like removed");
-      // Update like count in UI immediately
+      // Update like count in UI immediately using raw count
       const likeCountEl = document.getElementById("vipLikeCount");
-      if (likeCountEl) {
-        const current = parseInt(likeCountEl.textContent.replace(/[^0-9]/g, "")) || 0;
-        likeCountEl.textContent = liked ? (current + 1).toLocaleString() : Math.max(0, current - 1).toLocaleString();
+      const likeBtnEl = document.getElementById("vipLikeBtn");
+      if (likeCountEl && likeBtnEl) {
+        const rawCount = parseInt(likeBtnEl.dataset.rawCount || "0");
+        const newCount = liked ? rawCount + 1 : Math.max(0, rawCount - 1);
+        likeBtnEl.dataset.rawCount = String(newCount);
+        likeCountEl.textContent = formatViews(newCount);
       }
       // Boost taste profile on like
       if (liked) {
