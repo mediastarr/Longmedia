@@ -1705,9 +1705,6 @@ async function loadVideoInfoPanel(videoId, snippet) {
   const oldChapters = document.getElementById("vipChapters");
   if (oldChapters) oldChapters.remove();
 
-  // Load comments in background
-  _loadComments(videoId);
-
   // Fill from snippet immediately (fast)
   const title = snippet.title || "";
   const channel = snippet.channelTitle || "";
