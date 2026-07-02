@@ -4255,7 +4255,8 @@ async function _pollCheckNewContent() {
       localStorage.setItem("hubNewVideos", JSON.stringify(merged));
     } catch(e) {}
 
-    // Badge + HUD with breakdown
+    // Badge + HUD — never auto-inject while user is scrolling
+    // Only inject when user taps Home tab
     _pollSetBadge(_pollBadgeCount + allNew.length);
     const subCount = allNew.filter(v => v.source === "subscription").length;
     const watchedCount = allNew.filter(v => v.source === "watched").length;
@@ -4265,8 +4266,6 @@ async function _pollCheckNewContent() {
     if (watchedCount) parts.push(watchedCount + " from channels you watch");
     if (topicCount) parts.push(topicCount + " matching your interests");
     showHUD("🔴 " + _pollBadgeCount + " new — " + parts.join(" · "));
-
-    if (currentTab === "home" && feedEl) _injectHubVideos(allNew);
 
   } catch(e) {
     // Silent fail
