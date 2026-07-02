@@ -4193,25 +4193,32 @@ async function _pollCheckNewContent() {
       }
     } catch(e) {}
 
-    // ── SOURCE 2: Check actual subscription channels every poll cycle ──
-    // Gets subscribed channel IDs from tasteProfile and checks for recent uploads
-    // This catches videos PubSubHubbub may have missed
-    const subChannelIds = Object.keys(getTasteProfile().channels || {}).slice(0, 10);
-    if (subChannelIds.length) {
-      const subResults = await Promise.allSettled(
-        subChannelIds.map(cid =>
-          fetchYouTube("search", { part: "snippet", channelId: cid, type: "video", order: "date", maxResults: 2, publishedAfter: since6h, _: Date.now() })
-        )
-      );
-      subResults.forEach(r => {
-        if (r.status === "fulfilled") (r.value.items || []).forEach(item => {
-          const id = item.id?.videoId;
-          if (id && !_pollKnownIds.has(id)) {
-            _pollKnownIds.add(id);
-            allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "subscription" });
-          }
+    // ── SOURCE 2: Check subscription channels every 5 min (rate limited) ──
+    const lastSubCheck = parseInt(localStorage.getItem("_pollLastSubCheck") || "0");
+    const subCheckDue = Date.now() - lastSubCheck > 5 * 60 * 1000;
+    if (subCheckDue) {
+      localStorage.setItem("_pollLastSubCheck", String(Date.now()));
+      // Rotate through channels — check 3 at a time to spread quota usage
+      const allSubIds = Object.keys(getTasteProfile().channels || {});
+      const rotateIdx = parseInt(localStorage.getItem("_pollSubRotate") || "0");
+      const subChannelIds = allSubIds.slice(rotateIdx, rotateIdx + 3);
+      localStorage.setItem("_pollSubRotate", String((rotateIdx + 3) % Math.max(allSubIds.length, 1)));
+      if (subChannelIds.length) {
+        const subResults = await Promise.allSettled(
+          subChannelIds.map(cid =>
+            fetchYouTube("search", { part: "snippet", channelId: cid, type: "video", order: "date", maxResults: 2, publishedAfter: since6h, _: Date.now() })
+          )
+        );
+        subResults.forEach(r => {
+          if (r.status === "fulfilled") (r.value.items || []).forEach(item => {
+            const id = item.id?.videoId;
+            if (id && !_pollKnownIds.has(id)) {
+              _pollKnownIds.add(id);
+              allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "subscription" });
+            }
+          });
         });
-      });
+      }
     }
 
     // ── SOURCES 3 & 4: Taste channels + keywords every 30 min ──
