@@ -3860,6 +3860,14 @@ document.getElementById("syncClearBtn").onclick = async function() {
   localStorage.removeItem("tasteProfile");
   localStorage.removeItem("feedShownTimed");
   localStorage.removeItem("feedShownIds");
+  localStorage.removeItem("hubSeenIds");
+  localStorage.removeItem("hubNewVideos");
+  localStorage.removeItem("_pollLastTasteCheck");
+  localStorage.removeItem("_pollLastSubCheck");
+  localStorage.removeItem("_pollSubRotate");
+  _pollKnownIds = null;
+  _pollBadgeCount = 0;
+  _pollClearBadge();
   localStorage.removeItem("trendingShownTimed");
 
   syncStatus.textContent = "Fetching your actual YouTube subscriptions…";
@@ -3919,6 +3927,9 @@ document.getElementById("syncClearBtn").onclick = async function() {
     // Register ONLY subscribed channels with Worker
     // The Worker will replace the full channel list, removing old ones like Crunchyroll
     try {
+      // Save for Source 2 polling
+      const savedIds = allChannelIds || [];
+      if (savedIds.length) localStorage.setItem("subscribedChannelIds", JSON.stringify(savedIds.slice(0, 100)));
       const workerRes = await fetch(HUB_WORKER_URL + "/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-ViewTube-Secret": HUB_SECRET },
@@ -4021,6 +4032,8 @@ syncStartBtn.onclick=async function(){
   // Register channels with Worker for real-time push notifications
   try {
     const channelIds = Object.keys(profile.channels || {});
+    // Save for Source 2 polling (uses actual subscription IDs)
+    if (channelIds.length) localStorage.setItem("subscribedChannelIds", JSON.stringify(channelIds.slice(0, 100)));
     if (channelIds.length > 0) {
       const workerRes = await fetch(HUB_WORKER_URL + "/subscribe", {
         method: "POST",
@@ -4053,6 +4066,7 @@ async function silentSync(token){
   // This is automatic — no user action needed
   try {
     const channelIds = Object.keys(profile.channels || {});
+    if (channelIds.length) localStorage.setItem("subscribedChannelIds", JSON.stringify(channelIds.slice(0, 100)));
     if (channelIds.length > 0) {
       fetch(HUB_WORKER_URL + "/subscribe", {
         method: "POST",
@@ -4199,7 +4213,9 @@ async function _pollCheckNewContent() {
     if (subCheckDue) {
       localStorage.setItem("_pollLastSubCheck", String(Date.now()));
       // Rotate through channels — check 3 at a time to spread quota usage
-      const allSubIds = Object.keys(getTasteProfile().channels || {});
+      // Use actual subscription IDs, fall back to taste profile channels
+      const savedSubIds = JSON.parse(localStorage.getItem("subscribedChannelIds") || "[]");
+      const allSubIds = savedSubIds.length ? savedSubIds : Object.keys(getTasteProfile().channels || {});
       const rotateIdx = parseInt(localStorage.getItem("_pollSubRotate") || "0");
       const subChannelIds = allSubIds.slice(rotateIdx, rotateIdx + 3);
       localStorage.setItem("_pollSubRotate", String((rotateIdx + 3) % Math.max(allSubIds.length, 1)));
@@ -4593,6 +4609,11 @@ async function _loadComments(videoId) {
 
   // hubSeenIds only tracks videos explicitly watched from red highlighted cards
   // Don't seed from full history — that blocks subscription notifications
+
+  // Reset poll state on every app open so fresh videos always get through
+  _pollKnownIds = null;
+  _pollBadgeCount = 0;
+  try { localStorage.removeItem("_pollLastTasteCheck"); } catch(e) {}
 
   _startPolling();
 
