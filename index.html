@@ -4514,28 +4514,29 @@ async function _loadComments(videoId) {
   const hasRefresh = localStorage.getItem("yt_refresh_token");
   const authPromise = hasRefresh ? refreshAccessToken() : Promise.resolve(false);
 
-  // Startup feed — order:date first (fresh), mostPopular after
-  setActiveTab("home"); // ensure feedEl is visible before rendering
-  try {
-    const since24h = new Date(Date.now() - 86400000).toISOString();
-    const cat = freshCategory();
-    const seen = new Set(); const allItems = [];
-    const [fresh, popular] = await Promise.allSettled([
-      fetchYouTubeDirect("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 12, publishedAfter: since24h, _: Date.now() }),
-      fetchYouTubeDirect("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 12, _: Date.now() })
-    ]);
-    if (fresh.status === "fulfilled") (fresh.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
-    if (popular.status === "fulfilled") (popular.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
-    if (allItems.length) {
-      nextPageToken = (popular.status==="fulfilled"&&popular.value.nextPageToken)||null;
-      renderFeed(allItems); showHUD("Home");
-    } else throw new Error("empty");
-  } catch(e) {
+  // Startup feed — show home immediately, load in background
+  // feedEl is display:grid by default so it's already visible
+  // Use a timeout-wrapped fetch so slow API never blocks the UI
+  const _startupFetch = async () => {
+    try {
+      const since24h = new Date(Date.now() - 86400000).toISOString();
+      const cat = freshCategory();
+      const seen = new Set(); const allItems = [];
+      const [fresh, popular] = await Promise.allSettled([
+        fetchYouTubeDirect("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 12, publishedAfter: since24h, _: Date.now() }),
+        fetchYouTubeDirect("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 12, _: Date.now() })
+      ]);
+      if (fresh.status === "fulfilled") (fresh.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
+      if (popular.status === "fulfilled") (popular.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
+      if (allItems.length) { nextPageToken = (popular.status==="fulfilled"&&popular.value.nextPageToken)||null; renderFeed(allItems); showHUD("Home"); return; }
+    } catch(e) {}
+    // Fallback
     try {
       const data = await fetchYouTubeDirect("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
-      if (data && data.items && data.items.length) { nextPageToken = data.nextPageToken || null; renderFeed(data.items); }
+      if (data && data.items && data.items.length) { nextPageToken = data.nextPageToken || null; renderFeed(data.items); showHUD("Home"); }
     } catch(e2) {}
-  }
+  };
+  _startupFetch();
 
   // Wait for auth to complete (was running in parallel)
   const ok = await authPromise;
