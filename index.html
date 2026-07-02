@@ -2341,6 +2341,24 @@ async function preCacheShorts(items) {
 
 // Open a single video in the Shorts player (just like opening from Shorts tab)
 function openAsShort(videoId, snippet) {
+  // Mark as seen — remove red highlight from feed card
+  try {
+    const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
+    if (!seenHub.includes(videoId)) {
+      seenHub.push(videoId);
+      localStorage.setItem("hubSeenIds", JSON.stringify(seenHub.slice(-500)));
+    }
+    document.querySelectorAll('[data-videoid="' + videoId + '"]').forEach(card => {
+      card.style.border = "";
+      card.style.boxShadow = "";
+      card.dataset.hubvideo = "";
+      const meta = card.querySelector('.video-meta');
+      if (meta && meta.textContent.includes("🔴 New")) {
+        meta.style.color = "";
+        meta.textContent = meta.textContent.replace("🔴 New · ", "");
+      }
+    });
+  } catch(e) {}
   // Save position to restore on back
   const returnScrollY = window.scrollY;
   const returnTabName = currentTab;
