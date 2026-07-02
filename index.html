@@ -4217,7 +4217,7 @@ async function _pollCheckNewContent() {
     // ── SOURCES 3 & 4: Taste channels + keywords every 30 min ──
     const now = Date.now();
     const lastTasteCheck = parseInt(localStorage.getItem("_pollLastTasteCheck") || "0");
-    const tasteCheckDue = now - lastTasteCheck > 30 * 60 * 1000;
+    const tasteCheckDue = now - lastTasteCheck > 15 * 60 * 1000;
 
     if (tasteCheckDue) {
       localStorage.setItem("_pollLastTasteCheck", String(now));
