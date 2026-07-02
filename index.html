@@ -888,6 +888,27 @@ const API_KEYS = [
 let keyIndex = 0;
 
 /* CHANGE: copy params before adding key so retries never corrupt the URL */
+async function fetchYouTubeDirect(endpoint, params = {}, retries = 2) {
+  // Direct YouTube API fetch — no Worker cache (used for time-critical startup calls)
+  const key = API_KEYS[keyIndex];
+  keyIndex = (keyIndex + 1) % API_KEYS.length;
+  const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
+  const p = Object.assign({}, params, { key });
+  Object.entries(p).forEach(([k, v]) => { if (v !== undefined && v !== null) url.searchParams.append(k, v); });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4000);
+  try {
+    const res = await fetch(url.toString(), { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok && retries > 0) return fetchYouTubeDirect(endpoint, params, retries - 1);
+    return await res.json();
+  } catch (err) {
+    clearTimeout(timeout);
+    if (retries > 0) return fetchYouTubeDirect(endpoint, params, retries - 1);
+    throw err;
+  }
+}
+
 async function fetchYouTube(endpoint, params = {}, retries = 2) {
   // Try Worker cache first for cacheable endpoints (saves quota)
   const cacheableEndpoints = ["videos", "search", "channels", "playlistItems"];
@@ -908,24 +929,7 @@ async function fetchYouTube(endpoint, params = {}, retries = 2) {
       }
     } catch(e) {}
   }
-  // Direct YouTube API fetch fallback
-  const key = API_KEYS[keyIndex];
-  keyIndex = (keyIndex + 1) % API_KEYS.length;
-  const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
-  const p = Object.assign({}, params, { key });
-  Object.entries(p).forEach(([k, v]) => { if (v !== undefined && v !== null) url.searchParams.append(k, v); });
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3500);
-  try {
-    const res = await fetch(url.toString(), { signal: controller.signal });
-    clearTimeout(timeout);
-    if (!res.ok && retries > 0) return fetchYouTube(endpoint, params, retries - 1);
-    return await res.json();
-  } catch (err) {
-    clearTimeout(timeout);
-    if (retries > 0) return fetchYouTube(endpoint, params, retries - 1);
-    throw err;
-  }
+  return fetchYouTubeDirect(endpoint, params, retries);
 }
 
 let currentTab = "home";
@@ -4511,14 +4515,14 @@ async function _loadComments(videoId) {
   const authPromise = hasRefresh ? refreshAccessToken() : Promise.resolve(false);
 
   // Fetch feed immediately without waiting for auth
-  // Startup: order:date first (freshest), mostPopular after
+  // Use direct fetch (no Worker cache round-trip) for fast startup
   try {
     const since48h = new Date(Date.now() - 172800000).toISOString();
     const cat = freshCategory();
     const seen = new Set(); const allItems = [];
     const [fresh, popular] = await Promise.allSettled([
-      fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 12, publishedAfter: since48h, _: Date.now() }),
-      fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 12, _: Date.now() })
+      fetchYouTubeDirect("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 12, publishedAfter: since48h, _: Date.now() }),
+      fetchYouTubeDirect("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 12, _: Date.now() })
     ]);
     if (fresh.status === "fulfilled") (fresh.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
     if (popular.status === "fulfilled") (popular.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
