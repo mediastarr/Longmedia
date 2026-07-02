@@ -4193,7 +4193,28 @@ async function _pollCheckNewContent() {
       }
     } catch(e) {}
 
-    // ── SOURCES 2 & 3: Only run every 30 minutes — costs quota ──
+    // ── SOURCE 2: Check actual subscription channels every poll cycle ──
+    // Gets subscribed channel IDs from tasteProfile and checks for recent uploads
+    // This catches videos PubSubHubbub may have missed
+    const subChannelIds = Object.keys(getTasteProfile().channels || {}).slice(0, 10);
+    if (subChannelIds.length) {
+      const subResults = await Promise.allSettled(
+        subChannelIds.map(cid =>
+          fetchYouTube("search", { part: "snippet", channelId: cid, type: "video", order: "date", maxResults: 2, publishedAfter: since6h, _: Date.now() })
+        )
+      );
+      subResults.forEach(r => {
+        if (r.status === "fulfilled") (r.value.items || []).forEach(item => {
+          const id = item.id?.videoId;
+          if (id && !_pollKnownIds.has(id)) {
+            _pollKnownIds.add(id);
+            allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "subscription" });
+          }
+        });
+      });
+    }
+
+    // ── SOURCES 3 & 4: Taste channels + keywords every 30 min ──
     const now = Date.now();
     const lastTasteCheck = parseInt(localStorage.getItem("_pollLastTasteCheck") || "0");
     const tasteCheckDue = now - lastTasteCheck > 30 * 60 * 1000;
@@ -4201,8 +4222,8 @@ async function _pollCheckNewContent() {
     if (tasteCheckDue) {
       localStorage.setItem("_pollLastTasteCheck", String(now));
 
-      // ── SOURCE 2: Channels you watch often (taste profile) ──
-      const topCh = getTopChannels(3); // reduced from 5 to 3
+      // ── SOURCE 3: Channels you watch often (taste profile) ──
+      const topCh = getTopChannels(3);
       if (topCh.length) {
         const chResults = await Promise.allSettled(topCh.map(ch =>
           fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 2, publishedAfter: since6h, _: Date.now() })
@@ -4218,7 +4239,7 @@ async function _pollCheckNewContent() {
         });
       }
 
-      // ── SOURCE 3: Top keywords/topics ──
+      // ── SOURCE 4: Top keywords/topics ──
       const topKW = getTopKeywords(3);
       const topBI = getTopBigrams(1);
       if (topKW.length >= 2 || topBI.length) {
