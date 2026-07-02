@@ -889,6 +889,26 @@ let keyIndex = 0;
 
 /* CHANGE: copy params before adding key so retries never corrupt the URL */
 async function fetchYouTube(endpoint, params = {}, retries = 2) {
+  // Try Worker cache first for cacheable endpoints (saves quota)
+  const cacheableEndpoints = ["videos", "search", "channels", "playlistItems"];
+  if (cacheableEndpoints.includes(endpoint)) {
+    try {
+      const cacheKey = API_KEYS[keyIndex % API_KEYS.length];
+      const cacheRes = await fetch(HUB_WORKER_URL + "/cache", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-ViewTube-Secret": HUB_SECRET },
+        body: JSON.stringify({ endpoint, params, apiKey: cacheKey })
+      });
+      if (cacheRes.ok) {
+        const cacheResult = await cacheRes.json();
+        if (cacheResult.data && !cacheResult.data.error) {
+          if (!cacheResult.cached) keyIndex = (keyIndex + 1) % API_KEYS.length;
+          return cacheResult.data;
+        }
+      }
+    } catch(e) {}
+  }
+  // Direct YouTube API fetch fallback
   const key = API_KEYS[keyIndex];
   keyIndex = (keyIndex + 1) % API_KEYS.length;
   const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
@@ -904,7 +924,7 @@ async function fetchYouTube(endpoint, params = {}, retries = 2) {
   } catch (err) {
     clearTimeout(timeout);
     if (retries > 0) return fetchYouTube(endpoint, params, retries - 1);
-    return { items: [] };
+    throw err;
   }
 }
 
@@ -985,6 +1005,31 @@ function saveToHistory(video) {
   if (historyList.length > 500) historyList = historyList.slice(0, 500);
   localStorage.setItem("historyList", JSON.stringify(historyList));
   updateTasteProfile(video);
+  // Sync to Worker KV (debounced)
+  clearTimeout(window._historySyncTimer);
+  window._historySyncTimer = setTimeout(() => {
+    fetch(HUB_WORKER_URL + "/history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-ViewTube-Secret": HUB_SECRET },
+      body: JSON.stringify({ history: historyList.slice(0, 100) })
+    }).catch(() => {});
+  }, 30000);
+}
+
+async function _restoreHistoryFromWorker() {
+  try {
+    const res = await fetch(HUB_WORKER_URL + "/history", { headers: { "X-ViewTube-Secret": HUB_SECRET } });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.history || !data.history.length) return;
+    const merged = new Map();
+    [...data.history, ...historyList].forEach(item => {
+      const id = item.id?.videoId || item.id;
+      if (id) merged.set(id, item);
+    });
+    historyList = [...merged.values()].sort((a,b) => (b.watchedAt||0)-(a.watchedAt||0)).slice(0,500);
+    localStorage.setItem("historyList", JSON.stringify(historyList));
+  } catch(e) {}
 }
 
 function recordWatchDuration(videoId, watchedSecs, totalSecs) {
@@ -1654,6 +1699,14 @@ async function loadVideoInfoPanel(videoId, snippet) {
   panel.style.display = "block";
   sugFeed.innerHTML = "";
   // Don't force scroll to top — let user stay at their position
+  // Clear old comments and chapters
+  const oldComments = document.getElementById("vipComments");
+  if (oldComments) oldComments.remove();
+  const oldChapters = document.getElementById("vipChapters");
+  if (oldChapters) oldChapters.remove();
+
+  // Load comments in background
+  _loadComments(videoId);
 
   // Fill from snippet immediately (fast)
   const title = snippet.title || "";
@@ -1682,6 +1735,21 @@ async function loadVideoInfoPanel(videoId, snippet) {
     const ago = timeAgo(v.snippet?.publishedAt || publishedAt);
     document.getElementById("vipStats").textContent = [views && views + " Views", likes && likes + " Likes", ago].filter(Boolean).join("  ·  ");
     document.getElementById("vipLikeCount").textContent = likes || "";
+    // Store raw like count
+    document.getElementById("vipLikeBtn").dataset.rawCount = stats.likeCount || "0";
+
+    // Parse chapter markers from description
+    const desc = v.snippet?.description || "";
+    const chapterMatches = [...desc.matchAll(/(?:^|\n)(?:(\d+):)?(\d+):(\d+)\s+(.+)/gm)];
+    if (chapterMatches.length >= 2) {
+      const chapters = chapterMatches.map(m => {
+        const h = parseInt(m[1]||0), min = parseInt(m[2]), s = parseInt(m[3]);
+        const time = h*3600 + min*60 + s;
+        const title = m[4].trim();
+        return { time, title };
+      }).filter(c => c.time >= 0 && c.title);
+      if (chapters.length >= 2) _renderChapters(chapters);
+    }
     // Store raw count for accurate incrementing
     document.getElementById("vipLikeBtn").dataset.rawCount = stats.likeCount || "0";
   }
@@ -2119,6 +2187,32 @@ function formatViews(n) {
 // Signals: #shorts in title/description, or video duration ≤ 61s (from contentDetails)
 // Cache of confirmed shorts — keyed by videoId, value is boolean
 const _shortsCache = {};
+const _preloadedShorts = []; // pre-fetched shorts ready to play
+let _preloadIndex = 0;
+
+async function _preloadNextShorts(currentIndex, allShorts) {
+  // Pre-fetch the next 3 shorts in background
+  const toPreload = allShorts.slice(currentIndex + 1, currentIndex + 4);
+  for (const short of toPreload) {
+    const id = short.id?.videoId || short.id;
+    if (id && !_preloadedShorts.find(s => (s.id?.videoId || s.id) === id)) {
+      // Pre-check if it's actually a short and cache the result
+      if (_shortsCache[id] === undefined) {
+        try {
+          const details = await fetchContentDetails([id]);
+          const cd = details[id];
+          if (cd) {
+            const secs = parseDuration(cd.duration);
+            _shortsCache[id] = secs !== null && secs > 0 && secs <= 180;
+          }
+        } catch(e) {}
+      }
+      _preloadedShorts.push(short);
+    }
+  }
+  // Keep only last 10 preloaded
+  if (_preloadedShorts.length > 10) _preloadedShorts.splice(0, _preloadedShorts.length - 10);
+}
 
 // Parse ISO 8601 duration string to total seconds
 // e.g. "PT58S" → 58, "PT1M2S" → 62, "PT3M" → 180
@@ -2299,6 +2393,16 @@ function appendFeed(items) {
     const card = document.createElement("div");
     card.className = "video-card parallax focusable";
     card.dataset.videoid = videoId;
+    if (snippet.channelId) card.dataset.channelid = snippet.channelId;
+    // Apply live badge if channel is currently live
+    if (_liveChannels && _liveChannels.has(snippet.channelId)) {
+      const badge = document.createElement("div");
+      badge.className = "live-badge";
+      badge.textContent = "🔴 LIVE";
+      badge.style.cssText = "position:absolute;top:6px;left:6px;background:#ff0000;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;z-index:10;";
+      card.style.position = "relative";
+      card.appendChild(badge);
+    }
     const thumb = snippet.thumbnails?.medium?.url || snippet.thumbnails?.high?.url || "";
     const views = formatViews(stats.viewCount);
     const ago = timeAgo(snippet.publishedAt);
@@ -2387,6 +2491,16 @@ homeTab.addEventListener("click", async () => {
           const card = document.createElement("div");
           card.className = "video-card parallax focusable";
           card.dataset.videoid = videoId;
+    if (snippet.channelId) card.dataset.channelid = snippet.channelId;
+    // Apply live badge if channel is currently live
+    if (_liveChannels && _liveChannels.has(snippet.channelId)) {
+      const badge = document.createElement("div");
+      badge.className = "live-badge";
+      badge.textContent = "🔴 LIVE";
+      badge.style.cssText = "position:absolute;top:6px;left:6px;background:#ff0000;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;z-index:10;";
+      card.style.position = "relative";
+      card.appendChild(badge);
+    }
           card.dataset.hubvideo = "1";
           card.style.border = "1px solid rgba(255,68,68,0.7)";
           card.style.boxShadow = "0 0 14px rgba(255,68,68,0.35)";
@@ -3245,7 +3359,27 @@ function fetchSuggestions(q) {
     const cb = "ytSuggest_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
     const script = document.createElement("script");
     const timer = setTimeout(() => { cleanup(); resolve([]); }, 4000);
-    function cleanup() { try { delete window[cb]; } catch(e) {} script.remove(); clearTimeout(timer); }
+    function fetchSuggestions(q) {
+  if (!q || q.length < 2) return Promise.resolve([]);
+  // Route through Worker cache (no quota cost)
+  return fetch(HUB_WORKER_URL + "/suggest?q=" + encodeURIComponent(q), {
+    headers: { "X-ViewTube-Secret": HUB_SECRET }
+  }).then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (d && d.suggestions && d.suggestions.length) return d.suggestions;
+      // Fallback: JSONP direct
+      return new Promise((resolve) => {
+        const cb = "_ytSug" + Date.now();
+        const script = document.createElement("script");
+        const timer = setTimeout(() => { cleanup(); resolve([]); }, 3000);
+        const cleanup = () => { clearTimeout(timer); delete window[cb]; script.remove(); };
+        window[cb] = (data) => { cleanup(); resolve(((data && data[1]) || []).map(s => s[0]).slice(0, 10)); };
+        script.onerror = () => { cleanup(); resolve([]); };
+        script.src = `https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&q=${encodeURIComponent(q)}&callback=${cb}`;
+        document.head.appendChild(script);
+      });
+    }).catch(() => Promise.resolve([]));
+}
     window[cb] = (data) => { cleanup(); resolve(((data && data[1]) || []).map(s => s[0]).slice(0, 10)); };
     script.onerror = () => { cleanup(); resolve([]); };
     script.src = `https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&q=${encodeURIComponent(q)}&callback=${cb}`;
@@ -4162,6 +4296,16 @@ async function _injectHubVideos(hubVideos) {
       const card = document.createElement("div");
       card.className = "video-card parallax focusable";
       card.dataset.videoid = videoId;
+    if (snippet.channelId) card.dataset.channelid = snippet.channelId;
+    // Apply live badge if channel is currently live
+    if (_liveChannels && _liveChannels.has(snippet.channelId)) {
+      const badge = document.createElement("div");
+      badge.className = "live-badge";
+      badge.textContent = "🔴 LIVE";
+      badge.style.cssText = "position:absolute;top:6px;left:6px;background:#ff0000;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;z-index:10;";
+      card.style.position = "relative";
+      card.appendChild(badge);
+    }
       card.style.border = "1px solid rgba(255,68,68,0.7)";
       card.style.boxShadow = "0 0 14px rgba(255,68,68,0.35)";
       const thumb = snippet.thumbnails?.medium?.url || "";
@@ -4238,6 +4382,113 @@ function showAgeRestrictedOverlay(videoId) {
   showHUD("Age-restricted — open on YouTube");
 }
 
+
+/* ── Live stream detection ── */
+let _liveChannels = new Set();
+let _liveCheckTimer = null;
+
+async function _checkLiveStreams() {
+  try {
+    const key = API_KEYS[keyIndex % API_KEYS.length];
+    const res = await fetch(HUB_WORKER_URL + "/live?key=" + key, {
+      headers: { "X-ViewTube-Secret": HUB_SECRET }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.liveChannels) return;
+    _liveChannels = new Set(data.liveChannels.map(l => l.channelId));
+    // Update any visible cards with LIVE badge
+    document.querySelectorAll(".video-card").forEach(card => {
+      const channelId = card.dataset.channelid;
+      if (!channelId) return;
+      const existing = card.querySelector(".live-badge");
+      if (_liveChannels.has(channelId)) {
+        if (!existing) {
+          const badge = document.createElement("div");
+          badge.className = "live-badge";
+          badge.textContent = "🔴 LIVE";
+          badge.style.cssText = "position:absolute;top:6px;left:6px;background:#ff0000;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;z-index:10;";
+          card.style.position = "relative";
+          card.appendChild(badge);
+        }
+      } else if (existing) existing.remove();
+    });
+    // Show live video notification if any
+    if (data.liveChannels.length > 0 && !data.cached) {
+      data.liveChannels.forEach(live => {
+        if (!_pollKnownIds?.has("live:" + live.videoId)) {
+          _pollKnownIds?.add("live:" + live.videoId);
+          showHUD("🔴 " + live.channelTitle + " is LIVE now!");
+        }
+      });
+    }
+  } catch(e) {}
+}
+
+
+/* ── Chapter markers ── */
+function _renderChapters(chapters) {
+  let el = document.getElementById("vipChapters");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "vipChapters";
+    el.style.cssText = "margin:10px 0;padding:8px 0;border-top:1px solid rgba(255,255,255,0.08);";
+    const panel = document.getElementById("videoInfoPanel");
+    const stats = document.getElementById("vipStats");
+    if (panel && stats) stats.parentNode.insertBefore(el, stats.nextSibling);
+  }
+  el.innerHTML = '<div style="font-size:10px;opacity:0.5;margin-bottom:6px;letter-spacing:0.05em;">CHAPTERS</div>' +
+    chapters.map(c => {
+      const h = Math.floor(c.time/3600), m = Math.floor((c.time%3600)/60), s = c.time%60;
+      const ts = h ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${m}:${String(s).padStart(2,'0')}`;
+      return `<div class="chapter-item focusable" tabindex="0" data-time="${c.time}" style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:8px;cursor:pointer;touch-action:manipulation;font-size:12px;">
+        <span style="color:#3cf2ff;font-family:monospace;font-size:11px;min-width:38px;">${ts}</span>
+        <span style="opacity:0.85;">${c.title}</span>
+      </div>`;
+    }).join('');
+  // Wire chapter clicks to seek player
+  el.querySelectorAll(".chapter-item").forEach(item => {
+    item.onclick = () => {
+      const time = parseInt(item.dataset.time);
+      if (ytPlayer && ytPlayer.seekTo) { ytPlayer.seekTo(time, true); ytPlayer.playVideo(); showHUD("▶ " + item.querySelector("span:last-child").textContent); }
+    };
+  });
+}
+
+
+/* ── Comments ── */
+async function _loadComments(videoId) {
+  let el = document.getElementById("vipComments");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "vipComments";
+    el.style.cssText = "margin:12px 0;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);";
+    const panel = document.getElementById("videoInfoPanel");
+    const sugFeed = document.getElementById("suggestedFeed");
+    if (panel && sugFeed) panel.insertBefore(el, sugFeed);
+  }
+  el.innerHTML = '<div style="font-size:10px;opacity:0.5;margin-bottom:8px;letter-spacing:0.05em;">TOP COMMENTS</div><div style="opacity:0.5;font-size:12px;">Loading comments…</div>';
+
+  try {
+    const data = await fetchYouTube("commentThreads", {
+      part: "snippet", videoId, maxResults: 10, order: "relevance", _: Date.now()
+    });
+    const items = data.items || [];
+    if (!items.length) { el.innerHTML = ""; return; }
+    el.innerHTML = '<div style="font-size:10px;opacity:0.5;margin-bottom:8px;letter-spacing:0.05em;">TOP COMMENTS</div>' +
+      items.map(item => {
+        const c = item.snippet.topLevelComment.snippet;
+        const likes = c.likeCount > 0 ? ` · 👍 ${formatViews(c.likeCount)}` : "";
+        return `<div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.04);border-radius:10px;">
+          <div style="font-size:11px;font-weight:600;opacity:0.8;margin-bottom:3px;">${c.authorDisplayName}${likes}</div>
+          <div style="font-size:12px;line-height:1.4;opacity:0.9;">${(c.textDisplay||"").replace(/<[^>]+>/g,"").slice(0,200)}</div>
+        </div>`;
+      }).join('');
+  } catch(e) {
+    el.innerHTML = "";
+  }
+}
+
 (async function init() {
   // Safety: always dismiss boot splash even if init crashes
   const splashTimeout = setTimeout(() => {
@@ -4310,6 +4561,9 @@ function showAgeRestrictedOverlay(videoId) {
   const tkn = await getValidToken();
   if (tkn) { const p = getTasteProfile(); if (Date.now() - (p.syncedAt||0) > 7200000) { silentSync(tkn).then(()=>showHUD("Feed updated ✦")).catch(()=>{}); } }
 
+  // Restore watch history from Worker KV (syncs across devices)
+  _restoreHistoryFromWorker().catch(() => {});
+
   // Start background polling for new content
   // Reset taste check timer so all sources run on first poll
   localStorage.removeItem("_pollLastTasteCheck");
@@ -4325,6 +4579,10 @@ function showAgeRestrictedOverlay(videoId) {
   } catch(e) {}
 
   _startPolling();
+
+  // Check for live streams every 5 minutes
+  _checkLiveStreams();
+  setInterval(() => _checkLiveStreams(), 5 * 60 * 1000);
 
   // Proactive token refresh every 55 minutes — keeps session alive indefinitely
   // Access tokens expire in 60 min; this refreshes before they expire
