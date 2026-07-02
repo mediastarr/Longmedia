@@ -4311,6 +4311,10 @@ function showAgeRestrictedOverlay(videoId) {
   if (tkn) { const p = getTasteProfile(); if (Date.now() - (p.syncedAt||0) > 7200000) { silentSync(tkn).then(()=>showHUD("Feed updated ✦")).catch(()=>{}); } }
 
   // Start background polling for new content
+  // Reset taste check timer so sources 2+3 run on first poll after restart
+  localStorage.removeItem("_pollLastTasteCheck");
+  // Reset _pollLastCheck to 24h ago so we catch up on missed videos
+  _pollLastCheck = null;
   _startPolling();
 
   // Proactive token refresh every 55 minutes — keeps session alive indefinitely
