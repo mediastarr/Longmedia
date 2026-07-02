@@ -2778,6 +2778,8 @@ function playShort(index) {
     updateCounter();
     updateHeart();
     if (index >= shortsItems.length - 6 && !shortsLoadingMore) loadMoreShorts();
+    // Pre-cache next 3 shorts duration checks
+    _preloadNextShorts(index, shortsItems).catch(() => {});
   }
   let shortsLoadingMore=false;
   async function loadMoreShorts() {
@@ -3355,14 +3357,8 @@ async function loadChannelPage(channelId) {
 /* Suggestions now use YouTube's own free suggest endpoint (zero API quota)
    — the old version fired a 100-unit search call on EVERY keystroke */
 function fetchSuggestions(q) {
-  return new Promise(resolve => {
-    if (!q.trim()) return resolve([]);
-    const cb = "ytSuggest_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
-    const script = document.createElement("script");
-    const timer = setTimeout(() => { cleanup(); resolve([]); }, 4000);
-    function fetchSuggestions(q) {
   if (!q || q.length < 2) return Promise.resolve([]);
-  // Route through Worker cache (no quota cost)
+  // Route through Worker (cached 5 min, no quota cost)
   return fetch(HUB_WORKER_URL + "/suggest?q=" + encodeURIComponent(q), {
     headers: { "X-ViewTube-Secret": HUB_SECRET }
   }).then(r => r.ok ? r.json() : null)
@@ -3373,19 +3369,13 @@ function fetchSuggestions(q) {
         const cb = "_ytSug" + Date.now();
         const script = document.createElement("script");
         const timer = setTimeout(() => { cleanup(); resolve([]); }, 3000);
-        const cleanup = () => { clearTimeout(timer); delete window[cb]; script.remove(); };
-        window[cb] = (data) => { cleanup(); resolve(((data && data[1]) || []).map(s => s[0]).slice(0, 10)); };
+        const cleanup = () => { clearTimeout(timer); delete window[cb]; if (script.parentNode) script.remove(); };
+        window[cb] = (data) => { cleanup(); resolve(((data && data[1]) || []).map(s => s[0]).slice(0, 8)); };
         script.onerror = () => { cleanup(); resolve([]); };
-        script.src = `https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&q=${encodeURIComponent(q)}&callback=${cb}`;
+        script.src = "https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&q=" + encodeURIComponent(q) + "&callback=" + cb;
         document.head.appendChild(script);
       });
     }).catch(() => Promise.resolve([]));
-}
-    window[cb] = (data) => { cleanup(); resolve(((data && data[1]) || []).map(s => s[0]).slice(0, 10)); };
-    script.onerror = () => { cleanup(); resolve([]); };
-    script.src = `https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&q=${encodeURIComponent(q)}&callback=${cb}`;
-    document.head.appendChild(script);
-  });
 }
 
 function showSuggestions(list) {
@@ -4334,14 +4324,14 @@ function _startPolling() {
     await _pollCheckNewContent();
     // Then repeat every 2-6 minutes (randomized)
     function scheduleNext() {
-      const delay = (2 + Math.floor(Math.random() * 4)) * 60 * 1000; // 2-6 min
+      const delay = (1 + Math.floor(Math.random() * 2)) * 60 * 1000; // 1-3 min
       _pollTimer = setTimeout(async () => {
         await _pollCheckNewContent();
         scheduleNext();
       }, delay);
     }
     scheduleNext();
-  }, 30 * 1000); // first poll after 30 seconds
+  }, 15 * 1000); // first poll after 15 seconds
 }
 
 
@@ -4573,16 +4563,8 @@ async function _loadComments(videoId) {
   localStorage.removeItem("_pollLastTasteCheck");
   _pollLastCheck = null;
 
-  // Seed hubSeenIds from watch history so already-watched videos never show as new
-  try {
-    const watchedIds = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
-    // Add all videos from history list to seen set
-    historyList.forEach(item => {
-      const id = item.id?.videoId || item.id;
-      if (id) watchedIds.add(id);
-    });
-    localStorage.setItem("hubSeenIds", JSON.stringify([...watchedIds].slice(0, 1000)));
-  } catch(e) {}
+  // hubSeenIds only tracks videos explicitly watched from red highlighted cards
+  // Don't seed from full history — that blocks subscription notifications
 
   _startPolling();
 
