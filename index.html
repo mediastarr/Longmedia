@@ -4188,16 +4188,16 @@ function _startPolling() {
   // Initial poll after 2 minutes (let app settle first)
   setTimeout(async () => {
     await _pollCheckNewContent();
-    // Then repeat every 5-15 minutes (randomized)
+    // Then repeat every 2-6 minutes (randomized)
     function scheduleNext() {
-      const delay = (5 + Math.floor(Math.random() * 10)) * 60 * 1000; // 5-15 min
+      const delay = (2 + Math.floor(Math.random() * 4)) * 60 * 1000; // 2-6 min
       _pollTimer = setTimeout(async () => {
         await _pollCheckNewContent();
         scheduleNext();
       }, delay);
     }
     scheduleNext();
-  }, 2 * 60 * 1000);
+  }, 30 * 1000); // first poll after 30 seconds
 }
 
 
@@ -4311,10 +4311,19 @@ function showAgeRestrictedOverlay(videoId) {
   if (tkn) { const p = getTasteProfile(); if (Date.now() - (p.syncedAt||0) > 7200000) { silentSync(tkn).then(()=>showHUD("Feed updated ✦")).catch(()=>{}); } }
 
   // Start background polling for new content
-  // Reset taste check timer so sources 2+3 run on first poll after restart
+  // Reset taste check timer so all sources run on first poll
   localStorage.removeItem("_pollLastTasteCheck");
-  // Reset _pollLastCheck to 24h ago so we catch up on missed videos
   _pollLastCheck = null;
+
+  // Clear hubSeenIds if older than 6 hours — prevents over-filtering
+  try {
+    const seenClearedAt = parseInt(localStorage.getItem("hubSeenClearedAt") || "0");
+    if (Date.now() - seenClearedAt > 6 * 3600000) {
+      localStorage.removeItem("hubSeenIds");
+      localStorage.setItem("hubSeenClearedAt", String(Date.now()));
+    }
+  } catch(e) {}
+
   _startPolling();
 
   // Proactive token refresh every 55 minutes — keeps session alive indefinitely
