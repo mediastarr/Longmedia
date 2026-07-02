@@ -4269,11 +4269,13 @@ async function _pollCheckNewContent() {
         const chResults = await Promise.allSettled(topCh.map(ch =>
           fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 2, publishedAfter: since6h, _: Date.now() })
         ));
+        const seenIds3 = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
+        if (!window._src3SessionIds) window._src3SessionIds = new Set();
         chResults.forEach(r => {
           if (r.status === "fulfilled") (r.value.items || []).forEach(item => {
             const id = item.id?.videoId;
-            if (id && !_pollKnownIds.has(id)) {
-              _pollKnownIds.add(id);
+            if (id && !seenIds3.has(id) && !window._src3SessionIds.has(id)) {
+              window._src3SessionIds.add(id);
               allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "watched" });
             }
           });
@@ -4287,10 +4289,12 @@ async function _pollCheckNewContent() {
         const q = topBI.length ? topBI[0] : topKW.slice(0, 2).join(" ");
         try {
           const kwRes = await fetchYouTube("search", { part: "snippet", type: "video", q, order: "date", maxResults: 4, publishedAfter: since6h, _: Date.now() });
+          const seenIds4 = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
+          if (!window._src4SessionIds) window._src4SessionIds = new Set();
           (kwRes.items || []).forEach(item => {
             const id = item.id?.videoId;
-            if (id && !_pollKnownIds.has(id)) {
-              _pollKnownIds.add(id);
+            if (id && !seenIds4.has(id) && !window._src4SessionIds.has(id)) {
+              window._src4SessionIds.add(id);
               allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "topic" });
             }
           });
