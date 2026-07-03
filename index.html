@@ -4243,11 +4243,15 @@ async function _pollCheckNewContent() {
             fetchYouTube("search", { part: "snippet", channelId: cid, type: "video", order: "date", maxResults: 3, publishedAfter: new Date(Date.now() - 86400000).toISOString(), _: Date.now() })
           )
         );
+        // Use session set so same video isn't shown twice in same app session
+        // but DOES show again next time app opens
+        if (!window._src2SessionIds) window._src2SessionIds = new Set();
+        const src2Seen = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
         subResults.forEach(r => {
           if (r.status === "fulfilled") (r.value.items || []).forEach(item => {
             const id = item.id?.videoId;
-            if (id && !_pollKnownIds.has(id)) {
-              _pollKnownIds.add(id);
+            if (id && !src2Seen.has(id) && !window._src2SessionIds.has(id)) {
+              window._src2SessionIds.add(id);
               allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "subscription" });
             }
           });
