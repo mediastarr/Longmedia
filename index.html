@@ -4369,8 +4369,9 @@ async function _pollCheckNewContent() {
         (data.videos || []).forEach(v => {
           if (!_pollKnownIds.has(v.videoId)) {
             _pollKnownIds.add(v.videoId);
-            // Don't notify for live streams — they repeat endlessly
-            if (v.title && v.title.toLowerCase().includes("broadcast") || v.title && v.title.toLowerCase().includes("live")) return;
+            // Don't notify for live streams or broadcasts
+            const t = (v.title || "").toLowerCase();
+            if (t.includes("broadcast") || t.includes("| live") || t.includes("| powered by")) return;
             allNew.push({ ...v, source: "subscription" });
           }
         });
@@ -4392,7 +4393,7 @@ async function _pollCheckNewContent() {
       if (subChannelIds.length) {
         const subResults = await Promise.allSettled(
           subChannelIds.map(cid =>
-            fetchYouTube("search", { part: "snippet", channelId: cid, type: "video", order: "date", maxResults: 3, publishedAfter: new Date(Date.now() - 86400000).toISOString(), _: Date.now() })
+            fetchYouTube("search", { part: "snippet", channelId: cid, type: "video", order: "date", maxResults: 3, publishedAfter: new Date(Date.now() - 86400000).toISOString(), relevanceLanguage: "en", regionCode: "US", _: Date.now() })
           )
         );
         // Use session set so same video isn't shown twice in same app session
