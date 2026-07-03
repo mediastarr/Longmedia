@@ -4271,7 +4271,7 @@ async function _pollCheckNewContent() {
       const topCh = getTopChannels(3);
       if (topCh.length) {
         const chResults = await Promise.allSettled(topCh.map(ch =>
-          fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 2, publishedAfter: since6h, _: Date.now() })
+          fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 2, publishedAfter: since6h, relevanceLanguage: "en", regionCode: "US", _: Date.now() })
         ));
         const seenIds3 = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
         if (!window._src3SessionIds) window._src3SessionIds = new Set();
@@ -4295,7 +4295,7 @@ async function _pollCheckNewContent() {
       if (src4Query) {
         const q = src4Query;
         try {
-          const kwRes = await fetchYouTube("search", { part: "snippet", type: "video", q, order: "date", maxResults: 4, publishedAfter: since6h, _: Date.now() });
+          const kwRes = await fetchYouTube("search", { part: "snippet", type: "video", q, order: "date", maxResults: 4, publishedAfter: since6h, relevanceLanguage: "en", regionCode: "US", _: Date.now() });
           const seenIds4 = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
           if (!window._src4SessionIds) window._src4SessionIds = new Set();
           (kwRes.items || []).forEach(item => {
@@ -4639,8 +4639,15 @@ async function _loadComments(videoId) {
   localStorage.removeItem("_pollLastTasteCheck");
   _pollLastCheck = null;
 
-  // hubSeenIds only tracks videos explicitly watched from red highlighted cards
-  // Don't seed from full history — that blocks subscription notifications
+  // Seed hubSeenIds from watch history so already-watched videos never show as new
+  try {
+    const seenHub = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
+    historyList.forEach(item => {
+      const id = item.id?.videoId || item.id;
+      if (id) seenHub.add(id);
+    });
+    localStorage.setItem("hubSeenIds", JSON.stringify([...seenHub].slice(-1000)));
+  } catch(e) {}
 
   // Reset poll state on every app open so fresh videos always get through
   _pollKnownIds = null;
