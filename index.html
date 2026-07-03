@@ -4220,7 +4220,12 @@ async function _pollCheckNewContent() {
         const data = await res.json();
         _pollLastCheck = data.serverTime || Date.now();
         (data.videos || []).forEach(v => {
-          if (!_pollKnownIds.has(v.videoId)) { _pollKnownIds.add(v.videoId); allNew.push({ ...v, source: "subscription" }); }
+          if (!_pollKnownIds.has(v.videoId)) {
+            _pollKnownIds.add(v.videoId);
+            // Don't notify for live streams — they repeat endlessly
+            if (v.title && v.title.toLowerCase().includes("broadcast") || v.title && v.title.toLowerCase().includes("live")) return;
+            allNew.push({ ...v, source: "subscription" });
+          }
         });
       }
     } catch(e) {}
@@ -4252,6 +4257,8 @@ async function _pollCheckNewContent() {
             const id = item.id?.videoId;
             if (id && !src2Seen.has(id) && !window._src2SessionIds.has(id)) {
               window._src2SessionIds.add(id);
+              // Skip live streams — they stay "new" indefinitely and spam the feed
+              if (item.snippet?.liveBroadcastContent === "live") return;
               allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "subscription" });
             }
           });
@@ -4280,6 +4287,7 @@ async function _pollCheckNewContent() {
             const id = item.id?.videoId;
             if (id && !seenIds3.has(id) && !window._src3SessionIds.has(id)) {
               window._src3SessionIds.add(id);
+              if (item.snippet?.liveBroadcastContent === "live") return;
               allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "watched" });
             }
           });
@@ -4302,6 +4310,7 @@ async function _pollCheckNewContent() {
             const id = item.id?.videoId;
             if (id && !seenIds4.has(id) && !window._src4SessionIds.has(id)) {
               window._src4SessionIds.add(id);
+              if (item.snippet?.liveBroadcastContent === "live") return;
               allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "topic" });
             }
           });
@@ -4338,11 +4347,17 @@ async function _pollCheckNewContent() {
 async function _injectHubVideos(hubVideos) {
   if (!hubVideos || !hubVideos.length) return;
   try {
-    // Filter out already-watched videos before injecting
+    // Filter out already-watched videos and live streams before injecting
     try {
       const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
       const seenSet = new Set(seenHub);
-      hubVideos = hubVideos.filter(v => !seenSet.has(v.videoId));
+      hubVideos = hubVideos.filter(v => {
+        if (seenSet.has(v.videoId)) return false;
+        // Filter out live stream titles
+        const title = (v.title || "").toLowerCase();
+        if (title.includes("broadcast") || title.includes("| powered by liv") || title.includes("| live")) return false;
+        return true;
+      });
     } catch(e) {}
     if (!hubVideos.length) return;
 
