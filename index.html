@@ -434,8 +434,8 @@ body.fullscreen-active .exit-full-btn {
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
 body.fullscreen-active .exit-full-btn {
-  display: block !important;
-  pointer-events: auto !important;
+  display: none !important;
+  pointer-events: none !important;
 }
 .exit-full-btn:hover { box-shadow: 0 0 18px rgba(60,242,255,0.9), 0 0 30px rgba(60,242,255,0.5); transform: scale(1.08); }
 body#playerControls {
@@ -1593,6 +1593,12 @@ function playCinemaZoomIntro() { playerSection.classList.remove("zoom-intro"); v
 
 fullBtn.addEventListener("click", () => {
   if (playerSection.style.display === "none") return;
+  // If already fullscreen — exit back to medium player
+  if (document.body.classList.contains("fullscreen-active")) {
+    exitFullBtn.click();
+    return;
+  }
+  // Enter fullscreen
   playerSection.style.display = "block";
   miniActive = false;
   playerSection.classList.remove("player-mini");
