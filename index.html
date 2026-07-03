@@ -1041,17 +1041,50 @@ function recordWatchDuration(videoId, watchedSecs, totalSecs) {
   try {
     const profile = getTasteProfile();
     const pct = totalSecs > 0 ? watchedSecs / totalSecs : 0;
+
+    // ── Granular completion buckets (YouTube-style) ──
+    // >95% = loved it, 80-95% = liked it, 40-80% = interested, 10-40% = casual, <10% = skip
+    let weight, signal;
+    if (pct >= 0.95)      { weight = 5; signal = "loved"; }
+    else if (pct >= 0.80) { weight = 3; signal = "liked"; }
+    else if (pct >= 0.40) { weight = 2; signal = "interested"; }
+    else if (pct >= 0.10) { weight = 1; signal = "casual"; }
+    else                  { weight = -2; signal = "skip"; }
+
+    // Store per-video watch signal for future ranking
+    profile.watchSignals = profile.watchSignals || {};
+    profile.watchSignals[videoId] = { pct: Math.round(pct*100), signal, secs: watchedSecs, ts: Date.now() };
+    // Keep only last 100 signals
+    const signals = Object.entries(profile.watchSignals).sort((a,b) => b[1].ts - a[1].ts).slice(0, 100);
+    profile.watchSignals = Object.fromEntries(signals);
+
     const hist = JSON.parse(localStorage.getItem("historyList") || "[]");
     const entry = hist.find(h => (h.id?.videoId || h.id) === videoId);
     if (!entry) return;
     const snippet = entry.snippet || {};
     const channelId = snippet.channelId || "";
     const title = snippet.title || "";
-    let weight = pct >= 0.8 ? 3 : pct >= 0.4 ? 2 : pct >= 0.1 ? 1 : -1;
+    const categoryId = snippet.categoryId || "";
+
+    // ── Channel weight with watch signal ──
     if (channelId) {
-      if (weight < 0) profile.channels[channelId] = Math.max(0, (profile.channels[channelId] || 1) + weight);
-      else profile.channels[channelId] = (profile.channels[channelId] || 0) + weight;
+      profile.channels = profile.channels || {};
+      const ch = profile.channels[channelId] || { weight: 0 };
+      if (weight < 0) ch.weight = Math.max(0, (ch.weight || 0) + weight);
+      else ch.weight = (ch.weight || 0) + weight;
+      // Track skip rate per channel
+      ch.skipCount = (ch.skipCount || 0) + (signal === "skip" ? 1 : 0);
+      ch.totalWatched = (ch.totalWatched || 0) + 1;
+      profile.channels[channelId] = ch;
     }
+
+    // ── Category weight ──
+    if (categoryId && weight > 0) {
+      profile.categories = profile.categories || {};
+      profile.categories[categoryId] = (profile.categories[categoryId] || 0) + weight;
+    }
+
+    // ── Keywords boosted by watch signal ──
     if (weight > 0 && title) {
       const words = title.toLowerCase().replace(/[^a-z0-9 ]/g, "").split(" ").filter(w => w.length > 3);
       words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + weight; });
@@ -1112,49 +1145,93 @@ function updateTasteProfile(video) {
   const channelTitle = snippet.channelTitle || "";
   const categoryId = snippet.categoryId || "";
   const title = snippet.title || "";
+  const description = (snippet.description || "").slice(0, 500); // first 500 chars only
+  const tags = snippet.tags || [];
   const now = Date.now();
 
-  // Channel engagement — track both frequency AND recency
+  // ── Channel engagement — frequency + recency + velocity ──
   if (channelId) {
     profile.channels = profile.channels || {};
     const ch = profile.channels[channelId] || { title: channelTitle, weight: 0, lastWatch: 0, watches: [] };
-    ch.weight++;
+    ch.weight = (ch.weight || 0) + 1;
     ch.title = channelTitle;
     ch.lastWatch = now;
-    ch.watches = [...(ch.watches || []), now].slice(-20); // keep last 20 timestamps
+    ch.watches = [...(ch.watches || []), now].slice(-20);
+    // Velocity bonus: 3+ watches in last 7 days = high interest channel
+    const recentWatches = ch.watches.filter(t => now - t < 604800000).length;
+    if (recentWatches >= 3) ch.weight = (ch.weight || 0) + 2; // velocity boost
     profile.channels[channelId] = ch;
   }
 
-  // Category frequency
+  // ── Category with decay — recent categories weighted more ──
   if (categoryId) {
     profile.categories = profile.categories || {};
     profile.categories[categoryId] = (profile.categories[categoryId] || 0) + 1;
+    // Track category recency separately
+    profile.categoryRecency = profile.categoryRecency || {};
+    profile.categoryRecency[categoryId] = now;
   }
 
-  // Extract meaningful keywords + bigrams from title
-  const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","this","that","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","have","has","he","she","they","do","did","new","vs","ep","ft","official","video","full","2024","2025","2026","part","episode"]);
-  const words = title.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w));
+  // ── Deep keyword extraction: title + description + tags ──
+  const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","this","that","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","have","has","he","she","they","do","did","new","vs","ep","ft","official","video","full","2024","2025","2026","part","episode","watch","like","subscribe","channel","today","best","top","most"]);
+
+  const extractWords = (text) => text.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w));
+
+  const titleWords = extractWords(title);
+  const descWords = extractWords(description).slice(0, 20); // limit desc words
+  const tagWords = tags.slice(0, 10).flatMap(t => extractWords(t));
+
+  // Title words get full weight, desc gets 0.5x, tags get 0.75x
   profile.keywords = profile.keywords || {};
-  words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 1; });
+  titleWords.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 1; });
+  descWords.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 0.5; });
+  tagWords.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 0.75; });
 
-  // Bigrams capture topic phrases ("dragon ball", "solo leveling", etc.)
+  // ── Bigrams from title (topic depth signal) ──
   profile.bigrams = profile.bigrams || {};
-  for (let i = 0; i < words.length - 1; i++) {
-    const bi = words[i] + " " + words[i + 1];
-    profile.bigrams[bi] = (profile.bigrams[bi] || 0) + 1;
+  for (let i = 0; i < titleWords.length - 1; i++) {
+    const bigram = titleWords[i] + " " + titleWords[i+1];
+    profile.bigrams[bigram] = (profile.bigrams[bigram] || 0) + 1;
   }
 
-  // Recent video IDs for collaborative filtering
-  profile.recentVideoIds = [video.id, ...(profile.recentVideoIds || [])].slice(0, 30);
-
-  // Session tracking — what time of day you watch (for freshness timing)
+  // ── Context signals: time of day preference ──
+  profile.timeContext = profile.timeContext || {};
   const hour = new Date().getHours();
-  profile.hourBuckets = profile.hourBuckets || {};
-  const bucket = hour < 6 ? "night" : hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
-  profile.hourBuckets[bucket] = (profile.hourBuckets[bucket] || 0) + 1;
+  const timeSlot = hour < 6 ? "latenight" : hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 21 ? "evening" : "night";
+  profile.timeContext[timeSlot] = profile.timeContext[timeSlot] || {};
+  if (categoryId) profile.timeContext[timeSlot][categoryId] = (profile.timeContext[timeSlot][categoryId] || 0) + 1;
+
+  // ── Content duration preference ──
+  const duration = video.contentDetails?.duration || "";
+  if (duration) {
+    const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (match) {
+      const totalSecs = (parseInt(match[1]||0)*3600) + (parseInt(match[2]||0)*60) + parseInt(match[3]||0);
+      profile.durationPref = profile.durationPref || { short: 0, medium: 0, long: 0 };
+      if (totalSecs < 180) profile.durationPref.short++;
+      else if (totalSecs < 1200) profile.durationPref.medium++;
+      else profile.durationPref.long++;
+    }
+  }
+
+  // ── Recent video IDs to avoid re-showing ──
+  profile.recentVideoIds = profile.recentVideoIds || [];
+  const vid = video.id?.videoId || video.id;
+  if (vid && !profile.recentVideoIds.includes(vid)) {
+    profile.recentVideoIds = [vid, ...profile.recentVideoIds].slice(0, 200);
+  }
+
+  // Cap keyword/bigram sizes to prevent localStorage bloat
+  const capObj = (obj, limit) => {
+    const entries = Object.entries(obj).sort((a,b) => b[1]-a[1]);
+    return Object.fromEntries(entries.slice(0, limit));
+  };
+  profile.keywords = capObj(profile.keywords, 200);
+  profile.bigrams = capObj(profile.bigrams, 100);
 
   localStorage.setItem("tasteProfile", JSON.stringify(profile));
 }
+
 
 function getTasteProfile() { try { return JSON.parse(localStorage.getItem("tasteProfile") || "{}"); } catch(e) { return {}; } }
 
@@ -1242,6 +1319,21 @@ async function fetchPersonalizedFeed() {
   const profile5 = getTasteProfile();
   const watchedChannelIds = new Set(Object.keys(profile5.channels || {}));
   const watchedIds = new Set((getTasteProfile().recentVideoIds || []).slice(0, 50));
+
+  // ── Time-of-day context signal ──
+  const currentHour = new Date().getHours();
+  const timeSlot = currentHour < 6 ? "latenight" : currentHour < 12 ? "morning" : currentHour < 17 ? "afternoon" : currentHour < 21 ? "evening" : "night";
+  const timeContext = profile5.timeContext?.[timeSlot] || {};
+  const timeCat = Object.entries(timeContext).sort((a,b) => b[1]-a[1])[0]?.[0] || null;
+
+  // ── Freshness window — morning = tighter (last 12h), rest = last 24h ──
+  const freshnessMs = currentHour < 12 ? 43200000 : 86400000;
+  const freshnessDate = new Date(Date.now() - freshnessMs).toISOString();
+
+  // ── Duration preference signal ──
+  const durPref = profile5.durationPref || { short: 0, medium: 0, long: 0 };
+  const preferredDuration = durPref.short > durPref.medium && durPref.short > durPref.long ? "short" :
+                            durPref.long > durPref.medium ? "any" : "medium";
   let shownHistory = []; try { shownHistory = JSON.parse(localStorage.getItem("feedShownIds") || "[]"); } catch(e) {}
   const oneDayAgo = Date.now() - 86400000;
   let shownHistoryParsed = []; try { shownHistoryParsed = JSON.parse(localStorage.getItem("feedShownTimed") || "[]"); } catch(e) {}
@@ -1349,6 +1441,61 @@ async function fetchPersonalizedFeed() {
       });
     } catch(e) {}
   }
+
+  // ── Ranking phase: score each video and sort ──
+  const now = Date.now();
+  const watchSignals = profile5.watchSignals || {};
+  const channelWeights = profile5.channels || {};
+
+  feed = feed.map(item => {
+    const snippet = item.snippet || {};
+    const channelId = snippet.channelId || "";
+    const videoId = item.id?.videoId || item.id;
+    const publishedAt = new Date(snippet.publishedAt || 0).getTime();
+    const ageHours = (now - publishedAt) / 3600000;
+
+    let score = 0;
+
+    // 1. Channel affinity score (how much you watch this channel)
+    const chData = channelWeights[channelId] || {};
+    const chWeight = typeof chData === "object" ? (chData.weight || 0) : (chData || 0);
+    score += Math.min(chWeight * 2, 20); // cap at 20
+
+    // 2. Freshness score — newer = higher score, exponential decay
+    const freshnessScore = Math.max(0, 10 - (ageHours / 24) * 3);
+    score += freshnessScore;
+
+    // 3. Keyword match score
+    const titleWords = (snippet.title || "").toLowerCase().split(/\s+/);
+    const kwProfile = profile5.keywords || {};
+    titleWords.forEach(w => { if (kwProfile[w]) score += Math.min(kwProfile[w] * 0.5, 5); });
+
+    // 4. Category match with time-of-day preference
+    const catId = snippet.categoryId || "";
+    if (timeCat && catId === timeCat) score += 5; // time-of-day category boost
+
+    // 5. Discovery bonus — expose to new channels occasionally
+    if (snippet._isDiscovery) score += 3;
+
+    // 6. Skip penalty — if you skip this channel a lot, lower score
+    if (chData.skipCount && chData.totalWatched) {
+      const skipRate = chData.skipCount / chData.totalWatched;
+      if (skipRate > 0.5) score -= 5;
+    }
+
+    item._score = score;
+    return item;
+  });
+
+  // Sort by score descending, then deduplicate
+  feed.sort((a, b) => (b._score || 0) - (a._score || 0));
+  const seenIds = new Set();
+  feed = feed.filter(item => {
+    const id = item.id?.videoId || item.id;
+    if (!id || seenIds.has(id)) return false;
+    seenIds.add(id);
+    return true;
+  });
 
   return feed;
 }
