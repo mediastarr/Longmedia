@@ -1339,7 +1339,7 @@ async function fetchPersonalizedFeed() {
     const discQ = topBId.length ? topBId[0] : topKWd.slice(0,2).join(" ");
     try {
       const since48h = new Date(Date.now() - 172800000).toISOString();
-      const discRes = await fetchYouTube("search", { part: "snippet", type: "video", q: discQ, order: "date", maxResults: 6, publishedAfter: since6h, _: Date.now() });
+      const discRes = await fetchYouTube("search", { part: "snippet", type: "video", q: discQ, order: "date", maxResults: 6, publishedAfter: new Date(Date.now() - 21600000).toISOString(), _: Date.now() });
       (discRes.items || []).forEach(item => {
         const chId = item.snippet?.channelId;
         if (chId && !watchedChannelIds.has(chId)) {
@@ -4611,14 +4611,13 @@ async function _loadComments(videoId) {
       if (dls && !dls.textContent.includes("Logged in")) dls.textContent = "Logged in ✓";
       const pls = document.getElementById("playlistLoginStatus");
       if (pls) pls.textContent = "Logged in ✓";
-      // Reload home feed with personalized content now that we're logged in
-      if (hasEnoughHistory()) {
+      // Only reload home feed if it's still empty (don't interrupt user if already loaded)
+      if (hasEnoughHistory() && feedEl.children.length < 3) {
         showSkeletons(6);
-        const since48h = new Date(Date.now() - 172800000).toISOString();
         const items = await fetchPersonalizedFeed();
         renderFeed(items);
         showHUD("For You ✦");
-        const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, publishedAfter: since6h, _: Date.now() });
+        const seed = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
         nextPageToken = seed.nextPageToken || null;
       }
     }
