@@ -3218,8 +3218,8 @@ async function loadMoreVideos() {
     const seen2 = new Set(); const batch = [];
     const [r1, r2] = await Promise.allSettled([
       topKW.length >= 2
-        ? fetchYouTube("search", { part: "snippet", type: "video", q: topKW.slice(0,3).join(" "), order: "date", maxResults: 10, publishedAfter: since6h, _: Date.now() })
-        : fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 10, publishedAfter: since6h, _: Date.now() }),
+        ? fetchYouTube("search", { part: "snippet", type: "video", q: topKW.slice(0,3).join(" "), order: "date", maxResults: 10, publishedAfter: new Date(Date.now() - 21600000).toISOString(), _: Date.now() })
+        : fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 10, publishedAfter: new Date(Date.now() - 21600000).toISOString(), _: Date.now() }),
       fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 12, _: Date.now() })
     ]);
     [r1, r2].forEach(r => { if (r.status === "fulfilled") (r.value.items||[]).forEach(item => { const id = item.id?.videoId||item.id; if(!id||seen2.has(id)){return;} seen2.add(id); batch.push(item); }); });
@@ -4235,12 +4235,12 @@ async function _pollCheckNewContent() {
       const savedSubIds = JSON.parse(localStorage.getItem("subscribedChannelIds") || "[]");
       const allSubIds = savedSubIds.length ? savedSubIds : Object.keys(getTasteProfile().channels || {});
       const rotateIdx = parseInt(localStorage.getItem("_pollSubRotate") || "0");
-      const subChannelIds = allSubIds.slice(rotateIdx, rotateIdx + 3);
-      localStorage.setItem("_pollSubRotate", String((rotateIdx + 3) % Math.max(allSubIds.length, 1)));
+      const subChannelIds = allSubIds.slice(rotateIdx, rotateIdx + 6);
+      localStorage.setItem("_pollSubRotate", String((rotateIdx + 6) % Math.max(allSubIds.length, 1)));
       if (subChannelIds.length) {
         const subResults = await Promise.allSettled(
           subChannelIds.map(cid =>
-            fetchYouTube("search", { part: "snippet", channelId: cid, type: "video", order: "date", maxResults: 2, publishedAfter: since6h, _: Date.now() })
+            fetchYouTube("search", { part: "snippet", channelId: cid, type: "video", order: "date", maxResults: 3, publishedAfter: new Date(Date.now() - 86400000).toISOString(), _: Date.now() })
           )
         );
         subResults.forEach(r => {
@@ -4285,8 +4285,11 @@ async function _pollCheckNewContent() {
       // ── SOURCE 4: Top keywords/topics ──
       const topKW = getTopKeywords(3);
       const topBI = getTopBigrams(1);
-      if (topKW.length >= 2 || topBI.length) {
-        const q = topBI.length ? topBI[0] : topKW.slice(0, 2).join(" ");
+      // Fallback query if taste profile is empty
+      const fallbackQ = topBI.length ? topBI[0] : topKW.length >= 2 ? topKW.slice(0, 2).join(" ") : null;
+      const src4Query = fallbackQ || "trending news today";
+      if (src4Query) {
+        const q = src4Query;
         try {
           const kwRes = await fetchYouTube("search", { part: "snippet", type: "video", q, order: "date", maxResults: 4, publishedAfter: since6h, _: Date.now() });
           const seenIds4 = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
@@ -4635,7 +4638,11 @@ async function _loadComments(videoId) {
   // Reset poll state on every app open so fresh videos always get through
   _pollKnownIds = null;
   _pollBadgeCount = 0;
-  try { localStorage.removeItem("_pollLastTasteCheck"); } catch(e) {}
+  try {
+    localStorage.removeItem("_pollLastTasteCheck");
+    localStorage.removeItem("_pollLastSubCheck");
+    localStorage.setItem("_pollSubRotate", "0"); // restart rotation from beginning
+  } catch(e) {}
 
   _startPolling();
 
