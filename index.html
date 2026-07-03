@@ -4383,10 +4383,14 @@ async function _injectHubVideos(hubVideos) {
     });
     feedEl.insertBefore(frag, feedEl.firstChild);
     window.scrollTo({ top: 0, behavior: "smooth" });
-    // Save injected cards so they survive tab switching
+    // Mark ALL injected videos as seen so they never show as new again
     try {
       const injectedIds = hubVideos.map(v => v.videoId);
       sessionStorage.setItem("injectedHubIds", JSON.stringify(injectedIds));
+      // Add to hubSeenIds permanently
+      const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
+      const newSeen = [...new Set([...seenHub, ...injectedIds])].slice(-500);
+      localStorage.setItem("hubSeenIds", JSON.stringify(newSeen));
     } catch(e) {}
   } catch(e) {}
 }
