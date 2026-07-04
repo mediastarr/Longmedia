@@ -917,7 +917,7 @@ async function fetchYouTube(endpoint, params = {}, retries = 2) {
       const cacheKey = API_KEYS[keyIndex % API_KEYS.length];
       const cacheRes = await fetch(HUB_WORKER_URL + "/cache", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-ViewTube-Secret": HUB_SECRET },
+        headers: workerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ endpoint, params, apiKey: cacheKey })
       });
       if (cacheRes.ok) {
@@ -1015,7 +1015,7 @@ function saveToHistory(video) {
   window._historySyncTimer = setTimeout(() => {
     fetch(HUB_WORKER_URL + "/history", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-ViewTube-Secret": HUB_SECRET },
+      headers: workerHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ history: historyList.slice(0, 100) })
     }).catch(() => {});
   }, 30000);
@@ -1023,7 +1023,7 @@ function saveToHistory(video) {
 
 async function _restoreHistoryFromWorker() {
   try {
-    const res = await fetch(HUB_WORKER_URL + "/history", { headers: { "X-ViewTube-Secret": HUB_SECRET } });
+    const res = await fetch(HUB_WORKER_URL + "/history", { headers: workerHeaders() });
     if (!res.ok) return;
     const data = await res.json();
     if (!data.history || !data.history.length) return;
@@ -3186,6 +3186,19 @@ const OAUTH_CLIENT_SECRET = "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";
 const HUB_WORKER_URL = "https://viewtube-hub.mediastarr86.workers.dev";
 const HUB_SECRET = "viewtube-hub-secret-2024";
 
+// Multi-user isolation: get stored YouTube channel ID
+function getViewTubeUserId() {
+  return localStorage.getItem("yt_channel_id") || "default";
+}
+
+// Add user ID header to all Worker requests
+function workerHeaders(extra) {
+  return Object.assign({
+    "X-ViewTube-Secret": HUB_SECRET,
+    "X-ViewTube-User": getViewTubeUserId()
+  }, extra || {});
+}
+
 startLoginBtn.addEventListener("click", () => startDeviceLogin("subs"));
 document.getElementById("reloginBtn").addEventListener("click", () => {
   clearTokens();
@@ -3581,7 +3594,7 @@ function fetchSuggestions(q) {
   if (!q || q.length < 2) return Promise.resolve([]);
   // Route through Worker (cached 5 min, no quota cost)
   return fetch(HUB_WORKER_URL + "/suggest?q=" + encodeURIComponent(q), {
-    headers: { "X-ViewTube-Secret": HUB_SECRET }
+    headers: workerHeaders()
   }).then(r => r.ok ? r.json() : null)
     .then(d => {
       if (d && d.suggestions && d.suggestions.length) return d.suggestions;
@@ -4214,7 +4227,7 @@ document.getElementById("syncClearBtn").onclick = async function() {
       if (savedIds.length) localStorage.setItem("subscribedChannelIds", JSON.stringify(savedIds.slice(0, 100)));
       const workerRes = await fetch(HUB_WORKER_URL + "/subscribe", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-ViewTube-Secret": HUB_SECRET },
+        headers: workerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ channelIds: channelIds.slice(0, 100), replaceAll: true })
       });
       const d = await workerRes.json();
@@ -4319,7 +4332,7 @@ syncStartBtn.onclick=async function(){
     if (channelIds.length > 0) {
       const workerRes = await fetch(HUB_WORKER_URL + "/subscribe", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-ViewTube-Secret": HUB_SECRET },
+        headers: workerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ channelIds: channelIds.slice(0, 100) })
       });
       const workerData = await workerRes.json();
@@ -4479,7 +4492,7 @@ async function _pollCheckNewContent() {
     // ── SOURCE 1: Subscriptions via PubSubHubbub Worker (instant, ZERO quota) ──
     // Runs every poll cycle (5-15 min) — free
     try {
-      const res = await fetch(HUB_WORKER_URL + "/poll?since=" + since, { headers: { "X-ViewTube-Secret": HUB_SECRET } });
+      const res = await fetch(HUB_WORKER_URL + "/poll?since=" + since, { headers: workerHeaders() });
       if (res.ok) {
         const data = await res.json();
         _pollLastCheck = data.serverTime || Date.now();
@@ -4757,7 +4770,7 @@ async function _checkLiveStreams() {
   try {
     const key = API_KEYS[keyIndex % API_KEYS.length];
     const res = await fetch(HUB_WORKER_URL + "/live?key=" + key, {
-      headers: { "X-ViewTube-Secret": HUB_SECRET }
+      headers: workerHeaders()
     });
     if (!res.ok) return;
     const data = await res.json();
@@ -4907,6 +4920,16 @@ async function _loadComments(videoId) {
   const ok = await authPromise;
   if (ok) {
     showHUD("Signed in ✓");
+    // Store YouTube channel ID for multi-user Worker isolation
+    try {
+      const tkForId = await getValidToken();
+      if (tkForId && !localStorage.getItem("yt_channel_id")) {
+        const chRes = await fetch("https://www.googleapis.com/youtube/v3/channels?part=id&mine=true", { headers: { Authorization: "Bearer " + tkForId } });
+        const chData = await chRes.json();
+        const channelId = chData.items?.[0]?.id || "";
+        if (channelId) localStorage.setItem("yt_channel_id", channelId);
+      }
+    } catch(e) {}
     const autoTkn = await getValidToken();
     if (autoTkn) {
       // Update login status panels
