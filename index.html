@@ -945,6 +945,7 @@ let shortsSeenIds = new Set();
 let shortsIndex = 0;
 let lastSearchQuery = "";
 let nextPageToken = null;
+let shortsNextPageToken = null;
 let isLoadingMore = false;
 let savedScrollY = 0;
 
@@ -2965,7 +2966,7 @@ function playShort(index) {
     if (shortsLoadingMore) return; shortsLoadingMore=true;
     try {
       const q=SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length]; shortQIdx++;
-      const vt=nextPageToken&&nextPageToken!=="seed"?nextPageToken:undefined;
+      const vt=shortsNextPageToken&&shortsNextPageToken!=="seed"?shortsNextPageToken:undefined;
       const more=await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",maxResults:20,pageToken:vt,_:Date.now()}); // 20 more per scroll batch
       nextPageToken=more.nextPageToken||"seed";
       const fresh=(more.items||[]).filter(v=>v.id&&v.id.videoId&&!shortsSeenIds.has(v.id.videoId));
@@ -3398,15 +3399,18 @@ async function loadMoreVideos() {
     if (!data.nextPageToken) data.nextPageToken = "seed";
   }
   if (currentTab === "trending") {
-    const since48h2 = new Date(Date.now()-172800000).toISOString();
-    const tcat = getTopCategoryId();
+    // Rotate category for each batch to get variety
+    const trendMoreRotate = parseInt(localStorage.getItem("_trendMoreRotate")||"0");
+    const TREND_MORE_CATS = ["0","1","2","10","15","17","20","22","23","24","25","26","27","28"];
+    localStorage.setItem("_trendMoreRotate", String((trendMoreRotate+1)%TREND_MORE_CATS.length));
+    const tcat2 = TREND_MORE_CATS[trendMoreRotate];
     const [tr1, tr2] = await Promise.allSettled([
-      fetchYouTube("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:tcat||undefined,maxResults:10,publishedAfter:since48h2,_:Date.now()}),
-      fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:tcat||undefined,maxResults:12,pageToken:vt,_:Date.now()})
+      fetchYouTubeDirect("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:tcat2,maxResults:10,publishedAfter:new Date(Date.now()-172800000).toISOString(),_:Date.now()}),
+      fetchYouTubeDirect("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:tcat2,maxResults:12,_:Date.now()})
     ]);
     const tseen = new Set(); const tbatch = [];
     [tr1,tr2].forEach(r=>{if(r.status==="fulfilled")(r.value.items||[]).forEach(item=>{const id=item.id?.videoId||item.id;if(!id||tseen.has(id))return;tseen.add(id);tbatch.push(item);});});
-    data = {items:tbatch, nextPageToken:(tr2.status==="fulfilled"&&tr2.value.nextPageToken)||"seed"};
+    data = {items:tbatch, nextPageToken:"seed"};
   }
   if (currentTab === "search") data = await fetchYouTube("search", { part: "snippet", q: lastSearchQuery, type: "video", maxResults: 20, pageToken: vt, _: Date.now() });
   if (currentTab === "channel") data = await fetchYouTube("playlistItems", { part: "snippet", playlistId: channelUploadsId, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
@@ -4599,7 +4603,10 @@ async function _injectHubVideos(hubVideos) {
         return true;
       });
     } catch(e) {}
-    if (!hubVideos.length) return;
+    if (!hubVideos.length) {
+      localStorage.removeItem("hubNewVideos"); // clear stale data
+      return;
+    }
 
     const ids = hubVideos.map(v => v.videoId).join(",");
     const data = await fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() });
