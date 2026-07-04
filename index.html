@@ -1858,7 +1858,8 @@ function createYTPlayer(videoId, startSeconds) {
 }
 
 function setPlayerVideo(videoId, snippet, startSeconds) {
-  savedScrollY = window.scrollY;
+  // savedScrollY already captured in card onclick before scroll-to-top
+  if (!savedScrollY) savedScrollY = window.scrollY;
   currentVideoId = videoId;
   // Reset quality to auto for each new video — onReady will detect best quality
   currentQuality = "auto";
@@ -2674,6 +2675,8 @@ function appendFeed(items) {
     const meta = [views && views + " views", ago].filter(Boolean).join(" · ");
     card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title || ""}</div><div class="video-channel">${snippet.channelTitle || ""}</div><div class="video-meta">${meta}</div></div>`;
     card.onclick = async () => {
+      // Capture scroll position BEFORE hiding UI and scrolling to top
+      savedScrollY = window.scrollY;
       tabsEl.style.display = "none";
       searchTabEl.style.display = "none";
       feedEl.style.display = "none";
@@ -3191,6 +3194,7 @@ historyTab.addEventListener("click", async () => {
       const resumeLabel = resumeT > 5 ? " ▶ "+Math.floor(resumeT/60)+":"+(String(Math.floor(resumeT%60)).padStart(2,"0")) : "";
       card.querySelector(".video-meta").textContent = "Watched "+ago+resumeLabel;
       card.onclick = () => {
+        savedScrollY = window.scrollY;
         setPlayerVideo(h.id, snippet, resumeT);
         showHUD(resumeT > 5 ? "Resuming ▶" : "Playing: "+(snippet.title||""));
       };
@@ -4788,6 +4792,7 @@ async function _injectHubVideos(hubVideos) {
       const ago = timeAgo(snippet.publishedAt);
       card.innerHTML = '<div class="video-thumb"><img src="' + thumb + '" loading="lazy"></div><div class="video-info"><div class="video-title">' + (snippet.title||"") + '</div><div class="video-channel">' + (snippet.channelTitle||"") + '</div><div class="video-meta" style="color:rgba(255,100,100,0.9);">🔴 New · ' + ago + '</div></div>';
       card.onclick = async () => {
+        savedScrollY = window.scrollY;
         tabsEl.style.display = "none";
         searchTabEl.style.display = "none";
         feedEl.style.display = "none";
