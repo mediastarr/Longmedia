@@ -2716,6 +2716,8 @@ homeTab.addEventListener("click", async () => {
     if (allLogged.length) {
       renderFeed(allLogged); showHUD("For You ✦");
       nextPageToken = (popular2.status === "fulfilled" && popular2.value.nextPageToken) || null;
+      // Inject hub videos right after personalized feed renders
+      if (hubVideos.length) { clearTimeout(window._hubInjectTimer); window._hubInjectTimer = setTimeout(() => _injectHubVideos(hubVideos), 400); }
     } else {
       const fallback2 = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
       nextPageToken = fallback2.nextPageToken || null; renderFeed(fallback2.items || []); showHUD("Home");
@@ -2734,6 +2736,8 @@ homeTab.addEventListener("click", async () => {
     if (allItems.length) {
       renderFeed(allItems); showHUD("Home");
       nextPageToken = (popular.status === "fulfilled" && popular.value.nextPageToken) || null;
+      // Inject hub videos right after feed renders
+      if (hubVideos.length) { clearTimeout(window._hubInjectTimer); window._hubInjectTimer = setTimeout(() => _injectHubVideos(hubVideos), 400); }
     } else {
       const fallback = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
       nextPageToken = fallback.nextPageToken || null; renderFeed(fallback.items || []); showHUD("Home");
@@ -2742,7 +2746,9 @@ homeTab.addEventListener("click", async () => {
 
   // Inject hub new videos at TOP after feed finishes loading
   if (hubVideos.length) {
-    setTimeout(() => _injectHubVideos(hubVideos), 800);
+    // Use longer delay to ensure feed is fully rendered
+    // Personalized feed can take 2-3 seconds on slow connections
+    setTimeout(() => _injectHubVideos(hubVideos), 1500);
   }
 });
 
