@@ -4774,7 +4774,7 @@ async function _injectHubVideos(hubVideos) {
 }
 
 function _startPolling() {
-  // Initial poll after 2 minutes (let app settle first)
+  // Initial poll after 15 seconds
   setTimeout(async () => {
     await _pollCheckNewContent();
     // Then repeat every 2-6 minutes (randomized)
@@ -5148,6 +5148,10 @@ async function getSearchCTR(query) {
   try {
     sessionStorage.removeItem("injectedHubIds");
     sessionStorage.removeItem("feedShownIds"); // fresh dedup each session
+    // Clear stale hub videos — badge on startup should only come from THIS session's poll
+    localStorage.removeItem("hubNewVideos");
+    localStorage.removeItem("_pollLastSubCheck");
+    localStorage.setItem("_pollSubRotate", "0");
   } catch(e) {}
   try {
     localStorage.removeItem("_pollLastTasteCheck");
