@@ -4588,7 +4588,10 @@ async function _injectHubVideos(hubVideos) {
         if (title.startsWith("live") || title.startsWith("🔴") || title.includes("broadcast") ||
             title.includes("| powered by") || title.includes("| live") || title.includes(": live")) return false;
         if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return false;
-        if (v.publishedAt && new Date(v.publishedAt).getTime() < cutoff24h) return false;
+        // Use receivedAt (when WE found it) not publishedAt (when it was uploaded)
+        // A video uploaded yesterday is still "new" to us if we just found it
+        const foundAt = v.receivedAt || Date.now();
+        if (foundAt < cutoff24h) return false;
         return true;
       });
     } catch(e) {}
