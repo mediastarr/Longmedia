@@ -5070,6 +5070,9 @@ function markNotInterested(videoId, channelId, title) {
     localStorage.setItem("tasteProfile", JSON.stringify(profile));
   } catch(e) {}
 
+  // Send not-interested signal to Worker for cross-user learning
+  sendEngagement(videoId, channelId, "not_interested", 0, false, null);
+
   // Remove card from feed
   document.querySelectorAll(`[data-videoid="${videoId}"]`).forEach(card => {
     card.style.transition = "opacity 0.3s, transform 0.3s";
@@ -5079,6 +5082,22 @@ function markNotInterested(videoId, channelId, title) {
   });
 
   showHUD("Not interested — feed updated");
+
+  // Send signal to Worker so it improves recommendations across sessions
+  try {
+    fetch(HUB_WORKER_URL + "/engage", {
+      method: "POST",
+      headers: workerHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        videoId,
+        channelId,
+        signal: "not_interested",
+        pct: 0,
+        sessionContinued: false,
+        query: null
+      })
+    });
+  } catch(e) {}
 }
 
 (async function init() {
