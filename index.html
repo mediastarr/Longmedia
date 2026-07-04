@@ -4381,6 +4381,7 @@ async function _pollCheckNewContent() {
                 t.includes("| live") || t.includes("| powered by") || t.includes(": live")) return;
                // Skip non-English titles
             if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
+            if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
             allNew.push({ ...v, source: "subscription" });
           }
         });
