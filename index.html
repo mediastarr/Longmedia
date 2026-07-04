@@ -2379,12 +2379,7 @@ function renderFeed(items) {
   } catch(e) {}
   feedEl.innerHTML = "";
   appendFeed(items);
-  // Auto-inject pending hub videos only when on Home tab
-  if (window._pendingHubVideos && window._pendingHubVideos.length && currentTab === "home") {
-    const toInject = window._pendingHubVideos;
-    window._pendingHubVideos = null;
-    setTimeout(() => _injectHubVideos(toInject), 300);
-  }
+
 }
 
 /* CHANGE: data-videoid on each card so back button can find it */
@@ -2743,11 +2738,9 @@ homeTab.addEventListener("click", async () => {
     const hubRaw = localStorage.getItem("hubNewVideos");
     if (hubRaw) {
       hubVideos = JSON.parse(hubRaw) || [];
-      // Don't remove yet — remove only after inject completes
+      localStorage.removeItem("hubNewVideos");
     }
   } catch(e) {}
-  // Reset session dedup so hub videos always show fresh
-  try { sessionStorage.removeItem("feedShownIds"); } catch(e) {}
 
   // Re-inject previously shown hub videos if user switched tabs and came back
   try {
@@ -2755,11 +2748,7 @@ homeTab.addEventListener("click", async () => {
     if (prevIds.length) {
       setTimeout(async () => {
         if (feedEl.querySelector('[data-hubvideo="1"]')) return; // already there
-        // Filter out already-watched videos before re-injecting
-        const seenHub = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
-        const unWatchedIds = prevIds.filter(id => !seenHub.has(id));
-        if (!unWatchedIds.length) { sessionStorage.removeItem("injectedHubIds"); return; }
-        const data = await fetchYouTube("videos", { part: "snippet,statistics", id: unWatchedIds.join(","), _: Date.now() });
+        const data = await fetchYouTube("videos", { part: "snippet,statistics", id: prevIds.join(","), _: Date.now() });
         if (!data.items || !data.items.length) return;
         const frag = document.createDocumentFragment();
         data.items.forEach(item => {
@@ -2816,7 +2805,6 @@ homeTab.addEventListener("click", async () => {
     if (allLogged.length) {
       renderFeed(allLogged); showHUD("For You ✦");
       nextPageToken = (popular2.status === "fulfilled" && popular2.value.nextPageToken) || null;
-
     } else {
       const fallback2 = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
       nextPageToken = fallback2.nextPageToken || null; renderFeed(fallback2.items || []); showHUD("Home");
@@ -2835,15 +2823,16 @@ homeTab.addEventListener("click", async () => {
     if (allItems.length) {
       renderFeed(allItems); showHUD("Home");
       nextPageToken = (popular.status === "fulfilled" && popular.value.nextPageToken) || null;
-
     } else {
       const fallback = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
       nextPageToken = fallback.nextPageToken || null; renderFeed(fallback.items || []); showHUD("Home");
     }
   }
 
-  // Store hub videos globally so inject can fire at the right moment
-  window._pendingHubVideos = hubVideos.length ? hubVideos : null;
+  // Inject hub new videos at TOP after feed finishes loading
+  if (hubVideos.length) {
+    _injectHubVideos(hubVideos);
+  }
 });
 
 trendingTab.addEventListener("click", async () => {
