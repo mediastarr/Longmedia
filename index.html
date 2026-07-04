@@ -1556,14 +1556,6 @@ function hideUIForVideo() {
 }
 
 function showUIWithMiniPlayer() {
-  // Record partial watch when player closes
-  if (currentVideoId && ytPlayer) {
-    try {
-      const watched = ytPlayer.getCurrentTime ? ytPlayer.getCurrentTime() : 0;
-      const total = ytPlayer.getDuration ? ytPlayer.getDuration() : 0;
-      if (watched > 5) recordWatchDuration(currentVideoId, watched, total);
-    } catch(e) {}
-  }
   topbarEl.style.display = "flex";
   searchTabEl.style.display = "flex";
   tabsEl.style.display = "flex";
@@ -1577,12 +1569,7 @@ function showUIWithMiniPlayer() {
   else if (currentTab === "subs") subsPageEl.style.display = "block";
   else if (currentTab === "playlists") playlistPageEl.style.display = "block";
   else feedEl.style.display = "block";
-  // Double rAF ensures DOM reflow completes before scroll restore
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      window.scrollTo({ top: savedScrollY, behavior: "instant" });
-    });
-  });
+  requestAnimationFrame(() => window.scrollTo({ top: savedScrollY, behavior: "instant" }));
 }
 
 /* CHANGE: back button scrolls to the selected video card after exiting fullscreen */
@@ -2591,23 +2578,8 @@ function openAsShort(videoId, snippet) {
   const _origHomeClick = homeTab.onclick;
   const _restoreOnBack = () => {
     shortsPageEl.style.display = "none";
-    // Restore full UI without re-rendering the feed
-    topbarEl.style.display = "flex";
-    tabsEl.style.display = "flex";
-    searchTabEl.style.display = "flex";
-    // Restore tab active state without triggering a reload
-    currentTab = returnTabName;
-    [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab, subsTab, playlistTab]
-      .forEach(btn => btn && btn.classList.remove("active"));
-    const tabMap = { home: homeTab, shorts: shortsTab, movies: moviesTab, history: historyTab,
-                     trending: trendingTab, channel: channelTab, subs: subsTab, playlists: playlistTab };
-    if (tabMap[returnTabName]) tabMap[returnTabName].classList.add("active");
-    // Show the right content without reloading
-    feedEl.style.display = ["home","movies","history","trending","search"].includes(returnTabName) ? "block" : "none";
-    // Restore exact scroll position
-    requestAnimationFrame(() => {
-      window.scrollTo({ top: returnScrollY, behavior: "instant" });
-    });
+    setActiveTab(returnTabName);
+    requestAnimationFrame(() => window.scrollTo({ top: returnScrollY, behavior: "instant" }));
     showHUD("Back");
   };
 
