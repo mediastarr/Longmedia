@@ -2519,6 +2519,10 @@ function openAsShort(videoId, snippet) {
   const _origHomeClick = homeTab.onclick;
   const _restoreOnBack = () => {
     shortsPageEl.style.display = "none";
+    // Restore full UI before switching tab
+    topbarEl.style.display = "flex";
+    tabsEl.style.display = "flex";
+    searchTabEl.style.display = "flex";
     setActiveTab(returnTabName);
     requestAnimationFrame(() => window.scrollTo({ top: returnScrollY, behavior: "instant" }));
     showHUD("Back");
@@ -4516,16 +4520,14 @@ async function _injectHubVideos(hubVideos) {
     try {
       const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
       const seenSet = new Set(seenHub);
+      const cutoff72h = Date.now() - 72 * 3600000;
       hubVideos = hubVideos.filter(v => {
         if (seenSet.has(v.videoId)) return false;
-        // Filter out live stream titles
         const title = (v.title || "").toLowerCase();
-        if (title.startsWith("live") || title.startsWith("🔴") ||
-            title.includes("broadcast") || title.includes("| powered by") ||
-            title.includes("| live") || title.includes(": live")) return false;
-           // Skip non-English titles
+        if (title.startsWith("live") || title.startsWith("🔴") || title.includes("broadcast") ||
+            title.includes("| powered by") || title.includes("| live") || title.includes(": live")) return false;
         if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return false;
-        if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return false;
+        if (v.publishedAt && new Date(v.publishedAt).getTime() < cutoff72h) return false;
         return true;
       });
     } catch(e) {}
