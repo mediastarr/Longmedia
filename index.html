@@ -2352,13 +2352,11 @@ function renderFeed(items) {
   // Deduplicate against watch history + already shown this session
   try {
     const watchedSet = new Set(historyList.map(h => h.id?.videoId || h.id).filter(Boolean));
-    const seenHub = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
     const shownSet = new Set(JSON.parse(sessionStorage.getItem("feedShownIds") || "[]"));
     items = items.filter(item => {
       const id = item.id?.videoId || item.id;
       if (!id) return false;
       if (watchedSet.has(id)) return false; // already watched
-      if (seenHub.has(id)) return false; // shown as new before
       if (shownSet.has(id)) return false; // shown this session
       return true;
     });
@@ -2369,8 +2367,8 @@ function renderFeed(items) {
   } catch(e) {}
   feedEl.innerHTML = "";
   appendFeed(items);
-  // Auto-inject pending hub videos right after feed renders
-  if (window._pendingHubVideos && window._pendingHubVideos.length) {
+  // Auto-inject pending hub videos only when on Home tab
+  if (window._pendingHubVideos && window._pendingHubVideos.length && currentTab === "home") {
     const toInject = window._pendingHubVideos;
     window._pendingHubVideos = null;
     setTimeout(() => _injectHubVideos(toInject), 300);
