@@ -1858,8 +1858,7 @@ function createYTPlayer(videoId, startSeconds) {
 }
 
 function setPlayerVideo(videoId, snippet, startSeconds) {
-  // savedScrollY already captured in card onclick before scroll-to-top
-  if (!savedScrollY) savedScrollY = window.scrollY;
+  savedScrollY = window.scrollY;
   currentVideoId = videoId;
   // Reset quality to auto for each new video — onReady will detect best quality
   currentQuality = "auto";
@@ -2675,13 +2674,10 @@ function appendFeed(items) {
     const meta = [views && views + " views", ago].filter(Boolean).join(" · ");
     card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title || ""}</div><div class="video-channel">${snippet.channelTitle || ""}</div><div class="video-meta">${meta}</div></div>`;
     card.onclick = async () => {
-      // Capture scroll position BEFORE hiding UI and scrolling to top
-      savedScrollY = window.scrollY;
       tabsEl.style.display = "none";
       searchTabEl.style.display = "none";
       feedEl.style.display = "none";
       if (subsPageEl) subsPageEl.style.display = "none";
-      window.scrollTo({ top: 0, behavior: "instant" });
       // Track CTR — user clicked this video
       trackCTR(videoId, snippet.channelId || "", lastSearchQuery || null);
       trackSessionContinuation(videoId, snippet.channelId || "");
@@ -3194,7 +3190,6 @@ historyTab.addEventListener("click", async () => {
       const resumeLabel = resumeT > 5 ? " ▶ "+Math.floor(resumeT/60)+":"+(String(Math.floor(resumeT%60)).padStart(2,"0")) : "";
       card.querySelector(".video-meta").textContent = "Watched "+ago+resumeLabel;
       card.onclick = () => {
-        savedScrollY = window.scrollY;
         setPlayerVideo(h.id, snippet, resumeT);
         showHUD(resumeT > 5 ? "Resuming ▶" : "Playing: "+(snippet.title||""));
       };
@@ -4721,53 +4716,19 @@ async function _pollCheckNewContent() {
 async function _injectHubVideos(hubVideos) {
   if (!hubVideos || !hubVideos.length) return;
   try {
-    // Filter out already-watched videos and live streams before injecting
+    // Filter out already-watched videos before injecting
     try {
       const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
       const seenSet = new Set(seenHub);
-      const cutoff24h = Date.now() - 24 * 3600000;
-      hubVideos = hubVideos.filter(v => {
-        if (seenSet.has(v.videoId)) return false;
-        const title = (v.title || "").toLowerCase();
-        if (title.startsWith("live") || title.startsWith("🔴") || title.includes("broadcast") ||
-            title.includes("| powered by") || title.includes("| live") || title.includes(": live")) return false;
-        if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return false;
-        // Use receivedAt (when WE found it) not publishedAt (when it was uploaded)
-        // A video uploaded yesterday is still "new" to us if we just found it
-        const foundAt = v.receivedAt || Date.now();
-        if (foundAt < cutoff24h) return false;
-        return true;
-      });
+      hubVideos = hubVideos.filter(v => !seenSet.has(v.videoId));
     } catch(e) {}
-    if (!hubVideos.length) {
-      localStorage.removeItem("hubNewVideos"); // clear stale data
-      return;
-    }
+    if (!hubVideos.length) return;
 
     const ids = hubVideos.map(v => v.videoId).join(",");
-    let fetchedItems = [];
-    try {
-      const data = await fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() });
-      fetchedItems = data.items || [];
-    } catch(e) {}
-
-    // Fallback: use stored hub data if API fetch failed
-    if (!fetchedItems.length) {
-      fetchedItems = hubVideos.map(v => ({
-        id: v.videoId,
-        snippet: {
-          title: v.title || "",
-          channelTitle: v.channelId || "",
-          channelId: v.channelId || "",
-          publishedAt: v.publishedAt || "",
-          thumbnails: { medium: { url: `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg` } }
-        },
-        statistics: {}
-      }));
-    }
-    if (!fetchedItems.length) return;
+    const data = await fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() });
+    if (!data.items || !data.items.length) return;
     const frag = document.createDocumentFragment();
-    fetchedItems.forEach(item => {
+    data.items.forEach(item => {
       const snippet = item.snippet || {};
       const videoId = item.id;
       // Remove existing card for this video if present
@@ -4792,12 +4753,6 @@ async function _injectHubVideos(hubVideos) {
       const ago = timeAgo(snippet.publishedAt);
       card.innerHTML = '<div class="video-thumb"><img src="' + thumb + '" loading="lazy"></div><div class="video-info"><div class="video-title">' + (snippet.title||"") + '</div><div class="video-channel">' + (snippet.channelTitle||"") + '</div><div class="video-meta" style="color:rgba(255,100,100,0.9);">🔴 New · ' + ago + '</div></div>';
       card.onclick = async () => {
-        savedScrollY = window.scrollY;
-        tabsEl.style.display = "none";
-        searchTabEl.style.display = "none";
-        feedEl.style.display = "none";
-        if (subsPageEl) subsPageEl.style.display = "none";
-        window.scrollTo({ top: 0, behavior: "instant" });
         const short = await checkIsShort(videoId, snippet);
         if (short) openAsShort(videoId, snippet);
         else { setPlayerVideo(videoId, snippet); showHUD("Playing: " + (snippet.title||"")); }
@@ -4806,16 +4761,10 @@ async function _injectHubVideos(hubVideos) {
     });
     feedEl.insertBefore(frag, feedEl.firstChild);
     window.scrollTo({ top: 0, behavior: "smooth" });
-    // Mark ALL injected videos as seen so they never show as new again
+    // Save injected cards so they survive tab switching
     try {
-      const injectedIds = data.items.map(item => item.id);
+      const injectedIds = hubVideos.map(v => v.videoId);
       sessionStorage.setItem("injectedHubIds", JSON.stringify(injectedIds));
-      // Now safe to clear hubNewVideos
-      localStorage.removeItem("hubNewVideos");
-      // Add to hubSeenIds permanently
-      const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
-      const newSeen = [...new Set([...seenHub, ...injectedIds])].slice(-500);
-      localStorage.setItem("hubSeenIds", JSON.stringify(newSeen));
     } catch(e) {}
   } catch(e) {}
 }
