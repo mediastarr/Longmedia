@@ -2673,7 +2673,8 @@ function appendFeed(items) {
     };
     // ── Not Interested menu ──
     const menuBtn = document.createElement("div");
-    menuBtn.className = "video-card-menu focusable";
+    menuBtn.className = "video-card-menu";
+    menuBtn.setAttribute("tabindex", "-1"); // exclude from tab/scroll focus order
     menuBtn.textContent = "⋮";
     menuBtn.title = "More options";
     const dropdown = document.createElement("div");
@@ -2684,9 +2685,11 @@ function appendFeed(items) {
     `;
     menuBtn.onclick = (e) => {
       e.stopPropagation();
-      // Close all other dropdowns
+      const isOpen = dropdown.classList.contains("open");
+      // Close all dropdowns
       document.querySelectorAll(".card-dropdown.open").forEach(d => d.classList.remove("open"));
-      dropdown.classList.toggle("open");
+      // Toggle this one
+      if (!isOpen) dropdown.classList.add("open");
     };
     dropdown.querySelector("[data-action='not-interested']").onclick = (e) => {
       e.stopPropagation();
