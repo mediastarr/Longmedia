@@ -2617,6 +2617,8 @@ function appendFeed(items) {
       tabsEl.style.display = "none";
       searchTabEl.style.display = "none";
       feedEl.style.display = "none";
+      // Also hide subs page — prevents player loading inside subs tab
+      if (subsPageEl) subsPageEl.style.display = "none";
       window.scrollTo({ top: 0, behavior: "instant" });
       const short = await checkIsShort(videoId, snippet);
       if (short) {
@@ -2683,6 +2685,8 @@ homeTab.addEventListener("click", async () => {
       // Don't remove yet — remove only after inject completes
     }
   } catch(e) {}
+  // Reset session dedup so hub videos always show fresh
+  try { sessionStorage.removeItem("feedShownIds"); } catch(e) {}
 
   // Re-inject previously shown hub videos if user switched tabs and came back
   try {
@@ -4920,6 +4924,16 @@ async function _loadComments(videoId) {
   const ok = await authPromise;
   if (ok) {
     showHUD("Signed in ✓");
+    // Store YouTube channel ID for multi-user Worker isolation
+    try {
+      const tkForId = await getValidToken();
+      if (tkForId && !localStorage.getItem("yt_channel_id")) {
+        const chRes = await fetch("https://www.googleapis.com/youtube/v3/channels?part=id&mine=true", { headers: { Authorization: "Bearer " + tkForId } });
+        const chData = await chRes.json();
+        const channelId = chData.items?.[0]?.id || "";
+        if (channelId) localStorage.setItem("yt_channel_id", channelId);
+      }
+    } catch(e) {}
     // Store YouTube channel ID for multi-user Worker isolation
     try {
       const tkForId = await getValidToken();
