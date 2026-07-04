@@ -2309,7 +2309,34 @@ function showSkeletons(count = 6) {
   }
 }
 
-function renderFeed(items) { feedEl.innerHTML = ""; appendFeed(items); }
+function renderFeed(items) {
+  // Deduplicate against watch history + already shown this session
+  try {
+    const watchedSet = new Set(historyList.map(h => h.id?.videoId || h.id).filter(Boolean));
+    const seenHub = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
+    const shownSet = new Set(JSON.parse(sessionStorage.getItem("feedShownIds") || "[]"));
+    items = items.filter(item => {
+      const id = item.id?.videoId || item.id;
+      if (!id) return false;
+      if (watchedSet.has(id)) return false; // already watched
+      if (seenHub.has(id)) return false; // shown as new before
+      if (shownSet.has(id)) return false; // shown this session
+      return true;
+    });
+    // Track all rendered IDs so they never repeat this session
+    const newIds = items.map(item => item.id?.videoId || item.id).filter(Boolean);
+    const merged = [...new Set([...shownSet, ...newIds])].slice(-200);
+    sessionStorage.setItem("feedShownIds", JSON.stringify(merged));
+  } catch(e) {}
+  feedEl.innerHTML = "";
+  appendFeed(items);
+  // Auto-inject pending hub videos right after feed renders
+  if (window._pendingHubVideos && window._pendingHubVideos.length) {
+    const toInject = window._pendingHubVideos;
+    window._pendingHubVideos = null;
+    setTimeout(() => _injectHubVideos(toInject), 300);
+  }
+}
 
 /* CHANGE: data-videoid on each card so back button can find it */
 function timeAgo(dateStr) {
@@ -2554,6 +2581,14 @@ function openAsShort(videoId, snippet) {
 
 
 function appendFeed(items) {
+  // Memory management: remove cards that are far off screen (>100 cards)
+  const allCards = feedEl.querySelectorAll(".video-card");
+  if (allCards.length > 80) {
+    // Remove first 20 cards (already scrolled past)
+    for (let i = 0; i < 20; i++) {
+      if (allCards[i] && !allCards[i].dataset.hubvideo) allCards[i].remove();
+    }
+  }
   const frag = document.createDocumentFragment();
   items.forEach((item) => {
     const snippet = item.snippet || {};
@@ -2716,8 +2751,7 @@ homeTab.addEventListener("click", async () => {
     if (allLogged.length) {
       renderFeed(allLogged); showHUD("For You ✦");
       nextPageToken = (popular2.status === "fulfilled" && popular2.value.nextPageToken) || null;
-      // Inject hub videos right after personalized feed renders
-      if (hubVideos.length) { clearTimeout(window._hubInjectTimer); window._hubInjectTimer = setTimeout(() => _injectHubVideos(hubVideos), 400); }
+
     } else {
       const fallback2 = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
       nextPageToken = fallback2.nextPageToken || null; renderFeed(fallback2.items || []); showHUD("Home");
@@ -2736,20 +2770,15 @@ homeTab.addEventListener("click", async () => {
     if (allItems.length) {
       renderFeed(allItems); showHUD("Home");
       nextPageToken = (popular.status === "fulfilled" && popular.value.nextPageToken) || null;
-      // Inject hub videos right after feed renders
-      if (hubVideos.length) { clearTimeout(window._hubInjectTimer); window._hubInjectTimer = setTimeout(() => _injectHubVideos(hubVideos), 400); }
+
     } else {
       const fallback = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
       nextPageToken = fallback.nextPageToken || null; renderFeed(fallback.items || []); showHUD("Home");
     }
   }
 
-  // Inject hub new videos at TOP after feed finishes loading
-  if (hubVideos.length) {
-    // Use longer delay to ensure feed is fully rendered
-    // Personalized feed can take 2-3 seconds on slow connections
-    setTimeout(() => _injectHubVideos(hubVideos), 1500);
-  }
+  // Store hub videos globally so inject can fire at the right moment
+  window._pendingHubVideos = hubVideos.length ? hubVideos : null;
 });
 
 trendingTab.addEventListener("click", async () => {
@@ -4922,8 +4951,11 @@ async function _loadComments(videoId) {
   // Reset poll state on every app open so fresh videos always get through
   _pollKnownIds = null;
   _pollBadgeCount = 0;
-  // Clear stale injected hub IDs from previous session
-  try { sessionStorage.removeItem("injectedHubIds"); } catch(e) {}
+  // Clear stale session data from previous session
+  try {
+    sessionStorage.removeItem("injectedHubIds");
+    sessionStorage.removeItem("feedShownIds"); // fresh dedup each session
+  } catch(e) {}
   try {
     localStorage.removeItem("_pollLastTasteCheck");
     localStorage.removeItem("_pollLastSubCheck");
