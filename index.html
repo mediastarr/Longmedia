@@ -2739,14 +2739,18 @@ homeTab.addEventListener("click", async () => {
 
 trendingTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("trending"); showSkeletons(6);
-  const myCat = getTopCategoryId();
+  // Rotate through categories each tap for variety
+  const TREND_CATS = ["0","1","2","10","15","17","20","22","23","24","25","26","27","28"];
+  const trendRotate = parseInt(localStorage.getItem("_trendRotate")||"0");
+  localStorage.setItem("_trendRotate", String((trendRotate+1)%TREND_CATS.length));
+  const rotateCat = TREND_CATS[trendRotate];
+  const myCat = trendRotate === 0 ? (getTopCategoryId()||"0") : rotateCat;
   const allItems = []; const seen = new Set();
   function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); }); }
   const tSince24h = new Date(Date.now()-86400000).toISOString();
-  // Use fetchYouTubeDirect to bypass Worker cache — gets fresh results every tap
   const [fresh, popular] = await Promise.allSettled([
-    fetchYouTubeDirect("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:myCat||undefined,maxResults:15,publishedAfter:tSince24h,_:Date.now()}),
-    fetchYouTubeDirect("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat||undefined,maxResults:15,_:Date.now()})
+    fetchYouTubeDirect("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:myCat,maxResults:15,publishedAfter:tSince24h,_:Date.now()}),
+    fetchYouTubeDirect("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:15,_:Date.now()})
   ]);
   if (fresh.status==="fulfilled") addU(fresh.value.items);
   if (popular.status==="fulfilled") addU(popular.value.items);
@@ -2754,8 +2758,7 @@ trendingTab.addEventListener("click", async () => {
     renderFeed(allItems); showHUD("Trending");
     nextPageToken = (popular.status==="fulfilled" && popular.value.nextPageToken) || null;
   } else {
-    // Fallback — no category filter
-    const fallback = await fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",maxResults:20,_:Date.now()});
+    const fallback = await fetchYouTubeDirect("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",maxResults:20,_:Date.now()});
     nextPageToken = fallback.nextPageToken || null;
     renderFeed(fallback.items || []); showHUD("Trending");
   }
