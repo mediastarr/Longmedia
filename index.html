@@ -2743,10 +2743,10 @@ trendingTab.addEventListener("click", async () => {
   const allItems = []; const seen = new Set();
   function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); }); }
   const tSince24h = new Date(Date.now()-86400000).toISOString();
-  // order:date first (last 24h), then mostPopular, then fallback
+  // Use fetchYouTubeDirect to bypass Worker cache — gets fresh results every tap
   const [fresh, popular] = await Promise.allSettled([
-    fetchYouTube("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:myCat||undefined,maxResults:15,publishedAfter:tSince24h,_:Date.now()}),
-    fetchYouTube("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat||undefined,maxResults:15,_:Date.now()})
+    fetchYouTubeDirect("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:myCat||undefined,maxResults:15,publishedAfter:tSince24h,_:Date.now()}),
+    fetchYouTubeDirect("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat||undefined,maxResults:15,_:Date.now()})
   ]);
   if (fresh.status==="fulfilled") addU(fresh.value.items);
   if (popular.status==="fulfilled") addU(popular.value.items);
