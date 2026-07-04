@@ -1508,14 +1508,11 @@ function hideUIForVideo() {
   tabsEl.style.display = "none";
   feedEl.style.display = "none";
   channelPageEl.style.display = "none";
+  subsPageEl.style.display = "none";
   keyboardEl.style.display = "none";
   suggestionsEl.style.display = "none";
   playlistPageEl.style.display = "none";
-  subsPageEl.style.display = "none";
   document.getElementById("videoInfoPanel").style.display = "none";
-  // Ensure player is visible and correctly positioned
-  playerSection.style.display = "block";
-  playerSection.classList.remove("player-mini", "player-fullscreen");
 }
 
 function showUIWithMiniPlayer() {
@@ -4386,6 +4383,10 @@ async function _pollCheckNewContent() {
                // Skip non-English titles
             if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
             if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
+            if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
+            if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
+            if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
+            if ((v.title||"").split("").some(function(c){return c.charCodeAt(0)>591;})) return;
             allNew.push({ ...v, source: "subscription" });
           }
         });
@@ -4521,6 +4522,7 @@ async function _injectHubVideos(hubVideos) {
             title.includes("broadcast") || title.includes("| powered by") ||
             title.includes("| live") || title.includes(": live")) return false;
            // Skip non-English titles
+        if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return false;
         if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return false;
         return true;
       });
