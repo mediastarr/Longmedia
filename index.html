@@ -4440,7 +4440,7 @@ async function _pollCheckNewContent() {
       const topCh = getTopChannels(3);
       if (topCh.length) {
         const chResults = await Promise.allSettled(topCh.map(ch =>
-          fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 2, publishedAfter: since6h, relevanceLanguage: "en", regionCode: "US", _: Date.now() })
+          fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 2, publishedAfter: new Date(Date.now() - 21600000).toISOString(), relevanceLanguage: "en", regionCode: "US", _: Date.now() })
         ));
         const seenIds3 = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
         if (!window._src3SessionIds) window._src3SessionIds = new Set();
@@ -4465,7 +4465,7 @@ async function _pollCheckNewContent() {
       if (src4Query) {
         const q = src4Query;
         try {
-          const kwRes = await fetchYouTube("search", { part: "snippet", type: "video", q, order: "date", maxResults: 4, publishedAfter: since6h, relevanceLanguage: "en", regionCode: "US", _: Date.now() });
+          const kwRes = await fetchYouTube("search", { part: "snippet", type: "video", q, order: "date", maxResults: 4, publishedAfter: new Date(Date.now() - 21600000).toISOString(), relevanceLanguage: "en", regionCode: "US", _: Date.now() });
           const seenIds4 = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
           if (!window._src4SessionIds) window._src4SessionIds = new Set();
           (kwRes.items || []).forEach(item => {
