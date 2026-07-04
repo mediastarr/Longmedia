@@ -1052,6 +1052,14 @@ function recordWatchDuration(videoId, watchedSecs, totalSecs) {
     else if (pct >= 0.10) { weight = 1; signal = "casual"; }
     else                  { weight = -2; signal = "skip"; }
 
+    // Send engagement signal to Worker for cross-user aggregation
+    try {
+      const hist2 = JSON.parse(localStorage.getItem("historyList") || "[]");
+      const entry2 = hist2.find(h => (h.id?.videoId || h.id) === videoId);
+      const chId2 = entry2?.snippet?.channelId || "";
+      sendEngagement(videoId, chId2, signal, Math.round(pct * 100), undefined, null);
+    } catch(e2) {}
+
     // Store per-video watch signal for future ranking
     profile.watchSignals = profile.watchSignals || {};
     profile.watchSignals[videoId] = { pct: Math.round(pct*100), signal, secs: watchedSecs, ts: Date.now() };
@@ -1443,6 +1451,18 @@ async function fetchPersonalizedFeed() {
     } catch(e) {}
   }
 
+  // ── Collaborative filtering boost ──
+  let collabVideoIds = new Set();
+  try {
+    const collabRecs = await getCollabRecommendations();
+    collabRecs.forEach(v => collabVideoIds.add(v.videoId));
+  } catch(e) {}
+
+  // ── Cross-user engagement scores ──
+  const feedVideoIds = feed.map(item => item.id?.videoId || item.id).filter(Boolean);
+  let engScores = {};
+  try { engScores = await getEngagementScores(feedVideoIds); } catch(e) {}
+
   // ── Ranking phase: score each video and sort ──
   const now = Date.now();
   const watchSignals = profile5.watchSignals || {};
@@ -1482,6 +1502,25 @@ async function fetchPersonalizedFeed() {
     if (chData.skipCount && chData.totalWatched) {
       const skipRate = chData.skipCount / chData.totalWatched;
       if (skipRate > 0.5) score -= 5;
+    }
+
+    // 7. Collaborative filtering boost — similar users watched this
+    if (collabVideoIds.has(videoId)) score += 8;
+
+    // 8. Cross-user engagement score — completion rate + CTR across all users
+    const eng = engScores[videoId];
+    if (eng) {
+      // Average completion rate across all users
+      const avgPct = eng.pctCount > 0 ? (eng.totalPct / eng.pctCount) : 0;
+      if (avgPct > 80) score += 6;
+      else if (avgPct > 60) score += 3;
+      // High CTR relative to impressions
+      if (eng.clicks > 5) score += 2;
+      // Session continuation — users kept watching after this
+      if (eng.sessionTotal > 3) {
+        const contRate = eng.sessionContinued / eng.sessionTotal;
+        if (contRate > 0.7) score += 4; // people kept watching sessions after this
+      }
     }
 
     item._score = score;
@@ -2617,9 +2656,11 @@ function appendFeed(items) {
       tabsEl.style.display = "none";
       searchTabEl.style.display = "none";
       feedEl.style.display = "none";
-      // Also hide subs page — prevents player loading inside subs tab
       if (subsPageEl) subsPageEl.style.display = "none";
       window.scrollTo({ top: 0, behavior: "instant" });
+      // Track CTR — user clicked this video
+      trackCTR(videoId, snippet.channelId || "", lastSearchQuery || null);
+      trackSessionContinuation(videoId, snippet.channelId || "");
       const short = await checkIsShort(videoId, snippet);
       if (short) {
         openAsShort(videoId, snippet);
@@ -3701,6 +3742,22 @@ keyboardEl.addEventListener("click", async (e) => {
 
 
 /* ── Personalized Search Ranking ── */
+async function rankSearchResultsWithCTR(items, query) {
+  if (!items || !items.length) return items;
+  // Get cross-user CTR data for this query
+  let ctrData = {};
+  try { ctrData = await getSearchCTR(query || ""); } catch(e) {}
+  const ranked = rankSearchResults(items);
+  // Boost videos with high CTR from other users
+  return ranked.map(item => {
+    const id = item.id?.videoId || item.id;
+    if (id && ctrData[id]) {
+      item._searchScore = (item._searchScore || 0) + Math.min(ctrData[id] * 2, 10);
+    }
+    return item;
+  }).sort((a,b) => (b._searchScore||0) - (a._searchScore||0));
+}
+
 function rankSearchResults(items) {
   if (!items || !items.length) return items;
   const profile = getTasteProfile();
@@ -3775,7 +3832,7 @@ function triggerSearch(q) {
     nextPageToken = data.nextPageToken || null;
     if (data.items && data.items.length) {
       // Re-rank results using taste profile before rendering
-      const ranked = rankSearchResults(data.items);
+      const ranked = await rankSearchResultsWithCTR(data.items, q);
       renderFeed(ranked);
       showHUD("Search: " + q);
     } else {
@@ -4360,6 +4417,8 @@ async function silentSync(token){
   try{const ar=await fetch("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});const ad=await ar.json();(ad.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.channelId,s.channelTitle,2);const vid=it.contentDetails?.upload?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);});}catch(e){}
   profile.recentVideoIds=profile.recentVideoIds.slice(0,50);profile.syncedAt=Date.now();
   localStorage.setItem("tasteProfile",JSON.stringify(profile));
+  // Sync profile to Worker for collaborative filtering
+  syncProfileToWorker();
 
   // Send channel IDs to Worker for PubSubHubbub subscriptions
   // This is automatic — no user action needed
@@ -4875,6 +4934,100 @@ async function _loadComments(videoId) {
   } catch(e) {
     el.innerHTML = "";
   }
+}
+
+
+/* ================================================================
+   COLLABORATIVE FILTERING + ENGAGEMENT SIGNALS
+================================================================ */
+
+// Send engagement signal to Worker (CTR, watch completion, session continuation)
+async function sendEngagement(videoId, channelId, signal, pct, sessionContinued, query) {
+  try {
+    fetch(HUB_WORKER_URL + "/engage", {
+      method: "POST",
+      headers: workerHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ videoId, channelId, signal, pct, sessionContinued, query })
+    });
+  } catch(e) {}
+}
+
+// Track click-through rate — called when user taps a video card
+function trackCTR(videoId, channelId, fromQuery) {
+  sendEngagement(videoId, channelId, "click", undefined, undefined, fromQuery || null);
+}
+
+// Track session continuation — did user keep watching after this video?
+let _lastWatchedVideoId = null;
+let _lastWatchedChannelId = null;
+let _sessionStart = Date.now();
+
+function trackSessionContinuation(newVideoId, newChannelId) {
+  if (_lastWatchedVideoId && _lastWatchedVideoId !== newVideoId) {
+    const sessionDuration = Date.now() - _sessionStart;
+    const continued = sessionDuration < 7200000; // within 2 hours = session continuation
+    sendEngagement(_lastWatchedVideoId, _lastWatchedChannelId, "click", undefined, continued, null);
+  }
+  _lastWatchedVideoId = newVideoId;
+  _lastWatchedChannelId = newChannelId;
+  _sessionStart = Date.now();
+}
+
+// Sync taste profile to Worker for collaborative filtering
+async function syncProfileToWorker() {
+  try {
+    const profile = getTasteProfile();
+    fetch(HUB_WORKER_URL + "/profile", {
+      method: "POST",
+      headers: workerHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        keywords: profile.keywords || {},
+        channels: Object.fromEntries(
+          Object.entries(profile.channels || {}).map(([id, v]) => [id, typeof v === "object" ? v.weight || 0 : v])
+        ),
+        categories: profile.categories || {}
+      })
+    });
+  } catch(e) {}
+}
+
+// Get collaborative recommendations from similar users
+async function getCollabRecommendations() {
+  try {
+    const profile = getTasteProfile();
+    const topKW = getTopKeywords(10);
+    const topCH = Object.keys(profile.channels || {}).slice(0, 10);
+    if (!topKW.length && !topCH.length) return [];
+
+    const res = await fetch(HUB_WORKER_URL + "/collab", {
+      method: "POST",
+      headers: workerHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ keywords: topKW, channels: topCH })
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.videos || [];
+  } catch(e) { return []; }
+}
+
+// Get cross-user engagement scores for a list of video IDs
+async function getEngagementScores(videoIds) {
+  if (!videoIds.length) return {};
+  try {
+    const ids = videoIds.slice(0, 20).join(",");
+    const res = await fetch(HUB_WORKER_URL + "/engage?ids=" + ids, { headers: workerHeaders() });
+    if (!res.ok) return {};
+    return await res.json();
+  } catch(e) { return {}; }
+}
+
+// Get search CTR data — which videos users actually clicked for a query
+async function getSearchCTR(query) {
+  try {
+    const res = await fetch(HUB_WORKER_URL + "/searchctr?q=" + encodeURIComponent(query), { headers: workerHeaders() });
+    if (!res.ok) return {};
+    return await res.json();
+  } catch(e) { return {}; }
 }
 
 (async function init() {
