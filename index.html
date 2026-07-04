@@ -1511,7 +1511,11 @@ function hideUIForVideo() {
   keyboardEl.style.display = "none";
   suggestionsEl.style.display = "none";
   playlistPageEl.style.display = "none";
+  subsPageEl.style.display = "none";
   document.getElementById("videoInfoPanel").style.display = "none";
+  // Ensure player is visible and correctly positioned
+  playerSection.style.display = "block";
+  playerSection.classList.remove("player-mini", "player-fullscreen");
 }
 
 function showUIWithMiniPlayer() {
