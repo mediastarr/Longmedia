@@ -2651,8 +2651,25 @@ function appendFeed(items) {
     card.style.position = "relative";
     card.addEventListener("focus", () => card.classList.add("focused"));
     card.addEventListener("blur", () => {
-      // Delay removing focused class so dropdown clicks still register
       setTimeout(() => card.classList.remove("focused"), 200);
+    });
+    // Swipe right on card focuses the menu button
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === "Tab") {
+        e.preventDefault();
+        menuBtn.focus();
+      }
+    });
+    // Swipe left on menu button goes back to card
+    menuBtn.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        card.focus();
+      }
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        menuBtn.click();
+      }
     });
     if (snippet.channelId) card.dataset.channelid = snippet.channelId;
     // Apply live badge if channel is currently live
@@ -2684,7 +2701,7 @@ function appendFeed(items) {
     // ── Not Interested menu ──
     const menuBtn = document.createElement("div");
     menuBtn.className = "video-card-menu";
-    menuBtn.setAttribute("tabindex", "-1"); // exclude from tab/scroll focus order
+    menuBtn.setAttribute("tabindex", "-1"); // only reachable via ArrowRight from card
     menuBtn.textContent = "⋮";
     menuBtn.title = "More options";
     const dropdown = document.createElement("div");
