@@ -3081,7 +3081,10 @@ historyTab.addEventListener("click", async () => {
       const resumeT = getResumePosition(h.id);
       const resumeLabel = resumeT > 5 ? " ▶ "+Math.floor(resumeT/60)+":"+(String(Math.floor(resumeT%60)).padStart(2,"0")) : "";
       card.querySelector(".video-meta").textContent = "Watched "+ago+resumeLabel;
-      card.onclick = async () => { const short = await checkIsShort(h.id, snippet); if (short) openAsShort(h.id, snippet); else { setPlayerVideo(h.id, snippet, resumeT); showHUD(resumeT > 5 ? "Resuming ▶" : "Playing: "+(snippet.title||"")); } };
+      card.onclick = () => {
+        setPlayerVideo(h.id, snippet, resumeT);
+        showHUD(resumeT > 5 ? "Resuming ▶" : "Playing: "+(snippet.title||""));
+      };
       feedEl.appendChild(card);
     });
   }
