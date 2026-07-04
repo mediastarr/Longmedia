@@ -4718,10 +4718,29 @@ async function _injectHubVideos(hubVideos) {
     }
 
     const ids = hubVideos.map(v => v.videoId).join(",");
-    const data = await fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() });
-    if (!data.items || !data.items.length) return;
+    let fetchedItems = [];
+    try {
+      const data = await fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() });
+      fetchedItems = data.items || [];
+    } catch(e) {}
+
+    // Fallback: use stored hub data if API fetch failed
+    if (!fetchedItems.length) {
+      fetchedItems = hubVideos.map(v => ({
+        id: v.videoId,
+        snippet: {
+          title: v.title || "",
+          channelTitle: v.channelId || "",
+          channelId: v.channelId || "",
+          publishedAt: v.publishedAt || "",
+          thumbnails: { medium: { url: `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg` } }
+        },
+        statistics: {}
+      }));
+    }
+    if (!fetchedItems.length) return;
     const frag = document.createDocumentFragment();
-    data.items.forEach(item => {
+    fetchedItems.forEach(item => {
       const snippet = item.snippet || {};
       const videoId = item.id;
       // Remove existing card for this video if present
