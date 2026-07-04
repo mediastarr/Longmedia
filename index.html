@@ -2447,15 +2447,7 @@ async function checkIsShort(videoId, snippet) {
     _shortsCache[videoId] = false;
     return false;
   } catch(e) {
-    // API failed — use title heuristic as last resort
-    if (snippet) {
-      const title = (snippet.title || "").toLowerCase();
-      // Very short titles with common shorts patterns
-      if (title.includes("short") || title.includes("#")) {
-        _shortsCache[videoId] = true;
-        return true;
-      }
-    }
+    // API failed — default to false (open as regular video)
     _shortsCache[videoId] = false;
     return false;
   }
