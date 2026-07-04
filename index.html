@@ -1577,7 +1577,12 @@ function showUIWithMiniPlayer() {
   else if (currentTab === "subs") subsPageEl.style.display = "block";
   else if (currentTab === "playlists") playlistPageEl.style.display = "block";
   else feedEl.style.display = "block";
-  requestAnimationFrame(() => window.scrollTo({ top: savedScrollY, behavior: "instant" }));
+  // Double rAF ensures DOM reflow completes before scroll restore
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: savedScrollY, behavior: "instant" });
+    });
+  });
 }
 
 /* CHANGE: back button scrolls to the selected video card after exiting fullscreen */
@@ -1595,9 +1600,16 @@ backBtn.addEventListener("click", () => {
   document.body.classList.remove("ui-hidden");
   hideUIBtn.textContent = "Hide UI";
   showUIWithMiniPlayer();
+  // Restore scroll — prefer exact position, fallback to the video card
   requestAnimationFrame(() => {
-    const card = feedEl.querySelector(`[data-videoid="${currentVideoId}"]`);
-    if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+    requestAnimationFrame(() => {
+      if (savedScrollY > 0) {
+        window.scrollTo({ top: savedScrollY, behavior: "instant" });
+      } else {
+        const card = feedEl.querySelector(`[data-videoid="${currentVideoId}"]`);
+        if (card) card.scrollIntoView({ behavior: "instant", block: "center" });
+      }
+    });
   });
   showHUD("Mini-player");
 });
@@ -2584,12 +2596,23 @@ function openAsShort(videoId, snippet) {
   const _origHomeClick = homeTab.onclick;
   const _restoreOnBack = () => {
     shortsPageEl.style.display = "none";
-    // Restore full UI before switching tab
+    // Restore full UI without re-rendering the feed
     topbarEl.style.display = "flex";
     tabsEl.style.display = "flex";
     searchTabEl.style.display = "flex";
-    setActiveTab(returnTabName);
-    requestAnimationFrame(() => window.scrollTo({ top: returnScrollY, behavior: "instant" }));
+    // Restore tab active state without triggering a reload
+    currentTab = returnTabName;
+    [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab, subsTab, playlistTab]
+      .forEach(btn => btn && btn.classList.remove("active"));
+    const tabMap = { home: homeTab, shorts: shortsTab, movies: moviesTab, history: historyTab,
+                     trending: trendingTab, channel: channelTab, subs: subsTab, playlists: playlistTab };
+    if (tabMap[returnTabName]) tabMap[returnTabName].classList.add("active");
+    // Show the right content without reloading
+    feedEl.style.display = ["home","movies","history","trending","search"].includes(returnTabName) ? "block" : "none";
+    // Restore exact scroll position
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: returnScrollY, behavior: "instant" });
+    });
     showHUD("Back");
   };
 
