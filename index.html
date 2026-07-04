@@ -213,6 +213,29 @@ body.fullscreen-active #playerControls {
   opacity: 0; pointer-events: none; z-index: 60;
 }
 #feed { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; position: relative; z-index: 10; }
+.video-card-menu {
+  position: absolute; top: 6px; right: 6px;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: rgba(10,12,20,0.8); border: 1px solid rgba(120,130,160,0.3);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; opacity: 0; transition: opacity 0.2s;
+  font-size: 13px; color: #c8d0e8; z-index: 20;
+}
+.video-card:hover .video-card-menu { opacity: 1; }
+.card-dropdown {
+  position: absolute; top: 34px; right: 6px;
+  background: rgba(14,16,26,0.97); border: 1px solid rgba(120,130,160,0.3);
+  border-radius: 10px; padding: 4px 0; z-index: 200;
+  min-width: 155px; display: none;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+}
+.card-dropdown.open { display: block; }
+.card-dropdown-item {
+  padding: 8px 14px; font-size: 12px; color: #c8d0e8;
+  cursor: pointer; display: flex; align-items: center; gap: 8px;
+}
+.card-dropdown-item:hover { background: rgba(120,130,160,0.15); }
+.card-dropdown-item.danger { color: #ff6b6b; }
 .video-card {
   display: flex; gap: 10px; padding: 14px; border-radius: 18px;
   background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.08), rgba(8,10,16,0.96));
@@ -2341,15 +2364,17 @@ function showSkeletons(count = 6) {
 }
 
 function renderFeed(items) {
-  // Deduplicate against watch history + already shown this session
+  // Deduplicate against watch history + already shown + not interested
   try {
     const watchedSet = new Set(historyList.map(h => h.id?.videoId || h.id).filter(Boolean));
     const shownSet = new Set(JSON.parse(sessionStorage.getItem("feedShownIds") || "[]"));
+    const blockSet = new Set(getBlocklist());
     items = items.filter(item => {
       const id = item.id?.videoId || item.id;
       if (!id) return false;
-      if (watchedSet.has(id)) return false; // already watched
-      if (shownSet.has(id)) return false; // shown this session
+      if (watchedSet.has(id)) return false;
+      if (shownSet.has(id)) return false;
+      if (blockSet.has(id)) return false; // not interested
       return true;
     });
     // Track all rendered IDs so they never repeat this session
@@ -2618,6 +2643,7 @@ function appendFeed(items) {
     const card = document.createElement("div");
     card.className = "video-card parallax focusable";
     card.dataset.videoid = videoId;
+    card.style.position = "relative";
     if (snippet.channelId) card.dataset.channelid = snippet.channelId;
     // Apply live badge if channel is currently live
     if (_liveChannels && _liveChannels.has(snippet.channelId)) {
@@ -2645,6 +2671,34 @@ function appendFeed(items) {
         showHUD("Playing: " + (snippet.title || ""));
       }
     };
+    // ── Not Interested menu ──
+    const menuBtn = document.createElement("div");
+    menuBtn.className = "video-card-menu focusable";
+    menuBtn.textContent = "⋮";
+    menuBtn.title = "More options";
+    const dropdown = document.createElement("div");
+    dropdown.className = "card-dropdown";
+    dropdown.innerHTML = `
+      <div class="card-dropdown-item danger" data-action="not-interested">🚫 Not interested</div>
+      <div class="card-dropdown-item" data-action="dont-recommend">🔕 Don't recommend channel</div>
+    `;
+    menuBtn.onclick = (e) => {
+      e.stopPropagation();
+      // Close all other dropdowns
+      document.querySelectorAll(".card-dropdown.open").forEach(d => d.classList.remove("open"));
+      dropdown.classList.toggle("open");
+    };
+    dropdown.querySelector("[data-action='not-interested']").onclick = (e) => {
+      e.stopPropagation();
+      markNotInterested(videoId, snippet.channelId || "", snippet.title || "");
+    };
+    dropdown.querySelector("[data-action='dont-recommend']").onclick = (e) => {
+      e.stopPropagation();
+      markNotInterested(videoId, snippet.channelId || "", "");
+      showHUD("Channel removed from recommendations");
+    };
+    card.appendChild(menuBtn);
+    card.appendChild(dropdown);
     frag.appendChild(card);
   });
   feedEl.appendChild(frag);
@@ -3568,6 +3622,10 @@ scrollTopBtn.addEventListener("click", () => {
 })();
 
 let scrollCooldown = false;
+window.addEventListener("click", () => {
+  document.querySelectorAll(".card-dropdown.open").forEach(d => d.classList.remove("open"));
+});
+
 window.addEventListener("scroll", async () => {
   scrollTopBtn.classList.toggle("visible", window.scrollY > 600);
   if (isLoadingMore || scrollCooldown) return;
@@ -4972,6 +5030,52 @@ async function getSearchCTR(query) {
     if (!res.ok) return {};
     return await res.json();
   } catch(e) { return {}; }
+}
+
+
+// ── Not Interested System ──
+function getBlocklist() {
+  try { return JSON.parse(localStorage.getItem("notInterestedIds") || "[]"); } catch(e) { return []; }
+}
+
+function markNotInterested(videoId, channelId, title) {
+  // Add to blocklist
+  const blocklist = getBlocklist();
+  if (!blocklist.includes(videoId)) {
+    blocklist.push(videoId);
+    localStorage.setItem("notInterestedIds", JSON.stringify(blocklist.slice(-500)));
+  }
+
+  // Penalize channel and keywords in taste profile
+  try {
+    const profile = getTasteProfile();
+    // Channel penalty
+    if (channelId) {
+      profile.channels = profile.channels || {};
+      const ch = profile.channels[channelId] || { weight: 0 };
+      ch.weight = Math.max(0, (ch.weight || 0) - 5);
+      ch.notInterested = (ch.notInterested || 0) + 1;
+      profile.channels[channelId] = ch;
+    }
+    // Keyword penalty from title
+    if (title) {
+      const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with"]);
+      const words = title.toLowerCase().replace(/[^a-z0-9\s]/g,"").split(/\s+/).filter(w=>w.length>2&&!stopwords.has(w));
+      profile.keywords = profile.keywords || {};
+      words.forEach(w => { profile.keywords[w] = Math.max(0, (profile.keywords[w]||0) - 2); });
+    }
+    localStorage.setItem("tasteProfile", JSON.stringify(profile));
+  } catch(e) {}
+
+  // Remove card from feed
+  document.querySelectorAll(`[data-videoid="${videoId}"]`).forEach(card => {
+    card.style.transition = "opacity 0.3s, transform 0.3s";
+    card.style.opacity = "0";
+    card.style.transform = "scale(0.95)";
+    setTimeout(() => card.remove(), 300);
+  });
+
+  showHUD("Not interested — feed updated");
 }
 
 (async function init() {
