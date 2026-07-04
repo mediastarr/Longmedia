@@ -2644,7 +2644,7 @@ homeTab.addEventListener("click", async () => {
     const hubRaw = localStorage.getItem("hubNewVideos");
     if (hubRaw) {
       hubVideos = JSON.parse(hubRaw) || [];
-      localStorage.removeItem("hubNewVideos");
+      // Don't remove yet — remove only after inject completes
     }
   } catch(e) {}
 
@@ -2654,7 +2654,11 @@ homeTab.addEventListener("click", async () => {
     if (prevIds.length) {
       setTimeout(async () => {
         if (feedEl.querySelector('[data-hubvideo="1"]')) return; // already there
-        const data = await fetchYouTube("videos", { part: "snippet,statistics", id: prevIds.join(","), _: Date.now() });
+        // Filter out already-watched videos before re-injecting
+        const seenHub = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
+        const unWatchedIds = prevIds.filter(id => !seenHub.has(id));
+        if (!unWatchedIds.length) { sessionStorage.removeItem("injectedHubIds"); return; }
+        const data = await fetchYouTube("videos", { part: "snippet,statistics", id: unWatchedIds.join(","), _: Date.now() });
         if (!data.items || !data.items.length) return;
         const frag = document.createDocumentFragment();
         data.items.forEach(item => {
@@ -4636,8 +4640,10 @@ async function _injectHubVideos(hubVideos) {
     window.scrollTo({ top: 0, behavior: "smooth" });
     // Mark ALL injected videos as seen so they never show as new again
     try {
-      const injectedIds = hubVideos.map(v => v.videoId);
+      const injectedIds = data.items.map(item => item.id);
       sessionStorage.setItem("injectedHubIds", JSON.stringify(injectedIds));
+      // Now safe to clear hubNewVideos
+      localStorage.removeItem("hubNewVideos");
       // Add to hubSeenIds permanently
       const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
       const newSeen = [...new Set([...seenHub, ...injectedIds])].slice(-500);
@@ -4903,6 +4909,8 @@ async function _loadComments(videoId) {
   // Reset poll state on every app open so fresh videos always get through
   _pollKnownIds = null;
   _pollBadgeCount = 0;
+  // Clear stale injected hub IDs from previous session
+  try { sessionStorage.removeItem("injectedHubIds"); } catch(e) {}
   try {
     localStorage.removeItem("_pollLastTasteCheck");
     localStorage.removeItem("_pollLastSubCheck");
