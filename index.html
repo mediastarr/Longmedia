@@ -2733,7 +2733,7 @@ homeTab.addEventListener("click", async () => {
 
   // Inject hub new videos at TOP after feed finishes loading
   if (hubVideos.length) {
-    _injectHubVideos(hubVideos);
+    setTimeout(() => _injectHubVideos(hubVideos), 800);
   }
 });
 
