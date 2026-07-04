@@ -4689,6 +4689,11 @@ async function _injectHubVideos(hubVideos) {
       const ago = timeAgo(snippet.publishedAt);
       card.innerHTML = '<div class="video-thumb"><img src="' + thumb + '" loading="lazy"></div><div class="video-info"><div class="video-title">' + (snippet.title||"") + '</div><div class="video-channel">' + (snippet.channelTitle||"") + '</div><div class="video-meta" style="color:rgba(255,100,100,0.9);">🔴 New · ' + ago + '</div></div>';
       card.onclick = async () => {
+        tabsEl.style.display = "none";
+        searchTabEl.style.display = "none";
+        feedEl.style.display = "none";
+        if (subsPageEl) subsPageEl.style.display = "none";
+        window.scrollTo({ top: 0, behavior: "instant" });
         const short = await checkIsShort(videoId, snippet);
         if (short) openAsShort(videoId, snippet);
         else { setPlayerVideo(videoId, snippet); showHUD("Playing: " + (snippet.title||"")); }
