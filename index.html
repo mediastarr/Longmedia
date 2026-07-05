@@ -3575,7 +3575,6 @@ async function loadMoreVideos() {
     // Filter shorts from home feed before appending
     let moreItems = data.items || [];
     if (currentTab === "home") {
-      moreItems = await filterShortsFromFeed(moreItems);
     }
     appendFeed(moreItems);
   }
@@ -5199,6 +5198,7 @@ function markNotInterested(videoId, channelId, title) {
     if (splash) { splash.classList.add("fade-out"); setTimeout(() => splash.remove(), 800); }
   };
   showSkeletons(6);
+  setActiveTab("home");
   // Start token refresh AND feed fetch in parallel — don't wait for auth before loading
   const hasRefresh = localStorage.getItem("yt_refresh_token");
   const authPromise = hasRefresh ? refreshAccessToken() : Promise.resolve(false);
