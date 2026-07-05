@@ -4597,12 +4597,13 @@ async function _pollCheckNewContent() {
     const allNew = [];
     if (_pollKnownIds === null) {
       _pollKnownIds = new Set();
-      // Pre-load permanently seen hub video IDs so they never show as new again
       try {
         const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
         seenHub.forEach(id => _pollKnownIds.add(id));
       } catch(e) {}
     }
+    // Cache blocklist for this poll cycle
+    const _pollBlocklist = new Set(getBlocklist());
 
     // ── SOURCE 1: Subscriptions via PubSubHubbub Worker (instant, ZERO quota) ──
     // Runs every poll cycle (5-15 min) — free
@@ -4625,7 +4626,7 @@ async function _pollCheckNewContent() {
             if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
             if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
             if ((v.title||"").split("").some(function(c){return c.charCodeAt(0)>591;})) return;
-            if (getBlocklist().includes(v.videoId)) return;
+            if (_pollBlocklist.has(v.videoId)) return;
             allNew.push({ ...v, source: "subscription" });
           }
         });
@@ -4661,7 +4662,7 @@ async function _pollCheckNewContent() {
               window._src2SessionIds.add(id);
               // Skip live streams — they stay "new" indefinitely and spam the feed
               if (item.snippet?.liveBroadcastContent === "live") return;
-              if (getBlocklist().includes(id)) return;
+              if (_pollBlocklist.has(id)) return;
               allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "subscription" });
             }
           });
@@ -4691,7 +4692,7 @@ async function _pollCheckNewContent() {
             if (id && !seenIds3.has(id) && !window._src3SessionIds.has(id)) {
               window._src3SessionIds.add(id);
               if (item.snippet?.liveBroadcastContent === "live") return;
-              if (getBlocklist().includes(id)) return;
+              if (_pollBlocklist.has(id)) return;
               allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "watched" });
             }
           });
@@ -4715,7 +4716,7 @@ async function _pollCheckNewContent() {
             if (id && !seenIds4.has(id) && !window._src4SessionIds.has(id)) {
               window._src4SessionIds.add(id);
               if (item.snippet?.liveBroadcastContent === "live") return;
-              if (getBlocklist().includes(id)) return;
+              if (_pollBlocklist.has(id)) return;
               allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "topic" });
             }
           });
@@ -4761,8 +4762,29 @@ async function _injectHubVideos(hubVideos) {
     if (!hubVideos.length) return;
 
     const ids = hubVideos.map(v => v.videoId).join(",");
-    const data = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", id: ids, _: Date.now() });
+    let data;
+    try {
+      data = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", id: ids, _: Date.now() });
+    } catch(e) { return; }
     if (!data.items || !data.items.length) return;
+
+    // Filter fetched items — remove shorts, blocked, live streams
+    const blockSet = new Set(getBlocklist());
+    data.items = data.items.filter(item => {
+      if (blockSet.has(item.id)) return false;
+      if (isShortByDuration(item)) return false;
+      if (isShortByTitle(item)) return false;
+      const t = (item.snippet?.title || "").toLowerCase();
+      if (t.startsWith("live") || t.startsWith("🔴") || t.includes("broadcast") ||
+          t.includes("| powered by") || t.includes("| live") || t.includes(": live")) return false;
+      if ((item.snippet?.title||"").split("").some(c=>c.charCodeAt(0)>591)) return false;
+      return true;
+    });
+    if (!data.items.length) {
+      localStorage.removeItem("hubNewVideos");
+      return;
+    }
+
     const frag = document.createDocumentFragment();
     data.items.forEach(item => {
       const snippet = item.snippet || {};
