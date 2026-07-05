@@ -2377,13 +2377,9 @@ function renderFeed(items) {
       if (watchedSet.has(id)) return false;
       if (shownSet.has(id)) return false;
       if (blockSet.has(id)) return false; // not interested
-      // Filter shorts from home/trending/movie feeds
+      // Filter shorts from home/trending/movie feeds (YouTube does this by default)
       if (["home","trending","movies"].includes(currentTab)) {
-        const t = (item.snippet?.title || "").toLowerCase();
-        if (t.includes("#shorts") || t.includes("#short")) return false;
-        // Filter by duration if available (< 60 seconds)
-        const dur = item.contentDetails?.duration || "";
-        if (dur && !dur.includes("M") && !dur.includes("H")) return false; // no minutes = under 60s
+        if (isShortByTitle(item) || isShortByDuration(item)) return false;
       }
       return true;
     });
@@ -2869,6 +2865,10 @@ shortsTab.addEventListener("click", async () => {
     <div id="shortsCounter" style="position:absolute;top:20px;right:20px;z-index:10;">Loading…</div>
     <div id="shortsHint" style="z-index:10;"><div class="shorts-arrow up">▼</div><div class="shorts-hint-text">swipe up/down</div><div class="shorts-arrow down">▼</div></div>
     <div id="shortsActions" style="z-index:10;">
+      <div class="shorts-action-btn" id="shortsNotIntBtn" tabindex="0">
+        <div class="shorts-action-icon">🚫</div>
+        <div class="shorts-action-label">Not Interested</div>
+      </div>
       <div class="shorts-action-btn" id="shortsHeartBtn" tabindex="0">
         <div class="shorts-action-icon">♡</div>
         <div class="shorts-action-label" id="shortsHeartLabel">Like</div>
@@ -2921,6 +2921,34 @@ shortsTab.addEventListener("click", async () => {
 
   // Clear Mode — tap Clear to hide UI, tap video to exit
   let clearMode = false;
+  // Not Interested in shorts
+  const shortsNotIntBtn = document.getElementById("shortsNotIntBtn");
+  if (shortsNotIntBtn) {
+    shortsNotIntBtn.addEventListener("click", () => {
+      const item = shortsItems[shortsIndex];
+      if (!item) return;
+      const videoId = item.id;
+      const snippet = item.snippet || {};
+      markNotInterested(videoId, snippet.channelId || "", snippet.title || "");
+      // Also add to hubSeenIds
+      try {
+        const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
+        if (!seenHub.includes(videoId)) {
+          seenHub.push(videoId);
+          localStorage.setItem("hubSeenIds", JSON.stringify(seenHub.slice(-500)));
+        }
+      } catch(e) {}
+      // Skip to next short
+      if (shortsIndex < shortsItems.length - 1) {
+        shortsIndex++;
+        playShort(shortsIndex);
+        showHUD("Not interested — skipped");
+      } else {
+        showHUD("Not interested");
+      }
+    });
+  }
+
   shortsClearBtn.addEventListener("click", () => {
     clearMode = !clearMode;
     if (clearMode) {
@@ -3494,7 +3522,7 @@ async function loadMoreVideos() {
     ]);
     [r1, r2].forEach(r => { if (r.status === "fulfilled") (r.value.items||[]).forEach(item => { const id = item.id?.videoId||item.id; if(!id||seen2.has(id)){return;} seen2.add(id); batch.push(item); }); });
     data = { items: batch, nextPageToken: (r2.status==="fulfilled"&&r2.value.nextPageToken)||"seed" };
-    if (!data.items.length) data = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+    if (!data.items.length) data = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
   }
   if (currentTab === "movies") {
     // Always rotate to a new query for movies — pageTokens expire quickly
@@ -5022,6 +5050,25 @@ function getBlocklist() {
   try { return JSON.parse(localStorage.getItem("notInterestedIds") || "[]"); } catch(e) { return []; }
 }
 
+// Check if a video is a short based on duration
+function isShortByDuration(item) {
+  const dur = item.contentDetails?.duration || "";
+  if (!dur) return false;
+  const match = dur.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return false;
+  const h = parseInt(match[1] || 0);
+  const m = parseInt(match[2] || 0);
+  const s = parseInt(match[3] || 0);
+  const total = h * 3600 + m * 60 + s;
+  return total > 0 && total <= 60;
+}
+
+// Check if video is a short by title tags
+function isShortByTitle(item) {
+  const t = (item.snippet?.title || "").toLowerCase();
+  return t.includes("#shorts") || t.includes("#short");
+}
+
 function markNotInterested(videoId, channelId, title) {
   // Add to blocklist
   const blocklist = getBlocklist();
@@ -5197,6 +5244,11 @@ function markNotInterested(videoId, channelId, title) {
   // Reset poll state on every app open so fresh videos always get through
   _pollKnownIds = null;
   _pollBadgeCount = 0;
+  // Seed feedShownIds with watch history so watched videos never reappear
+  try {
+    const watchedIds = historyList.map(h => h.id?.videoId || h.id).filter(Boolean).slice(0, 200);
+    if (watchedIds.length) sessionStorage.setItem("feedShownIds", JSON.stringify(watchedIds));
+  } catch(e) {}
   // Clear stale session data from previous session
   try {
     sessionStorage.removeItem("injectedHubIds");
