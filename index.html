@@ -2830,8 +2830,7 @@ homeTab.addEventListener("click", async () => {
     if (fresh.status === "fulfilled") addU(fresh.value.items);
     if (popular.status === "fulfilled") addU(popular.value.items);
     if (allItems.length) {
-      const filteredItems = await filterShortsFromFeed(allItems);
-      renderFeed(filteredItems); showHUD("Home");
+      renderFeed(allItems); showHUD("Home");
       nextPageToken = (popular.status === "fulfilled" && popular.value.nextPageToken) || null;
     } else {
       const fallback = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
