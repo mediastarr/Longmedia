@@ -2377,6 +2377,14 @@ function renderFeed(items) {
       if (watchedSet.has(id)) return false;
       if (shownSet.has(id)) return false;
       if (blockSet.has(id)) return false; // not interested
+      // Filter shorts from home/trending/movie feeds
+      if (["home","trending","movies"].includes(currentTab)) {
+        const t = (item.snippet?.title || "").toLowerCase();
+        if (t.includes("#shorts") || t.includes("#short")) return false;
+        // Filter by duration if available (< 60 seconds)
+        const dur = item.contentDetails?.duration || "";
+        if (dur && !dur.includes("M") && !dur.includes("H")) return false; // no minutes = under 60s
+      }
       return true;
     });
     // Track all rendered IDs so they never repeat this session
@@ -2914,9 +2922,14 @@ shortsTab.addEventListener("click", async () => {
   // Clear Mode — tap Clear to hide UI, tap video to exit
   let clearMode = false;
   shortsClearBtn.addEventListener("click", () => {
-    clearMode = true;
-    shortsPageEl.classList.add("clear-mode");
-    showHUD("Clear Mode — tap to exit");
+    clearMode = !clearMode;
+    if (clearMode) {
+      shortsPageEl.classList.add("clear-mode");
+      showHUD("Clear mode on — tap ⊘ again to exit");
+    } else {
+      shortsPageEl.classList.remove("clear-mode");
+      showHUD("Clear mode off");
+    }
   });
   shortsIframe.addEventListener("click", () => {
     if (clearMode) { clearMode = false; shortsPageEl.classList.remove("clear-mode"); }
