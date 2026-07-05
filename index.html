@@ -2056,6 +2056,10 @@ async function loadVideoInfoPanel(videoId, snippet) {
   // Like / Dislike — calls YouTube Ratings API for real
   let liked = false, disliked = false;
 
+  // Clear previous video's like/dislike state
+  document.getElementById("vipLikeBtn").classList.remove("active");
+  document.getElementById("vipDislikeBtn").classList.remove("active");
+
   // Check existing rating on load
   getValidToken().then(token => {
     if (!token) return;
