@@ -2757,7 +2757,7 @@ homeTab.addEventListener("click", async () => {
     if (prevIds.length) {
       setTimeout(async () => {
         if (feedEl.querySelector('[data-hubvideo="1"]')) return; // already there
-        const data = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", id: prevIds.join(","), _: Date.now() });
+        const data = await fetchYouTube("videos", { part: "snippet,statistics", id: prevIds.join(","), _: Date.now() });
         if (!data.items || !data.items.length) return;
         const frag = document.createDocumentFragment();
         data.items.forEach(item => {
@@ -2806,7 +2806,7 @@ homeTab.addEventListener("click", async () => {
     const [pf, fresh2, popular2] = await Promise.allSettled([
       fetchPersonalizedFeed(),
       fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 10, publishedAfter: since24h, _: Date.now() }),
-      fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 10, _: Date.now() })
+      fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 10, _: Date.now() })
     ]);
     if (pf.status === "fulfilled") addL(pf.value);
     if (fresh2.status === "fulfilled") addL(fresh2.value.items);
@@ -2815,7 +2815,7 @@ homeTab.addEventListener("click", async () => {
       renderFeed(allLogged); showHUD("For You ✦");
       nextPageToken = (popular2.status === "fulfilled" && popular2.value.nextPageToken) || null;
     } else {
-      const fallback2 = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+      const fallback2 = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
       nextPageToken = fallback2.nextPageToken || null; renderFeed(fallback2.items || []); showHUD("Home");
     }
   } else {
@@ -2825,7 +2825,7 @@ homeTab.addEventListener("click", async () => {
     // order:date first (last 24h), then mostPopular
     const [fresh, popular] = await Promise.allSettled([
       fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 15, publishedAfter: since24h, _: Date.now() }),
-      fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 15, _: Date.now() })
+      fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 15, _: Date.now() })
     ]);
     if (fresh.status === "fulfilled") addU(fresh.value.items);
     if (popular.status === "fulfilled") addU(popular.value.items);
@@ -2833,7 +2833,7 @@ homeTab.addEventListener("click", async () => {
       renderFeed(allItems); showHUD("Home");
       nextPageToken = (popular.status === "fulfilled" && popular.value.nextPageToken) || null;
     } else {
-      const fallback = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+      const fallback = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
       nextPageToken = fallback.nextPageToken || null; renderFeed(fallback.items || []); showHUD("Home");
     }
   }
@@ -4772,34 +4772,8 @@ async function _injectHubVideos(hubVideos) {
     if (!hubVideos.length) return;
 
     const ids = hubVideos.map(v => v.videoId).join(",");
-    let data;
-    try {
-      data = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", id: ids, _: Date.now() });
-    } catch(e) { return; }
+    const data = await fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() });
     if (!data.items || !data.items.length) return;
-
-    // Filter fetched items — remove shorts, blocked, old, live streams
-    const blockSet = new Set(getBlocklist());
-    const cutoff24h = Date.now() - 24 * 3600000;
-    data.items = data.items.filter(item => {
-      if (blockSet.has(item.id)) return false;
-      if (isShortByDuration(item)) return false;
-      if (isShortByTitle(item)) return false;
-      const t = (item.snippet?.title || "").toLowerCase();
-      if (t.startsWith("live") || t.startsWith("🔴") || t.includes("broadcast") ||
-          t.includes("| powered by") || t.includes("| live") || t.includes(": live")) return false;
-      if ((item.snippet?.title||"").split("").some(c=>c.charCodeAt(0)>591)) return false;
-      // Check receivedAt from original hubVideos array
-      const hubEntry = hubVideos.find(v => v.videoId === item.id);
-      const foundAt = hubEntry?.receivedAt || Date.now();
-      if (foundAt < cutoff24h) return false;
-      return true;
-    });
-    if (!data.items.length) {
-      localStorage.removeItem("hubNewVideos");
-      return;
-    }
-
     const frag = document.createDocumentFragment();
     data.items.forEach(item => {
       const snippet = item.snippet || {};
