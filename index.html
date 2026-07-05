@@ -703,9 +703,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
       <div style="font-size:10px; opacity:0.65; margin-bottom:12px; line-height:1.4; flex-shrink:0;">Choose a playlist to add this video to.</div>
       <div id="plPickerList" style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; touch-action:pan-y;"></div>
       <div id="plPickerStatus" style="display:none; padding:8px; text-align:center; font-size:12px; border-radius:12px; margin-top:8px; flex-shrink:0;"></div>
-      <div style="display:flex; gap:8px; margin-top:12px; flex-shrink:0;">
-        <button id="plPickerClose" class="topbar-btn" tabindex="0" style="flex:1; font-size:11px; padding:6px 10px; min-height:32px; background:radial-gradient(circle at 0% 0%,rgba(255,80,80,0.2),rgba(10,12,20,0.9));">Cancel</button>
-      </div>
+      <button id="plPickerClose" class="topbar-btn focusable" tabindex="0" style="width:100%; margin-top:8px; font-size:12px; padding:8px; flex-shrink:0;">✕ Cancel</button>
     </div>
   </div>
   <div id="searchPanel">
@@ -1707,7 +1705,11 @@ document.addEventListener("keydown", (e) => {
       items.forEach(item => item.classList.remove("pl-nav-focus"));
       // Move to next/prev
       let next = e.key === "ArrowDown" ? cur + 1 : cur - 1;
-      if (next < 0) next = 0;
+      if (next < 0) {
+        // Scrolled past top — focus Cancel button
+        document.getElementById("plPickerClose").focus();
+        return;
+      }
       if (next >= items.length) {
         // At end of list — focus Cancel button
         document.getElementById("plPickerClose").focus();
@@ -1842,6 +1844,14 @@ function createYTPlayer(videoId, startSeconds) {
 function setPlayerVideo(videoId, snippet, startSeconds) {
   savedScrollY = window.scrollY;
   currentVideoId = videoId;
+  // Mark as seen immediately on open — prevents it showing as "new" again
+  try {
+    const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
+    if (!seenHub.includes(videoId)) {
+      seenHub.push(videoId);
+      localStorage.setItem("hubSeenIds", JSON.stringify(seenHub.slice(-500)));
+    }
+  } catch(e) {}
   // Reset quality to auto for each new video — onReady will detect best quality
   currentQuality = "auto";
   qualityIndex = 0;
@@ -2056,9 +2066,11 @@ async function loadVideoInfoPanel(videoId, snippet) {
   // Like / Dislike — calls YouTube Ratings API for real
   let liked = false, disliked = false;
 
-  // Clear previous video's like/dislike state
-  document.getElementById("vipLikeBtn").classList.remove("active");
-  document.getElementById("vipDislikeBtn").classList.remove("active");
+  // Clear previous video's like/dislike state immediately and keep cleared until API responds
+  const likeBtn = document.getElementById("vipLikeBtn");
+  const dislikeBtn = document.getElementById("vipDislikeBtn");
+  likeBtn.classList.remove("active");
+  dislikeBtn.classList.remove("active");
 
   // Check existing rating on load
   getValidToken().then(token => {
