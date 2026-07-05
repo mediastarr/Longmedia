@@ -2086,12 +2086,25 @@ async function loadVideoInfoPanel(videoId, snippet) {
 
   async function setRating(rating) {
     const token = await getValidToken();
-    if (!token) { showHUD("Login required to rate videos"); return false; }
+    if (!token) {
+      showHUD("Session expired — please log in again");
+      triggerReAuthFlow();
+      return false;
+    }
     try {
       const res = await fetch(
         `https://www.googleapis.com/youtube/v3/videos/rate?id=${videoId}&rating=${rating}`,
         { method: "POST", headers: { Authorization: "Bearer " + token } }
       );
+      if (res.status === 401) {
+        showHUD("Session expired — please log in again");
+        triggerReAuthFlow();
+        return false;
+      }
+      if (res.status === 403) {
+        showHUD("This video cannot be rated (restricted content)");
+        return false;
+      }
       return res.status === 204 || res.ok;
     } catch(e) { return false; }
   }
