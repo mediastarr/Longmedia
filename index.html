@@ -2377,9 +2377,13 @@ function renderFeed(items) {
       if (watchedSet.has(id)) return false;
       if (shownSet.has(id)) return false;
       if (blockSet.has(id)) return false; // not interested
-      // Filter shorts from home/trending/movie feeds (YouTube does this by default)
+      // Filter shorts from home/trending/movie feeds
       if (["home","trending","movies"].includes(currentTab)) {
         if (isShortByTitle(item) || isShortByDuration(item)) return false;
+        // Also filter by aspect ratio signal — portrait thumbnails are shorts
+        const t = (item.snippet?.title || "").toLowerCase();
+        // Common shorts signals in titles
+        if (t.match(/^#|\s#shorts?/)) return false;
       }
       return true;
     });
@@ -2815,7 +2819,8 @@ homeTab.addEventListener("click", async () => {
     if (fresh.status === "fulfilled") addU(fresh.value.items);
     if (popular.status === "fulfilled") addU(popular.value.items);
     if (allItems.length) {
-      renderFeed(allItems); showHUD("Home");
+      const filteredItems = await filterShortsFromFeed(allItems);
+      renderFeed(filteredItems); showHUD("Home");
       nextPageToken = (popular.status === "fulfilled" && popular.value.nextPageToken) || null;
     } else {
       const fallback = await fetchYouTube("videos", { part: "snippet,statistics", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
@@ -3556,7 +3561,14 @@ async function loadMoreVideos() {
       card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle || ""}</div></div>`;
       card.onclick = async () => { const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet); }; channelPageEl.appendChild(card);
     });
-  } else { appendFeed(data.items || []); }
+  } else {
+    // Filter shorts from home feed before appending
+    let moreItems = data.items || [];
+    if (currentTab === "home") {
+      moreItems = await filterShortsFromFeed(moreItems);
+    }
+    appendFeed(moreItems);
+  }
 }
 
 async function loadMoreSubs() {
@@ -4951,6 +4963,30 @@ async function _loadComments(videoId) {
 }
 
 
+/* ── Shorts Filter for Home Feed ── */
+async function filterShortsFromFeed(items) {
+  if (!items || !items.length) return items;
+  // Items from search API have no duration — fetch it
+  const searchItems = items.filter(item => !item.contentDetails);
+  if (searchItems.length) {
+    try {
+      const ids = searchItems.map(item => item.id?.videoId || item.id).filter(Boolean).join(",");
+      if (ids) {
+        const durData = await fetchYouTube("videos", { part: "contentDetails", id: ids, _: Date.now() });
+        const durMap = {};
+        (durData.items || []).forEach(v => { durMap[v.id] = v.contentDetails?.duration || ""; });
+        items = items.map(item => {
+          const id = item.id?.videoId || item.id;
+          if (id && durMap[id]) item.contentDetails = { duration: durMap[id] };
+          return item;
+        });
+      }
+    } catch(e) {}
+  }
+  // Now filter out shorts
+  return items.filter(item => !isShortByDuration(item) && !isShortByTitle(item));
+}
+
 /* ================================================================
    COLLABORATIVE FILTERING + ENGAGEMENT SIGNALS
 ================================================================ */
@@ -5050,7 +5086,7 @@ function getBlocklist() {
   try { return JSON.parse(localStorage.getItem("notInterestedIds") || "[]"); } catch(e) { return []; }
 }
 
-// Check if a video is a short based on duration
+// Check if a video is a short based on duration (5s to 1:58 = 118s)
 function isShortByDuration(item) {
   const dur = item.contentDetails?.duration || "";
   if (!dur) return false;
@@ -5060,7 +5096,7 @@ function isShortByDuration(item) {
   const m = parseInt(match[2] || 0);
   const s = parseInt(match[3] || 0);
   const total = h * 3600 + m * 60 + s;
-  return total > 0 && total <= 60;
+  return total >= 5 && total <= 118; // block 5s to 1:58
 }
 
 // Check if video is a short by title tags
