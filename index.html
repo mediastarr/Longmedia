@@ -2379,16 +2379,14 @@ function showSkeletons(count = 6) {
 }
 
 function renderFeed(items) {
-  // Deduplicate against watch history + already shown + not interested
+  // Deduplicate against watch history + not interested
   try {
     const watchedSet = new Set(historyList.map(h => h.id?.videoId || h.id).filter(Boolean));
-    const shownSet = new Set(JSON.parse(sessionStorage.getItem("feedShownIds") || "[]"));
     const blockSet = new Set(getBlocklist());
     items = items.filter(item => {
       const id = item.id?.videoId || item.id;
       if (!id) return false;
       if (watchedSet.has(id)) return false;
-      if (shownSet.has(id)) return false;
       if (blockSet.has(id)) return false; // not interested
       // Filter shorts from home/trending/movie feeds
       if (["home","trending","movies"].includes(currentTab)) {
@@ -2400,10 +2398,7 @@ function renderFeed(items) {
       }
       return true;
     });
-    // Track all rendered IDs so they never repeat this session
-    const newIds = items.map(item => item.id?.videoId || item.id).filter(Boolean);
-    const merged = [...new Set([...shownSet, ...newIds])].slice(-200);
-    sessionStorage.setItem("feedShownIds", JSON.stringify(merged));
+
   } catch(e) {}
   feedEl.innerHTML = "";
   appendFeed(items);
@@ -2619,6 +2614,9 @@ function openAsShort(videoId, snippet) {
   const _origHomeClick = homeTab.onclick;
   const _restoreOnBack = () => {
     shortsPageEl.style.display = "none";
+    topbarEl.style.display = "flex";
+    tabsEl.style.display = "flex";
+    searchTabEl.style.display = "flex";
     setActiveTab(returnTabName);
     requestAnimationFrame(() => window.scrollTo({ top: returnScrollY, behavior: "instant" }));
     showHUD("Back");
@@ -4781,8 +4779,9 @@ async function _injectHubVideos(hubVideos) {
     } catch(e) { return; }
     if (!data.items || !data.items.length) return;
 
-    // Filter fetched items — remove shorts, blocked, live streams
+    // Filter fetched items — remove shorts, blocked, old, live streams
     const blockSet = new Set(getBlocklist());
+    const cutoff24h = Date.now() - 24 * 3600000;
     data.items = data.items.filter(item => {
       if (blockSet.has(item.id)) return false;
       if (isShortByDuration(item)) return false;
@@ -4791,6 +4790,10 @@ async function _injectHubVideos(hubVideos) {
       if (t.startsWith("live") || t.startsWith("🔴") || t.includes("broadcast") ||
           t.includes("| powered by") || t.includes("| live") || t.includes(": live")) return false;
       if ((item.snippet?.title||"").split("").some(c=>c.charCodeAt(0)>591)) return false;
+      // Check receivedAt from original hubVideos array
+      const hubEntry = hubVideos.find(v => v.videoId === item.id);
+      const foundAt = hubEntry?.receivedAt || Date.now();
+      if (foundAt < cutoff24h) return false;
       return true;
     });
     if (!data.items.length) {
@@ -5323,7 +5326,6 @@ function markNotInterested(videoId, channelId, title) {
   // Clear stale session data from previous session
   try {
     sessionStorage.removeItem("injectedHubIds");
-    sessionStorage.removeItem("feedShownIds"); // fresh dedup each session
     // Clear stale hub videos — badge on startup should only come from THIS session's poll
     localStorage.removeItem("hubNewVideos");
     localStorage.removeItem("_pollLastSubCheck");
