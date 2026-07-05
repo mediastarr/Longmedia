@@ -4625,6 +4625,7 @@ async function _pollCheckNewContent() {
             if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
             if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
             if ((v.title||"").split("").some(function(c){return c.charCodeAt(0)>591;})) return;
+            if (getBlocklist().includes(v.videoId)) return;
             allNew.push({ ...v, source: "subscription" });
           }
         });
@@ -4660,6 +4661,7 @@ async function _pollCheckNewContent() {
               window._src2SessionIds.add(id);
               // Skip live streams — they stay "new" indefinitely and spam the feed
               if (item.snippet?.liveBroadcastContent === "live") return;
+              if (getBlocklist().includes(id)) return;
               allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "subscription" });
             }
           });
@@ -4689,6 +4691,7 @@ async function _pollCheckNewContent() {
             if (id && !seenIds3.has(id) && !window._src3SessionIds.has(id)) {
               window._src3SessionIds.add(id);
               if (item.snippet?.liveBroadcastContent === "live") return;
+              if (getBlocklist().includes(id)) return;
               allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "watched" });
             }
           });
@@ -4712,6 +4715,7 @@ async function _pollCheckNewContent() {
             if (id && !seenIds4.has(id) && !window._src4SessionIds.has(id)) {
               window._src4SessionIds.add(id);
               if (item.snippet?.liveBroadcastContent === "live") return;
+              if (getBlocklist().includes(id)) return;
               allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "topic" });
             }
           });
