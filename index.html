@@ -2379,26 +2379,31 @@ function showSkeletons(count = 6) {
 }
 
 function renderFeed(items) {
-  // Deduplicate against watch history + not interested
+  // Deduplicate against watch history + already shown + not interested
   try {
     const watchedSet = new Set(historyList.map(h => h.id?.videoId || h.id).filter(Boolean));
+    const shownSet = new Set(JSON.parse(sessionStorage.getItem("feedShownIds") || "[]"));
     const blockSet = new Set(getBlocklist());
     items = items.filter(item => {
       const id = item.id?.videoId || item.id;
       if (!id) return false;
       if (watchedSet.has(id)) return false;
+      if (shownSet.has(id)) return false;
       if (blockSet.has(id)) return false; // not interested
-      // Filter shorts from home/trending/movie feeds
+      // Filter shorts from home/trending/movies
+      if (["home","trending","movies"].includes(currentTab)) {
+        try { if (isShortByTitle(item) || isShortByDuration(item)) return false; } catch(e) {}
+      }
+      // Filter shorts from home/trending/movie feeds (YouTube does this by default)
       if (["home","trending","movies"].includes(currentTab)) {
         if (isShortByTitle(item) || isShortByDuration(item)) return false;
-        // Also filter by aspect ratio signal — portrait thumbnails are shorts
-        const t = (item.snippet?.title || "").toLowerCase();
-        // Common shorts signals in titles
-        if (t.match(/^#|\s#shorts?/)) return false;
       }
       return true;
     });
-
+    // Track all rendered IDs so they never repeat this session
+    const newIds = items.map(item => item.id?.videoId || item.id).filter(Boolean);
+    const merged = [...new Set([...shownSet, ...newIds])].slice(-200);
+    sessionStorage.setItem("feedShownIds", JSON.stringify(merged));
   } catch(e) {}
   feedEl.innerHTML = "";
   appendFeed(items);
@@ -5299,6 +5304,7 @@ function markNotInterested(videoId, channelId, title) {
   // Clear stale session data from previous session
   try {
     sessionStorage.removeItem("injectedHubIds");
+    sessionStorage.removeItem("feedShownIds");
     // Clear stale hub videos — badge on startup should only come from THIS session's poll
     localStorage.removeItem("hubNewVideos");
     localStorage.removeItem("_pollLastSubCheck");
