@@ -5319,11 +5319,7 @@ function markNotInterested(videoId, channelId, title) {
   // Reset poll state on every app open so fresh videos always get through
   _pollKnownIds = null;
   _pollBadgeCount = 0;
-  // Seed feedShownIds with watch history so watched videos never reappear
-  try {
-    const watchedIds = historyList.map(h => h.id?.videoId || h.id).filter(Boolean).slice(0, 200);
-    if (watchedIds.length) sessionStorage.setItem("feedShownIds", JSON.stringify(watchedIds));
-  } catch(e) {}
+
   // Clear stale session data from previous session
   try {
     sessionStorage.removeItem("injectedHubIds");
