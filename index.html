@@ -1844,11 +1844,9 @@ function createYTPlayer(videoId, startSeconds) {
 function setPlayerVideo(videoId, snippet, startSeconds) {
   savedScrollY = window.scrollY;
   currentVideoId = videoId;
-  try {
-    const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
-    if (!seenHub.includes(videoId)) { seenHub.push(videoId); localStorage.setItem("hubSeenIds", JSON.stringify(seenHub.slice(-500))); }
-  } catch(e) {}
-  // Mark as seen immediately on open — prevents it showing as "new" again
+  // Note: do NOT add to hubSeenIds here — that blocks new video notifications
+  // hubSeenIds is only for explicitly dismissed hub notification videos
+  // Reset quality to auto — prevents it showing as "new" again
   try {
     const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
     if (!seenHub.includes(videoId)) {
@@ -2380,12 +2378,15 @@ function renderFeed(items) {
     const watchedSet = new Set(historyList.map(h => h.id?.videoId || h.id).filter(Boolean));
     const shownSet = new Set(JSON.parse(sessionStorage.getItem("feedShownIds") || "[]"));
     const blockSet = new Set(getBlocklist());
+    const sessionDedup = new Set();
     items = items.filter(item => {
       const id = item.id?.videoId || item.id;
       if (!id) return false;
       if (watchedSet.has(id)) return false;
       if (shownSet.has(id)) return false;
       if (blockSet.has(id)) return false; // not interested
+      if (sessionDedup.has(id)) return false; // dedup within this render call
+      sessionDedup.add(id);
       // Filter shorts from home/trending/movie feeds (YouTube does this by default)
       if (["home","trending","movies"].includes(currentTab)) {
         if (isShortByTitle(item) || isShortByDuration(item)) return false;
