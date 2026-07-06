@@ -2782,7 +2782,8 @@ trendingTab.addEventListener("click", async () => {
   if (fresh.status==="fulfilled") addU(fresh.value.items);
   if (popular.status==="fulfilled") addU(popular.value.items);
   if (allItems.length) {
-    renderFeed(allItems); showHUD("Trending");
+    const ranked = await getPersonalizedTrending(allItems);
+    renderFeed(ranked); showHUD("Trending ✦");
     nextPageToken = (popular.status==="fulfilled" && popular.value.nextPageToken) || null;
   } else {
     const fallback = await fetchYouTubeDirect("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",maxResults:20,_:Date.now()});
@@ -5120,6 +5121,37 @@ function updateSessionContext(snippet) {
       body: JSON.stringify({ watchedTopics: _sessionTopics, watchedChannels: _sessionChannels })
     }).catch(()=>{});
   } catch(e) {}
+}
+
+
+// ── Personalized trending via Worker ──
+async function getPersonalizedTrending(videos) {
+  if (!videos || !videos.length) return videos;
+  try {
+    const profile = getTasteProfile();
+    const res = await fetch(HUB_WORKER_URL + "/trending", {
+      method: "POST",
+      headers: workerHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        videos: videos.map(item => ({
+          videoId: item.id?.videoId || item.id,
+          channelId: item.snippet?.channelId || "",
+          title: item.snippet?.title || "",
+          publishedAt: item.snippet?.publishedAt || ""
+        })),
+        profile: {
+          keywords: profile.keywords || {},
+          channels: Object.fromEntries(Object.entries(profile.channels||{}).map(([id,v])=>[id,typeof v==="object"?v.weight||0:v]))
+        }
+      })
+    });
+    if (!res.ok) return videos;
+    const data = await res.json();
+    const scoreMap = {};
+    (data.videos||[]).forEach(v => scoreMap[v.videoId] = v._trendScore);
+    return videos.map(item => ({ ...item, _trendScore: scoreMap[item.id?.videoId||item.id] || 0 }))
+      .sort((a,b) => (b._trendScore||0) - (a._trendScore||0));
+  } catch(e) { return videos; }
 }
 
 (async function init() {
