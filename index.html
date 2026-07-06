@@ -822,10 +822,10 @@ async function fetchYouTubeDirect(endpoint, params = {}, retries = 2) {
     });
     if (res.ok) { const data = await res.json(); if (!data.error) return data; }
   } catch(e) {}
-  // True fallback: use any client-side keys if available
-  if (!API_KEYS.length) return { items: [], error: true };
-  const key = API_KEYS[keyIndex % API_KEYS.length];
-  keyIndex = (keyIndex + 1) % API_KEYS.length;
+  // No client-side keys — Worker is the only path
+  return { items: [], error: true };
+  // Dead code kept for structure:
+  const key = "";
   const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
   const p = Object.assign({}, params, { key });
   Object.entries(p).forEach(([k, v]) => { if (v !== undefined && v !== null) url.searchParams.append(k, v); });
@@ -854,13 +854,8 @@ async function fetchYouTube(endpoint, params = {}, retries = 2) {
     if (res.ok) {
       const data = await res.json();
       if (!data.error) return data;
-      console.warn("Worker /yt error:", data.error, endpoint);
-    } else {
-      console.warn("Worker /yt HTTP error:", res.status, endpoint);
     }
-  } catch(e) {
-    console.warn("Worker /yt fetch failed:", e.message, endpoint);
-  }
+  } catch(e) {}
   // Fallback to direct if Worker unavailable
   return fetchYouTubeDirect(endpoint, params, retries);
 }
@@ -1692,11 +1687,7 @@ window.onYouTubeIframeAPIReady = function () {
       playerVars: { autoplay: 0, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin },
       events: {
         onReady: () => { isPlayerReady = true; },
-        onError: (e) => {
-          if (e.data === 101 || e.data === 150) showAgeRestrictedOverlay(currentVideoId);
-          else if (e.data === 100) showHUD("Video not available");
-          else showHUD("Playback error — try another video");
-        },
+
         onStateChange: (e) => {
           if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "⏸";
           if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "▶";
@@ -4816,8 +4807,7 @@ let _liveCheckTimer = null;
 
 async function _checkLiveStreams() {
   try {
-    const key = API_KEYS[keyIndex % API_KEYS.length];
-    const res = await fetch(HUB_WORKER_URL + "/live?key=" + key, {
+    const res = await fetch(HUB_WORKER_URL + "/live?key=worker", {
       headers: workerHeaders()
     });
     if (!res.ok) return;
