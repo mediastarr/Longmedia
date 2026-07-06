@@ -2758,6 +2758,21 @@ homeTab.addEventListener("click", async () => {
     }
   }
 
+  // Cold-start fallback for brand new users with an empty feed
+  if (feedEl.children.length === 0 && !historyList.length) {
+    try {
+      const coldVideos = await getColdStartVideos();
+      if (coldVideos.length) {
+        const ids = coldVideos.map(v => v.videoId).join(",");
+        const coldData = await fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() });
+        if (coldData.items && coldData.items.length) {
+          renderFeed(coldData.items);
+          showHUD("Welcome ✦");
+        }
+      }
+    } catch(e) {}
+  }
+
   // Inject hub new videos at TOP after feed finishes loading
   if (hubVideos.length) {
     _injectHubVideos(hubVideos);
@@ -5152,6 +5167,35 @@ async function getPersonalizedTrending(videos) {
     return videos.map(item => ({ ...item, _trendScore: scoreMap[item.id?.videoId||item.id] || 0 }))
       .sort((a,b) => (b._trendScore||0) - (a._trendScore||0));
   } catch(e) { return videos; }
+}
+
+
+// ── Cold-start for new users ──
+async function getColdStartVideos() {
+  try {
+    const res = await fetch(HUB_WORKER_URL + "/coldstart", { headers: workerHeaders() });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.videos || [];
+  } catch(e) { return []; }
+}
+
+// ── A/B test group assignment ──
+let _abTestConfig = null;
+async function getABTestConfig() {
+  if (_abTestConfig) return _abTestConfig;
+  try {
+    const cached = localStorage.getItem("_abTestConfig");
+    if (cached) { _abTestConfig = JSON.parse(cached); return _abTestConfig; }
+    const res = await fetch(HUB_WORKER_URL + "/abtest", { headers: workerHeaders() });
+    if (res.ok) {
+      const data = await res.json();
+      _abTestConfig = data.config || { feedStrategy:"standard" };
+      localStorage.setItem("_abTestConfig", JSON.stringify(_abTestConfig));
+      return _abTestConfig;
+    }
+  } catch(e) {}
+  return { feedStrategy:"standard" };
 }
 
 (async function init() {
