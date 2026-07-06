@@ -1813,6 +1813,7 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   window.scrollTo({ top: 0, behavior: "instant" });
   // Show info panel below medium player
   loadVideoInfoPanel(videoId, snippet);
+  updateSessionContext(snippet);
   playPauseBtn.textContent = "⏸";
   initAudioGlow();
   const resumeAt = startSeconds || getResumePosition(videoId);
@@ -5099,6 +5100,26 @@ function markNotInterested(videoId, channelId, title) {
   });
   try { fetch(HUB_WORKER_URL+"/engage", { method:"POST", headers:workerHeaders({"Content-Type":"application/json"}), body:JSON.stringify({videoId,channelId,signal:"not_interested",pct:0}) }); } catch(e) {}
   showHUD("Not interested — feed updated");
+}
+
+
+// ── Session diversity tracking ──
+let _sessionTopics = [];
+let _sessionChannels = [];
+function updateSessionContext(snippet) {
+  if (!snippet) return;
+  try {
+    const channelId = snippet.channelId || "";
+    const title = (snippet.title || "").toLowerCase();
+    const words = title.replace(/[^a-z0-9\s]/g,"").split(/\s+/).filter(w=>w.length>3);
+    if (channelId && !_sessionChannels.includes(channelId)) _sessionChannels = [..._sessionChannels, channelId].slice(-10);
+    words.forEach(w => { if (!_sessionTopics.includes(w)) _sessionTopics = [..._sessionTopics, w].slice(-20); });
+    fetch(HUB_WORKER_URL + "/session", {
+      method: "POST",
+      headers: workerHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ watchedTopics: _sessionTopics, watchedChannels: _sessionChannels })
+    }).catch(()=>{});
+  } catch(e) {}
 }
 
 (async function init() {
