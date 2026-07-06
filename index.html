@@ -1686,7 +1686,11 @@ window.onYouTubeIframeAPIReady = function () {
       width: "100%", height: "100%",
       playerVars: { autoplay: 0, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin },
       events: {
-        onReady: () => { isPlayerReady = true; },
+        onReady: () => {
+          isPlayerReady = true;
+          // Start playback immediately when player is ready
+          try { ytPlayer.playVideo(); } catch(e) {}
+        },
         onError: (e) => {
           if (e.data === 101 || e.data === 150) showAgeRestrictedOverlay(currentVideoId);
           else if (e.data === 100) showHUD("Video not available");
@@ -1725,6 +1729,8 @@ function createYTPlayer(videoId, startSeconds) {
         ytPlayer.loadVideoById(videoId);
       }
       if (currentQuality !== "auto") { try { ytPlayer.setPlaybackQuality(currentQuality); } catch(e) {} }
+      // loadVideoById only cues the video — must call playVideo() to start playback
+      try { ytPlayer.playVideo(); } catch(e) {}
       playPauseBtn.textContent = "⏸";
       return;
     } catch(e) {
