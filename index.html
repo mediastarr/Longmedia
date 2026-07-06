@@ -2773,6 +2773,15 @@ homeTab.addEventListener("click", async () => {
     } catch(e) {}
   }
 
+  // Submit rendered feed items to Worker for background feed pre-building
+  try {
+    const renderedItems = Array.from(feedEl.querySelectorAll(".video-card")).slice(0,30).map(card => ({
+      id: card.dataset.videoid,
+      snippet: { channelId: card.dataset.channelid || "" }
+    })).filter(item => item.id);
+    if (renderedItems.length) submitFeedCandidates(renderedItems);
+  } catch(e) {}
+
   // Inject hub new videos at TOP after feed finishes loading
   if (hubVideos.length) {
     _injectHubVideos(hubVideos);
@@ -5196,6 +5205,32 @@ async function getABTestConfig() {
     }
   } catch(e) {}
   return { feedStrategy:"standard" };
+}
+
+
+// ── Worker feed pre-building (background, non-blocking) ──
+function submitFeedCandidates(items) {
+  if (!items || !items.length) return;
+  try {
+    const profile = getTasteProfile();
+    fetch(HUB_WORKER_URL + "/feed", {
+      method: "POST",
+      headers: workerHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        candidates: items.slice(0, 30).map(item => ({
+          videoId: item.id?.videoId || item.id,
+          channelId: item.snippet?.channelId || "",
+          title: item.snippet?.title || "",
+          publishedAt: item.snippet?.publishedAt || ""
+        })),
+        profile: {
+          keywords: profile.keywords || {},
+          channels: Object.fromEntries(Object.entries(profile.channels||{}).map(([id,v])=>[id,typeof v==="object"?v.weight||0:v])),
+          categories: profile.categories || {}
+        }
+      })
+    }).catch(()=>{});
+  } catch(e) {}
 }
 
 (async function init() {
