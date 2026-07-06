@@ -766,7 +766,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
     <!-- Suggested videos label -->
     <div style="font-size:12px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:rgba(60,242,255,0.7); padding:10px 2px 6px;">Up Next</div>
     <!-- Suggested feed -->
-    <div id="suggestedFeed" style="touch-action:pan-y;"></div>
+    <div id="suggestedFeed" style="touch-action:manipulation;"></div>
   </div>
   <div id="channelPage"></div>
   <div id="subsPage" style="display:none; margin-top:16px; position:relative; z-index:10;">
@@ -2167,8 +2167,9 @@ async function loadVideoInfoPanel(videoId, snippet) {
     const ago = timeAgo(s.publishedAt);
     const meta = [views && views + " views", ago].filter(Boolean).join(" · ");
     const card = document.createElement("div");
-    card.className = "video-card parallax";
+    card.className = "video-card parallax focusable";
     card.dataset.videoid = vid;
+    card.setAttribute("tabindex", "0");
     card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${s.title || ""}</div><div class="video-channel">${s.channelTitle || ""}</div><div class="video-meta">${meta}</div></div>`;
     card.onclick = () => {
       // Always open suggested videos in medium player — never route to shorts player
