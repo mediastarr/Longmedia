@@ -5301,22 +5301,13 @@ function submitFeedCandidates(items) {
       if (data && data.items && data.items.length) { nextPageToken = data.nextPageToken || null; renderFeed(data.items); showHUD("Home"); }
     } catch(e2) {}
   };
-  _startupFetch();
+  const startupPromise = _startupFetch();
 
   // Wait for auth to complete (was running in parallel)
   const ok = await authPromise;
+  await startupPromise; // ensure home feed finished rendering before checking feedEl.children.length
   if (ok) {
     showHUD("Signed in ✓");
-    // Store YouTube channel ID for multi-user Worker isolation
-    try {
-      const tkForId = await getValidToken();
-      if (tkForId && !localStorage.getItem("yt_channel_id")) {
-        const chRes = await fetch("https://www.googleapis.com/youtube/v3/channels?part=id&mine=true", { headers: { Authorization: "Bearer " + tkForId } });
-        const chData = await chRes.json();
-        const channelId = chData.items?.[0]?.id || "";
-        if (channelId) localStorage.setItem("yt_channel_id", channelId);
-      }
-    } catch(e) {}
     // Store YouTube channel ID for multi-user Worker isolation
     try {
       const tkForId = await getValidToken();
