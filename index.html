@@ -2754,11 +2754,11 @@ homeTab.addEventListener("click", async () => {
     if (fresh2.status === "fulfilled") addL(fresh2.value.items);
     if (popular2.status === "fulfilled") addL(popular2.value.items);
     if (allLogged.length) {
-      renderFeed(allLogged); showHUD("For You ✦");
+      await renderFeed(allLogged); showHUD("For You ✦");
       nextPageToken = (popular2.status === "fulfilled" && popular2.value.nextPageToken) || null;
     } else {
       const fallback2 = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
-      nextPageToken = fallback2.nextPageToken || null; renderFeed(fallback2.items || []); showHUD("Home");
+      nextPageToken = fallback2.nextPageToken || null; await renderFeed(fallback2.items || []); showHUD("Home");
     }
   } else {
     const seen = new Set(); const allItems = [];
@@ -2772,11 +2772,11 @@ homeTab.addEventListener("click", async () => {
     if (fresh.status === "fulfilled") addU(fresh.value.items);
     if (popular.status === "fulfilled") addU(popular.value.items);
     if (allItems.length) {
-      renderFeed(allItems); showHUD("Home");
+      await renderFeed(allItems); showHUD("Home");
       nextPageToken = (popular.status === "fulfilled" && popular.value.nextPageToken) || null;
     } else {
       const fallback = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
-      nextPageToken = fallback.nextPageToken || null; renderFeed(fallback.items || []); showHUD("Home");
+      nextPageToken = fallback.nextPageToken || null; await renderFeed(fallback.items || []); showHUD("Home");
     }
   }
 
@@ -2788,7 +2788,7 @@ homeTab.addEventListener("click", async () => {
         const ids = coldVideos.map(v => v.videoId).join(",");
         const coldData = await fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() });
         if (coldData.items && coldData.items.length) {
-          renderFeed(coldData.items);
+          await renderFeed(coldData.items);
           showHUD("Welcome ✦");
         }
       }
@@ -2829,12 +2829,12 @@ trendingTab.addEventListener("click", async () => {
   if (popular.status==="fulfilled") addU(popular.value.items);
   if (allItems.length) {
     const ranked = await getPersonalizedTrending(allItems);
-    renderFeed(ranked); showHUD("Trending ✦");
+    await renderFeed(ranked); showHUD("Trending ✦");
     nextPageToken = (popular.status==="fulfilled" && popular.value.nextPageToken) || null;
   } else {
     const fallback = await fetchYouTubeDirect("videos",{part:"snippet,statistics",chart:"mostPopular",regionCode:"US",maxResults:20,_:Date.now()});
     nextPageToken = fallback.nextPageToken || null;
-    renderFeed(fallback.items || []); showHUD("Trending");
+    await renderFeed(fallback.items || []); showHUD("Trending");
   }
 });
 
@@ -3166,7 +3166,7 @@ moviesTab.addEventListener("click", async () => {
   const items=allItems.filter(v=>v.id?.videoId||v.id).map(v=>({id:v.id?.videoId||v.id,snippet:v.snippet}));
   if (!items.length) { feedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies again to retry.</div>'; isLoadingMovies=false; return; }
   nextPageToken="seed";
-  renderFeed(items); showHUD("Movies");
+  await renderFeed(items); showHUD("Movies");
   } catch(e) { feedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies to retry.</div>'; } finally { isLoadingMovies = false; }
 });
 
@@ -3871,7 +3871,7 @@ function triggerSearch(q) {
     if (data.items && data.items.length) {
       // Re-rank results using taste profile before rendering
       const ranked = await rankSearchResultsWithCTR(data.items, q);
-      renderFeed(ranked);
+      await renderFeed(ranked);
       showHUD("Search: " + q);
     } else {
       feedEl.innerHTML = `<div style="font-size:13px;opacity:0.8;padding:16px;text-align:center;">No results for "${q}". API quota may be exhausted — try again in a moment.</div>`;
@@ -5293,12 +5293,12 @@ function submitFeedCandidates(items) {
       ]);
       if (fresh.status === "fulfilled") (fresh.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
       if (popular.status === "fulfilled") (popular.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
-      if (allItems.length) { nextPageToken = (popular.status==="fulfilled"&&popular.value.nextPageToken)||null; renderFeed(allItems); showHUD("Home"); return; }
+      if (allItems.length) { nextPageToken = (popular.status==="fulfilled"&&popular.value.nextPageToken)||null; await renderFeed(allItems); showHUD("Home"); return; }
     } catch(e) {}
     // Fallback
     try {
       const data = await fetchYouTubeDirect("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
-      if (data && data.items && data.items.length) { nextPageToken = data.nextPageToken || null; renderFeed(data.items); showHUD("Home"); }
+      if (data && data.items && data.items.length) { nextPageToken = data.nextPageToken || null; await renderFeed(data.items); showHUD("Home"); }
     } catch(e2) {}
   };
   const startupPromise = _startupFetch();
@@ -5329,7 +5329,7 @@ function submitFeedCandidates(items) {
       if (hasEnoughHistory() && feedEl.children.length < 3) {
         showSkeletons(6);
         const items = await fetchPersonalizedFeed();
-        renderFeed(items);
+        await renderFeed(items);
         showHUD("For You ✦");
         const seed = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
         nextPageToken = seed.nextPageToken || null;
