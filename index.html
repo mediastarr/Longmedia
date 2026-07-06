@@ -1756,15 +1756,21 @@ window.onYouTubeIframeAPIReady = function () {
     if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
     ytPlayer = new YT.Player("playerFrame", {
       width: "100%", height: "100%",
-      playerVars: { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin },
+      playerVars: { autoplay: 0, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin },
       events: {
         onReady: () => { isPlayerReady = true; },
         onError: (e) => {
           // Error codes: 2=invalid ID, 5=HTML5 error, 100=not found, 101/150=not embeddable
-          const msgs = { 2:"Invalid video ID", 5:"HTML5 player error", 100:"Video not found", 101:"Video not embeddable", 150:"Video not embeddable" };
-          const msg = msgs[e.data] || `Player error (${e.data})`;
-          showHUD("⚠️ " + msg);
-          console.warn("YT Player error:", e.data, msg);
+          if (e.data === 101 || e.data === 150) {
+            showHUD("⚠️ Creator disabled embedding — try another video");
+          } else if (e.data === 100) {
+            showHUD("⚠️ Video not found or deleted");
+          } else if (e.data === 2) {
+            showHUD("⚠️ Invalid video");
+          } else {
+            showHUD("⚠️ Playback error — try another video");
+          }
+          console.warn("YT Player error:", e.data);
         },
         onStateChange: (e) => {
           if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "⏸";
