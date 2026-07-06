@@ -807,25 +807,91 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 </div>
 
 <script>
-const API_KEYS = []; // Keys managed server-side in Worker
+const API_KEYS = [
+  "AIzaSyCc97ABTRJOh5zcr9ATm67P9WKwTqmIvQU",
+  "AIzaSyC1pCcPHsL11vrxRuUNoeN3urdwt3qjilM",
+  "AIzaSyASan345SwgI0lcXKNK-DSW9-lhm4NqqGs",
+  "AIzaSyAxz8JgYT02TS12fcdIYVNqmhT_0OwA48Q",
+  "AIzaSyAvIf8brzBEbdGnpGoPkIaSF2ApObzihnM",
+  "AIzaSyALpQ6mleh8v4SlVnk1V8nBZ2pTIUQAoLk",
+  "AIzaSyAMnR9igJ7CAZk4fgGfXZnuAXcUSTQe9k0",
+  "AIzaSyCpsw8XjapAsBb3qzwMk6-uYbHl854go3k",
+  "AIzaSyBQVV8JV387xducmehPKsvySsf-8cd2mLU",
+  "AIzaSyDo5MtsaaX8Ve9M8NGb-WNBYLuACA8VheM",
+  "AIzaSyC6QiQHKfSzvOXCQKrp_TWP1wBbqDOtgko",
+  "AIzaSyCQ3x_B3Cb_-hb8INKcagJTYM8Aa0bIdE4",
+  "AIzaSyD1ZrnaVPygZAvLM8HCmXOO4UGXN3ReOXY",
+  "AIzaSyBTKio9NP697v86sdX5s6TVAwrhWxVFBaw",
+  "AIzaSyAQ3o2jVOxwgNXzmnycVcegZFL5rRvBXzg",
+  "AIzaSyCv_FArQ3AD1J7-KwOX47f7BRuKO4OsveY",
+  "AIzaSyAxl2YeimopUuvARE9i3gAa55rSku2g10A",
+  "AIzaSyBPpmxIKHhw1Xx5D19x90FpMLIpDQmW03s",
+  "AIzaSyCMMQj3sH_Zk7k_dO6H8_Kzbax9F04yFYc",
+  "AIzaSyBpS1ffp-NEwZNFy7CxN-zwEDqrTxJjXSQ",
+  "AIzaSyDXU_965063hQaURGP-Vl5cnetgjDHLPAc",
+  "AIzaSyBQriBvxSUYcLuutFIS7SLfOwpTme5Fgpk",
+  "AIzaSyDUXQGd2DP1VCY3wYtD2Cj8XLl09YEVTSA",
+  "AIzaSyCIAJWic4kRT1a_6mAGzieiPA2-wTibt8w",
+  "AIzaSyB3qpgBkms1z2CwdYcnMKUH6HHuJyJVaI8",
+  "AIzaSyDro3EeG61526CmdHmA55bXtp_O6OPOK7k",
+  "AIzaSyC47gzD2PeNeSHFPrSBJ15UIVTboU4DFgQ",
+  "AIzaSyAfnRb0EhXCW6omiWe47MzigRi2eYZY6OI",
+  "AIzaSyClCermv6tii5xRnSst-5i-q1K_ytEB3nw",
+  "AIzaSyAgNr0Pb8SJ16TtJ22J9AmOWR1Lm9MxHPc",
+  "AIzaSyCxeRhm_E4meK59JHYFici67dF0q7i4gbs",
+  "AIzaSyAPXOQIVcdza66-tfeFUigOejEicvgdcas",
+  "AIzaSyB0cB1FlDb4Azzq2xh7_ENz2CvwpWJnJXg",
+  "AIzaSyDTIw26DvcDWRCGftd-c-_SdcllN0zvxE0",
+  "AIzaSyAiG74ZYcjR4K78NPfUe3sQGeJLnoBIXYU",
+  "AIzaSyDF7DasyCt4U2nle8U6fPZm7QnOwbg_VKg",
+  "AIzaSyBuMhjmMoSRNPhqsIY0doOXfSdtvQtbGVU",
+  "AIzaSyCAsV7vK_lzvjYtJj5mPtz1l1WXIVhG9zc",
+  "AIzaSyAtArRltyay0qcM3wS1ehGnKLYNsbqQujk",
+  "AIzaSyC3yYo8nw0b93tHKJLQhnO1Mcabh1vvy1M",
+  "AIzaSyAQUxDKTdrQyCEXHBirQrEZ5pb9JaWibus",
+  "AIzaSyDM5JjKJk1oOTWT7JafHycQ0YDfnCOVBhI",
+  "AIzaSyDFeSO31B744w9qG4Mos8bmQhxumuZqAlk",
+  "AIzaSyCxRkHWkD3dEZ7bu0KImsB6P8PHrVj2AFA",
+  "AIzaSyAp7n-yoWUh0iQEgiqZDqieUCbItWkaAC8",
+  "AIzaSyD8SGI3BxP-pPcsLmG5a_NBDR7YJa7tnuE",
+  "AIzaSyABp0mrVw1nX_Nukn8JFwdQTnPnqJwvZtY",
+  "AIzaSyCDnNSQVHwLWNyny_XSbiR0azQq6y3THvE",
+  "AIzaSyDCNpDnHN4dQFjco8glxAey6JaHCPaByA8",
+  "AIzaSyAeqrFuzZ8xkZ5kLZjRZyJeYJxSJ9dhr1M",
+  "AIzaSyDh-BnoCv5NwDDTkpEi-NU7fAL62hBWSUs",
+  "AIzaSyDslyHBxTIaEFPWwowYOhUG39dP8VXERKs",
+  "AIzaSyCILq9ctqaP60rD7P0ldHplc3Zljh55Mvk",
+  "AIzaSyCcJWHWaiorqj8Qpjb5AUYXT44XGxGxNeI",
+  "AIzaSyABPHxKydF0qb2g5vyXVN-ACkQo3TtxWdQ",
+  "AIzaSyDc_TSt7CkevcizyZJCp4B4W4FBJ8Id78U",
+  "AIzaSyCDczk7RSP-8iIRpdsHo5wQD7D8xP_jKXk",
+  "AIzaSyCog6hOtzKL5v3KrMJdxqRHdJoL0KZ6LaQ",
+  "AIzaSyCgy7GO_ySgwGC91-C7BtS1yBdqW3zYe0I",
+  "AIzaSyB0qAIiSB343Ovglxq9TPY70TEtlnMTgjE",
+  "AIzaSyAm12JbLjvb9hgrZ7MwxwcwJRbilH550Ms",
+  "AIzaSyDdHVcrWHWL6rD0d65af-aThvv2esPmqHg",
+  "AIzaSyBw7uQiBoL4ZliSgyigRlKX4blJIoUJV0Q",
+  "AIzaSyCD9R5m2ReO8GfbrynUNp06SX4Nrgi-7p8",
+  "AIzaSyC-ZuI61RhmEHAeZkZ_cv3m-gch9Fvgs64",
+  "AIzaSyDOXeM1ypIziRA6sHgbOP_wTMpi3SF-y3c",
+  "AIzaSyDxtJolyDB5uYmMlEvLecBq9SS8NmtX50E",
+  "AIzaSyA7BCysaWwlfqFv1tiN8qCK_f9QJaSbUfo",
+  "AIzaSyArTjJjwXkbUILXHIcnjbjFYEvxLwIi4bY",
+  "AIzaSyBu3mXryXqLrofoT2lv_H_cAdBMynyabEc",
+  "AIzaSyBCNDanL_6rFyq-k29T0loBvUz0pYpxELA",
+  "AIzaSyDiOqGokEdXFsR0SqGkFEQEvxC_gOdGuXA",
+  "AIzaSyDcOhKCPS0DawXezs04WgclDQImyFJ_J6c",
+  "AIzaSyCWYKInBnvtWM0jSYwcbTj70u16m-LsMU0",
+  "AIzaSyA6mKilCNTEYuIQVx35EPUPqq87Vv_dHOU"
+];
 
+let keyIndex = 0;
 
 /* CHANGE: copy params before adding key so retries never corrupt the URL */
 async function fetchYouTubeDirect(endpoint, params = {}, retries = 2) {
-  // Route through Worker (same as fetchYouTube but bypasses KV cache)
-  // This ensures fresh results even when Worker cache has stale data
-  try {
-    const res = await fetch(HUB_WORKER_URL + "/yt", {
-      method: "POST",
-      headers: workerHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ endpoint, params, noCache: true })
-    });
-    if (res.ok) { const data = await res.json(); if (!data.error) return data; }
-  } catch(e) {}
-  // No client-side keys — Worker is the only path
-  return { items: [], error: true };
-  // Dead code kept for structure:
-  const key = "";
+  // Direct YouTube API fetch — no Worker cache (used for time-critical startup calls)
+  const key = API_KEYS[keyIndex];
+  keyIndex = (keyIndex + 1) % API_KEYS.length;
   const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
   const p = Object.assign({}, params, { key });
   Object.entries(p).forEach(([k, v]) => { if (v !== undefined && v !== null) url.searchParams.append(k, v); });
@@ -844,19 +910,25 @@ async function fetchYouTubeDirect(endpoint, params = {}, retries = 2) {
 }
 
 async function fetchYouTube(endpoint, params = {}, retries = 2) {
-  // Route through Worker — API keys managed server-side
-  try {
-    const res = await fetch(HUB_WORKER_URL + "/yt", {
-      method: "POST",
-      headers: workerHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ endpoint, params })
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (!data.error) return data;
-    }
-  } catch(e) {}
-  // Fallback to direct if Worker unavailable
+  // Try Worker cache first for cacheable endpoints (saves quota)
+  const cacheableEndpoints = ["videos", "search", "channels", "playlistItems"];
+  if (cacheableEndpoints.includes(endpoint)) {
+    try {
+      const cacheKey = API_KEYS[keyIndex % API_KEYS.length];
+      const cacheRes = await fetch(HUB_WORKER_URL + "/cache", {
+        method: "POST",
+        headers: workerHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ endpoint, params, apiKey: cacheKey })
+      });
+      if (cacheRes.ok) {
+        const cacheResult = await cacheRes.json();
+        if (cacheResult.data && !cacheResult.data.error) {
+          if (!cacheResult.cached) keyIndex = (keyIndex + 1) % API_KEYS.length;
+          return cacheResult.data;
+        }
+      }
+    } catch(e) {}
+  }
   return fetchYouTubeDirect(endpoint, params, retries);
 }
 
@@ -1687,7 +1759,6 @@ window.onYouTubeIframeAPIReady = function () {
       playerVars: { autoplay: 0, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin },
       events: {
         onReady: () => { isPlayerReady = true; },
-
         onStateChange: (e) => {
           if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "⏸";
           if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "▶";
@@ -1817,8 +1888,6 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   window.scrollTo({ top: 0, behavior: "instant" });
   // Show info panel below medium player
   loadVideoInfoPanel(videoId, snippet);
-  updateSessionContext(snippet);
-  submitFeedCandidates([{ id: videoId, snippet }]);
   playPauseBtn.textContent = "⏸";
   initAudioGlow();
   const resumeAt = startSeconds || getResumePosition(videoId);
@@ -2097,9 +2166,7 @@ async function loadVideoInfoPanel(videoId, snippet) {
     markNotInterested(vid, ch, t);
     showHUD("Not interested — feed updated");
   };
-  document.getElementById("vipNotIntBtn").onclick = () => {
-    markNotInterested(videoId, snippet.channelId || "", snippet.title || "");
-  };
+  document.getElementById("vipNotIntBtn").onclick = () => { markNotInterested(videoId, snippet.channelId||"", snippet.title||""); };
   document.getElementById("vipShareBtn").onclick = () => {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
     if (navigator.share) navigator.share({ title, url }).catch(() => {});
@@ -2307,15 +2374,15 @@ function renderFeed(items) {
     const watchedSet = new Set(historyList.map(h => h.id?.videoId || h.id).filter(Boolean));
     const shownSet = new Set(JSON.parse(sessionStorage.getItem("feedShownIds") || "[]"));
     const blockSet = new Set(getBlocklist());
-    const sessionDedup = new Set();
+    const _sessionDedup = new Set();
     items = items.filter(item => {
       const id = item.id?.videoId || item.id;
       if (!id) return false;
       if (watchedSet.has(id)) return false;
       if (shownSet.has(id)) return false;
       if (blockSet.has(id)) return false; // not interested
-      if (sessionDedup.has(id)) return false; // dedup within this render call
-      sessionDedup.add(id);
+      if (_sessionDedup.has(id)) return false;
+      _sessionDedup.add(id);
       // Filter shorts from home/trending/movie feeds (YouTube does this by default)
       if (["home","trending","movies"].includes(currentTab)) {
         if (isShortByTitle(item) || isShortByDuration(item)) return false;
@@ -2891,6 +2958,15 @@ shortsTab.addEventListener("click", async () => {
     });
   }
 
+  const _sniBtn = document.getElementById("shortsNotIntBtn");
+  if (_sniBtn) _sniBtn.addEventListener("click", () => {
+    const item = shortsItems[shortsIndex];
+    if (!item) return;
+    markNotInterested(item.id, item.snippet?.channelId||"", item.snippet?.title||"");
+    try { const sh=JSON.parse(localStorage.getItem("hubSeenIds")||"[]"); if(!sh.includes(item.id)){sh.push(item.id);localStorage.setItem("hubSeenIds",JSON.stringify(sh.slice(-500)));} } catch(e) {}
+    if (shortsIndex < shortsItems.length-1) { shortsIndex++; playShort(shortsIndex); }
+    showHUD("Not interested — skipped");
+  });
   shortsClearBtn.addEventListener("click", () => {
     clearMode = !clearMode;
     if (clearMode) {
@@ -3216,12 +3292,8 @@ const HUB_SECRET = "viewtube-hub-secret-2024";
 function getViewTubeUserId() {
   return localStorage.getItem("yt_channel_id") || "default";
 }
-
 function workerHeaders(extra) {
-  return Object.assign({
-    "X-ViewTube-Secret": HUB_SECRET,
-    "X-ViewTube-User": getViewTubeUserId()
-  }, extra || {});
+  return Object.assign({ "X-ViewTube-Secret": HUB_SECRET, "X-ViewTube-User": getViewTubeUserId() }, extra || {});
 }
 
 // Multi-user isolation: get stored YouTube channel ID
@@ -4538,10 +4610,7 @@ async function _pollCheckNewContent() {
     const allNew = [];
     if (_pollKnownIds === null) {
       _pollKnownIds = new Set();
-      try {
-        const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
-        seenHub.forEach(id => _pollKnownIds.add(id));
-      } catch(e) {}
+      try { const seenHub=JSON.parse(localStorage.getItem("hubSeenIds")||"[]"); seenHub.forEach(id=>_pollKnownIds.add(id)); } catch(e) {}
     }
     const _pollBlocklist = new Set(getBlocklist());
 
@@ -4807,7 +4876,8 @@ let _liveCheckTimer = null;
 
 async function _checkLiveStreams() {
   try {
-    const res = await fetch(HUB_WORKER_URL + "/live?key=worker", {
+    const key = API_KEYS[keyIndex % API_KEYS.length];
+    const res = await fetch(HUB_WORKER_URL + "/live?key=" + key, {
       headers: workerHeaders()
     });
     if (!res.ok) return;
@@ -5085,115 +5155,25 @@ function markNotInterested(videoId, channelId, title) {
 }
 
 
-// ── Not Interested System ──
+// ── Not Interested ──
 function getBlocklist() {
   try { return JSON.parse(localStorage.getItem("notInterestedIds") || "[]"); } catch(e) { return []; }
 }
-
 function markNotInterested(videoId, channelId, title) {
-  const blocklist = getBlocklist();
-  if (!blocklist.includes(videoId)) {
-    blocklist.push(videoId);
-    localStorage.setItem("notInterestedIds", JSON.stringify(blocklist.slice(-500)));
-  }
+  const bl = getBlocklist();
+  if (!bl.includes(videoId)) { bl.push(videoId); localStorage.setItem("notInterestedIds", JSON.stringify(bl.slice(-500))); }
   try {
     const profile = getTasteProfile();
-    if (channelId) {
-      profile.channels = profile.channels || {};
-      const ch = profile.channels[channelId] || { weight: 0 };
-      ch.weight = Math.max(0, (ch.weight || 0) - 5);
-      ch.notInterested = (ch.notInterested || 0) + 1;
-      profile.channels[channelId] = ch;
-    }
-    if (title) {
-      const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with"]);
-      const words = title.toLowerCase().replace(/[^a-z0-9\s]/g,"").split(/\s+/).filter(w=>w.length>2&&!stopwords.has(w));
-      profile.keywords = profile.keywords || {};
-      words.forEach(w => { profile.keywords[w] = Math.max(0, (profile.keywords[w]||0) - 2); });
-    }
+    if (channelId) { profile.channels = profile.channels||{}; const ch=profile.channels[channelId]||{weight:0}; ch.weight=Math.max(0,(ch.weight||0)-5); profile.channels[channelId]=ch; }
+    if (title) { const words=title.toLowerCase().replace(/[^a-z0-9\s]/g,"").split(/\s+/).filter(w=>w.length>2); profile.keywords=profile.keywords||{}; words.forEach(w=>{profile.keywords[w]=Math.max(0,(profile.keywords[w]||0)-2);}); }
     localStorage.setItem("tasteProfile", JSON.stringify(profile));
   } catch(e) {}
-  document.querySelectorAll(`[data-videoid="${videoId}"]`).forEach(card => {
-    card.style.transition = "opacity 0.3s, transform 0.3s";
-    card.style.opacity = "0";
-    card.style.transform = "scale(0.95)";
-    setTimeout(() => card.remove(), 300);
+  document.querySelectorAll('[data-videoid="'+videoId+'"]').forEach(card=>{
+    card.style.transition="opacity 0.3s"; card.style.opacity="0";
+    setTimeout(()=>card.remove(), 300);
   });
-  sendEngagement(videoId, channelId, "not_interested", 0, false, null);
+  try { fetch(HUB_WORKER_URL+"/engage", { method:"POST", headers:workerHeaders({"Content-Type":"application/json"}), body:JSON.stringify({videoId,channelId,signal:"not_interested",pct:0}) }); } catch(e) {}
   showHUD("Not interested — feed updated");
-}
-
-
-
-// ── Worker v4: A/B Test group ──
-let _abTestConfig = null;
-async function getABTestConfig() {
-  if (_abTestConfig) return _abTestConfig;
-  try {
-    const cached = localStorage.getItem("_abTestConfig");
-    if (cached) { _abTestConfig = JSON.parse(cached); return _abTestConfig; }
-    const res = await fetch(HUB_WORKER_URL + "/abtest", { headers: workerHeaders() });
-    if (res.ok) {
-      const data = await res.json();
-      _abTestConfig = data.config || { feedStrategy:"standard", rankWeight:1.0, freshnessBoost:1.0, collabWeight:1.0 };
-      localStorage.setItem("_abTestConfig", JSON.stringify(_abTestConfig));
-      return _abTestConfig;
-    }
-  } catch(e) {}
-  return { feedStrategy:"standard", rankWeight:1.0, freshnessBoost:1.0, collabWeight:1.0 };
-}
-
-// ── Worker v4: Pre-built feed ──
-async function getWorkerFeed() {
-  try {
-    const res = await fetch(HUB_WORKER_URL + "/feed", { headers: workerHeaders() });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.items && data.items.length > 0) return data.items;
-  } catch(e) {}
-  return null;
-}
-
-// ── Worker v4: Cold-start ──
-async function getColdStartVideos() {
-  try {
-    const res = await fetch(HUB_WORKER_URL + "/coldstart", { headers: workerHeaders() });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.videos || [];
-  } catch(e) { return []; }
-}
-
-// ── Worker v4: Personalized trending ──
-async function getPersonalizedTrending(videos) {
-  if (!videos || !videos.length) return videos;
-  try {
-    const profile = getTasteProfile();
-    const res = await fetch(HUB_WORKER_URL + "/trending", {
-      method: "POST",
-      headers: workerHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        videos: videos.map(item => ({
-          videoId: item.id?.videoId||item.id,
-          channelId: item.snippet?.channelId||"",
-          title: item.snippet?.title||"",
-          publishedAt: item.snippet?.publishedAt||""
-        })),
-        profile: {
-          keywords: profile.keywords||{},
-          channels: Object.fromEntries(Object.entries(profile.channels||{}).map(([id,v])=>[id,typeof v==="object"?v.weight||0:v]))
-        }
-      })
-    });
-    if (!res.ok) return videos;
-    const data = await res.json();
-    const scoreMap = {};
-    (data.videos||[]).forEach(v => scoreMap[v.videoId] = v._trendScore);
-    return videos.map(item => {
-      const id = item.id?.videoId||item.id;
-      return { ...item, _trendScore: scoreMap[id]||0 };
-    }).sort((a,b)=>(b._trendScore||0)-(a._trendScore||0));
-  } catch(e) { return videos; }
 }
 
 (async function init() {
@@ -5259,15 +5239,6 @@ async function getPersonalizedTrending(videos) {
       }
     } catch(e) {}
     // Store YouTube channel ID for multi-user Worker isolation
-    try {
-      const tkForId = await getValidToken();
-      if (tkForId && !localStorage.getItem("yt_channel_id")) {
-        const chRes = await fetch("https://www.googleapis.com/youtube/v3/channels?part=id&mine=true", { headers: { Authorization: "Bearer " + tkForId } });
-        const chData = await chRes.json();
-        const channelId = chData.items?.[0]?.id || "";
-        if (channelId) localStorage.setItem("yt_channel_id", channelId);
-      }
-    } catch(e) {}
     try {
       const tkForId = await getValidToken();
       if (tkForId && !localStorage.getItem("yt_channel_id")) {
