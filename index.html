@@ -2318,13 +2318,21 @@ async function renderFeed(items) {
       const needsDuration = items.filter(item => !item.contentDetails).map(item => item.id?.videoId || item.id).filter(Boolean);
       if (needsDuration.length) {
         try {
-          const durMap = await fetchContentDetails(needsDuration);
+          // Timeout guard — never let this block the feed for more than 3s
+          const durMap = await Promise.race([
+            fetchContentDetails(needsDuration),
+            new Promise(resolve => setTimeout(() => resolve({}), 3000))
+          ]);
           items = items.filter(item => {
             const id = item.id?.videoId || item.id;
             if (durMap[id]) item.contentDetails = durMap[id];
+            // If we still have no duration data, fall back to title-only check (already passed above)
+            if (!item.contentDetails || !item.contentDetails.duration) return true;
             return !isShortByDuration(item);
           });
-        } catch(e) {}
+        } catch(e) {
+          // On failure, keep items — title filter already applied above
+        }
       } else {
         items = items.filter(item => !isShortByDuration(item));
       }
