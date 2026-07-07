@@ -1729,7 +1729,7 @@ function createYTPlayer(videoId, startSeconds) {
   const container = document.getElementById("playerSection");
   let div = document.getElementById("playerFrame");
   if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
-  const pv = { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin };
+  const pv = { autoplay: 0, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin };
   if (currentQuality !== "auto") pv.vq = currentQuality;
   if (start > 0) { pv.start = start; showHUD("Resuming ▶"); }
   ytPlayer = new YT.Player("playerFrame", {
@@ -1821,9 +1821,7 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   else { pendingVideoId = videoId; pendingStartSeconds = resumeAt; }
 }
 
-let _vipGeneration = 0;
 async function loadVideoInfoPanel(videoId, snippet) {
-  const myGeneration = ++_vipGeneration;
   const panel = document.getElementById("videoInfoPanel");
   const sugFeed = document.getElementById("suggestedFeed");
   panel.style.display = "block";
@@ -1852,9 +1850,6 @@ async function loadVideoInfoPanel(videoId, snippet) {
     fetchYouTube("videos", { part: "snippet,statistics", id: videoId, _: Date.now() }),
     channelId ? fetchYouTube("channels", { part: "snippet,statistics", id: channelId, _: Date.now() }) : Promise.resolve(null),
   ]);
-
-  // Discard stale results if a newer video was opened meanwhile
-  if (myGeneration !== _vipGeneration) return;
 
   // Video stats
   if (videoData.status === "fulfilled" && videoData.value.items?.[0]) {
@@ -2155,10 +2150,6 @@ async function loadVideoInfoPanel(videoId, snippet) {
   fetches.push(fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", maxResults: 15, _: Date.now() }));
 
   const results = await Promise.allSettled(fetches);
-
-  // Discard this result if a newer video was opened while we were fetching
-  if (myGeneration !== _vipGeneration) return;
-
   results.forEach(r => { if (r.status === "fulfilled") addItems(r.value.items); });
 
   sugFeed.innerHTML = "";
@@ -2237,7 +2228,7 @@ resBtn.addEventListener("click", () => {
   let div = document.getElementById("playerFrame");
   if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
 
-  const pv = { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin };
+  const pv = { autoplay: 0, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin };
   if (currentQuality !== "auto") pv.vq = currentQuality;
   if (_resumePos > 5) pv.start = _resumePos;
 
