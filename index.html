@@ -15,7 +15,8 @@
 <link rel="icon" type="image/png" sizes="192x192" href="https://mediastarr.github.io/Longmedia/viewtube-icon-192.png" />
 <link rel="icon" type="image/png" sizes="96x96" href="https://mediastarr.github.io/Longmedia/viewtube-icon-96.png" />
 <link rel="apple-touch-icon" sizes="192x192" href="https://mediastarr.github.io/Longmedia/viewtube-icon-192.png" />
-<link rel="preconnect" href="https://www.youtube.com">
+<link rel="preconnect" href="https://www.youtube.com" crossorigin>
+<link rel="preconnect" href="https://www.google.com" crossorigin>
 <link rel="preload" href="https://www.youtube.com/iframe_api" as="script">
 <link rel="preconnect" href="https://www.youtube-nocookie.com">
 <link rel="preconnect" href="https://i.ytimg.com">
@@ -668,6 +669,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   </div>
   <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
     <div id="playerFrame"></div>
+    <div id="yt-focus-sink" tabindex="0" aria-hidden="true" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;"></div>
     <div class="player-controls" id="playerControls">
       <button id="playPauseBtn" tabindex="0" title="Play/Pause">⏸</button>
       <button id="rewindBtn" tabindex="0" title="Rewind 10s">⏪10</button>
@@ -1540,7 +1542,10 @@ closeMini.addEventListener("click", () => {
   document.body.classList.remove("ui-hidden");
   hideUIBtn.textContent = "Hide UI";
   playerSection.style.display = "none";
-  if (ytPlayer) { try { ytPlayer.stopVideo(); ytPlayer.destroy(); } catch(e) {} ytPlayer = null; isPlayerReady = false; }
+  // Keep the player instance alive — just stop playback. Destroying it forces
+  // every reopen through the fallback recreate path, which can lose autoplay
+  // permission after async gaps. Reusing via loadVideoById is more reliable.
+  if (ytPlayer) { try { ytPlayer.stopVideo(); } catch(e) {} }
   showUIWithMiniPlayer();
   showHUD("Player closed");
 });
@@ -1808,6 +1813,12 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   playerSection.classList.remove("player-mini", "player-fullscreen");
   saveToHistory({ id: videoId, snippet });
   hideUIForVideo();
+  // Reclaim keyboard/D-pad focus after the YouTube iframe loads —
+  // prevents Neural Band input from being trapped inside the cross-origin player
+  setTimeout(() => {
+    const sink = document.getElementById("yt-focus-sink");
+    if (sink) sink.focus();
+  }, 600);
   // Always scroll to top so player is visible — works whether opening from
   // home feed or from suggested videos (which may be far down the page)
   window.scrollTo({ top: 0, behavior: "instant" });
@@ -4820,11 +4831,11 @@ function showAgeRestrictedOverlay(videoId) {
   const overlay = document.createElement("div");
   overlay.id = "ageRestrictedOverlay";
   overlay.style.cssText = "position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(5,6,12,0.96);border-radius:22px;padding:20px;text-align:center;";
-  overlay.innerHTML = '<div style="font-size:28px;">🔞</div>' +
-    '<div style="font-size:13px;font-weight:600;color:#f5f7ff;line-height:1.4;margin-top:4px;">Age-restricted video</div>' +
-    '<div style="font-size:11px;opacity:0.65;line-height:1.5;margin-top:4px;">This video cannot play here.<br>Watch it directly on YouTube.</div>' +
-    '<button id="ageWatchBtn" style="display:inline-block;margin-top:10px;padding:10px 20px;border-radius:999px;background:#ff0000;color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer;touch-action:manipulation;">▶ Watch on YouTube</button>' +
-    '<button id="ageCloseBtn" style="margin-top:6px;padding:8px 16px;border-radius:999px;border:1px solid rgba(120,130,160,0.6);background:rgba(10,12,20,0.9);color:#f5f7ff;font-size:12px;cursor:pointer;touch-action:manipulation;">✕ Close</button>';
+  overlay.innerHTML = '<div style="font-size:28px;">🚫</div>' +
+    '<div style="font-size:13px;font-weight:600;color:#f5f7ff;line-height:1.4;margin-top:4px;">Can\'t play this one here</div>' +
+    '<div style="font-size:11px;opacity:0.65;line-height:1.5;margin-top:4px;">YouTube is blocking embedded playback for this video (it sometimes asks to confirm you\'re not a bot). You can open it on YouTube, or go back and try another.</div>' +
+    '<button id="ageWatchBtn" style="display:inline-block;margin-top:10px;padding:10px 20px;border-radius:999px;background:#ff0000;color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer;touch-action:manipulation;">▶ Open in YouTube</button>' +
+    '<button id="ageCloseBtn" style="margin-top:6px;padding:8px 16px;border-radius:999px;border:1px solid rgba(120,130,160,0.6);background:rgba(10,12,20,0.9);color:#f5f7ff;font-size:12px;cursor:pointer;touch-action:manipulation;">← Back</button>';
   overlay.querySelector('#ageCloseBtn').addEventListener('click', () => { overlay.remove(); document.getElementById('closeMini').click(); });
   overlay.querySelector('#ageWatchBtn').addEventListener('click', () => {
     // Try multiple methods — glasses browser blocks window.open and target=_blank
