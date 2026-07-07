@@ -5371,24 +5371,46 @@ function applyShortPlayerPatch(card, item) {
   // Startup feed — show home immediately, load in background
   // feedEl is display:grid by default so it's already visible
   // Use a timeout-wrapped fetch so slow API never blocks the UI
+  // Herald-style linear fallback chain: each step is ONE simple call.
+  // Success -> render + stop. Fail/empty -> fall through to the next,
+  // simpler source. Last step always renders something, never leaves
+  // the screen hanging. No merging multiple sources, no retry loops.
   const _startupFetch = async () => {
+    const cat = freshCategory();
+
+    // Step 1: fresh videos in your top category (last 24h)
     try {
       const since24h = new Date(Date.now() - 86400000).toISOString();
-      const cat = freshCategory();
-      const seen = new Set(); const allItems = [];
-      const [fresh, popular] = await Promise.allSettled([
-        fetchYouTubeDirect("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 12, publishedAfter: since24h, _: Date.now() }),
-        fetchYouTubeDirect("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 12, _: Date.now() })
-      ]);
-      if (fresh.status === "fulfilled") (fresh.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
-      if (popular.status === "fulfilled") (popular.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
-      if (allItems.length) { nextPageToken = (popular.status==="fulfilled"&&popular.value.nextPageToken)||null; renderFeed(await enrichWithDurations(allItems)); showHUD("Home"); return; }
+      const data = await fetchYouTubeDirect("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 20, publishedAfter: since24h, _: Date.now() }, 2, { filterShorts: true, trim: true });
+      if (data && data.items && data.items.length) {
+        nextPageToken = data.nextPageToken || "seed";
+        renderFeed(await enrichWithDurations(data.items));
+        showHUD("Home");
+        return;
+      }
     } catch(e) {}
-    // Fallback
+
+    // Step 2: popular videos in your top category
     try {
-      const data = await fetchYouTubeDirect("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
-      if (data && data.items && data.items.length) { nextPageToken = data.nextPageToken || null; renderFeed(await enrichWithDurations(data.items)); showHUD("Home"); }
-    } catch(e2) {}
+      const data = await fetchYouTubeDirect("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 20, _: Date.now() }, 2, { filterShorts: true, trim: true });
+      if (data && data.items && data.items.length) {
+        nextPageToken = data.nextPageToken || null;
+        renderFeed(await enrichWithDurations(data.items));
+        showHUD("Home");
+        return;
+      }
+    } catch(e) {}
+
+    // Step 3: general popular videos, no category filter (always has content)
+    try {
+      const data = await fetchYouTubeDirect("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() }, 2, { filterShorts: true, trim: true });
+      renderFeed(await enrichWithDurations(data?.items || []));
+      nextPageToken = data?.nextPageToken || null;
+      showHUD(data?.items?.length ? "Home" : "Home — check connection");
+    } catch(e) {
+      renderFeed([]);
+      showHUD("Home — check connection");
+    }
   };
   _startupFetch();
 
