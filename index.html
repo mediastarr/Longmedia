@@ -1755,11 +1755,15 @@ function createYTPlayer(videoId, startSeconds) {
   // Fallback: create from scratch (first tap if pre-warm failed, or after close)
   isPlayerReady = false;
   const container = document.getElementById("playerSection");
+  if (!container) { showHUD("⚠️ Player unavailable — try again"); return; }
   let div = document.getElementById("playerFrame");
-  if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
+  try {
+    if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
+  } catch(e) { showHUD("⚠️ Player unavailable — try again"); return; }
   const pv = { autoplay: 0, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin };
   if (currentQuality !== "auto") pv.vq = currentQuality;
   if (start > 0) { pv.start = start; showHUD("Resuming ▶"); }
+  try {
   ytPlayer = new YT.Player("playerFrame", {
     videoId,
     playerVars: pv,
@@ -1792,6 +1796,9 @@ function createYTPlayer(videoId, startSeconds) {
         }
     }
   });
+  } catch(e) {
+    showHUD("⚠️ Player unavailable — try again");
+  }
 }
 
 function setPlayerVideo(videoId, snippet, startSeconds) {
