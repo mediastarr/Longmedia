@@ -2719,9 +2719,19 @@ function setActiveTab(tab) {
 }
 
 /* CHANGE: home tab uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
+let _homeLastLoaded = 0;
+let _homeCacheValid = false;
 homeTab.addEventListener("click", async () => {
-  nextPageToken = null; setActiveTab("home"); showSkeletons(6);
+  setActiveTab("home");
   _pollClearBadge();
+  // Skip re-fetching if Home was loaded recently and still has content —
+  // avoids redundant network calls when quickly switching back to Home
+  const cacheAge = Date.now() - _homeLastLoaded;
+  const hasNewVideos = (() => { try { return JSON.parse(localStorage.getItem("hubNewVideos")||"[]").length > 0; } catch(e) { return false; } })();
+  if (_homeCacheValid && cacheAge < 120000 && feedEl.children.length > 0 && !hasNewVideos) {
+    return; // just show what's already rendered
+  }
+  nextPageToken = null; showSkeletons(6);
 
   // Grab hub new videos BEFORE feed loads
   let hubVideos = [];
@@ -2848,6 +2858,8 @@ homeTab.addEventListener("click", async () => {
   if (hubVideos.length) {
     _injectHubVideos(hubVideos);
   }
+  _homeLastLoaded = Date.now();
+  _homeCacheValid = feedEl.children.length > 0;
 });
 
 trendingTab.addEventListener("click", async () => {
