@@ -2211,8 +2211,13 @@ async function loadVideoInfoPanel(videoId, snippet) {
     card.onclick = () => {
       // Always open suggested videos in medium player — never route to shorts player
       // This prevents audio bleed from the medium player when tapping suggestions
-      setPlayerVideo(vid, s);
-      showHUD("Playing: " + (s.title || ""));
+      try {
+        showHUD("Loading: " + (s.title || "").slice(0,30));
+        setPlayerVideo(vid, s);
+      } catch(e) {
+        console.error("Suggested video failed to open:", e);
+        showHUD("⚠️ Couldn't open — try again");
+      }
     };
     sugFeed.appendChild(card);
   });
