@@ -811,18 +811,14 @@ const API_KEYS = []; // Keys managed server-side in Worker
 
 
 /* CHANGE: copy params before adding key so retries never corrupt the URL */
-async function fetchYouTubeDirect(endpoint, params = {}, retries = 2, options = {}) {
-  // Route through Worker (bypasses KV cache for fresh results) — with timeout guard
+async function fetchYouTubeDirect(endpoint, params = {}, retries = 2) {
+  // Route through Worker (bypasses KV cache for fresh results)
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(HUB_WORKER_URL + "/yt", {
       method: "POST",
       headers: workerHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ endpoint, params, noCache: true, filterShorts: !!options.filterShorts, trim: !!options.trim }),
-      signal: controller.signal
+      body: JSON.stringify({ endpoint, params, noCache: true })
     });
-    clearTimeout(timeout);
     if (res.ok) { const data = await res.json(); if (!data.error) return data; }
   } catch(e) {}
   if (!API_KEYS.length) return { items: [], error: true };
@@ -845,18 +841,14 @@ async function fetchYouTubeDirect(endpoint, params = {}, retries = 2, options = 
   }
 }
 
-async function fetchYouTube(endpoint, params = {}, retries = 2, options = {}) {
-  // Route through Worker — API keys managed server-side — with timeout guard
+async function fetchYouTube(endpoint, params = {}, retries = 2) {
+  // Route through Worker — API keys managed server-side
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(HUB_WORKER_URL + "/yt", {
       method: "POST",
       headers: workerHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ endpoint, params, filterShorts: !!options.filterShorts, trim: !!options.trim }),
-      signal: controller.signal
+      body: JSON.stringify({ endpoint, params })
     });
-    clearTimeout(timeout);
     if (res.ok) {
       const data = await res.json();
       if (!data.error) return data;
@@ -1829,7 +1821,9 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   else { pendingVideoId = videoId; pendingStartSeconds = resumeAt; }
 }
 
+let _vipGeneration = 0;
 async function loadVideoInfoPanel(videoId, snippet) {
+  const myGeneration = ++_vipGeneration;
   const panel = document.getElementById("videoInfoPanel");
   const sugFeed = document.getElementById("suggestedFeed");
   panel.style.display = "block";
@@ -1858,6 +1852,9 @@ async function loadVideoInfoPanel(videoId, snippet) {
     fetchYouTube("videos", { part: "snippet,statistics", id: videoId, _: Date.now() }),
     channelId ? fetchYouTube("channels", { part: "snippet,statistics", id: channelId, _: Date.now() }) : Promise.resolve(null),
   ]);
+
+  // Discard stale results if a newer video was opened meanwhile
+  if (myGeneration !== _vipGeneration) return;
 
   // Video stats
   if (videoData.status === "fulfilled" && videoData.value.items?.[0]) {
@@ -2158,6 +2155,10 @@ async function loadVideoInfoPanel(videoId, snippet) {
   fetches.push(fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", maxResults: 15, _: Date.now() }));
 
   const results = await Promise.allSettled(fetches);
+
+  // Discard this result if a newer video was opened while we were fetching
+  if (myGeneration !== _vipGeneration) return;
+
   results.forEach(r => { if (r.status === "fulfilled") addItems(r.value.items); });
 
   sugFeed.innerHTML = "";
@@ -2611,11 +2612,15 @@ function appendFeed(items) {
     const meta = [views && views + " views", ago].filter(Boolean).join(" · ");
     card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title || ""}</div><div class="video-channel">${snippet.channelTitle || ""}</div><div class="video-meta">${meta}</div></div>`;
     card.onclick = async () => {
+      tabsEl.style.display = "none";
+      searchTabEl.style.display = "none";
+      feedEl.style.display = "none";
+      if (subsPageEl) subsPageEl.style.display = "none";
       // Track CTR — user clicked this video
       trackCTR(videoId, snippet.channelId || "", lastSearchQuery || null);
       trackSessionContinuation(videoId, snippet.channelId || "");
-      const short = await checkIsShort(videoId, snippet);
-      if (short) {
+      await ensureDuration(item);
+      if (isShort(item)) {
         openAsShort(videoId, snippet);
       } else {
         setPlayerVideo(videoId, snippet);
@@ -2799,44 +2804,30 @@ homeTab.addEventListener("click", async () => {
 
 trendingTab.addEventListener("click", async () => {
   nextPageToken = null; setActiveTab("trending"); showSkeletons(6);
+  // Rotate through categories each tap for variety
   const TREND_CATS = ["0","1","2","10","15","17","20","22","23","24","25","26","27","28"];
-  let allItems = [];
-  // Retry up to 2 times if cold-cache first attempt returns too few videos
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const trendRotate = parseInt(localStorage.getItem("_trendRotate")||"0");
-    localStorage.setItem("_trendRotate", String((trendRotate+1)%TREND_CATS.length));
-    const rotateCat = TREND_CATS[trendRotate];
-    const myCat = trendRotate === 0 ? (getTopCategoryId()||"0") : rotateCat;
-    const seen = new Set(); allItems = [];
-    function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); }); }
-    const tSince24h = new Date(Date.now()-86400000).toISOString();
-    const [fresh, popular] = await Promise.allSettled([
-      fetchYouTubeDirect("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:myCat,maxResults:25,publishedAfter:tSince24h,_:Date.now()}, 2, { filterShorts: true, trim: true }),
-      fetchYouTubeDirect("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:25,_:Date.now()}, 2, { filterShorts: true, trim: true })
-    ]);
-    if (fresh.status==="fulfilled") addU(fresh.value.items);
-    if (popular.status==="fulfilled") addU(popular.value.items);
-    if (allItems.length >= 4) {
-      const ranked = await getPersonalizedTrending(allItems);
-      renderFeed(await enrichWithDurations(ranked)); showHUD("Trending ✦");
-      nextPageToken = (popular.status==="fulfilled" && popular.value.nextPageToken) || null;
-      break;
-    }
-    if (attempt === 1) {
-      const fallback = await fetchYouTubeDirect("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:"US",maxResults:20,_:Date.now()}, 2, { filterShorts: true, trim: true });
-      nextPageToken = fallback.nextPageToken || null;
-      renderFeed(await enrichWithDurations(fallback.items || [])); showHUD("Trending");
-    }
+  const trendRotate = parseInt(localStorage.getItem("_trendRotate")||"0");
+  localStorage.setItem("_trendRotate", String((trendRotate+1)%TREND_CATS.length));
+  const rotateCat = TREND_CATS[trendRotate];
+  const myCat = trendRotate === 0 ? (getTopCategoryId()||"0") : rotateCat;
+  const allItems = []; const seen = new Set();
+  function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); }); }
+  const tSince24h = new Date(Date.now()-86400000).toISOString();
+  const [fresh, popular] = await Promise.allSettled([
+    fetchYouTubeDirect("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:myCat,maxResults:15,publishedAfter:tSince24h,_:Date.now()}),
+    fetchYouTubeDirect("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:15,_:Date.now()})
+  ]);
+  if (fresh.status==="fulfilled") addU(fresh.value.items);
+  if (popular.status==="fulfilled") addU(popular.value.items);
+  if (allItems.length) {
+    const ranked = await getPersonalizedTrending(allItems);
+    renderFeed(await enrichWithDurations(ranked)); showHUD("Trending ✦");
+    nextPageToken = (popular.status==="fulfilled" && popular.value.nextPageToken) || null;
+  } else {
+    const fallback = await fetchYouTubeDirect("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:"US",maxResults:20,_:Date.now()});
+    nextPageToken = fallback.nextPageToken || null;
+    renderFeed(await enrichWithDurations(fallback.items || [])); showHUD("Trending");
   }
-  // Auto-fill: if the rendered feed isn't tall enough to scroll, fetch more automatically
-  // so infinite scroll always has a chance to trigger
-  requestAnimationFrame(() => {
-    setTimeout(async () => {
-      if (currentTab === "trending" && nextPageToken && document.body.offsetHeight <= window.innerHeight + 100) {
-        try { await loadMoreVideos(); } catch(e) {}
-      }
-    }, 300);
-  });
 });
 
 shortsTab.addEventListener("click", async () => {
@@ -3225,7 +3216,10 @@ historyTab.addEventListener("click", async () => {
           const snippet = it.snippet || {}; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
           const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = videoId;
           card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Liked</div></div>';
-          card.onclick = async () => { const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); } };
+          card.onclick = async () => {
+            tabsEl.style.display="none"; searchTabEl.style.display="none"; feedEl.style.display="none";
+            const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); }
+          };
           feedEl.appendChild(card);
         });
       }
@@ -3239,7 +3233,10 @@ historyTab.addEventListener("click", async () => {
           const snippet = it.snippet || {}; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
           const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = videoId;
           card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Watch Later</div></div>';
-          card.onclick = async () => { const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); } };
+          card.onclick = async () => {
+            tabsEl.style.display="none"; searchTabEl.style.display="none"; feedEl.style.display="none";
+            const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); }
+          };
           feedEl.appendChild(card);
         });
       }
@@ -3491,7 +3488,11 @@ async function openPlaylist(playlistId, title) {
       const thumb = snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || "";
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
       card.innerHTML = `<div class="video-thumb"><img src="${thumb}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.videoOwnerChannelTitle || snippet.channelTitle || ""}</div><div class="video-meta">#${i + 1} in playlist</div></div>`;
-      card.onclick = async () => { const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: " + snippet.title); } };
+      card.onclick = async () => {
+        tabsEl.style.display="none"; searchTabEl.style.display="none"; feedEl.style.display="none";
+        if(playlistPageEl) playlistPageEl.style.display="none";
+        const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: " + snippet.title); }
+      };
       playlistItemsList.appendChild(card); rendered++;
     });
     if (rendered === 0) playlistItemsList.innerHTML = `<div style="font-size:12px;opacity:0.6;padding:8px 0;">This playlist is empty.</div>`;
@@ -3537,8 +3538,8 @@ async function loadMoreVideos() {
     localStorage.setItem("_trendMoreRotate", String((trendMoreRotate+1)%TREND_MORE_CATS.length));
     const tcat2 = TREND_MORE_CATS[trendMoreRotate];
     const [tr1, tr2] = await Promise.allSettled([
-      fetchYouTubeDirect("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:tcat2,maxResults:20,publishedAfter:new Date(Date.now()-172800000).toISOString(),_:Date.now()}, 2, { filterShorts: true, trim: true }),
-      fetchYouTubeDirect("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:"US",videoCategoryId:tcat2,maxResults:20,_:Date.now()}, 2, { filterShorts: true, trim: true })
+      fetchYouTubeDirect("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:tcat2,maxResults:10,publishedAfter:new Date(Date.now()-172800000).toISOString(),_:Date.now()}),
+      fetchYouTubeDirect("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:"US",videoCategoryId:tcat2,maxResults:12,_:Date.now()})
     ]);
     const tseen = new Set(); const tbatch = [];
     [tr1,tr2].forEach(r=>{if(r.status==="fulfilled")(r.value.items||[]).forEach(item=>{const id=item.id?.videoId||item.id;if(!id||tseen.has(id))return;tseen.add(id);tbatch.push(item);});});
@@ -3553,7 +3554,11 @@ async function loadMoreVideos() {
       const snippet = item.snippet; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
       card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle || ""}</div></div>`;
-      card.onclick = async () => { const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet); }; channelPageEl.appendChild(card);
+      card.onclick = async () => {
+        tabsEl.style.display="none"; searchTabEl.style.display="none"; feedEl.style.display="none";
+        if(channelPageEl) channelPageEl.style.display="none";
+        const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet);
+      }; channelPageEl.appendChild(card);
     });
   } else { appendFeed(data.items || []); }
 }
@@ -3667,7 +3672,11 @@ async function loadChannelPage(channelId) {
     const snippet = item.snippet; const videoId = snippet.resourceId.videoId;
     const card = document.createElement("div"); card.className = "video-card parallax focusable";
     card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails.medium.url}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle}</div></div>`;
-    card.onclick = async () => { const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet); }; channelPageEl.appendChild(card);
+    card.onclick = async () => {
+      tabsEl.style.display="none"; searchTabEl.style.display="none"; feedEl.style.display="none";
+      if(channelPageEl) channelPageEl.style.display="none";
+      const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet);
+    }; channelPageEl.appendChild(card);
   });
   showHUD("Channel Loaded");
 }
@@ -4773,8 +4782,12 @@ async function _injectHubVideos(hubVideos) {
       const ago = timeAgo(snippet.publishedAt);
       card.innerHTML = '<div class="video-thumb"><img src="' + thumb + '" loading="lazy"></div><div class="video-info"><div class="video-title">' + (snippet.title||"") + '</div><div class="video-channel">' + (snippet.channelTitle||"") + '</div><div class="video-meta" style="color:rgba(255,100,100,0.9);">🔴 New · ' + ago + '</div></div>';
       card.onclick = async () => {
-        const short = await checkIsShort(videoId, snippet);
-        if (short) openAsShort(videoId, snippet);
+        tabsEl.style.display = "none";
+        searchTabEl.style.display = "none";
+        feedEl.style.display = "none";
+        if (subsPageEl) subsPageEl.style.display = "none";
+        await ensureDuration(item);
+        if (isShort(item)) openAsShort(videoId, snippet);
         else { setPlayerVideo(videoId, snippet); showHUD("Playing: " + (snippet.title||"")); }
       };
       frag.appendChild(card);
@@ -5279,6 +5292,56 @@ async function enrichWithDurations(items) {
   return items;
 }
 
+
+/* ================================================================
+   UNIFIED SHORTS DETECTION (with UI-safe click routing)
+================================================================ */
+function isShort(item) {
+  const title = (item.snippet?.title || "").toLowerCase();
+  if (title.includes("#shorts") || title.includes("#short")) return true;
+  const dur = item.contentDetails?.duration || "";
+  if (dur) {
+    const match = dur.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (match) {
+      const h = parseInt(match[1] || 0);
+      const m = parseInt(match[2] || 0);
+      const s = parseInt(match[3] || 0);
+      const total = h * 3600 + m * 60 + s;
+      if (total >= 2 && total <= 150) return true; // 2s–2:30 = SHORT
+    }
+  }
+  return false;
+}
+
+async function ensureDuration(item) {
+  if (!item.contentDetails) {
+    const id = item.id?.videoId || item.id;
+    try {
+      const durMap = await fetchContentDetails([id]);
+      if (durMap[id]) item.contentDetails = durMap[id];
+    } catch(e) {}
+  }
+  return item;
+}
+
+// UI-safe click routing — hides tab UI BEFORE any async duration check
+function applyShortPlayerPatch(card, item) {
+  const videoId = item.id?.videoId || item.id;
+  card.onclick = async () => {
+    tabsEl.style.display = "none";
+    searchTabEl.style.display = "none";
+    feedEl.style.display = "none";
+    if (subsPageEl) subsPageEl.style.display = "none";
+    await ensureDuration(item);
+    if (isShort(item)) {
+      openAsShort(videoId, item.snippet);
+    } else {
+      setPlayerVideo(videoId, item.snippet);
+      showHUD("Playing: " + (item.snippet?.title || ""));
+    }
+  };
+}
+
 (async function init() {
   // Safety: always dismiss boot splash even if init crashes
   const splashTimeout = setTimeout(() => {
@@ -5307,22 +5370,18 @@ async function enrichWithDurations(items) {
   // feedEl is display:grid by default so it's already visible
   // Use a timeout-wrapped fetch so slow API never blocks the UI
   const _startupFetch = async () => {
-    // Retry up to 2 times if the cold-cache first attempt returns too few videos
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const since24h = new Date(Date.now() - 86400000).toISOString();
-        const cat = freshCategory();
-        const seen = new Set(); const allItems = [];
-        const [fresh, popular] = await Promise.allSettled([
-          fetchYouTubeDirect("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 15, publishedAfter: since24h, _: Date.now() }, 2, { filterShorts: true, trim: true }),
-          fetchYouTubeDirect("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 15, _: Date.now() }, 2, { filterShorts: true, trim: true })
-        ]);
-        if (fresh.status === "fulfilled") (fresh.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
-        if (popular.status === "fulfilled") (popular.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
-        if (allItems.length >= 4) { nextPageToken = (popular.status==="fulfilled"&&popular.value.nextPageToken)||null; renderFeed(await enrichWithDurations(allItems)); showHUD("Home"); return; }
-        // Too few videos (likely cold-cache first attempt) — retry once more before falling through
-      } catch(e) {}
-    }
+    try {
+      const since24h = new Date(Date.now() - 86400000).toISOString();
+      const cat = freshCategory();
+      const seen = new Set(); const allItems = [];
+      const [fresh, popular] = await Promise.allSettled([
+        fetchYouTubeDirect("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 12, publishedAfter: since24h, _: Date.now() }),
+        fetchYouTubeDirect("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 12, _: Date.now() })
+      ]);
+      if (fresh.status === "fulfilled") (fresh.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
+      if (popular.status === "fulfilled") (popular.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
+      if (allItems.length) { nextPageToken = (popular.status==="fulfilled"&&popular.value.nextPageToken)||null; renderFeed(await enrichWithDurations(allItems)); showHUD("Home"); return; }
+    } catch(e) {}
     // Fallback
     try {
       const data = await fetchYouTubeDirect("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
