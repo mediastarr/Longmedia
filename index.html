@@ -2093,6 +2093,9 @@ async function loadVideoInfoPanel(videoId, snippet) {
           words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 5; });
           if (snippet.categoryId) profile.categories[snippet.categoryId] = (profile.categories[snippet.categoryId] || 0) + 3;
           localStorage.setItem("tasteProfile", JSON.stringify(profile));
+          // Sync to Worker immediately so cross-user collaborative filtering
+          // learns from this like right away, not just on manual Sync
+          syncProfileToWorker();
         } catch(e) {}
       }
     } else {
