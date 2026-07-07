@@ -812,13 +812,17 @@ const API_KEYS = []; // Keys managed server-side in Worker
 
 /* CHANGE: copy params before adding key so retries never corrupt the URL */
 async function fetchYouTubeDirect(endpoint, params = {}, retries = 2) {
-  // Route through Worker (bypasses KV cache for fresh results)
+  // Route through Worker (bypasses KV cache for fresh results) — with timeout guard
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(HUB_WORKER_URL + "/yt", {
       method: "POST",
       headers: workerHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ endpoint, params, noCache: true })
+      body: JSON.stringify({ endpoint, params, noCache: true }),
+      signal: controller.signal
     });
+    clearTimeout(timeout);
     if (res.ok) { const data = await res.json(); if (!data.error) return data; }
   } catch(e) {}
   if (!API_KEYS.length) return { items: [], error: true };
@@ -842,13 +846,17 @@ async function fetchYouTubeDirect(endpoint, params = {}, retries = 2) {
 }
 
 async function fetchYouTube(endpoint, params = {}, retries = 2) {
-  // Route through Worker — API keys managed server-side
+  // Route through Worker — API keys managed server-side — with timeout guard
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(HUB_WORKER_URL + "/yt", {
       method: "POST",
       headers: workerHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ endpoint, params })
+      body: JSON.stringify({ endpoint, params }),
+      signal: controller.signal
     });
+    clearTimeout(timeout);
     if (res.ok) {
       const data = await res.json();
       if (!data.error) return data;
@@ -5286,8 +5294,8 @@ async function enrichWithDurations(items) {
       const cat = freshCategory();
       const seen = new Set(); const allItems = [];
       const [fresh, popular] = await Promise.allSettled([
-        fetchYouTubeDirect("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 12, publishedAfter: since24h, _: Date.now() }),
-        fetchYouTubeDirect("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 12, _: Date.now() })
+        fetchYouTubeDirect("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 10, publishedAfter: since24h, _: Date.now() }),
+        fetchYouTubeDirect("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 10, _: Date.now() })
       ]);
       if (fresh.status === "fulfilled") (fresh.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
       if (popular.status === "fulfilled") (popular.value.items||[]).forEach(item => { const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); });
