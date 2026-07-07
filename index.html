@@ -1482,6 +1482,10 @@ function hideUIForVideo() {
   suggestionsEl.style.display = "none";
   playlistPageEl.style.display = "none";
   document.getElementById("videoInfoPanel").style.display = "none";
+  // Safety net: exitFullBtn should never show in the medium player —
+  // only fullscreen mode explicitly reveals it
+  const efb = document.getElementById("exitFullBtn");
+  if (efb) { efb.style.setProperty("display", "none", "important"); efb.style.setProperty("pointer-events", "none", "important"); }
 }
 
 function showUIWithMiniPlayer() {
@@ -1573,6 +1577,9 @@ fullBtn.addEventListener("click", () => {
   playCinemaZoomIntro();
   setTimeout(() => { playerSection.classList.add("settled"); }, 550);
   hideUIForVideo();
+  // Explicitly control visibility via JS — don't rely on CSS cascade
+  exitFullBtn.style.setProperty("display", "inline-block", "important");
+  exitFullBtn.style.setProperty("pointer-events", "auto", "important");
   showHUD("Fullscreen");
 });
 
@@ -1584,6 +1591,9 @@ exitFullBtn.addEventListener("click", () => {
   }
   playerSection.classList.remove("player-fullscreen");
   document.body.classList.remove("fullscreen-active");
+  // Explicitly hide via JS — back to medium player, no floating Back button
+  exitFullBtn.style.setProperty("display", "none", "important");
+  exitFullBtn.style.setProperty("pointer-events", "none", "important");
   disableCinemaMode();
   // Always return to medium player (not mini) with suggestions visible
   playerSection.classList.remove("player-mini");
