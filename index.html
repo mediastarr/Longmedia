@@ -1840,7 +1840,7 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   // prevents Neural Band input from being trapped inside the cross-origin player
   setTimeout(() => {
     const sink = document.getElementById("yt-focus-sink");
-    if (sink) sink.focus();
+    if (sink) sink.focus({ preventScroll: true });
   }, 600);
   // Always scroll to top so player is visible — works whether opening from
   // home feed or from suggested videos (which may be far down the page)
@@ -5373,11 +5373,16 @@ function applyShortPlayerPatch(card, item) {
 }
 
 (async function init() {
-  // Warm the Worker connection immediately — fire-and-forget, no await.
-  // This establishes the TCP/TLS handshake to Cloudflare before the first
-  // real video fetch needs it, since every fetch now routes through the
-  // Worker first. Matches Herald's DNS/TLS preconnect pattern.
-  try { fetch(HUB_WORKER_URL + "/status", { headers: workerHeaders() }).catch(()=>{}); } catch(e) {}
+  // Warm the Worker connection and actually WAIT for it (briefly) —
+  // this establishes the TCP/TLS handshake to Cloudflare before the first
+  // real video fetch needs it. A fire-and-forget ping races the real
+  // fetch over the same cold connection, defeating the purpose.
+  try {
+    await Promise.race([
+      fetch(HUB_WORKER_URL + "/status", { headers: workerHeaders() }).catch(()=>{}),
+      new Promise(resolve => setTimeout(resolve, 800))
+    ]);
+  } catch(e) {}
 
   // Safety: always dismiss boot splash even if init crashes
   const splashTimeout = setTimeout(() => {
