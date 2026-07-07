@@ -2603,10 +2603,6 @@ function appendFeed(items) {
     const meta = [views && views + " views", ago].filter(Boolean).join(" · ");
     card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title || ""}</div><div class="video-channel">${snippet.channelTitle || ""}</div><div class="video-meta">${meta}</div></div>`;
     card.onclick = async () => {
-      tabsEl.style.display = "none";
-      searchTabEl.style.display = "none";
-      feedEl.style.display = "none";
-      if (subsPageEl) subsPageEl.style.display = "none";
       // Track CTR — user clicked this video
       trackCTR(videoId, snippet.channelId || "", lastSearchQuery || null);
       trackSessionContinuation(videoId, snippet.channelId || "");
