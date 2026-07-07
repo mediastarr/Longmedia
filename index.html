@@ -2809,8 +2809,8 @@ trendingTab.addEventListener("click", async () => {
   function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); }); }
   const tSince24h = new Date(Date.now()-86400000).toISOString();
   const [fresh, popular] = await Promise.allSettled([
-    fetchYouTubeDirect("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:myCat,maxResults:12,publishedAfter:tSince24h,_:Date.now()}, 2, { filterShorts: true, trim: true }),
-    fetchYouTubeDirect("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:12,_:Date.now()}, 2, { filterShorts: true, trim: true })
+    fetchYouTubeDirect("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:myCat,maxResults:25,publishedAfter:tSince24h,_:Date.now()}, 2, { filterShorts: true, trim: true }),
+    fetchYouTubeDirect("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:25,_:Date.now()}, 2, { filterShorts: true, trim: true })
   ]);
   if (fresh.status==="fulfilled") addU(fresh.value.items);
   if (popular.status==="fulfilled") addU(popular.value.items);
@@ -2823,6 +2823,15 @@ trendingTab.addEventListener("click", async () => {
     nextPageToken = fallback.nextPageToken || null;
     renderFeed(await enrichWithDurations(fallback.items || [])); showHUD("Trending");
   }
+  // Auto-fill: if the rendered feed isn't tall enough to scroll, fetch more automatically
+  // so infinite scroll always has a chance to trigger
+  requestAnimationFrame(() => {
+    setTimeout(async () => {
+      if (currentTab === "trending" && nextPageToken && document.body.offsetHeight <= window.innerHeight + 100) {
+        try { await loadMoreVideos(); } catch(e) {}
+      }
+    }, 300);
+  });
 });
 
 shortsTab.addEventListener("click", async () => {
@@ -3523,8 +3532,8 @@ async function loadMoreVideos() {
     localStorage.setItem("_trendMoreRotate", String((trendMoreRotate+1)%TREND_MORE_CATS.length));
     const tcat2 = TREND_MORE_CATS[trendMoreRotate];
     const [tr1, tr2] = await Promise.allSettled([
-      fetchYouTubeDirect("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:tcat2,maxResults:10,publishedAfter:new Date(Date.now()-172800000).toISOString(),_:Date.now()}),
-      fetchYouTubeDirect("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:"US",videoCategoryId:tcat2,maxResults:12,_:Date.now()})
+      fetchYouTubeDirect("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:tcat2,maxResults:20,publishedAfter:new Date(Date.now()-172800000).toISOString(),_:Date.now()}, 2, { filterShorts: true, trim: true }),
+      fetchYouTubeDirect("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:"US",videoCategoryId:tcat2,maxResults:20,_:Date.now()}, 2, { filterShorts: true, trim: true })
     ]);
     const tseen = new Set(); const tbatch = [];
     [tr1,tr2].forEach(r=>{if(r.status==="fulfilled")(r.value.items||[]).forEach(item=>{const id=item.id?.videoId||item.id;if(!id||tseen.has(id))return;tseen.add(id);tbatch.push(item);});});
