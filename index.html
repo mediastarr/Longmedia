@@ -868,6 +868,7 @@ let isLight = false;
 let currentChannelId = "UCoLDGQ7a81ep9SJqPlDs2sg";
 let channelNextPageToken = null;
 let channelUploadsId = null;
+let subsReturnScrollY = 0;
 let historyList = JSON.parse(localStorage.getItem("historyList") || "[]");
 let shortsItems = [];
 let shortsSeenIds = new Set();
@@ -3531,7 +3532,7 @@ async function loadSubscriptions() {
       const ch = item.snippet; const channelId = ch.resourceId.channelId;
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
       card.innerHTML = `<div class="video-thumb"><img src="${ch.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${ch.title}</div><div class="video-channel">${ch.channelTitle || "Channel"}</div><div class="video-meta">Tap to open channel</div></div>`;
-      card.onclick = () => { currentChannelId = channelId; subsPageEl.style.display = "none"; setActiveTab("channel"); loadChannelPage(channelId); };
+      card.onclick = () => { subsReturnScrollY = window.scrollY; currentChannelId = channelId; subsPageEl.style.display = "none"; setActiveTab("channel"); loadChannelPage(channelId); };
       subsFeedEl.appendChild(card);
     });
   } catch (e) { subsFeedEl.innerHTML = `<div style="font-size:12px;opacity:0.8;">Error loading subscriptions.</div>`; }
@@ -3678,7 +3679,7 @@ async function loadMoreSubs() {
     const ch = item.snippet; const channelId = ch.resourceId.channelId;
     const card = document.createElement("div"); card.className = "video-card parallax focusable";
     card.innerHTML = `<div class="video-thumb"><img src="${ch.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${ch.title}</div><div class="video-channel">${ch.channelTitle || "Channel"}</div><div class="video-meta">Tap to open channel</div></div>`;
-    card.onclick = () => { currentChannelId = channelId; subsPageEl.style.display = "none"; setActiveTab("channel"); loadChannelPage(channelId); };
+    card.onclick = () => { subsReturnScrollY = window.scrollY; currentChannelId = channelId; subsPageEl.style.display = "none"; setActiveTab("channel"); loadChannelPage(channelId); };
     subsFeedEl.appendChild(card);
   });
 }
@@ -3770,7 +3771,16 @@ async function loadChannelPage(channelId) {
   setActiveTab("channel"); currentChannelId = channelId;
   const info = await fetchYouTube("channels", { part: "snippet,statistics,contentDetails", id: channelId });
   const channelInfo = info.items?.[0]; if (!channelInfo) return;
-  channelPageEl.innerHTML = `<div class="channel-banner parallax"><div class="banner-logo"></div><div class="banner-text">ViewTube</div></div><div class="channel-header parallax"><img class="channel-pic" src="${channelInfo.snippet.thumbnails?.default?.url}"><div class="channel-meta"><div class="channel-name">${channelInfo.snippet.title}</div><div class="channel-subs">${channelInfo.statistics?.subscriberCount} subscribers</div></div></div>`;
+  channelPageEl.innerHTML = `<button class="playlist-back-btn" id="channelBackBtn">← Back</button><div class="channel-banner parallax"><div class="banner-logo"></div><div class="banner-text">ViewTube</div></div><div class="channel-header parallax"><img class="channel-pic" src="${channelInfo.snippet.thumbnails?.default?.url}"><div class="channel-meta"><div class="channel-name">${channelInfo.snippet.title}</div><div class="channel-subs">${channelInfo.statistics?.subscriberCount} subscribers</div></div></div>`;
+  const channelBackBtn = document.getElementById("channelBackBtn");
+  if (channelBackBtn) {
+    channelBackBtn.addEventListener("click", () => {
+      channelPageEl.style.display = "none";
+      setActiveTab("subs");
+      requestAnimationFrame(() => window.scrollTo({ top: subsReturnScrollY, behavior: "instant" }));
+      showHUD("Subscriptions");
+    });
+  }
   channelUploadsId = channelInfo.contentDetails.relatedPlaylists.uploads;
   const uploads = await fetchYouTube("playlistItems", { part: "snippet", playlistId: channelUploadsId, maxResults: 20, _: Date.now() });
   channelNextPageToken = uploads.nextPageToken || null; nextPageToken = uploads.nextPageToken || null;
