@@ -4685,10 +4685,7 @@ async function silentSync(token){
     if (channelIds.length > 0) {
       fetch(HUB_WORKER_URL + "/subscribe", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-ViewTube-Secret": HUB_SECRET
-        },
+        headers: workerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ channelIds: channelIds.slice(0, 100) })
       }).then(r => r.json()).then(d => {
         if (d.subscribed > 0) console.log("Hub: subscribed", d.subscribed, "channels for real-time notifications");
@@ -5636,16 +5633,6 @@ function applyShortPlayerPatch(card, item) {
         if (channelId) localStorage.setItem("yt_channel_id", channelId);
       }
     } catch(e) {}
-    // Store YouTube channel ID for multi-user Worker isolation
-    try {
-      const tkForId = await getValidToken();
-      if (tkForId && !localStorage.getItem("yt_channel_id")) {
-        const chRes = await fetch("https://www.googleapis.com/youtube/v3/channels?part=id&mine=true", { headers: { Authorization: "Bearer " + tkForId } });
-        const chData = await chRes.json();
-        const channelId = chData.items?.[0]?.id || "";
-        if (channelId) localStorage.setItem("yt_channel_id", channelId);
-      }
-    } catch(e) {}
     const autoTkn = await getValidToken();
     if (autoTkn) {
       // Update login status panels
@@ -5653,14 +5640,18 @@ function applyShortPlayerPatch(card, item) {
       if (dls && !dls.textContent.includes("Logged in")) dls.textContent = "Logged in ✓";
       const pls = document.getElementById("playlistLoginStatus");
       if (pls) pls.textContent = "Logged in ✓";
-      // Only reload home feed if it's still empty (don't interrupt user if already loaded)
-      if (hasEnoughHistory() && feedEl.children.length < 3) {
+      // Upgrade the generic startup feed to the real personalized/subscription-aware
+      // feed once auth is confirmed — not just when the startup feed came back empty,
+      // otherwise this practically never runs (the generic feed usually succeeds).
+      if (hasEnoughHistory()) {
         showSkeletons(6);
         const items = await fetchPersonalizedFeed();
         renderFeed(items);
         showHUD("For You ✦");
         const seed = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
         nextPageToken = seed.nextPageToken || null;
+        _homeLastLoaded = Date.now();
+        _homeCacheValid = feedEl.children.length > 0;
       }
     }
   }
