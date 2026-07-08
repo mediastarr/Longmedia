@@ -1753,6 +1753,7 @@ window.onYouTubeIframeAPIReady = function () {
           if (e.data === 101 || e.data === 150) showAgeRestrictedOverlay(currentVideoId);
           else if (e.data === 100) showHUD('Video not available');
           else showHUD('Playback error (code ' + e.data + ') — try another video');
+          recoverPlayerAfterError();
         }
       }
     });
@@ -1766,6 +1767,16 @@ function playNextSuggested() {
   const sugFeed = document.getElementById("suggestedFeed");
   const firstCard = sugFeed?.querySelector(".video-card");
   if (firstCard) firstCard.click();
+}
+
+// After a real playback error, the persistent player instance can be left in a
+// broken state where it keeps failing to load anything further (a known YouTube
+// IFrame API quirk). Destroy it so the next video load builds a fresh instance
+// instead of reusing a possibly-poisoned one via loadVideoById().
+function recoverPlayerAfterError() {
+  try { if (ytPlayer && ytPlayer.destroy) ytPlayer.destroy(); } catch(e) {}
+  ytPlayer = null;
+  isPlayerReady = false;
 }
 
 function createYTPlayer(videoId, startSeconds) {
@@ -1829,6 +1840,7 @@ function createYTPlayer(videoId, startSeconds) {
           if (e.data === 101 || e.data === 150) showAgeRestrictedOverlay(currentVideoId);
           else if (e.data === 100) showHUD('Video not available');
           else showHUD('Playback error (code ' + e.data + ') — try another video');
+          recoverPlayerAfterError();
         }
     }
   });
@@ -2391,6 +2403,7 @@ resBtn.addEventListener("click", () => {
           if (e.data === 101 || e.data === 150) showAgeRestrictedOverlay(currentVideoId);
           else if (e.data === 100) showHUD('Video not available');
           else showHUD('Playback error (code ' + e.data + ') — try another video');
+          recoverPlayerAfterError();
         }
     }
   });
