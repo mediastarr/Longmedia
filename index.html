@@ -5350,7 +5350,7 @@ async function _loadComments(videoId) {
     const sugFeed = document.getElementById("suggestedFeed");
     if (panel && sugFeed) panel.insertBefore(el, sugFeed);
   }
-  el.innerHTML = '<div style="font-size:10px;opacity:0.5;margin-bottom:8px;letter-spacing:0.05em;">TOP COMMENTS</div><div style="opacity:0.5;font-size:12px;">Loading comments…</div>';
+  el.innerHTML = '<div style="font-size:10px;opacity:0.5;margin-bottom:8px;letter-spacing:0.05em;">COMMENTS</div><div style="opacity:0.5;font-size:12px;">Loading comments…</div>';
 
   try {
     const data = await fetchYouTube("commentThreads", {
@@ -5358,15 +5358,42 @@ async function _loadComments(videoId) {
     });
     const items = data.items || [];
     if (!items.length) { el.innerHTML = ""; return; }
-    el.innerHTML = '<div style="font-size:10px;opacity:0.5;margin-bottom:8px;letter-spacing:0.05em;">TOP COMMENTS</div>' +
-      items.map(item => {
-        const c = item.snippet.topLevelComment.snippet;
-        const likes = c.likeCount > 0 ? ` · 👍 ${formatViews(c.likeCount)}` : "";
-        return `<div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.04);border-radius:10px;">
-          <div style="font-size:11px;font-weight:600;opacity:0.8;margin-bottom:3px;">${c.authorDisplayName}${likes}</div>
-          <div style="font-size:12px;line-height:1.4;opacity:0.9;">${(c.textDisplay||"").replace(/<[^>]+>/g,"").slice(0,200)}</div>
-        </div>`;
-      }).join('');
+
+    const renderComment = item => {
+      const c = item.snippet.topLevelComment.snippet;
+      const likes = c.likeCount > 0 ? ` · 👍 ${formatViews(c.likeCount)}` : "";
+      return `<div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.04);border-radius:10px;">
+        <div style="font-size:11px;font-weight:600;opacity:0.8;margin-bottom:3px;">${c.authorDisplayName}${likes}</div>
+        <div style="font-size:12px;line-height:1.4;opacity:0.9;">${(c.textDisplay||"").replace(/<[^>]+>/g,"").slice(0,200)}</div>
+      </div>`;
+    };
+
+    // Collapsed by default — just a small preview, like real YouTube's comment
+    // teaser, so it never blocks quick access to the suggested videos right
+    // below it. Expanding the rest is an explicit, optional action.
+    const previewCount = 2;
+    const preview = items.slice(0, previewCount);
+    const rest = items.slice(previewCount);
+
+    el.innerHTML = `<div style="font-size:10px;opacity:0.5;margin-bottom:8px;letter-spacing:0.05em;">COMMENTS · ${items.length}</div>` + preview.map(renderComment).join('');
+
+    if (rest.length) {
+      const toggleBtn = document.createElement("button");
+      toggleBtn.textContent = `Show ${rest.length} more comment${rest.length !== 1 ? "s" : ""}`;
+      toggleBtn.style.cssText = "background:none;border:none;color:#3cf2ff;font-size:12px;font-weight:600;cursor:pointer;padding:4px 0;touch-action:manipulation;";
+      let expanded = false;
+      const restHtml = rest.map(renderComment).join('');
+      const restEl = document.createElement("div");
+      restEl.style.display = "none";
+      restEl.innerHTML = restHtml;
+      toggleBtn.onclick = () => {
+        expanded = !expanded;
+        restEl.style.display = expanded ? "block" : "none";
+        toggleBtn.textContent = expanded ? "Show fewer comments" : `Show ${rest.length} more comment${rest.length !== 1 ? "s" : ""}`;
+      };
+      el.appendChild(toggleBtn);
+      el.appendChild(restEl);
+    }
   } catch(e) {
     el.innerHTML = "";
   }
