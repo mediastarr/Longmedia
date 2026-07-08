@@ -848,11 +848,11 @@ async function fetchYouTubeDirect(endpoint, params = {}, retries = 2, options = 
 async function fetchYouTube(endpoint, params = {}, retries = 2, options = {}) {
   // Route through Worker — API keys managed server-side
   try {
-    const res = await fetch(HUB_WORKER_URL + "/yt", {
+    const res = await fetchWithTimeout(HUB_WORKER_URL + "/yt", {
       method: "POST",
       headers: workerHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ endpoint, params, filterShorts: options.filterShorts, trim: options.trim })
-    });
+    }, 8000);
     if (res.ok) {
       const data = await res.json();
       if (!data.error) return data;
@@ -1253,6 +1253,16 @@ function getRecentSearches(n) { return ((getTasteProfile().searchHistory || []).
 
    Phase 3: MERGE — interleave scored candidates into a unified stream
 ----------------------------------------------------------- */
+// Wraps fetch() with a hard timeout — several raw fetch() calls in the
+// personalized feed pipeline talk directly to Google's API (not through
+// fetchYouTube's own timeout/retry handling), so without this, one hung
+// request on a slow connection could block the whole feed build forever.
+function fetchWithTimeout(url, options, ms = 6000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeout));
+}
+
 async function fetchPersonalizedFeed() {
   const token = await getValidToken();
   const profile5 = getTasteProfile();
@@ -1289,7 +1299,7 @@ async function fetchPersonalizedFeed() {
   }
   if (token) {
     try {
-      const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance", { headers: { Authorization: "Bearer " + token } });
+      const subsRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance", { headers: { Authorization: "Bearer " + token } });
       const subsData = await subsRes.json();
       const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
       if (channelIds.length > 0) {
@@ -1312,7 +1322,7 @@ async function fetchPersonalizedFeed() {
       }
     } catch(e) {}
     try {
-      const llRes = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=15", { headers: { Authorization: "Bearer " + token } });
+      const llRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=15", { headers: { Authorization: "Bearer " + token } });
       const llData = await llRes.json();
       const likedItems = (llData.items || []).map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } }));
       for (let i = likedItems.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [likedItems[i], likedItems[j]] = [likedItems[j], likedItems[i]]; }
@@ -2427,20 +2437,40 @@ function filterAndTrackFeedItems(items) {
     const shownSet = new Set(JSON.parse(sessionStorage.getItem("feedShownIds") || "[]"));
     const blockSet = new Set(getBlocklist());
     const _sessionDedup = new Set();
-    items = items.filter(item => {
-      const id = item.id?.videoId || item.id;
-      if (!id) return false;
+    const passesCore = (item, id) => {
       if (watchedSet.has(id)) return false;
-      if (shownSet.has(id)) return false;
       if (blockSet.has(id)) return false; // not interested / disliked
-      if (_sessionDedup.has(id)) return false;
-      _sessionDedup.add(id);
-      // Filter shorts from home/trending/movie feeds (YouTube does this by default)
       if (["home","trending","movies"].includes(currentTab)) {
         if (isShortByTitle(item) || isShortByDuration(item)) return false;
       }
       return true;
+    };
+    let filtered = items.filter(item => {
+      const id = item.id?.videoId || item.id;
+      if (!id || _sessionDedup.has(id)) return false;
+      if (!passesCore(item, id)) return false;
+      if (shownSet.has(id)) return false;
+      _sessionDedup.add(id);
+      return true;
     });
+    // Floor: repeated taps of the same tab (Trending/Movies especially) can
+    // re-fetch largely the same "popular"/"general" results each time, so the
+    // "already shown this session" check alone can shrink the surviving pool
+    // to nothing after just a couple of taps. If that happens, backfill with
+    // candidates that still pass every real preference check (blocklist,
+    // watch history, Shorts filter) even if they were shown earlier this
+    // session — showing some repeats beats showing an empty feed.
+    if (filtered.length < 6) {
+      const backfill = items.filter(item => {
+        const id = item.id?.videoId || item.id;
+        if (!id || _sessionDedup.has(id)) return false;
+        if (!passesCore(item, id)) return false;
+        _sessionDedup.add(id);
+        return true;
+      });
+      filtered = filtered.concat(backfill);
+    }
+    items = filtered;
     // Track all rendered IDs so they never repeat this session
     const newIds = items.map(item => item.id?.videoId || item.id).filter(Boolean);
     const merged = [...new Set([...shownSet, ...newIds])].slice(-200);
@@ -2810,49 +2840,13 @@ homeTab.addEventListener("click", async () => {
     }
   } catch(e) {}
 
-  // Re-inject previously shown hub videos if user switched tabs and came back
-  try {
-    const prevIds = JSON.parse(sessionStorage.getItem("injectedHubIds") || "[]");
-    if (prevIds.length) {
-      setTimeout(async () => {
-        if (feedEl.querySelector('[data-hubvideo="1"]')) return; // already there
-        const data = await fetchYouTube("videos", { part: "snippet,statistics", id: prevIds.join(","), _: Date.now() });
-        if (!data.items || !data.items.length) return;
-        const frag = document.createDocumentFragment();
-        data.items.forEach(item => {
-          const snippet = item.snippet || {};
-          const videoId = item.id;
-          if (feedEl.querySelector('[data-videoid="' + videoId + '"]')) return;
-          const card = document.createElement("div");
-          card.className = "video-card parallax focusable";
-          card.dataset.videoid = videoId;
-    if (snippet.channelId) card.dataset.channelid = snippet.channelId;
-    // Apply live badge if channel is currently live
-    if (_liveChannels && _liveChannels.has(snippet.channelId)) {
-      const badge = document.createElement("div");
-      badge.className = "live-badge";
-      badge.textContent = "🔴 LIVE";
-      badge.style.cssText = "position:absolute;top:6px;left:6px;background:#ff0000;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;z-index:10;";
-      card.style.position = "relative";
-      card.appendChild(badge);
-    }
-          card.dataset.hubvideo = "1";
-          card.style.border = "1px solid rgba(255,68,68,0.7)";
-          card.style.boxShadow = "0 0 14px rgba(255,68,68,0.35)";
-          const thumb = snippet.thumbnails?.medium?.url || "";
-          card.innerHTML = '<div class="video-thumb"><img src="' + thumb + '" loading="lazy"></div><div class="video-info"><div class="video-title">' + (snippet.title||"") + '</div><div class="video-channel">' + (snippet.channelTitle||"") + '</div><div class="video-meta" style="color:rgba(255,100,100,0.9);">🔴 New · ' + timeAgo(snippet.publishedAt) + '</div></div>';
-          card.onclick = async () => {
-            sessionStorage.removeItem("injectedHubIds");
-            const short = await checkIsShort(videoId, snippet);
-            if (short) openAsShort(videoId, snippet);
-            else { setPlayerVideo(videoId, snippet); showHUD("Playing: " + (snippet.title||"")); }
-          };
-          frag.appendChild(card);
-        });
-        feedEl.insertBefore(frag, feedEl.firstChild);
-      }, 800);
-    }
-  } catch(e) {}
+  // Note: previously-injected hub cards don't need manual re-injection here —
+  // if the cache-is-still-valid check above already returned early, whatever
+  // was in feedEl (including any hub cards) is untouched. If we're past that
+  // point, a full reload is happening and _injectHubVideos() (called after
+  // renderFeed completes below) is the single source of truth for hub cards —
+  // avoiding a race where a separate blind timer used to insert cards that
+  // renderFeed's innerHTML wipe would then immediately destroy.
 
   const token = await getValidToken();
   const since48h = new Date(Date.now() - 172800000).toISOString();
@@ -3092,7 +3086,7 @@ shortsTab.addEventListener("click", async () => {
   // 8 channels instead of 15 — saves 7 API calls
   if (token) {
     try {
-      const subsRes = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance", { headers: { Authorization: "Bearer " + token } });
+      const subsRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance", { headers: { Authorization: "Bearer " + token } });
       const subsData = await subsRes.json();
       let channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
       for (let i = channelIds.length-1; i>0; i--) { const j = Math.floor(Math.random()*(i+1)); [channelIds[i],channelIds[j]]=[channelIds[j],channelIds[i]]; }
@@ -3343,7 +3337,7 @@ historyTab.addEventListener("click", async () => {
   const token = await getValidToken();
   if (token) {
     try {
-      const llRes = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=20", { headers: { Authorization: "Bearer " + token } });
+      const llRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=20", { headers: { Authorization: "Bearer " + token } });
       const llData = await llRes.json();
       if (llData.items && llData.items.length) {
         addHeader("♥ Liked Videos");
@@ -4939,11 +4933,12 @@ async function _pollCheckNewContent() {
 async function _injectHubVideos(hubVideos) {
   if (!hubVideos || !hubVideos.length) return;
   try {
-    // Filter out already-watched videos before injecting
+    // Filter out already-watched AND explicitly blocked (Not Interested / disliked) videos
     try {
       const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
       const seenSet = new Set(seenHub);
-      hubVideos = hubVideos.filter(v => !seenSet.has(v.videoId));
+      const blockSet = new Set(getBlocklist());
+      hubVideos = hubVideos.filter(v => !seenSet.has(v.videoId) && !blockSet.has(v.videoId));
     } catch(e) {}
     if (!hubVideos.length) return;
 
