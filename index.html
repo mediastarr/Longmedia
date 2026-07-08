@@ -812,6 +812,104 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 
 <script>
 
+// === ViewTube Worker Integration ===
+const WORKER_URL = 'https://viewtube-hub.mediastarr86.workers.dev';
+const WORKER_SECRET = 'viewtube-hub-secret-2024';
+
+// Generate persistent user ID for glasses
+const userId = localStorage.getItem('vt_user') || 'rayban_' + Math.random().toString(36).slice(2);
+localStorage.setItem('vt_user', userId);
+
+async function fetchYT(endpoint, params, options = {}) {
+  try {
+    const res = await fetch(WORKER_URL + '/yt', {
+      method: 'POST',
+      headers: { 
+        'X-ViewTube-Secret': WORKER_SECRET,
+        'X-ViewTube-User': userId,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ 
+        endpoint, 
+        params, 
+        trim: true,
+        filterShorts: options.filterShorts || false,
+        noCache: options.noCache || false
+      })
+    });
+    if (!res.ok) throw new Error('Worker error ' + res.status);
+    return await res.json();
+  } catch(e) {
+    console.error('YT fetch failed:', e);
+    return { error: true, items: [] };
+  }
+}
+
+// Replace loadHomeContent to use worker
+async function loadHomeContent() {
+  if (isHomeLoading) return;
+  isHomeLoading = true;
+  if (homeAbortController) homeAbortController.abort();
+  homeAbortController = new AbortController();
+  
+  setActiveTab("home");
+  _pollClearBadge();
+  
+  const feedEl = getFeedEl("home");
+  if (!feedEl) return;
+  
+  try {
+    // Skip if cached
+    const cacheAge = Date.now() - _homeLastLoaded;
+    if (_homeCacheValid && cacheAge < 120000 && feedEl.children.length > 0) {
+      return;
+    }
+    
+    feedEl.innerHTML = '<div class="skeleton"></div>'.repeat(6);
+    
+    // Use worker instead of direct API
+    const data = await fetchYT('search', {
+      part: 'snippet',
+      type: 'video',
+      maxResults: 12,
+      q: 'trending',
+      regionCode: 'US'
+    }, { signal: homeAbortController.signal });
+    
+    if (data.items && data.items.length) {
+      renderVideoList(data.items, feedEl);
+      _homeLastLoaded = Date.now();
+      _homeCacheValid = true;
+    } else {
+      feedEl.innerHTML = '<div style="padding:20px;text-align:center">Tap Home to retry</div>';
+    }
+  } catch(e) {
+    if (e.name !== 'AbortError') {
+      console.error('Home load error:', e);
+      feedEl.innerHTML = '<div style="padding:20px;text-align:center">Failed to load</div>';
+    }
+  } finally {
+    isHomeLoading = false;
+    homeAbortController = null;
+  }
+}
+
+function renderVideoList(items, container) {
+  container.innerHTML = '';
+  items.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'video-card';
+    div.innerHTML = `
+      <img src="${item.snippet.thumbnails.medium.url}" loading="lazy">
+      <div class="title">${item.snippet.title}</div>
+      <div class="channel">${item.snippet.channelTitle}</div>
+    `;
+    div.onclick = () => playVideo(item.id);
+    container.appendChild(div);
+  });
+}
+
+
 // === Tab loading state management ===
 let homeAbortController = null;
 let isHomeLoading = false;
