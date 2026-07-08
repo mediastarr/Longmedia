@@ -1467,6 +1467,21 @@ async function fetchPersonalizedFeed() {
     return true;
   });
 
+  // Re-apply channel diversity spacing on this FINAL ranked order — see comment above
+  const diversified = [];
+  const lastChannelIndex = {};
+  feed.forEach(item => {
+    const chId = item.snippet?.channelId || "";
+    const li = lastChannelIndex[chId];
+    if (li !== undefined && diversified.length - li < 3) {
+      diversified.splice(Math.min(diversified.length + 2, feed.length), 0, item);
+    } else {
+      diversified.push(item);
+    }
+    lastChannelIndex[chId] = diversified.length - 1;
+  });
+  feed = diversified;
+
   return feed;
 }
 
@@ -3355,6 +3370,7 @@ function workerHeaders(extra) {
   return Object.assign({ "X-ViewTube-Secret": HUB_SECRET, "X-ViewTube-User": getViewTubeUserId() }, extra || {});
 }
 
+let _deviceLoginActive = false;
 startLoginBtn.addEventListener("click", () => startDeviceLogin("subs"));
 document.getElementById("reloginBtn").addEventListener("click", () => {
   clearTokens();
@@ -3364,6 +3380,8 @@ document.getElementById("reloginBtn").addEventListener("click", () => {
 });
 
 async function startDeviceLogin(source) {
+  if (_deviceLoginActive) { showHUD("Login already in progress — check the code on screen"); return; }
+  _deviceLoginActive = true;
   showHUD("Requesting login code…");
   const codeEl = source === "playlists" ? playlistLoginCode : deviceUserCodeEl;
   const statusEl = source === "playlists" ? playlistLoginStatus : deviceLoginStatusEl;
@@ -3375,18 +3393,19 @@ async function startDeviceLogin(source) {
       body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, scope: "https://www.googleapis.com/auth/youtube" })
     });
     const data = await res.json();
-    if (data.error) { codeEl.textContent = "Error: " + (data.error_description || data.error); statusEl.textContent = "Check Google Cloud Console scope settings"; showHUD("Login error"); return; }
-    if (!data.user_code) { codeEl.textContent = "No code returned — try again"; return; }
+    if (data.error) { codeEl.textContent = "Error: " + (data.error_description || data.error); statusEl.textContent = "Check Google Cloud Console scope settings"; showHUD("Login error"); _deviceLoginActive = false; return; }
+    if (!data.user_code) { codeEl.textContent = "No code returned — try again"; _deviceLoginActive = false; return; }
     codeEl.textContent = "Code: " + data.user_code;
     statusEl.textContent = "Go to: " + data.verification_url;
     pollForToken(data.device_code, data.interval || 5, source);
-  } catch(e) { codeEl.textContent = "Network error — check connection"; statusEl.textContent = e.message || ""; showHUD("Login error"); }
+  } catch(e) { codeEl.textContent = "Network error — check connection"; statusEl.textContent = e.message || ""; showHUD("Login error"); _deviceLoginActive = false; }
 }
 
 async function pollForToken(deviceCode, intervalSeconds, source) {
   const statusEl = source === "playlists" ? playlistLoginStatus : deviceLoginStatusEl;
   let authorized = false;
   let attempts = 0;
+  try {
   while (!authorized) {
     await new Promise(r => setTimeout(r, intervalSeconds * 1000));
     attempts++;
@@ -3435,6 +3454,9 @@ async function pollForToken(deviceCode, intervalSeconds, source) {
     showHUD("YouTube logged in ✓");
     if (source === "playlists") loadPlaylists();
     else loadSubscriptions();
+  }
+  } finally {
+    _deviceLoginActive = false;
   }
 }
 
@@ -4634,16 +4656,10 @@ async function triggerReAuthFlow() {
     }, 3000);
   });
 
-  // Also auto-start login silently after 5 seconds if user doesn't tap
-  setTimeout(async () => {
-    const stillNeeds = localStorage.getItem("yt_needs_relogin");
-    if (!stillNeeds) return;
-    if (reAuthBanner) reAuthBanner.querySelector("span").textContent = "🔄 Auto-reconnecting — check Subscriptions tab for your code";
-    setActiveTab("subs");
-    subsPageEl.style.display = "block";
-    document.getElementById("subsLoginPanel").style.display = "block";
-    await startDeviceLogin("subs");
-  }, 5000);
+  // Re-auth is user-initiated only (tap "Reconnect Now" above) — we deliberately do NOT
+  // auto-request a new device code in the background. Silently calling Google's
+  // device/code endpoint without a user action isn't something we want this app doing,
+  // especially while under Google's OAuth verification review.
 }
 
 // On startup, check if we need re-auth from a previous session
