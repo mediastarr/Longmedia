@@ -2505,6 +2505,12 @@ function filterAndTrackFeedItems(items) {
 
 function renderFeed(items) {
   items = filterAndTrackFeedItems(items);
+  if (!items.length && feedEl.children.length > 0) {
+    // Nothing new to show — leave whatever's already on screen alone rather
+    // than wiping it out and going blank.
+    showHUD("No new videos — showing previous feed");
+    return;
+  }
   feedEl.innerHTML = "";
   appendFeed(items);
 
