@@ -1263,6 +1263,17 @@ function fetchWithTimeout(url, options, ms = 6000) {
   return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeout));
 }
 
+// Caps the total wall-clock time of any promise. Used to bound the whole
+// personalized-feed pipeline, not just its individual network calls — a chain
+// of several sequential steps can add up to a very long wait even when each
+// step is individually timed out.
+function withHardTimeout(promise, ms, fallbackValue) {
+  return Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(() => resolve(fallbackValue), ms))
+  ]);
+}
+
 async function fetchPersonalizedFeed() {
   const token = await getValidToken();
   const profile5 = getTasteProfile();
@@ -2845,7 +2856,8 @@ homeTab.addEventListener("click", async () => {
   // Guard against a stale/abandoned earlier load (e.g. one still stuck behind a
   // slow network call) finishing late and overwriting a newer, successful one.
   const myHomeGen = ++_homeLoadGeneration;
-  nextPageToken = null; showSkeletons(6);
+  nextPageToken = null;
+  if (feedEl.children.length === 0) showSkeletons(6);
 
   // Grab hub new videos BEFORE feed loads
   let hubVideos = [];
@@ -2874,7 +2886,7 @@ homeTab.addEventListener("click", async () => {
     function addL(items) { (items||[]).forEach(item => { const id = item.id?.videoId||item.id; if(!id||seen2.has(id)) return; seen2.add(id); allLogged.push(item); }); }
     // Personalized feed + order:date + mostPopular in parallel
     const [pf, fresh2, popular2] = await Promise.allSettled([
-      fetchPersonalizedFeed(),
+      withHardTimeout(fetchPersonalizedFeed(), 18000, []),
       fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 10, publishedAfter: since24h, _: Date.now() }),
       fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 10, _: Date.now() })
     ]);
@@ -5608,6 +5620,7 @@ function applyShortPlayerPatch(card, item) {
   // UI always updates — never leaves skeletons stuck. Uses cached
   // fetchYouTube (not noCache) so a warm Worker cache speeds up repeat loads.
   const _startupFetch = async () => {
+    const myStartupFetchGen = ++_homeLoadGeneration;
     try {
       const cat = freshCategory();
       const since24h = new Date(Date.now() - 86400000).toISOString();
@@ -5623,16 +5636,24 @@ function applyShortPlayerPatch(card, item) {
       const results = await Promise.allSettled(fetches);
       results.forEach(r => { if (r.status === "fulfilled") addU(r.value?.items || []); });
 
+      if (myStartupFetchGen !== _homeLoadGeneration) return; // a newer Home load has since started — discard this stale one
+
       if (!allItems.length) {
         feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home again to retry.</div>';
         return;
       }
 
       nextPageToken = "seed";
-      renderFeed(await enrichWithDurations(allItems));
+      const enriched = await enrichWithDurations(allItems);
+      if (myStartupFetchGen !== _homeLoadGeneration) return;
+      renderFeed(enriched);
       showHUD("Home");
+      _homeLastLoaded = Date.now();
+      _homeCacheValid = feedEl.children.length > 0;
     } catch(e) {
-      feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home to retry.</div>';
+      if (myStartupFetchGen === _homeLoadGeneration) {
+        feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home to retry.</div>';
+      }
     }
   };
   _startupFetch();
@@ -5663,9 +5684,13 @@ function applyShortPlayerPatch(card, item) {
       // otherwise this practically never runs (the generic feed usually succeeds).
       if (hasEnoughHistory()) {
         const myStartupGen = ++_homeLoadGeneration;
-        showSkeletons(6);
-        const items = await fetchPersonalizedFeed();
-        if (myStartupGen === _homeLoadGeneration) {
+        // Don't wipe the already-rendered generic feed with skeletons — only show
+        // them if there's genuinely nothing on screen yet. The existing content
+        // stays visible for however long this upgrade takes, and only gets
+        // replaced once it actually succeeds.
+        if (feedEl.children.length === 0) showSkeletons(6);
+        const items = await withHardTimeout(fetchPersonalizedFeed(), 18000, []);
+        if (myStartupGen === _homeLoadGeneration && items && items.length) {
           renderFeed(items);
           showHUD("For You ✦");
           const seed = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
