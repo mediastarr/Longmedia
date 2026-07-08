@@ -2843,6 +2843,9 @@ function setActiveTab(tab) {
 let _homeLastLoaded = 0;
 let _homeCacheValid = false;
 let _homeLoadGeneration = 0;
+// feedEl is shared by Home, Trending, Movies, History, and Search — whenever any
+// of them takes it over, Home's cache is no longer showing Home's own content.
+function invalidateHomeCache() { _homeCacheValid = false; }
 homeTab.addEventListener("click", async () => {
   setActiveTab("home");
   _pollClearBadge();
@@ -2960,6 +2963,7 @@ homeTab.addEventListener("click", async () => {
 
 trendingTab.addEventListener("click", async () => {
   if (isLoadingTrending) return; isLoadingTrending = true;
+  invalidateHomeCache();
   nextPageToken = null; setActiveTab("trending"); showSkeletons(6);
   try {
     // Rotate through categories each tap for variety
@@ -3276,6 +3280,7 @@ let isLoadingMovies = false;
 let isLoadingTrending = false;
 moviesTab.addEventListener("click", async () => {
   if (isLoadingMovies) return; isLoadingMovies = true;
+  invalidateHomeCache();
   nextPageToken = null; setActiveTab("movies"); showSkeletons(6);
   try {
   const allItems=[]; const seen=new Set();
@@ -3319,6 +3324,7 @@ moviesTab.addEventListener("click", async () => {
 });
 
 historyTab.addEventListener("click", async () => {
+  invalidateHomeCache();
   setActiveTab("history"); nextPageToken = null;
   feedEl.innerHTML = ""; showHUD("Loading history…");
   const now = Date.now(); const DAY = 86400000;
@@ -4074,6 +4080,7 @@ function rankSearchResults(items) {
 function triggerSearch(q) {
   lastSearchQuery = q;
   saveSearchToProfile(q);
+  invalidateHomeCache();
   (async () => {
     currentTab = "search";
     closeKeyboard();
