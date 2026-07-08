@@ -3642,9 +3642,12 @@ function saveTokens(tokenData) {
   localStorage.setItem("yt_token_expiry", Date.now() + expiresIn * 1000);
 }
 function isTokenExpired() { const expiry = localStorage.getItem("yt_token_expiry"); if (!expiry) return true; return Date.now() > parseInt(expiry); }
+let _refreshInFlight = null;
 async function refreshAccessToken() {
+  if (_refreshInFlight) return _refreshInFlight; // share the in-flight refresh instead of starting a redundant one
   const refreshToken = localStorage.getItem("yt_refresh_token");
   if (!refreshToken) return false;
+  _refreshInFlight = (async () => {
   try {
     const res = await fetchWithTimeout(HUB_WORKER_URL + "/oauth/refresh", {
       method: "POST", headers: workerHeaders({ "Content-Type": "application/json" }),
@@ -3672,6 +3675,8 @@ async function refreshAccessToken() {
     }
     return false;
   } catch (e) { return false; }
+  })();
+  try { return await _refreshInFlight; } finally { _refreshInFlight = null; }
 }
 function clearTokens() {
   localStorage.removeItem("yt_access_token");
@@ -5833,6 +5838,32 @@ function applyShortPlayerPatch(card, item) {
             nextPageToken = seed.nextPageToken || null;
             _homeLastLoaded = Date.now();
             _homeCacheValid = (_feedOwner === "home" && feedEl.children.length > 0);
+          }
+        } else if (myStartupGen === _homeLoadGeneration && feedEl.children.length === 0) {
+          // The personalized fetch timed out or came back empty, AND the earlier
+          // generic startup content never rendered either — don't leave this as a
+          // silent no-op. Fall through to one last plain "most popular" attempt so
+          // Home always lands in a definite state instead of an indefinite limbo.
+          try {
+            const fallback = await withHardTimeout(
+              fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() }),
+              10000, { items: [] }
+            );
+            if (myStartupGen === _homeLoadGeneration) {
+              if (fallback.items && fallback.items.length) {
+                nextPageToken = fallback.nextPageToken || null;
+                renderFeed(await enrichWithDurations(fallback.items));
+                showHUD("Home");
+                _homeLastLoaded = Date.now();
+                _homeCacheValid = (_feedOwner === "home" && feedEl.children.length > 0);
+              } else {
+                feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home to retry.</div>';
+              }
+            }
+          } catch(e) {
+            if (myStartupGen === _homeLoadGeneration) {
+              feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home to retry.</div>';
+            }
           }
         }
       }
