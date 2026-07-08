@@ -2168,14 +2168,15 @@ async function loadVideoInfoPanel(videoId, snippet) {
   };
   document.getElementById("vipSaveBtn").onclick = () => {
     if (!currentVideoId) { showHUD("No video playing"); return; }
+    const targetVideoId = currentVideoId;
     openPicker();
     plPickerStatus.style.display = "none";
     plPickerList.innerHTML = '<div class="pl-pick-msg">Loading playlists…</div>';
     getValidToken().then(token => {
       if (!token) {
         plPickerList.innerHTML = '<div class="pl-pick-msg"><div>Login to save videos to playlists.</div><button id="plPickerLoginBtn" class="topbar-btn" style="margin-top:8px;">Login to YouTube</button></div>';
-        document.getElementById("plPickerLoginBtn").addEventListener("click", async () => { const t = await startWriteLogin(); if (t) openPickerWithToken(t); });
-      } else openPickerWithToken(token);
+        document.getElementById("plPickerLoginBtn").addEventListener("click", async () => { const t = await startWriteLogin(); if (t) openPickerWithToken(t, targetVideoId); });
+      } else openPickerWithToken(token, targetVideoId);
     });
   };
 
@@ -3320,7 +3321,7 @@ historyTab.addEventListener("click", async () => {
           const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = videoId;
           card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Liked</div></div>';
           card.onclick = async () => {
-            tabsEl.style.display="none"; searchTabEl.style.display="none"; feedEl.style.display="none";
+            tabsEl.style.display="none"; searchTabEl.style.display="none";
             const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); }
           };
           feedEl.appendChild(card);
@@ -3337,7 +3338,7 @@ historyTab.addEventListener("click", async () => {
           const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = videoId;
           card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Watch Later</div></div>';
           card.onclick = async () => {
-            tabsEl.style.display="none"; searchTabEl.style.display="none"; feedEl.style.display="none";
+            tabsEl.style.display="none"; searchTabEl.style.display="none";
             const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); }
           };
           feedEl.appendChild(card);
@@ -3600,8 +3601,7 @@ async function openPlaylist(playlistId, title) {
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
       card.innerHTML = `<div class="video-thumb"><img src="${thumb}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.videoOwnerChannelTitle || snippet.channelTitle || ""}</div><div class="video-meta">#${i + 1} in playlist</div></div>`;
       card.onclick = async () => {
-        tabsEl.style.display="none"; searchTabEl.style.display="none"; feedEl.style.display="none";
-        if(playlistPageEl) playlistPageEl.style.display="none";
+        tabsEl.style.display="none"; searchTabEl.style.display="none";
         const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: " + snippet.title); }
       };
       playlistItemsList.appendChild(card); rendered++;
@@ -3669,8 +3669,7 @@ async function loadMoreVideos() {
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
       card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle || ""}</div></div>`;
       card.onclick = async () => {
-        tabsEl.style.display="none"; searchTabEl.style.display="none"; feedEl.style.display="none";
-        if(channelPageEl) channelPageEl.style.display="none";
+        tabsEl.style.display="none"; searchTabEl.style.display="none";
         const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet);
       }; channelPageEl.appendChild(card);
     });
@@ -3796,8 +3795,7 @@ async function loadChannelPage(channelId) {
     const card = document.createElement("div"); card.className = "video-card parallax focusable";
     card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails.medium.url}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle}</div></div>`;
     card.onclick = async () => {
-      tabsEl.style.display="none"; searchTabEl.style.display="none"; feedEl.style.display="none";
-      if(channelPageEl) channelPageEl.style.display="none";
+      tabsEl.style.display="none"; searchTabEl.style.display="none";
       const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet);
     }; channelPageEl.appendChild(card);
   });
@@ -3842,10 +3840,19 @@ function showSuggestions(list) {
 function openKeyboard() { searchPanelEl.style.display = "block"; keyboardEl.style.display = "block"; document.querySelector(".search-input-bar").style.display = "flex"; feedEl.style.display = "none"; }
 function closeKeyboard() { keyboardEl.style.display = "none"; searchPanelEl.style.display = "none"; suggestionsEl.style.display = "none"; feedEl.style.display = "block"; }
 
+let _suggestGeneration = 0;
+async function updateSuggestionsForInput() {
+  const gen = ++_suggestGeneration;
+  const q = searchInput.value.trim();
+  const list = await fetchSuggestions(q);
+  if (gen !== _suggestGeneration) return; // a newer keystroke/tap already superseded this request
+  showSuggestions(list);
+}
+
 searchTabEl.addEventListener("click", openKeyboard);
 searchBack.addEventListener("click", closeKeyboard);
 searchGo.addEventListener("click", () => { const q = searchInput.value.trim() || "music"; triggerSearch(q); });
-searchInput.addEventListener("input", async () => { const q = searchInput.value.trim(); showSuggestions(await fetchSuggestions(q)); });
+searchInput.addEventListener("input", updateSuggestionsForInput);
 // Keyboard wrap-around navigation — within same row only
 // P swipe right → Q (wraps to start of same row)
 // L swipe right → A (wraps to start of same row)
@@ -3908,7 +3915,7 @@ keyboardEl.addEventListener("click", async (e) => {
   else if (key === "DELETE") searchInput.value = searchInput.value.slice(0, -1);
   else if (key === "ENTER") { triggerSearch(searchInput.value.trim()); return; }
   else searchInput.value += key;
-  showSuggestions(await fetchSuggestions(searchInput.value.trim()));
+  updateSuggestionsForInput();
 });
 
 
@@ -4312,12 +4319,12 @@ async function startWriteLogin() {
     }
   } catch(e) { plPickerList.innerHTML='<div class="pl-pick-msg">Login error. Try again.</div>'; return null; }
 }
-async function openPickerWithToken(token) {
+async function openPickerWithToken(token, targetVideoId) {
   plPickerList.innerHTML='<div class="pl-pick-msg">Loading playlists…</div>';
   try {
     const res=await fetch("https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}});
     const data=await res.json();
-    if (data.error) { clearTokens(); plPickerList.innerHTML='<div class="pl-pick-msg"><div>Session expired.</div><button id="plPickerReloginBtn" class="topbar-btn" style="margin-top:8px;">Re-login</button></div>'; document.getElementById("plPickerReloginBtn").addEventListener("click",async function(){const t=await startWriteLogin();if(t)openPickerWithToken(t);}); return; }
+    if (data.error) { clearTokens(); plPickerList.innerHTML='<div class="pl-pick-msg"><div>Session expired.</div><button id="plPickerReloginBtn" class="topbar-btn" style="margin-top:8px;">Re-login</button></div>'; document.getElementById("plPickerReloginBtn").addEventListener("click",async function(){const t=await startWriteLogin();if(t)openPickerWithToken(t, targetVideoId);}); return; }
     if (!data.items||!data.items.length){plPickerList.innerHTML='<div class="pl-pick-msg">No playlists found.</div>';return;}
     plPickerList.innerHTML="";
     data.items.forEach(function(pl){
@@ -4325,7 +4332,7 @@ async function openPickerWithToken(token) {
       var thumb=(s.thumbnails&&(s.thumbnails.medium&&s.thumbnails.medium.url||s.thumbnails.default&&s.thumbnails.default.url))||"";
       var item=document.createElement("button");item.className="pl-pick-item";item.type="button";
       item.innerHTML='<div class="pl-pick-thumb">'+(thumb?'<img src="'+thumb+'">':"")+'</div><div class="pl-pick-info"><div class="pl-pick-title">'+s.title+'</div><div class="pl-pick-count">'+count+' video'+(count!==1?'s':'')+'</div></div>';
-      item.onclick=(function(pid,ptitle,tok){return function(){insertVideoToPlaylist(pid,ptitle,tok);};})(pl.id,s.title,token);
+      item.onclick=(function(pid,ptitle,tok,vid){return function(){insertVideoToPlaylist(pid,ptitle,tok,vid);};})(pl.id,s.title,token,targetVideoId);
       plPickerList.appendChild(item);
     });
     // Highlight first item for Neural Band navigation
@@ -4333,13 +4340,14 @@ async function openPickerWithToken(token) {
     if (firstItem) firstItem.classList.add("pl-nav-focus");
   } catch(e){plPickerList.innerHTML='<div class="pl-pick-msg">Network error. Try again.</div>';}
 }
-async function insertVideoToPlaylist(playlistId,playlistTitle,token) {
+async function insertVideoToPlaylist(playlistId,playlistTitle,token,targetVideoId) {
+  const videoId = targetVideoId || currentVideoId;
   plPickerStatus.style.display="block";plPickerStatus.className="";plPickerStatus.textContent="Adding…";
   try {
-    var res=await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({snippet:{playlistId:playlistId,resourceId:{kind:"youtube#video",videoId:currentVideoId}}})});
+    var res=await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({snippet:{playlistId:playlistId,resourceId:{kind:"youtube#video",videoId:videoId}}})});
     var data=await res.json();
     if (data.error){
-      if(data.error.code===403){plPickerList.innerHTML='<div class="pl-pick-msg"><div>Write permission needed.</div><button id="plPickerUpgradeBtn" class="topbar-btn" style="margin-top:8px;">Upgrade Access</button></div>';document.getElementById("plPickerUpgradeBtn").addEventListener("click",async function(){clearTokens();var t=await startWriteLogin();if(t)insertVideoToPlaylist(playlistId,playlistTitle,t);});return;}
+      if(data.error.code===403){plPickerList.innerHTML='<div class="pl-pick-msg"><div>Write permission needed.</div><button id="plPickerUpgradeBtn" class="topbar-btn" style="margin-top:8px;">Upgrade Access</button></div>';document.getElementById("plPickerUpgradeBtn").addEventListener("click",async function(){clearTokens();var t=await startWriteLogin();if(t)insertVideoToPlaylist(playlistId,playlistTitle,t,targetVideoId);});return;}
       if(data.error.code===409||(data.error.errors&&data.error.errors[0]&&data.error.errors[0].reason==="videoAlreadyInPlaylist")){plPickerStatus.textContent="Already in this playlist.";return;}
       plPickerStatus.className="error";plPickerStatus.textContent="Error: "+(data.error.message||"Unknown error");return;
     }
@@ -4350,15 +4358,16 @@ async function insertVideoToPlaylist(playlistId,playlistTitle,token) {
 }
 addToPlaylistBtn.addEventListener("click", async function() {
   if (!currentVideoId){showHUD("No video playing");return;}
+  const targetVideoId = currentVideoId;
   openPicker(); plPickerStatus.style.display="none";
   plPickerList.innerHTML='<div class="pl-pick-msg">Loading playlists…</div>';
   const token=await getValidToken();
   if (!token){
     plPickerList.innerHTML='<div class="pl-pick-msg"><div>Login to add videos to playlists.</div><button id="plPickerLoginBtn" class="topbar-btn" style="margin-top:8px;">Login to YouTube</button></div>';
-    document.getElementById("plPickerLoginBtn").addEventListener("click",async function(){const t=await startWriteLogin();if(t)openPickerWithToken(t);});
+    document.getElementById("plPickerLoginBtn").addEventListener("click",async function(){const t=await startWriteLogin();if(t)openPickerWithToken(t, targetVideoId);});
     return;
   }
-  openPickerWithToken(token);
+  openPickerWithToken(token, targetVideoId);
 });
 
 
@@ -4901,7 +4910,6 @@ async function _injectHubVideos(hubVideos) {
       card.onclick = async () => {
         tabsEl.style.display = "none";
         searchTabEl.style.display = "none";
-        feedEl.style.display = "none";
         if (subsPageEl) subsPageEl.style.display = "none";
         await ensureDuration(item);
         if (isShort(item)) openAsShort(videoId, snippet);
@@ -5426,7 +5434,6 @@ function applyShortPlayerPatch(card, item) {
   card.onclick = async () => {
     tabsEl.style.display = "none";
     searchTabEl.style.display = "none";
-    feedEl.style.display = "none";
     if (subsPageEl) subsPageEl.style.display = "none";
     await ensureDuration(item);
     if (isShort(item)) {
