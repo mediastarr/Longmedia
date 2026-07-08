@@ -815,13 +815,13 @@ const API_KEYS = []; // Keys managed server-side in Worker
 
 
 /* CHANGE: copy params before adding key so retries never corrupt the URL */
-async function fetchYouTubeDirect(endpoint, params = {}, retries = 2) {
+async function fetchYouTubeDirect(endpoint, params = {}, retries = 2, options = {}) {
   // Route through Worker (bypasses KV cache for fresh results)
   try {
     const res = await fetch(HUB_WORKER_URL + "/yt", {
       method: "POST",
       headers: workerHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ endpoint, params, noCache: true })
+      body: JSON.stringify({ endpoint, params, noCache: true, filterShorts: options.filterShorts, trim: options.trim })
     });
     if (res.ok) { const data = await res.json(); if (!data.error) return data; }
   } catch(e) {}
@@ -836,29 +836,29 @@ async function fetchYouTubeDirect(endpoint, params = {}, retries = 2) {
   try {
     const res = await fetch(url.toString(), { signal: controller.signal });
     clearTimeout(timeout);
-    if (!res.ok && retries > 0) return fetchYouTubeDirect(endpoint, params, retries - 1);
+    if (!res.ok && retries > 0) return fetchYouTubeDirect(endpoint, params, retries - 1, options);
     return await res.json();
   } catch (err) {
     clearTimeout(timeout);
-    if (retries > 0) return fetchYouTubeDirect(endpoint, params, retries - 1);
+    if (retries > 0) return fetchYouTubeDirect(endpoint, params, retries - 1, options);
     throw err;
   }
 }
 
-async function fetchYouTube(endpoint, params = {}, retries = 2) {
+async function fetchYouTube(endpoint, params = {}, retries = 2, options = {}) {
   // Route through Worker — API keys managed server-side
   try {
     const res = await fetch(HUB_WORKER_URL + "/yt", {
       method: "POST",
       headers: workerHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ endpoint, params })
+      body: JSON.stringify({ endpoint, params, filterShorts: options.filterShorts, trim: options.trim })
     });
     if (res.ok) {
       const data = await res.json();
       if (!data.error) return data;
     }
   } catch(e) {}
-  return fetchYouTubeDirect(endpoint, params, retries);
+  return fetchYouTubeDirect(endpoint, params, retries, options);
 }
 
 let currentTab = "home";
@@ -3139,8 +3139,8 @@ shortsTab.addEventListener("click", async () => {
   shortsSeenIds = new Set(shortsItems.map(v=>v.id));
   try { localStorage.setItem("shortsSeenHistory",JSON.stringify([...shortsSeenIds,...persistentSeenIds].slice(0,50))); } catch(e) {}
 
-  if (data.nextPageToken) nextPageToken=data.nextPageToken;
-  else { const seed=await fetchYouTube("search",{part:"snippet",q:SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length],type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:"US",maxResults:1,_:Date.now()}); nextPageToken=seed.nextPageToken||"seed"; }
+  if (data.nextPageToken) shortsNextPageToken=data.nextPageToken;
+  else { const seed=await fetchYouTube("search",{part:"snippet",q:SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length],type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:"US",maxResults:1,_:Date.now()}); shortsNextPageToken=seed.nextPageToken||"seed"; }
 
   if (!shortsItems.length) { shortsCounter.textContent="No shorts — tap Back"; return; }
 
@@ -3165,7 +3165,7 @@ function playShort(index) {
       const q=SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length]; shortQIdx++;
       const vt=shortsNextPageToken&&shortsNextPageToken!=="seed"?shortsNextPageToken:undefined;
       const more=await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",maxResults:20,pageToken:vt,_:Date.now()}); // 20 more per scroll batch
-      nextPageToken=more.nextPageToken||"seed";
+      shortsNextPageToken=more.nextPageToken||"seed";
       const fresh=(more.items||[]).filter(v=>v.id&&v.id.videoId&&!shortsSeenIds.has(v.id.videoId));
       fresh.forEach(v=>shortsSeenIds.add(v.id.videoId));
       shortsItems=shortsItems.concat(fresh.map(v=>({id:v.id.videoId,snippet:v.snippet})));
