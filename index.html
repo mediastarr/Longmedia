@@ -814,11 +814,90 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 
 // === ViewTube Worker Integration ===
 const WORKER_URL = 'https://viewtube-hub.mediastarr86.workers.dev';
-const WORKER_SECRET = 'viewtube-hub-secret-2024';
+const WORKER_SECRET = 'vt_rayban_Z-29YQMEx2gMrz8iS7E8KOZVUX--hGM-';
 
 // Generate persistent user ID for glasses
 const userId = localStorage.getItem('vt_user') || 'rayban_' + Math.random().toString(36).slice(2);
 localStorage.setItem('vt_user', userId);
+
+// === Google OAuth Login for YouTube ===
+const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+const OAUTH_REDIRECT = WORKER_URL + '/auth/callback';
+
+function showLoginButton() {
+  const loginBtn = document.createElement('button');
+  loginBtn.id = 'ytLoginBtn';
+  loginBtn.textContent = 'Sign in with YouTube';
+  loginBtn.style.cssText = 'position:fixed;top:10px;right:10px;z-index:9999;padding:8px 12px;background:#ff0000;color:#fff;border:none;border-radius:4px;';
+  loginBtn.onclick = startOAuth;
+  document.body.appendChild(loginBtn);
+}
+
+function startOAuth() {
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(OAUTH_REDIRECT)}&response_type=code&scope=https://www.googleapis.com/auth/youtube.readonly&access_type=offline&prompt=consent&state=${userId}`;
+  // For Ray-Ban: show QR code or open system browser
+  window.open(authUrl, '_blank');
+  checkAuthStatus();
+}
+
+
+function showSignOutButton() {
+  const btn = document.getElementById('ytLoginBtn');
+  if (btn) {
+    btn.textContent = 'Sign out of YouTube';
+    btn.style.background = '#757575';
+    btn.onclick = async () => {
+      await fetch(WORKER_URL + '/auth/logout', {
+        method: 'POST',
+        headers: { 'X-ViewTube-User': userId }
+      });
+      localStorage.removeItem('vt_yt_logged_in');
+      location.reload();
+    };
+  }
+}
+
+// Update checkAuthStatus to show sign out
+async function checkAuthStatus() {
+  const res = await fetch(WORKER_URL + '/auth/status', {
+    headers: { 'X-ViewTube-User': userId }
+  });
+  const data = await res.json();
+  if (data.logged_in) {
+    showSignOutButton();
+    localStorage.setItem('vt_yt_logged_in', '1');
+  } else {
+    setTimeout(checkAuthStatus, 3000);
+  }
+}
+
+async function checkAuthStatus() {
+  const res = await fetch(WORKER_URL + '/auth/status', {
+    headers: { 'X-ViewTube-User': userId }
+  });
+  const data = await res.json();
+  if (data.logged_in) {
+    showSignOutButton();
+    localStorage.setItem('vt_yt_logged_in', '1');
+  } else {
+    setTimeout(checkAuthStatus, 3000); // poll until logged in
+  }
+}
+
+// Check on load
+if (!localStorage.getItem('vt_yt_logged_in')) {
+  showLoginButton();
+} else {
+  checkAuthStatus();
+}
+
+// Update fetchYT to send user token automatically
+const _origFetchYT = fetchYT;
+fetchYT = async function(endpoint, params, options = {}) {
+  // Worker will check KV for user token and use it if present
+  return _origFetchYT(endpoint, params, options);
+}
+
 
 async function fetchYT(endpoint, params, options = {}) {
   try {
