@@ -2818,6 +2818,7 @@ function setActiveTab(tab) {
 /* CHANGE: home tab uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
 let _homeLastLoaded = 0;
 let _homeCacheValid = false;
+let _homeLoadGeneration = 0;
 homeTab.addEventListener("click", async () => {
   setActiveTab("home");
   _pollClearBadge();
@@ -2828,6 +2829,9 @@ homeTab.addEventListener("click", async () => {
   if (_homeCacheValid && cacheAge < 120000 && feedEl.children.length > 0 && !hasNewVideos) {
     return; // just show what's already rendered
   }
+  // Guard against a stale/abandoned earlier load (e.g. one still stuck behind a
+  // slow network call) finishing late and overwriting a newer, successful one.
+  const myHomeGen = ++_homeLoadGeneration;
   nextPageToken = null; showSkeletons(6);
 
   // Grab hub new videos BEFORE feed loads
@@ -2864,11 +2868,13 @@ homeTab.addEventListener("click", async () => {
     if (pf.status === "fulfilled") addL(pf.value);
     if (fresh2.status === "fulfilled") addL(fresh2.value.items);
     if (popular2.status === "fulfilled") addL(popular2.value.items);
+    if (myHomeGen !== _homeLoadGeneration) return; // a newer Home load has since started — discard this stale one
     if (allLogged.length) {
       renderFeed(await enrichWithDurations(allLogged)); showHUD("For You ✦");
       nextPageToken = (popular2.status === "fulfilled" && popular2.value.nextPageToken) || null;
     } else {
       const fallback2 = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+      if (myHomeGen !== _homeLoadGeneration) return;
       nextPageToken = fallback2.nextPageToken || null; renderFeed(await enrichWithDurations(fallback2.items || [])); showHUD("Home");
     }
   } else {
@@ -2882,11 +2888,13 @@ homeTab.addEventListener("click", async () => {
     ]);
     if (fresh.status === "fulfilled") addU(fresh.value.items);
     if (popular.status === "fulfilled") addU(popular.value.items);
+    if (myHomeGen !== _homeLoadGeneration) return; // a newer Home load has since started — discard this stale one
     if (allItems.length) {
       renderFeed(await enrichWithDurations(allItems)); showHUD("Home");
       nextPageToken = (popular.status === "fulfilled" && popular.value.nextPageToken) || null;
     } else {
       const fallback = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", maxResults: 20, _: Date.now() });
+      if (myHomeGen !== _homeLoadGeneration) return;
       nextPageToken = fallback.nextPageToken || null; renderFeed(await enrichWithDurations(fallback.items || [])); showHUD("Home");
     }
   }
@@ -2895,16 +2903,18 @@ homeTab.addEventListener("click", async () => {
   if (feedEl.children.length === 0 && !historyList.length) {
     try {
       const coldVideos = await getColdStartVideos();
-      if (coldVideos.length) {
+      if (coldVideos.length && myHomeGen === _homeLoadGeneration) {
         const ids = coldVideos.map(v => v.videoId).join(",");
         const coldData = await fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() });
-        if (coldData.items && coldData.items.length) {
+        if (coldData.items && coldData.items.length && myHomeGen === _homeLoadGeneration) {
           renderFeed(await enrichWithDurations(coldData.items));
           showHUD("Welcome ✦");
         }
       }
     } catch(e) {}
   }
+
+  if (myHomeGen !== _homeLoadGeneration) return; // stale — a newer load already took over
 
   // Submit rendered feed items to Worker for background feed pre-building
   try {
@@ -3356,7 +3366,7 @@ historyTab.addEventListener("click", async () => {
       }
     } catch(e) {}
     try {
-      const wlRes = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=20", { headers: { Authorization: "Bearer " + token } });
+      const wlRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=20", { headers: { Authorization: "Bearer " + token } });
       const wlData = await wlRes.json();
       if (wlData.items && wlData.items.length) {
         addHeader("⏱ Watch Later");
@@ -5260,11 +5270,11 @@ async function getCollabRecommendations() {
     const topCH = Object.keys(profile.channels || {}).slice(0, 10);
     if (!topKW.length && !topCH.length) return [];
 
-    const res = await fetch(HUB_WORKER_URL + "/collab", {
+    const res = await fetchWithTimeout(HUB_WORKER_URL + "/collab", {
       method: "POST",
       headers: workerHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ keywords: topKW, channels: topCH })
-    });
+    }, 5000);
     if (!res.ok) return [];
     const data = await res.json();
     return data.videos || [];
@@ -5276,7 +5286,7 @@ async function getEngagementScores(videoIds) {
   if (!videoIds.length) return {};
   try {
     const ids = videoIds.slice(0, 20).join(",");
-    const res = await fetch(HUB_WORKER_URL + "/engage?ids=" + ids, { headers: workerHeaders() });
+    const res = await fetchWithTimeout(HUB_WORKER_URL + "/engage?ids=" + ids, { headers: workerHeaders() }, 5000);
     if (!res.ok) return {};
     return await res.json();
   } catch(e) { return {}; }
@@ -5285,7 +5295,7 @@ async function getEngagementScores(videoIds) {
 // Get search CTR data — which videos users actually clicked for a query
 async function getSearchCTR(query) {
   try {
-    const res = await fetch(HUB_WORKER_URL + "/searchctr?q=" + encodeURIComponent(query), { headers: workerHeaders() });
+    const res = await fetchWithTimeout(HUB_WORKER_URL + "/searchctr?q=" + encodeURIComponent(query), { headers: workerHeaders() }, 5000);
     if (!res.ok) return {};
     return await res.json();
   } catch(e) { return {}; }
@@ -5622,7 +5632,7 @@ function applyShortPlayerPatch(card, item) {
     try {
       const tkForId = await getValidToken();
       if (tkForId && !localStorage.getItem("yt_channel_id")) {
-        const chRes = await fetch("https://www.googleapis.com/youtube/v3/channels?part=id&mine=true", { headers: { Authorization: "Bearer " + tkForId } });
+        const chRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/channels?part=id&mine=true", { headers: { Authorization: "Bearer " + tkForId } }, 6000);
         const chData = await chRes.json();
         const channelId = chData.items?.[0]?.id || "";
         if (channelId) localStorage.setItem("yt_channel_id", channelId);
@@ -5639,14 +5649,19 @@ function applyShortPlayerPatch(card, item) {
       // feed once auth is confirmed — not just when the startup feed came back empty,
       // otherwise this practically never runs (the generic feed usually succeeds).
       if (hasEnoughHistory()) {
+        const myStartupGen = ++_homeLoadGeneration;
         showSkeletons(6);
         const items = await fetchPersonalizedFeed();
-        renderFeed(items);
-        showHUD("For You ✦");
-        const seed = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
-        nextPageToken = seed.nextPageToken || null;
-        _homeLastLoaded = Date.now();
-        _homeCacheValid = feedEl.children.length > 0;
+        if (myStartupGen === _homeLoadGeneration) {
+          renderFeed(items);
+          showHUD("For You ✦");
+          const seed = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
+          if (myStartupGen === _homeLoadGeneration) {
+            nextPageToken = seed.nextPageToken || null;
+            _homeLastLoaded = Date.now();
+            _homeCacheValid = feedEl.children.length > 0;
+          }
+        }
       }
     }
   }
