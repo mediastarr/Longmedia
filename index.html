@@ -5746,10 +5746,7 @@ function applyShortPlayerPatch(card, item) {
   // real video fetch needs it. A fire-and-forget ping races the real
   // fetch over the same cold connection, defeating the purpose.
   try {
-    await Promise.race([
-      fetch(HUB_WORKER_URL + "/status", { headers: workerHeaders() }).catch(()=>{}),
-      new Promise(resolve => setTimeout(resolve, 800))
-    ]);
+    await fetchWithTimeout(HUB_WORKER_URL + "/status", { headers: workerHeaders() }, 800).catch(()=>{});
   } catch(e) {}
 
   // Safety: always dismiss boot splash even if init crashes
