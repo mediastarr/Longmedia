@@ -2503,17 +2503,20 @@ function filterAndTrackFeedItems(items) {
   return items;
 }
 
+let _feedOwner = null; // which tab's content is actually currently in feedEl
 function renderFeed(items) {
   items = filterAndTrackFeedItems(items);
   if (!items.length && feedEl.children.length > 0) {
     // Nothing new to show — leave whatever's already on screen alone rather
-    // than wiping it out and going blank.
+    // than wiping it out and going blank. Note: _feedOwner is NOT updated here,
+    // since the content on screen still belongs to whichever tab last actually
+    // rendered — not necessarily the tab currently requesting a reload.
     showHUD("No new videos — showing previous feed");
     return;
   }
   feedEl.innerHTML = "";
   appendFeed(items);
-
+  _feedOwner = currentTab;
 }
 
 /* CHANGE: data-videoid on each card so back button can find it */
@@ -2859,7 +2862,7 @@ homeTab.addEventListener("click", async () => {
   // avoids redundant network calls when quickly switching back to Home
   const cacheAge = Date.now() - _homeLastLoaded;
   const hasNewVideos = (() => { try { return JSON.parse(localStorage.getItem("hubNewVideos")||"[]").length > 0; } catch(e) { return false; } })();
-  if (_homeCacheValid && cacheAge < 120000 && feedEl.children.length > 0 && !hasNewVideos) {
+  if (_homeCacheValid && cacheAge < 120000 && _feedOwner === "home" && feedEl.children.length > 0 && !hasNewVideos) {
     return; // just show what's already rendered
   }
   // Guard against a stale/abandoned earlier load (e.g. one still stuck behind a
@@ -2964,7 +2967,7 @@ homeTab.addEventListener("click", async () => {
     _injectHubVideos(hubVideos);
   }
   _homeLastLoaded = Date.now();
-  _homeCacheValid = feedEl.children.length > 0;
+  _homeCacheValid = (_feedOwner === "home" && feedEl.children.length > 0);
 });
 
 trendingTab.addEventListener("click", async () => {
@@ -3329,10 +3332,14 @@ moviesTab.addEventListener("click", async () => {
   } catch(e) { feedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies to retry.</div>'; } finally { isLoadingMovies = false; }
 });
 
+let isLoadingHistory = false;
 historyTab.addEventListener("click", async () => {
+  if (isLoadingHistory) return; isLoadingHistory = true;
+  try {
   invalidateHomeCache();
   setActiveTab("history"); nextPageToken = null;
   feedEl.innerHTML = ""; showHUD("Loading history…");
+  _feedOwner = "history";
   const now = Date.now(); const DAY = 86400000;
   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
   const yesterdayStart = new Date(todayStart.getTime() - DAY);
@@ -3422,6 +3429,7 @@ historyTab.addEventListener("click", async () => {
     } catch(e) {}
   }
   showHUD(token ? "History ✦" : "History");
+  } finally { isLoadingHistory = false; }
 });
 
 channelTab.addEventListener("click", () => {
@@ -4083,11 +4091,15 @@ function rankSearchResults(items) {
   }).sort((a, b) => (b._searchScore || 0) - (a._searchScore || 0));
 }
 
+let isLoadingSearch = false;
 function triggerSearch(q) {
+  if (isLoadingSearch) return;
   lastSearchQuery = q;
   saveSearchToProfile(q);
   invalidateHomeCache();
   (async () => {
+    isLoadingSearch = true;
+    try {
     currentTab = "search";
     closeKeyboard();
     showSkeletons(6);
@@ -4108,6 +4120,7 @@ function triggerSearch(q) {
       feedEl.innerHTML = `<div style="font-size:13px;opacity:0.8;padding:16px;text-align:center;">No results for "${q}". API quota may be exhausted — try again in a moment.</div>`;
       showHUD("No results");
     }
+    } finally { isLoadingSearch = false; }
   })();
 }
 
@@ -4187,6 +4200,7 @@ function initGyroscope() {
   }
 
   function applyOrientation(e) {
+    if (document.hidden) return;
     const beta = e.beta || 0;
     const gamma = e.gamma || 0;
     const x = Math.max(-1, Math.min(1, gamma / 30));
@@ -5047,17 +5061,31 @@ async function _injectHubVideos(hubVideos) {
 function _startPolling() {
   // Initial poll after 15 seconds
   setTimeout(async () => {
-    await _pollCheckNewContent();
+    if (!document.hidden) await _pollCheckNewContent();
     // Then repeat every 2-6 minutes (randomized)
     function scheduleNext() {
       const delay = (1 + Math.floor(Math.random() * 2)) * 60 * 1000; // 1-3 min
       _pollTimer = setTimeout(async () => {
-        await _pollCheckNewContent();
+        // Skip this cycle's network work while the app isn't visible — nothing
+        // is watching for it anyway, and the visibilitychange listener below
+        // will trigger an immediate check as soon as it becomes visible again.
+        if (!document.hidden) await _pollCheckNewContent();
         scheduleNext();
       }, delay);
     }
     scheduleNext();
   }, 15 * 1000); // first poll after 15 seconds
+
+  // Catch up immediately when the app becomes visible again, rather than
+  // waiting for whatever's left of the current timer.
+  let _lastVisibilityCheck = 0;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    const now = Date.now();
+    if (now - _lastVisibilityCheck < 30000) return; // avoid rapid-fire re-checks
+    _lastVisibilityCheck = now;
+    _pollCheckNewContent().catch(() => {});
+  });
 }
 
 
@@ -5662,7 +5690,7 @@ function applyShortPlayerPatch(card, item) {
       renderFeed(enriched);
       showHUD("Home");
       _homeLastLoaded = Date.now();
-      _homeCacheValid = feedEl.children.length > 0;
+      _homeCacheValid = (_feedOwner === "home" && feedEl.children.length > 0);
     } catch(e) {
       if (myStartupFetchGen === _homeLoadGeneration) {
         feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home to retry.</div>';
@@ -5710,7 +5738,7 @@ function applyShortPlayerPatch(card, item) {
           if (myStartupGen === _homeLoadGeneration) {
             nextPageToken = seed.nextPageToken || null;
             _homeLastLoaded = Date.now();
-            _homeCacheValid = feedEl.children.length > 0;
+            _homeCacheValid = (_feedOwner === "home" && feedEl.children.length > 0);
           }
         }
       }
