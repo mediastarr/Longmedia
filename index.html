@@ -3279,17 +3279,25 @@ historyTab.addEventListener("click", async () => {
   }
   function addHistoryCards(items) {
     items.forEach(h => {
+      const vid = h.id?.videoId || h.id;
       const snippet = h.snippet || {};
       const diff = now - (h.watchedAt || 0);
       const ago = diff < 3600000 ? Math.floor(diff/60000)+"m ago" : diff < DAY ? Math.floor(diff/3600000)+"h ago" : diff < 2*DAY ? "yesterday" : Math.floor(diff/DAY)+"d ago";
-      const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = h.id;
+      const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = vid;
       card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"Untitled")+'</div><div class="video-channel">'+(snippet.channelTitle||"")+'</div><div class="video-meta">Watched '+ago+'</div></div>';
-      const resumeT = getResumePosition(h.id);
+      const resumeT = getResumePosition(vid);
       const resumeLabel = resumeT > 5 ? " ▶ "+Math.floor(resumeT/60)+":"+(String(Math.floor(resumeT%60)).padStart(2,"0")) : "";
       card.querySelector(".video-meta").textContent = "Watched "+ago+resumeLabel;
-      card.onclick = () => {
-        setPlayerVideo(h.id, snippet, resumeT);
-        showHUD(resumeT > 5 ? "Resuming ▶" : "Playing: "+(snippet.title||""));
+      card.onclick = async () => {
+        tabsEl.style.display = "none";
+        searchTabEl.style.display = "none";
+        const short = await checkIsShort(vid, snippet);
+        if (short) {
+          openAsShort(vid, snippet);
+        } else {
+          setPlayerVideo(vid, snippet, resumeT);
+          showHUD(resumeT > 5 ? "Resuming ▶" : "Playing: "+(snippet.title||""));
+        }
       };
       feedEl.appendChild(card);
     });
