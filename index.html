@@ -1802,7 +1802,13 @@ function createYTPlayer(videoId, startSeconds) {
 }
 
 function setPlayerVideo(videoId, snippet, startSeconds) {
-  savedScrollY = window.scrollY;
+  // Only capture scroll position if the feed is still visible right now.
+  // Card onclick handlers that hide the feed before an async check
+  // capture savedScrollY themselves beforehand; this just avoids
+  // overwriting that with 0 once the feed's already hidden/collapsed.
+  if (feedEl.style.display !== "none") {
+    savedScrollY = window.scrollY;
+  }
   currentVideoId = videoId;
   // Reset captions state for the new video
   captionsOn = false;
@@ -2684,6 +2690,7 @@ function appendFeed(items) {
     const meta = [views && views + " views", ago].filter(Boolean).join(" · ");
     card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title || ""}</div><div class="video-channel">${snippet.channelTitle || ""}</div><div class="video-meta">${meta}</div></div>`;
     card.onclick = async () => {
+      savedScrollY = window.scrollY;
       tabsEl.style.display = "none";
       searchTabEl.style.display = "none";
       feedEl.style.display = "none";
@@ -3313,6 +3320,7 @@ historyTab.addEventListener("click", async () => {
           const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = videoId;
           card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Liked</div></div>';
           card.onclick = async () => {
+      savedScrollY = window.scrollY;
             tabsEl.style.display="none"; searchTabEl.style.display="none"; feedEl.style.display="none";
             const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); }
           };
@@ -3330,6 +3338,7 @@ historyTab.addEventListener("click", async () => {
           const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = videoId;
           card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Watch Later</div></div>';
           card.onclick = async () => {
+      savedScrollY = window.scrollY;
             tabsEl.style.display="none"; searchTabEl.style.display="none"; feedEl.style.display="none";
             const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); }
           };
@@ -3585,6 +3594,7 @@ async function openPlaylist(playlistId, title) {
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
       card.innerHTML = `<div class="video-thumb"><img src="${thumb}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.videoOwnerChannelTitle || snippet.channelTitle || ""}</div><div class="video-meta">#${i + 1} in playlist</div></div>`;
       card.onclick = async () => {
+      savedScrollY = window.scrollY;
         tabsEl.style.display="none"; searchTabEl.style.display="none"; feedEl.style.display="none";
         if(playlistPageEl) playlistPageEl.style.display="none";
         const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: " + snippet.title); }
@@ -3654,6 +3664,7 @@ async function loadMoreVideos() {
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
       card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle || ""}</div></div>`;
       card.onclick = async () => {
+      savedScrollY = window.scrollY;
         tabsEl.style.display="none"; searchTabEl.style.display="none"; feedEl.style.display="none";
         if(channelPageEl) channelPageEl.style.display="none";
         const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet);
@@ -3772,6 +3783,7 @@ async function loadChannelPage(channelId) {
     const card = document.createElement("div"); card.className = "video-card parallax focusable";
     card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails.medium.url}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle}</div></div>`;
     card.onclick = async () => {
+      savedScrollY = window.scrollY;
       tabsEl.style.display="none"; searchTabEl.style.display="none"; feedEl.style.display="none";
       if(channelPageEl) channelPageEl.style.display="none";
       const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet);
@@ -4881,6 +4893,7 @@ async function _injectHubVideos(hubVideos) {
       const ago = timeAgo(snippet.publishedAt);
       card.innerHTML = '<div class="video-thumb"><img src="' + thumb + '" loading="lazy"></div><div class="video-info"><div class="video-title">' + (snippet.title||"") + '</div><div class="video-channel">' + (snippet.channelTitle||"") + '</div><div class="video-meta" style="color:rgba(255,100,100,0.9);">🔴 New · ' + ago + '</div></div>';
       card.onclick = async () => {
+      savedScrollY = window.scrollY;
         tabsEl.style.display = "none";
         searchTabEl.style.display = "none";
         feedEl.style.display = "none";
@@ -5427,6 +5440,7 @@ async function ensureDuration(item) {
 function applyShortPlayerPatch(card, item) {
   const videoId = item.id?.videoId || item.id;
   card.onclick = async () => {
+      savedScrollY = window.scrollY;
     tabsEl.style.display = "none";
     searchTabEl.style.display = "none";
     feedEl.style.display = "none";
