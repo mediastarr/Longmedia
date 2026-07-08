@@ -2551,13 +2551,6 @@ async function checkIsShort(videoId, snippet) {
   }
 }
 
-// Sync check — only true if API confirmed ≤60s
-function isShort(videoId, snippet) {
-  if (_shortsCache[videoId] !== undefined) return _shortsCache[videoId];
-  if (snippet && snippet._isShort) return true;
-  return false;
-}
-
 // Pre-check a batch of videos in one API call and populate cache.
 // Called when a feed page loads so taps are instant (cache already warm).
 async function preCacheShorts(items) {
@@ -3018,15 +3011,6 @@ shortsTab.addEventListener("click", async () => {
     });
   }
 
-  const _sniBtn = document.getElementById("shortsNotIntBtn");
-  if (_sniBtn) _sniBtn.addEventListener("click", () => {
-    const item = shortsItems[shortsIndex];
-    if (!item) return;
-    markNotInterested(item.id, item.snippet?.channelId||"", item.snippet?.title||"");
-    try { const sh=JSON.parse(localStorage.getItem("hubSeenIds")||"[]"); if(!sh.includes(item.id)){sh.push(item.id);localStorage.setItem("hubSeenIds",JSON.stringify(sh.slice(-500)));} } catch(e) {}
-    if (shortsIndex < shortsItems.length-1) { shortsIndex++; playShort(shortsIndex); }
-    showHUD("Not interested — skipped");
-  });
   shortsClearBtn.addEventListener("click", () => {
     clearMode = !clearMode;
     if (clearMode) {
@@ -3369,19 +3353,6 @@ function getViewTubeUserId() {
 }
 function workerHeaders(extra) {
   return Object.assign({ "X-ViewTube-Secret": HUB_SECRET, "X-ViewTube-User": getViewTubeUserId() }, extra || {});
-}
-
-// Multi-user isolation: get stored YouTube channel ID
-function getViewTubeUserId() {
-  return localStorage.getItem("yt_channel_id") || "default";
-}
-
-// Add user ID header to all Worker requests
-function workerHeaders(extra) {
-  return Object.assign({
-    "X-ViewTube-Secret": HUB_SECRET,
-    "X-ViewTube-User": getViewTubeUserId()
-  }, extra || {});
 }
 
 startLoginBtn.addEventListener("click", () => startDeviceLogin("subs"));
@@ -5271,27 +5242,6 @@ function markNotInterested(videoId, channelId, title) {
   } catch(e) {}
 }
 
-
-// ── Not Interested ──
-function getBlocklist() {
-  try { return JSON.parse(localStorage.getItem("notInterestedIds") || "[]"); } catch(e) { return []; }
-}
-function markNotInterested(videoId, channelId, title) {
-  const bl = getBlocklist();
-  if (!bl.includes(videoId)) { bl.push(videoId); localStorage.setItem("notInterestedIds", JSON.stringify(bl.slice(-500))); }
-  try {
-    const profile = getTasteProfile();
-    if (channelId) { profile.channels = profile.channels||{}; const ch=profile.channels[channelId]||{weight:0}; ch.weight=Math.max(0,(ch.weight||0)-5); profile.channels[channelId]=ch; }
-    if (title) { const words=title.toLowerCase().replace(/[^a-z0-9\s]/g,"").split(/\s+/).filter(w=>w.length>2); profile.keywords=profile.keywords||{}; words.forEach(w=>{profile.keywords[w]=Math.max(0,(profile.keywords[w]||0)-2);}); }
-    localStorage.setItem("tasteProfile", JSON.stringify(profile));
-  } catch(e) {}
-  document.querySelectorAll('[data-videoid="'+videoId+'"]').forEach(card=>{
-    card.style.transition="opacity 0.3s"; card.style.opacity="0";
-    setTimeout(()=>card.remove(), 300);
-  });
-  try { fetch(HUB_WORKER_URL+"/engage", { method:"POST", headers:workerHeaders({"Content-Type":"application/json"}), body:JSON.stringify({videoId,channelId,signal:"not_interested",pct:0}) }); } catch(e) {}
-  showHUD("Not interested — feed updated");
-}
 
 
 // ── Session diversity tracking ──
