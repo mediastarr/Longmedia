@@ -1277,12 +1277,13 @@ async function fetchPersonalizedFeed() {
   const oneDayAgo = Date.now() - 86400000;
   let shownHistoryParsed = []; try { shownHistoryParsed = JSON.parse(localStorage.getItem("feedShownTimed") || "[]"); } catch(e) {}
   const recentShownIds = new Set(shownHistoryParsed.filter(e => e.ts > oneDayAgo).map(e => e.id));
+  const blockedIds = new Set(getBlocklist());
   const seen = new Set();
   const allItems = [];
   function addItems(items, weight) {
     (items || []).forEach(item => {
       const id = item.id?.videoId || item.id;
-      if (!id || seen.has(id) || watchedIds.has(id) || recentShownIds.has(id)) return;
+      if (!id || seen.has(id) || watchedIds.has(id) || recentShownIds.has(id) || blockedIds.has(id)) return;
       seen.add(id); allItems.push({ item, weight });
     });
   }
@@ -2167,6 +2168,9 @@ async function loadVideoInfoPanel(videoId, snippet) {
           words.forEach(w => { if (profile.keywords[w]) profile.keywords[w] = Math.max(0, profile.keywords[w] - 3); });
           localStorage.setItem("tasteProfile", JSON.stringify(profile));
         } catch(e) {}
+        // Suppress this video from reappearing in the feed — same exclusion as
+        // explicitly tapping "Not Interested" (blocklist + Worker signal).
+        markNotInterested(videoId, snippet.channelId || "", snippet.title || "");
       }
     } else {
       disliked = wasDisliked; liked = false;
@@ -2415,8 +2419,12 @@ function showSkeletons(count = 6) {
   }
 }
 
-function renderFeed(items) {
-  // Deduplicate against watch history + already shown + not interested
+// Dedup/filter against watch history, already-shown-this-session, and the
+// "Not Interested" blocklist. Shared by renderFeed (first page) and the
+// infinite-scroll pagination in loadMoreVideos (which previously skipped this
+// entirely, so blocked/watched/already-shown videos could reappear once you
+// scrolled past the first page).
+function filterAndTrackFeedItems(items) {
   try {
     const watchedSet = new Set(historyList.map(h => h.id?.videoId || h.id).filter(Boolean));
     const shownSet = new Set(JSON.parse(sessionStorage.getItem("feedShownIds") || "[]"));
@@ -2427,7 +2435,7 @@ function renderFeed(items) {
       if (!id) return false;
       if (watchedSet.has(id)) return false;
       if (shownSet.has(id)) return false;
-      if (blockSet.has(id)) return false; // not interested
+      if (blockSet.has(id)) return false; // not interested / disliked
       if (_sessionDedup.has(id)) return false;
       _sessionDedup.add(id);
       // Filter shorts from home/trending/movie feeds (YouTube does this by default)
@@ -2441,6 +2449,11 @@ function renderFeed(items) {
     const merged = [...new Set([...shownSet, ...newIds])].slice(-200);
     sessionStorage.setItem("feedShownIds", JSON.stringify(merged));
   } catch(e) {}
+  return items;
+}
+
+function renderFeed(items) {
+  items = filterAndTrackFeedItems(items);
   feedEl.innerHTML = "";
   appendFeed(items);
 
@@ -3709,7 +3722,7 @@ async function loadMoreVideos() {
         const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet);
       }; channelPageEl.appendChild(card);
     });
-  } else { appendFeed(data.items || []); }
+  } else { appendFeed(filterAndTrackFeedItems(data.items || [])); }
 }
 
 async function loadMoreSubs() {
@@ -5352,22 +5365,6 @@ function markNotInterested(videoId, channelId, title) {
   });
 
   showHUD("Not interested — feed updated");
-
-  // Send signal to Worker so it improves recommendations across sessions
-  try {
-    fetch(HUB_WORKER_URL + "/engage", {
-      method: "POST",
-      headers: workerHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        videoId,
-        channelId,
-        signal: "not_interested",
-        pct: 0,
-        sessionContinued: false,
-        query: null
-      })
-    });
-  } catch(e) {}
 }
 
 
