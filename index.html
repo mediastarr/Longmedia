@@ -1296,7 +1296,7 @@ async function fetchPersonalizedFeed() {
         const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 50).join(",") });
         const uploadPlaylists = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
         for (let i = uploadPlaylists.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [uploadPlaylists[i], uploadPlaylists[j]] = [uploadPlaylists[j], uploadPlaylists[i]]; }
-        const uploadFetches = uploadPlaylists.slice(0, 10).map(plId =>
+        const uploadFetches = uploadPlaylists.slice(0, 5).map(plId =>
           fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId: plId, maxResults: 10, _: Date.now() })
         );
         const uploadResults = await Promise.allSettled(uploadFetches);
@@ -1324,13 +1324,10 @@ async function fetchPersonalizedFeed() {
   function shuffle(arr) { const a = [...arr]; for (let i = a.length-1; i>0; i--) { const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
   const sC = shuffle(topChannels), sK = shuffle(topKeywords), sB = shuffle(topBigrams), sS = shuffle(recentSearches), sR = shuffle(recentIds);
   const lf = [], lw = [];
-  sS.slice(0,2).forEach(q => { lf.push(fetchYouTube("search",{part:"snippet",q,type:"video",maxResults:6,_:Date.now()})); lw.push(5); });
-  sC.slice(0,token?2:4).forEach(ch => { lf.push(fetchYouTube("search",{part:"snippet",channelId:ch.id,type:"video",order:"date",maxResults:4,_:Date.now()})); lw.push(4); });
-  sB.slice(0,2).forEach(phrase => { lf.push(fetchYouTube("search",{part:"snippet",q:phrase,type:"video",maxResults:6,_:Date.now()})); lw.push(4); });
+  sS.slice(0,1).forEach(q => { lf.push(fetchYouTube("search",{part:"snippet",q,type:"video",maxResults:6,_:Date.now()})); lw.push(5); });
+  sC.slice(0,2).forEach(ch => { lf.push(fetchYouTube("search",{part:"snippet",channelId:ch.id,type:"video",order:"date",maxResults:4,_:Date.now()})); lw.push(4); });
+  sB.slice(0,1).forEach(phrase => { lf.push(fetchYouTube("search",{part:"snippet",q:phrase,type:"video",maxResults:6,_:Date.now()})); lw.push(4); });
   if (sK.length>=2) { lf.push(fetchYouTube("search",{part:"snippet",q:sK.slice(0,3).join(" "),type:"video",maxResults:6,_:Date.now()})); lw.push(3); }
-  // Add extra keyword searches to fill the gap from removed relatedToVideoId (deprecated Aug 2023)
-  if (sS.length>0) { lf.push(fetchYouTube("search",{part:"snippet",q:sS[0],type:"video",order:"date",maxResults:6,_:Date.now()})); lw.push(3); }
-  if (sB.length>2) { lf.push(fetchYouTube("search",{part:"snippet",q:sB[2],type:"video",order:"date",maxResults:6,_:Date.now()})); lw.push(3); }
   const allCats = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
   const myCats = topCats.length ? topCats : [allCats[Math.floor(Math.random()*allCats.length)]];
   lf.push(fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:"US",videoCategoryId:myCats[Math.floor(Math.random()*myCats.length)],maxResults:10,_:Date.now()})); lw.push(2);
@@ -3256,7 +3253,6 @@ moviesTab.addEventListener("click", async () => {
   function addU(items){ (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); }); }
   movieQIdx=Math.floor(Math.random()*MOVIE_QUERIES.length);
   const usedQ=MOVIE_QUERIES[movieQIdx%MOVIE_QUERIES.length]; movieQIdx++;
-  const q2=MOVIE_QUERIES[movieQIdx%MOVIE_QUERIES.length]; movieQIdx++;
   lastMovieQuery=usedQ;
   const since48h = new Date(Date.now()-172800000).toISOString();
   const topKW=getTopKeywords(6), topBI=getTopBigrams(3), recentS=getRecentSearches(3);
@@ -3268,10 +3264,8 @@ moviesTab.addEventListener("click", async () => {
     ...(recentS.length>0 ? [fetchYouTube("search",{part:"snippet",q:recentS[0]+" full movie",type:"video",videoDuration:"long",videoEmbeddable:"true",order:"date",maxResults:8,_:Date.now()})] : []),
     // 2. Fresh general movies (order:date)
     fetchYouTube("search",{part:"snippet",q:usedQ,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:10,order:"date",publishedAfter:since48h,_:Date.now()}),
-    fetchYouTube("search",{part:"snippet",q:q2,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:8,order:"date",publishedAfter:since48h,_:Date.now()}),
     // 3. Popular movies after
-    fetchYouTube("search",{part:"snippet",q:usedQ,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:8,order:"viewCount",_:Date.now()}),
-    fetchYouTube("search",{part:"snippet",q:q2,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:6,order:"relevance",_:Date.now()})
+    fetchYouTube("search",{part:"snippet",q:usedQ,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:"US",maxResults:8,order:"viewCount",_:Date.now()})
   ];
   // 4. If logged in — pull from Watch Later and liked videos for movie taste signals
   const movToken = await getValidToken();
