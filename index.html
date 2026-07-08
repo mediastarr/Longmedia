@@ -2851,6 +2851,12 @@ function setActiveTab(tab) {
 /* CHANGE: home tab uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
 let _homeLastLoaded = 0;
 let _homeCacheValid = false;
+// Shared across every tab that renders into feedEl (Home, Trending, Movies,
+// History, Search) — not just Home. Each tab's handler increments this when it
+// starts loading and checks it before actually rendering, so switching to a
+// DIFFERENT tab while an older tab's fetch is still in flight correctly
+// invalidates that older fetch, regardless of which tab it came from or which
+// tab the user has since switched to.
 let _homeLoadGeneration = 0;
 // feedEl is shared by Home, Trending, Movies, History, and Search — whenever any
 // of them takes it over, Home's cache is no longer showing Home's own content.
@@ -2973,6 +2979,7 @@ homeTab.addEventListener("click", async () => {
 trendingTab.addEventListener("click", async () => {
   if (isLoadingTrending) return; isLoadingTrending = true;
   invalidateHomeCache();
+  const myGen = ++_homeLoadGeneration;
   nextPageToken = null; setActiveTab("trending"); showSkeletons(6);
   try {
     // Rotate through categories each tap for variety
@@ -2995,16 +3002,21 @@ trendingTab.addEventListener("click", async () => {
     if (popular.status==="fulfilled") addU(popular.value.items);
     if (general.status==="fulfilled") addU(general.value.items);
 
+    if (myGen !== _homeLoadGeneration) return; // user has since switched tabs — discard
+
     if (!allItems.length) {
       feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Trending again to retry.</div>';
       return;
     }
 
     const ranked = await getPersonalizedTrending(allItems);
+    if (myGen !== _homeLoadGeneration) return; // user has since switched tabs — discard
     renderFeed(await enrichWithDurations(ranked)); showHUD("Trending ✦");
     nextPageToken = (popular.status==="fulfilled" && popular.value.nextPageToken) || null;
   } catch(e) {
-    feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Trending to retry.</div>';
+    if (myGen === _homeLoadGeneration) {
+      feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Trending to retry.</div>';
+    }
   } finally {
     isLoadingTrending = false;
   }
@@ -3290,6 +3302,7 @@ let isLoadingTrending = false;
 moviesTab.addEventListener("click", async () => {
   if (isLoadingMovies) return; isLoadingMovies = true;
   invalidateHomeCache();
+  const myGen = ++_homeLoadGeneration;
   nextPageToken = null; setActiveTab("movies"); showSkeletons(6);
   try {
   const allItems=[]; const seen=new Set();
@@ -3327,9 +3340,10 @@ moviesTab.addEventListener("click", async () => {
   for (let i=allItems.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [allItems[i],allItems[j]]=[allItems[j],allItems[i]]; }
   const items=allItems.filter(v=>v.id?.videoId||v.id).map(v=>({id:v.id?.videoId||v.id,snippet:v.snippet}));
   if (!items.length) { feedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies again to retry.</div>'; isLoadingMovies=false; return; }
+  if (myGen !== _homeLoadGeneration) return; // user has since switched tabs — discard
   nextPageToken="seed";
   renderFeed(await enrichWithDurations(items)); showHUD("Movies");
-  } catch(e) { feedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies to retry.</div>'; } finally { isLoadingMovies = false; }
+  } catch(e) { if (myGen === _homeLoadGeneration) feedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies to retry.</div>'; } finally { isLoadingMovies = false; }
 });
 
 let isLoadingHistory = false;
@@ -3337,6 +3351,7 @@ historyTab.addEventListener("click", async () => {
   if (isLoadingHistory) return; isLoadingHistory = true;
   try {
   invalidateHomeCache();
+  const myGen = ++_homeLoadGeneration;
   setActiveTab("history"); nextPageToken = null;
   feedEl.innerHTML = ""; showHUD("Loading history…");
   _feedOwner = "history";
@@ -3390,11 +3405,11 @@ historyTab.addEventListener("click", async () => {
   if (!historyList.length) feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">No watch history yet. Videos you watch will appear here.</div>';
   // Fetch Liked Videos and Watch Later from YouTube
   const token = await getValidToken();
-  if (token) {
+  if (token && myGen === _homeLoadGeneration) {
     try {
       const llRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=20", { headers: { Authorization: "Bearer " + token } });
       const llData = await llRes.json();
-      if (llData.items && llData.items.length) {
+      if (llData.items && llData.items.length && myGen === _homeLoadGeneration) {
         addHeader("♥ Liked Videos");
         preCacheShorts(llData.items.map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: it.snippet })).filter(x => x.id)).catch(() => {});
         llData.items.forEach(it => {
@@ -3412,7 +3427,7 @@ historyTab.addEventListener("click", async () => {
     try {
       const wlRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=20", { headers: { Authorization: "Bearer " + token } });
       const wlData = await wlRes.json();
-      if (wlData.items && wlData.items.length) {
+      if (wlData.items && wlData.items.length && myGen === _homeLoadGeneration) {
         addHeader("⏱ Watch Later");
         preCacheShorts(wlData.items.map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: it.snippet })).filter(x => x.id)).catch(() => {});
         wlData.items.forEach(it => {
@@ -4097,6 +4112,7 @@ function triggerSearch(q) {
   lastSearchQuery = q;
   saveSearchToProfile(q);
   invalidateHomeCache();
+  const myGen = ++_homeLoadGeneration;
   (async () => {
     isLoadingSearch = true;
     try {
@@ -4110,10 +4126,12 @@ function triggerSearch(q) {
       data = await fetchYouTube("search", { part: "snippet", q, type: "video", maxResults: 20, _: Date.now() });
       if (data.items && data.items.length) break;
     }
+    if (myGen !== _homeLoadGeneration) return; // user has since switched tabs/searches — discard
     nextPageToken = data.nextPageToken || null;
     if (data.items && data.items.length) {
       // Re-rank results using taste profile before rendering
       const ranked = await rankSearchResultsWithCTR(data.items, q);
+      if (myGen !== _homeLoadGeneration) return;
       renderFeed(ranked);
       showHUD("Search: " + q);
     } else {
