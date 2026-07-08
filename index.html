@@ -2507,11 +2507,12 @@ function filterAndTrackFeedItems(items) {
 let _feedOwner = null; // which tab's content is actually currently in feedEl
 function renderFeed(items) {
   items = filterAndTrackFeedItems(items);
-  if (!items.length && feedEl.children.length > 0) {
-    // Nothing new to show — leave whatever's already on screen alone rather
-    // than wiping it out and going blank. Note: _feedOwner is NOT updated here,
-    // since the content on screen still belongs to whichever tab last actually
-    // rendered — not necessarily the tab currently requesting a reload.
+  if (!items.length && feedEl.children.length > 0 && _feedOwner === currentTab) {
+    // Nothing new to show, and this is the SAME tab that already owns what's on
+    // screen refreshing itself — leave it alone rather than wiping it out and
+    // going blank. This does NOT apply when switching to a different tab: in
+    // that case we always want to show (or at least attempt to show) the newly
+    // selected tab's own content, not silently keep a different tab's leftovers.
     showHUD("No new videos — showing previous feed");
     return;
   }
