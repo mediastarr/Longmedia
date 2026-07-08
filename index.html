@@ -1906,6 +1906,8 @@ async function loadVideoInfoPanel(videoId, snippet) {
   if (oldComments) oldComments.remove();
   const oldChapters = document.getElementById("vipChapters");
   if (oldChapters) oldChapters.remove();
+  const oldDescription = document.getElementById("vipDescription");
+  if (oldDescription) oldDescription.remove();
 
   // Fill from snippet immediately (fast)
   const title = snippet.title || "";
@@ -1954,7 +1956,14 @@ async function loadVideoInfoPanel(videoId, snippet) {
     }
     // Store raw count for accurate incrementing
     document.getElementById("vipLikeBtn").dataset.rawCount = stats.likeCount || "0";
+
+    // Description — strip any HTML-like tags (same sanitization pattern used for
+    // comments below) and show a YouTube-style truncated/expandable block
+    _renderDescription(desc);
   }
+
+  // Comments — this was fully implemented (fetch, format, render) but never called
+  _loadComments(videoId);
 
   // Channel info + avatar
   if (channelData.status === "fulfilled" && channelData.value?.items?.[0]) {
@@ -5081,6 +5090,46 @@ async function _checkLiveStreams() {
 
 
 /* ── Chapter markers ── */
+function _renderDescription(desc) {
+  const panel = document.getElementById("videoInfoPanel");
+  const stats = document.getElementById("vipStats");
+  if (!panel || !stats) return;
+  // Strip HTML-like tags — same sanitization approach used for comment text below.
+  // Description text is untrusted (comes from the video's uploader), so it's only
+  // ever inserted as escaped text content, never as raw HTML.
+  const clean = (desc || "").replace(/<[^>]+>/g, "").trim();
+  if (!clean) return;
+
+  let el = document.getElementById("vipDescription");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "vipDescription";
+    el.style.cssText = "margin:10px 0;padding:10px 0;border-top:1px solid rgba(255,255,255,0.08);font-size:12px;line-height:1.5;opacity:0.85;white-space:pre-wrap;word-break:break-word;";
+    stats.parentNode.insertBefore(el, stats.nextSibling);
+  }
+
+  const textEl = document.createElement("div");
+  textEl.textContent = clean; // textContent, not innerHTML — never render description as HTML
+  const collapsedLimit = 150;
+  const isLong = clean.length > collapsedLimit;
+
+  el.innerHTML = "";
+  el.appendChild(textEl);
+  if (isLong) {
+    textEl.style.cssText = "display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;";
+    const toggleBtn = document.createElement("button");
+    toggleBtn.textContent = "Show more";
+    toggleBtn.style.cssText = "margin-top:6px;background:none;border:none;color:#3cf2ff;font-size:12px;font-weight:600;cursor:pointer;padding:0;touch-action:manipulation;";
+    let expanded = false;
+    toggleBtn.onclick = () => {
+      expanded = !expanded;
+      textEl.style.cssText = expanded ? "" : "display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;";
+      toggleBtn.textContent = expanded ? "Show less" : "Show more";
+    };
+    el.appendChild(toggleBtn);
+  }
+}
+
 function _renderChapters(chapters) {
   let el = document.getElementById("vipChapters");
   if (!el) {
