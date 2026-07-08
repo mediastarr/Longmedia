@@ -5867,7 +5867,16 @@ function applyShortPlayerPatch(card, item) {
       // feed once auth is confirmed — not just when the startup feed came back empty,
       // otherwise this practically never runs (the generic feed usually succeeds).
       if (hasEnoughHistory()) {
-        const myStartupGen = ++_homeLoadGeneration;
+        // Deliberately NOT incrementing _homeLoadGeneration here — this upgrade
+        // step and _startupFetch above are two sequential stages of the SAME
+        // initial load, not competing loads. Claiming a new generation here
+        // would make _startupFetch's still-in-flight result look "stale" the
+        // moment this line runs, even though nothing actually superseded it —
+        // causing it to discard its own result the instant it arrives. Reusing
+        // the same generation means only a genuine new tab switch (which does
+        // increment the counter, via its own handler) can invalidate either of
+        // these startup-sequence stages.
+        const myStartupGen = _homeLoadGeneration;
         // Don't wipe the already-rendered generic feed with skeletons — only show
         // them if there's genuinely nothing on screen yet. The existing content
         // stays visible for however long this upgrade takes, and only gets
