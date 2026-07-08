@@ -1663,6 +1663,7 @@ exitFullBtn.addEventListener("click", () => {
 });
 
 setInterval(() => {
+  if (document.hidden) return;
   const isFullscreen = playerSection.classList.contains("player-fullscreen");
   const isCinema = document.body.classList.contains("cinema-mode");
   const isFSBody = document.body.classList.contains("fullscreen-active");
@@ -5812,7 +5813,7 @@ function applyShortPlayerPatch(card, item) {
 
   // Check for live streams every 5 minutes
   _checkLiveStreams();
-  setInterval(() => _checkLiveStreams(), 5 * 60 * 1000);
+  setInterval(() => { if (!document.hidden) _checkLiveStreams(); }, 5 * 60 * 1000);
 
   // Proactive token refresh every 55 minutes — keeps session alive indefinitely
   // Access tokens expire in 60 min; this refreshes before they expire
