@@ -865,7 +865,7 @@ let currentTab = "home";
 let currentVideoId = null;
 let miniActive = false;
 let isLight = false;
-let currentChannelId = "UCoLDGQ7a81ep9SJqPlDs2sg";
+let currentChannelId = null;
 let channelNextPageToken = null;
 let channelUploadsId = null;
 let subsReturnScrollY = 0;
@@ -3349,7 +3349,19 @@ historyTab.addEventListener("click", async () => {
   showHUD(token ? "History ✦" : "History");
 });
 
-channelTab.addEventListener("click", () => loadChannelPage(currentChannelId));
+channelTab.addEventListener("click", () => {
+  // Default to whichever channel is currently set (e.g. from tapping a subscriber),
+  // otherwise fall back to the logged-in user's own channel — never a hardcoded ID,
+  // since that would show the same fixed channel to every user of this app.
+  const myOwnChannelId = localStorage.getItem("yt_channel_id");
+  const idToLoad = currentChannelId || myOwnChannelId;
+  if (!idToLoad) {
+    setActiveTab("channel");
+    channelPageEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Log in via Subscriptions to see your own channel here, or tap a subscriber to view theirs.</div>';
+    return;
+  }
+  loadChannelPage(idToLoad);
+});
 
 subsTab.addEventListener("click", async () => {
   setActiveTab("subs"); showHUD("Subscriptions");
@@ -4081,9 +4093,21 @@ let gyroActive = false;
 
 function initGyroscope() {
   if (gyroActive) return;
+  let _orientationRAFPending = false;
+  let _latestOrientationEvent = null;
 
   function handleOrientation(e) {
     if (!gyroActive) gyroActive = true;
+    _latestOrientationEvent = e;
+    if (_orientationRAFPending) return;
+    _orientationRAFPending = true;
+    requestAnimationFrame(() => {
+      _orientationRAFPending = false;
+      applyOrientation(_latestOrientationEvent);
+    });
+  }
+
+  function applyOrientation(e) {
     const beta = e.beta || 0;
     const gamma = e.gamma || 0;
     const x = Math.max(-1, Math.min(1, gamma / 30));
@@ -4148,12 +4172,20 @@ let ambientVideo = null;
 let ambientCanvas = null;
 let ambientCtx = null;
 
+let ambientStream = null;
+function stopAmbientCamera() {
+  if (ambientStream) { try { ambientStream.getTracks().forEach(t => t.stop()); } catch(e) {} ambientStream = null; }
+  ambientActive = false;
+}
+window.addEventListener("beforeunload", stopAmbientCamera);
+
 async function initAmbientLighting() {
   if (ambientActive) return;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: "environment", width: 64, height: 48 }
     });
+    ambientStream = stream;
 
     ambientVideo = document.createElement("video");
     ambientVideo.srcObject = stream;
@@ -4262,7 +4294,15 @@ function initTimeBasedAmbient() {
 }
 
 // Start ambient — tries camera first, falls back to time-of-day
-initAmbientLighting();
+// Ambient lighting defaults to the time-of-day fallback (no camera access).
+// The camera-based version above (initAmbientLighting) is left in place and fully
+// functional, but is NOT auto-invoked: requesting environment-facing camera access
+// silently on every launch, for every user, with no in-app explanation and no way
+// to turn it off, isn't something this app should do by default — particularly on
+// AR glasses with a real camera pointed at the world, and particularly while under
+// platform/OAuth verification review. If you want the camera-based effect back,
+// call initAmbientLighting() from an explicit, opt-in settings toggle instead.
+initTimeBasedAmbient();
 
 themeToggle.addEventListener("click", () => { isLight = !isLight; document.body.classList.toggle("light", isLight); showHUD(isLight ? "Light Mode" : "Dark Mode"); });
 
