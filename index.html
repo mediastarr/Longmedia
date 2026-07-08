@@ -1841,6 +1841,26 @@ function createYTPlayer(videoId, startSeconds) {
       }
       if (currentQuality !== "auto") { try { ytPlayer.setPlaybackQuality(currentQuality); } catch(e) {} }
       playPauseBtn.textContent = "⏸";
+      // Verify the reused player actually switched to the requested video.
+      // loadVideoById can silently fail to update the visible iframe content
+      // in some cases (a known real-world IFrame API quirk) without ever
+      // throwing or firing an error — so nothing else in the app would
+      // otherwise notice. If the player's actual loaded video doesn't match
+      // what we asked for, force a full recreation to recover.
+      const expectedVideoId = videoId;
+      const playerAtCallTime = ytPlayer;
+      setTimeout(() => {
+        if (currentVideoId !== expectedVideoId) return; // user has since moved on to another video
+        if (ytPlayer !== playerAtCallTime) return; // player was already replaced by something else
+        try {
+          const actual = ytPlayer.getVideoData?.().video_id;
+          if (actual && actual !== expectedVideoId) {
+            try { ytPlayer.destroy(); } catch(e) {}
+            ytPlayer = null; isPlayerReady = false;
+            createYTPlayer(expectedVideoId, startSeconds);
+          }
+        } catch(e) {}
+      }, 1500);
       return;
     } catch(e) {
       try { ytPlayer.destroy(); } catch(e2) {}
