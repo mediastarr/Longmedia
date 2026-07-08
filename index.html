@@ -742,7 +742,12 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
     </div>
     <div id="suggestions"></div>
   </div>
-  <div id="feed"></div>
+  <div id="homeFeed" class="tab-feed"></div>
+    <div id="trendingFeed" class="tab-feed" style="display:none"></div>
+    <div id="moviesFeed" class="tab-feed" style="display:none"></div>
+    <div id="historyFeed" class="tab-feed" style="display:none"></div>
+    <div id="shortsFeed" class="tab-feed" style="display:none"></div>
+    <div id="subsFeed" class="tab-feed" style="display:none"></div>
 
   <!-- Video info panel — shown below medium player -->
   <div id="videoInfoPanel" style="display:none; margin-top:12px; position:relative; z-index:10; touch-action:pan-y;">
@@ -811,6 +816,35 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 </div>
 
 <script>
+
+// === Tab loading state management ===
+let homeAbortController = null;
+let isHomeLoading = false;
+let trendingAbortController = null;
+let isTrendingLoading = false;
+let historyAbortController = null;
+let isHistoryLoading = false;
+let moviesAbortController = null;
+let isMoviesLoading = false;
+
+// Direct loader functions to replace loadHomeContent() calls
+async function loadHomeContent() {
+  if (isHomeLoading) return;
+  isHomeLoading = true;
+  if (homeAbortController) homeAbortController.abort();
+  homeAbortController = new AbortController();
+  
+  setActiveTab("home");
+  try {
+    await renderHomeFeed(homeAbortController.signal); // assuming renderHomeFeed exists or replace with actual
+  } catch(e) {
+    if (e.name !== 'AbortError') console.error('Home load error:', e);
+  } finally {
+    isHomeLoading = false;
+    homeAbortController = null;
+  }
+}
+
 const API_KEYS = []; // Keys managed server-side in Worker
 
 
@@ -818,13 +852,13 @@ const API_KEYS = []; // Keys managed server-side in Worker
 async function fetchYouTubeDirect(endpoint, params = {}, retries = 2, options = {}) {
   // Route through Worker (bypasses KV cache for fresh results)
   try {
-    const res = await fetchWithTimeout(HUB_WORKER_URL + "/yt", {
+    const res = await fetch(HUB_WORKER_URL + "/yt", {
       method: "POST",
       headers: workerHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ endpoint, params, noCache: true, filterShorts: options.filterShorts, trim: options.trim })
-    }, 8000, options.signal);
+    });
     if (res.ok) { const data = await res.json(); if (!data.error) return data; }
-  } catch(e) { if (e.name === "AbortError") throw e; }
+  } catch(e) {}
   if (!API_KEYS.length) return { items: [], error: true };
   const key = API_KEYS[keyIndex % API_KEYS.length];
   keyIndex = (keyIndex + 1) % API_KEYS.length;
@@ -833,10 +867,6 @@ async function fetchYouTubeDirect(endpoint, params = {}, retries = 2, options = 
   Object.entries(p).forEach(([k, v]) => { if (v !== undefined && v !== null) url.searchParams.append(k, v); });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 4000);
-  if (options.signal) {
-    if (options.signal.aborted) controller.abort();
-    else options.signal.addEventListener("abort", () => controller.abort(), { once: true });
-  }
   try {
     const res = await fetch(url.toString(), { signal: controller.signal });
     clearTimeout(timeout);
@@ -844,7 +874,6 @@ async function fetchYouTubeDirect(endpoint, params = {}, retries = 2, options = 
     return await res.json();
   } catch (err) {
     clearTimeout(timeout);
-    if (options.signal?.aborted) throw err;
     if (retries > 0) return fetchYouTubeDirect(endpoint, params, retries - 1, options);
     throw err;
   }
@@ -857,12 +886,12 @@ async function fetchYouTube(endpoint, params = {}, retries = 2, options = {}) {
       method: "POST",
       headers: workerHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ endpoint, params, filterShorts: options.filterShorts, trim: options.trim })
-    }, 8000, options.signal);
+    }, 8000);
     if (res.ok) {
       const data = await res.json();
       if (!data.error) return data;
     }
-  } catch(e) { if (e.name === "AbortError") throw e; }
+  } catch(e) {}
   return fetchYouTubeDirect(endpoint, params, retries, options);
 }
 
@@ -884,7 +913,9 @@ let shortsNextPageToken = null;
 let isLoadingMore = false;
 let savedScrollY = 0;
 
-const feedEl = document.getElementById("feed");
+
+  const getFeedEl = (tab) => document.getElementById(tab + 'Feed');
+;
 const playerFrame = document.getElementById("playerFrame");
 const playerSection = document.getElementById("playerSection");
 const hudEl = document.getElementById("hud");
@@ -1262,13 +1293,9 @@ function getRecentSearches(n) { return ((getTasteProfile().searchHistory || []).
 // personalized feed pipeline talk directly to Google's API (not through
 // fetchYouTube's own timeout/retry handling), so without this, one hung
 // request on a slow connection could block the whole feed build forever.
-function fetchWithTimeout(url, options, ms = 6000, externalSignal) {
+function fetchWithTimeout(url, options, ms = 6000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), ms);
-  if (externalSignal) {
-    if (externalSignal.aborted) controller.abort();
-    else externalSignal.addEventListener("abort", () => controller.abort(), { once: true });
-  }
   return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeout));
 }
 
@@ -2454,9 +2481,9 @@ let shortQIdx = Math.floor(Math.random() * SHORT_QUERIES.length);
 let movieQIdx = Math.floor(Math.random() * MOVIE_QUERIES.length);
 
 function showSkeletons(count = 6) {
-  feedEl.innerHTML = "";
+  getFeedEl("home").innerHTML = "";
   for (let i = 0; i < count; i++) {
-    feedEl.innerHTML += `<div class="skeleton"><div class="skeleton-thumb"></div><div class="skeleton-info"><div class="skeleton-line"></div><div class="skeleton-line short"></div><div class="skeleton-line shorter"></div></div></div>`;
+    getFeedEl("home").innerHTML += `<div class="skeleton"><div class="skeleton-thumb"></div><div class="skeleton-info"><div class="skeleton-line"></div><div class="skeleton-line short"></div><div class="skeleton-line shorter"></div></div></div>`;
   }
 }
 
@@ -2525,7 +2552,7 @@ function renderFeed(items) {
     showHUD("No new videos — showing previous feed");
     return;
   }
-  feedEl.innerHTML = "";
+  getFeedEl("home").innerHTML = "";
   appendFeed(items);
   _feedOwner = currentTab;
 }
@@ -2841,22 +2868,21 @@ function appendFeed(items) {
 }
 
 function setActiveTab(tab) {
-  currentTab = tab;
-  [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab, subsTab, playlistTab]
-    .forEach(btn => btn && btn.classList.remove("active"));
-  if (tab === "home") homeTab.classList.add("active");
-  if (tab === "shorts") shortsTab.classList.add("active");
-  if (tab === "movies") moviesTab.classList.add("active");
-  if (tab === "history") historyTab.classList.add("active");
-  if (tab === "trending") trendingTab.classList.add("active");
-  if (tab === "channel") channelTab.classList.add("active");
-  if (tab === "subs") subsTab.classList.add("active");
-  if (tab === "playlists") playlistTab.classList.add("active");
-  feedEl.style.display = (["home","movies","history","trending","search"].includes(tab)) ? "block" : "none";
-  channelPageEl.style.display = (tab === "channel") ? "block" : "none";
-  subsPageEl.style.display = (tab === "subs") ? "block" : "none";
-  playlistPageEl.style.display = (tab === "playlists") ? "block" : "none";
-  shortsPageEl.style.display = (tab === "shorts") ? "block" : "none";
+  // Hide all feeds
+  document.querySelectorAll('.tab-feed').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  
+  // Show selected feed
+  const feedEl = document.getElementById(tab + 'Feed');
+  const tabEl = document.getElementById(tab + 'Tab');
+  if (feedEl) feedEl.style.display = 'block';
+  if (tabEl) tabEl.classList.add('active');
+  
+  // Abort any pending loads when switching away
+  if (tab !== 'home' && homeAbortController) { homeAbortController.abort(); isHomeLoading = false; }
+  if (tab !== 'trending' && trendingAbortController) { trendingAbortController.abort(); isTrendingLoading = false; }
+  if (tab !== 'history' && historyAbortController) { historyAbortController.abort(); isHistoryLoading = false; }
+  if (tab !== 'movies' && moviesAbortController) { moviesAbortController.abort(); isMoviesLoading = false; }
 }
 
 /* CHANGE: home tab uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
@@ -2869,32 +2895,27 @@ let _homeCacheValid = false;
 // invalidates that older fetch, regardless of which tab it came from or which
 // tab the user has since switched to.
 let _homeLoadGeneration = 0;
-// Actually cancels the underlying network requests of a superseded load
-// (on top of the generation-counter correctness guarantee above), so a
-// stale fetch stops consuming bandwidth/quota once the user has moved on.
-let _feedAbortController = null;
-function startNewFeedLoad() {
-  if (_feedAbortController) { try { _feedAbortController.abort(); } catch(e) {} }
-  _feedAbortController = new AbortController();
-  return _feedAbortController.signal;
-}
 // feedEl is shared by Home, Trending, Movies, History, and Search — whenever any
 // of them takes it over, Home's cache is no longer showing Home's own content.
 function invalidateHomeCache() { _homeCacheValid = false; }
 homeTab.addEventListener("click", async () => {
+  if (isHomeLoading) return;
+  isHomeLoading = true;
+  if (homeAbortController) homeAbortController.abort();
+  homeAbortController = new AbortController();
+  
   setActiveTab("home");
   _pollClearBadge();
   // Skip re-fetching if Home was loaded recently and still has content —
   // avoids redundant network calls when quickly switching back to Home
   const cacheAge = Date.now() - _homeLastLoaded;
   const hasNewVideos = (() => { try { return JSON.parse(localStorage.getItem("hubNewVideos")||"[]").length > 0; } catch(e) { return false; } })();
-  if (_homeCacheValid && cacheAge < 120000 && _feedOwner === "home" && feedEl.children.length > 0 && !hasNewVideos) {
+  if (_homeCacheValid && cacheAge < 120000 && _feedOwner === "home" && getFeedEl("home").children.length > 0 && !hasNewVideos) {
     return; // just show what's already rendered
   }
   // Guard against a stale/abandoned earlier load (e.g. one still stuck behind a
   // slow network call) finishing late and overwriting a newer, successful one.
   const myHomeGen = ++_homeLoadGeneration;
-  const mySignal = startNewFeedLoad();
   nextPageToken = null;
   if (feedEl.children.length === 0) showSkeletons(6);
 
@@ -2922,12 +2943,14 @@ homeTab.addEventListener("click", async () => {
   if (token && hasEnoughHistory()) {
     const since24h = new Date(Date.now() - 86400000).toISOString();
     const seen2 = new Set(); const allLogged = [];
-    function addL(items) { (items||[]).forEach(item => { const id = item.id?.videoId||item.id; if(!id||seen2.has(id)) return; seen2.add(id); allLogged.push(item); }); }
+    function addL(items) { (items||[]).forEach(item => { const id = item.id?.videoId||item.id; if(!id||seen2.has(id)) return; seen2.add(id); allLogged.push(item);   isHomeLoading = false;
+  homeAbortController = null;
+}); }
     // Personalized feed + order:date + mostPopular in parallel
     const [pf, fresh2, popular2] = await Promise.allSettled([
       withHardTimeout(fetchPersonalizedFeed(), 18000, []),
-      fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 10, publishedAfter: since24h, _: Date.now() }, 2, { signal: mySignal }),
-      fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 10, _: Date.now() }, 2, { signal: mySignal })
+      fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 10, publishedAfter: since24h, _: Date.now() }),
+      fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 10, _: Date.now() })
     ]);
     if (pf.status === "fulfilled") addL(pf.value);
     if (fresh2.status === "fulfilled") addL(fresh2.value.items);
@@ -2947,8 +2970,8 @@ homeTab.addEventListener("click", async () => {
     const since24h = new Date(Date.now() - 86400000).toISOString();
     // order:date first (last 24h), then mostPopular
     const [fresh, popular] = await Promise.allSettled([
-      fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 15, publishedAfter: since24h, _: Date.now() }, 2, { signal: mySignal }),
-      fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 15, _: Date.now() }, 2, { signal: mySignal })
+      fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: "US", videoCategoryId: cat, maxResults: 15, publishedAfter: since24h, _: Date.now() }),
+      fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "US", videoCategoryId: cat, maxResults: 15, _: Date.now() })
     ]);
     if (fresh.status === "fulfilled") addU(fresh.value.items);
     if (popular.status === "fulfilled") addU(popular.value.items);
@@ -2998,10 +3021,14 @@ homeTab.addEventListener("click", async () => {
 });
 
 trendingTab.addEventListener("click", async () => {
+  if (isTrendingLoading) return;
+  isTrendingLoading = true;
+  if (trendingAbortController) trendingAbortController.abort();
+  trendingAbortController = new AbortController();
+  
   if (isLoadingTrending) return; isLoadingTrending = true;
   invalidateHomeCache();
   const myGen = ++_homeLoadGeneration;
-  const mySignal = startNewFeedLoad();
   nextPageToken = null; setActiveTab("trending"); showSkeletons(6);
   try {
     // Rotate through categories each tap for variety
@@ -3011,14 +3038,16 @@ trendingTab.addEventListener("click", async () => {
     const rotateCat = TREND_CATS[trendRotate];
     const myCat = trendRotate === 0 ? (getTopCategoryId()||"0") : rotateCat;
     const allItems = []; const seen = new Set();
-    function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); }); }
+    function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item);   isTrendingLoading = false;
+  trendingAbortController = null;
+}); }
     const tSince24h = new Date(Date.now()-86400000).toISOString();
     // Parallel fetch, cached (fetchYouTube not fetchYouTubeDirect) — benefits
     // from a warm Worker cache on repeat loads, same pattern as Movies tab
     const [fresh, popular, general] = await Promise.allSettled([
-      fetchYouTube("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:myCat,maxResults:25,publishedAfter:tSince24h,_:Date.now()}, 2, { filterShorts: true, trim: true, signal: mySignal }),
-      fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:25,_:Date.now()}, 2, { filterShorts: true, trim: true, signal: mySignal }),
-      fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:"US",maxResults:20,_:Date.now()}, 2, { filterShorts: true, trim: true, signal: mySignal })
+      fetchYouTube("search",{part:"snippet",type:"video",order:"date",regionCode:"US",videoCategoryId:myCat,maxResults:25,publishedAfter:tSince24h,_:Date.now()}, 2, { filterShorts: true, trim: true }),
+      fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:"US",videoCategoryId:myCat,maxResults:25,_:Date.now()}, 2, { filterShorts: true, trim: true }),
+      fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:"US",maxResults:20,_:Date.now()}, 2, { filterShorts: true, trim: true })
     ]);
     if (fresh.status==="fulfilled") addU(fresh.value.items);
     if (popular.status==="fulfilled") addU(popular.value.items);
@@ -3027,7 +3056,7 @@ trendingTab.addEventListener("click", async () => {
     if (myGen !== _homeLoadGeneration) return; // user has since switched tabs — discard
 
     if (!allItems.length) {
-      feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Trending again to retry.</div>';
+      getFeedEl("home").innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Trending again to retry.</div>';
       return;
     }
 
@@ -3037,7 +3066,7 @@ trendingTab.addEventListener("click", async () => {
     nextPageToken = (popular.status==="fulfilled" && popular.value.nextPageToken) || null;
   } catch(e) {
     if (myGen === _homeLoadGeneration) {
-      feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Trending to retry.</div>';
+      getFeedEl("home").innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Trending to retry.</div>';
     }
   } finally {
     isLoadingTrending = false;
@@ -3080,7 +3109,7 @@ shortsTab.addEventListener("click", async () => {
   const shortsClearBtn = document.getElementById("shortsClearBtn");
 
   // Wire back button immediately before any async work
-  backBtn2.addEventListener("click", () => { shortsIframe.src = "about:blank"; shortsPageEl.style.display = "none"; setActiveTab("home"); homeTab.click(); showHUD("Home"); });
+  backBtn2.addEventListener("click", () => { shortsIframe.src = "about:blank"; shortsPageEl.style.display = "none"; setActiveTab("home"); loadHomeContent(); showHUD("Home"); });
 
   // Heart / Like button — tracks liked shorts locally
   let likedShorts = new Set();
@@ -3325,7 +3354,6 @@ moviesTab.addEventListener("click", async () => {
   if (isLoadingMovies) return; isLoadingMovies = true;
   invalidateHomeCache();
   const myGen = ++_homeLoadGeneration;
-  const mySignal = startNewFeedLoad();
   nextPageToken = null; setActiveTab("movies"); showSkeletons(6);
   try {
   const allItems=[]; const seen=new Set();
@@ -3362,11 +3390,11 @@ moviesTab.addEventListener("click", async () => {
   results.forEach(r=>{ if(r.status==="fulfilled") addU(r.value.items||[]); });
   for (let i=allItems.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [allItems[i],allItems[j]]=[allItems[j],allItems[i]]; }
   const items=allItems.filter(v=>v.id?.videoId||v.id).map(v=>({id:v.id?.videoId||v.id,snippet:v.snippet}));
-  if (!items.length) { feedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies again to retry.</div>'; isLoadingMovies=false; return; }
+  if (!items.length) { getFeedEl("home").innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies again to retry.</div>'; isLoadingMovies=false; return; }
   if (myGen !== _homeLoadGeneration) return; // user has since switched tabs — discard
   nextPageToken="seed";
   renderFeed(await enrichWithDurations(items)); showHUD("Movies");
-  } catch(e) { if (myGen === _homeLoadGeneration) feedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies to retry.</div>'; } finally { isLoadingMovies = false; }
+  } catch(e) { if (myGen === _homeLoadGeneration) getFeedEl("home").innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies to retry.</div>'; } finally { isLoadingMovies = false; }
 });
 
 let isLoadingHistory = false;
@@ -3375,9 +3403,8 @@ historyTab.addEventListener("click", async () => {
   try {
   invalidateHomeCache();
   const myGen = ++_homeLoadGeneration;
-  startNewFeedLoad();
   setActiveTab("history"); nextPageToken = null;
-  feedEl.innerHTML = ""; showHUD("Loading history…");
+  getFeedEl("home").innerHTML = ""; showHUD("Loading history…");
   _feedOwner = "history";
   const now = Date.now(); const DAY = 86400000;
   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
@@ -3394,7 +3421,7 @@ historyTab.addEventListener("click", async () => {
   function addHeader(title) {
     const hdr = document.createElement("div");
     hdr.style.cssText = "font-size:13px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; padding:14px 4px 6px; opacity:0.7; color:var(--accent);";
-    hdr.textContent = title; feedEl.appendChild(hdr);
+    hdr.textContent = title; getFeedEl("trending").appendChild(hdr);
   }
   function addHistoryCards(items) {
     items.forEach(h => {
@@ -3418,7 +3445,7 @@ historyTab.addEventListener("click", async () => {
           showHUD(resumeT > 5 ? "Resuming ▶" : "Playing: "+(snippet.title||""));
         }
       };
-      feedEl.appendChild(card);
+      getFeedEl("movies").appendChild(card);
     });
   }
   if (today.length) { addHeader("▸ Today"); addHistoryCards(today); }
@@ -3426,7 +3453,7 @@ historyTab.addEventListener("click", async () => {
   if (thisWeek.length) { addHeader("▸ This Week"); addHistoryCards(thisWeek); }
   if (earlier.length) { addHeader("▸ Earlier"); addHistoryCards(earlier.slice(0, 30)); }
   preCacheShorts(historyList.slice(0, 60).map(h => ({ id: h.id?.videoId || h.id, snippet: h.snippet })).filter(x => x.id)).catch(() => {});
-  if (!historyList.length) feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">No watch history yet. Videos you watch will appear here.</div>';
+  if (!historyList.length) getFeedEl("home").innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">No watch history yet. Videos you watch will appear here.</div>';
   // Fetch Liked Videos and Watch Later from YouTube
   const token = await getValidToken();
   if (token && myGen === _homeLoadGeneration) {
@@ -3444,7 +3471,7 @@ historyTab.addEventListener("click", async () => {
             tabsEl.style.display="none"; searchTabEl.style.display="none";
             const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); }
           };
-          feedEl.appendChild(card);
+          getFeedEl("history").appendChild(card);
         });
       }
     } catch(e) {}
@@ -3606,10 +3633,10 @@ async function refreshAccessToken() {
   const refreshToken = localStorage.getItem("yt_refresh_token");
   if (!refreshToken) return false;
   try {
-    const res = await fetchWithTimeout("https://oauth2.googleapis.com/token", {
+    const res = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ client_id: OAUTH_CLIENT_ID, client_secret: OAUTH_CLIENT_SECRET, refresh_token: refreshToken, grant_type: "refresh_token" })
-    }, 8000);
+    });
     const data = await res.json();
     if (data.access_token) {
       saveTokens(data);
@@ -4137,7 +4164,6 @@ function triggerSearch(q) {
   saveSearchToProfile(q);
   invalidateHomeCache();
   const myGen = ++_homeLoadGeneration;
-  startNewFeedLoad();
   (async () => {
     isLoadingSearch = true;
     try {
@@ -4160,7 +4186,7 @@ function triggerSearch(q) {
       renderFeed(ranked);
       showHUD("Search: " + q);
     } else {
-      feedEl.innerHTML = `<div style="font-size:13px;opacity:0.8;padding:16px;text-align:center;">No results for "${q}". API quota may be exhausted — try again in a moment.</div>`;
+      getFeedEl("home").innerHTML = `<div style="font-size:13px;opacity:0.8;padding:16px;text-align:center;">No results for "${q}". API quota may be exhausted — try again in a moment.</div>`;
       showHUD("No results");
     }
     } finally { isLoadingSearch = false; }
@@ -4702,13 +4728,7 @@ document.getElementById("syncClearBtn").onclick = async function() {
     } catch(e) {}
 
     showHUD("Taste profile rebuilt ✦");
-    setTimeout(() => {
-      syncOverlay.style.display = "none";
-      // Only jump to Home if the user is still sitting where this flow started —
-      // don't yank them away from whatever they've since navigated to themselves.
-      if (currentTab === "subs") homeTab.click();
-      else invalidateHomeCache();
-    }, 2500);
+    setTimeout(() => { syncOverlay.style.display = "none"; loadHomeContent(); }, 2500);
 
   } catch(e) {
     syncStatus.textContent = "Error: " + (e.message || "check connection");
@@ -4766,11 +4786,7 @@ syncStartBtn.onclick=async function(){
   } catch(e) {}
 
   syncStartBtn.textContent="Sync Again";syncStartBtn.disabled=false;showHUD("YouTube synced ✦");
-  setTimeout(()=>{
-    syncOverlay.style.display="none";
-    if (currentTab === "subs") homeTab.click();
-    else invalidateHomeCache();
-  },1500);
+  setTimeout(()=>{syncOverlay.style.display="none";loadHomeContent();},1500);
 };
 async function silentSync(token){
   const profile=getTasteProfile();
@@ -4842,9 +4858,8 @@ async function triggerReAuthFlow() {
         if (reAuthBanner) { reAuthBanner.remove(); reAuthBanner = null; }
         localStorage.removeItem("yt_needs_relogin");
         showHUD("Reconnected ✓");
-        // Only jump to Home if the user is still where this flow started
-        if (currentTab === "subs") homeTab.click();
-        else invalidateHomeCache();
+        // Reload home feed
+        loadHomeContent();
       }
     }, 3000);
   });
@@ -5734,7 +5749,7 @@ function applyShortPlayerPatch(card, item) {
       if (myStartupFetchGen !== _homeLoadGeneration) return; // a newer Home load has since started — discard this stale one
 
       if (!allItems.length) {
-        feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home again to retry.</div>';
+        getFeedEl("home").innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home again to retry.</div>';
         return;
       }
 
@@ -5747,7 +5762,7 @@ function applyShortPlayerPatch(card, item) {
       _homeCacheValid = (_feedOwner === "home" && feedEl.children.length > 0);
     } catch(e) {
       if (myStartupFetchGen === _homeLoadGeneration) {
-        feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home to retry.</div>';
+        getFeedEl("home").innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home to retry.</div>';
       }
     }
   };
