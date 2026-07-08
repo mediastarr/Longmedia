@@ -3332,6 +3332,7 @@ historyTab.addEventListener("click", async () => {
   if (yesterday.length) { addHeader("▸ Yesterday"); addHistoryCards(yesterday); }
   if (thisWeek.length) { addHeader("▸ This Week"); addHistoryCards(thisWeek); }
   if (earlier.length) { addHeader("▸ Earlier"); addHistoryCards(earlier.slice(0, 30)); }
+  preCacheShorts(historyList.slice(0, 60).map(h => ({ id: h.id?.videoId || h.id, snippet: h.snippet })).filter(x => x.id)).catch(() => {});
   if (!historyList.length) feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">No watch history yet. Videos you watch will appear here.</div>';
   // Fetch Liked Videos and Watch Later from YouTube
   const token = await getValidToken();
@@ -3341,6 +3342,7 @@ historyTab.addEventListener("click", async () => {
       const llData = await llRes.json();
       if (llData.items && llData.items.length) {
         addHeader("♥ Liked Videos");
+        preCacheShorts(llData.items.map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: it.snippet })).filter(x => x.id)).catch(() => {});
         llData.items.forEach(it => {
           const snippet = it.snippet || {}; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
           const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = videoId;
@@ -3358,6 +3360,7 @@ historyTab.addEventListener("click", async () => {
       const wlData = await wlRes.json();
       if (wlData.items && wlData.items.length) {
         addHeader("⏱ Watch Later");
+        preCacheShorts(wlData.items.map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: it.snippet })).filter(x => x.id)).catch(() => {});
         wlData.items.forEach(it => {
           const snippet = it.snippet || {}; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
           const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = videoId;
@@ -3631,6 +3634,7 @@ async function openPlaylist(playlistId, title) {
     } else { data = await fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId, maxResults: 50, _: Date.now() }); }
     playlistItemsList.innerHTML = "";
     if (!data.items || !data.items.length) { playlistItemsList.innerHTML = `<div style="font-size:12px;opacity:0.6;padding:8px 0;">This playlist is empty.</div>`; return; }
+    preCacheShorts(data.items.map(item => ({ id: item.snippet?.resourceId?.videoId || item.contentDetails?.videoId, snippet: item.snippet })).filter(x => x.id)).catch(() => {});
     let rendered = 0;
     data.items.forEach((item, i) => {
       const snippet = item.snippet; const videoId = snippet.resourceId?.videoId || item.contentDetails?.videoId; if (!videoId) return;
@@ -3701,6 +3705,7 @@ async function loadMoreVideos() {
   if (!data) return;
   nextPageToken = data.nextPageToken || (["home","trending","movies"].includes(currentTab) ? "seed" : null);
   if (currentTab === "channel") {
+    preCacheShorts(data.items || []).catch(() => {});
     (data.items || []).forEach(item => {
       const snippet = item.snippet; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
@@ -3827,6 +3832,7 @@ async function loadChannelPage(channelId) {
   channelUploadsId = channelInfo.contentDetails.relatedPlaylists.uploads;
   const uploads = await fetchYouTube("playlistItems", { part: "snippet", playlistId: channelUploadsId, maxResults: 20, _: Date.now() });
   channelNextPageToken = uploads.nextPageToken || null; nextPageToken = uploads.nextPageToken || null;
+  preCacheShorts(uploads.items || []).catch(() => {});
   (uploads.items || []).forEach(item => {
     const snippet = item.snippet; const videoId = snippet.resourceId.videoId;
     const card = document.createElement("div"); card.className = "video-card parallax focusable";
