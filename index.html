@@ -1738,16 +1738,27 @@ window.onYouTubeIframeAPIReady = function () {
               const dur = e.target.getDuration ? e.target.getDuration() : 0;
               if (dur > 0) recordWatchDuration(currentVideoId, dur, dur);
             } catch(err) {}
+            playNextSuggested();
           }
         },
         onError: (e) => {
           if (e.data === 101 || e.data === 150) showAgeRestrictedOverlay(currentVideoId);
           else if (e.data === 100) showHUD('Video not available');
+          else showHUD('Playback error (code ' + e.data + ') — try another video');
         }
       }
     });
   }
 };
+
+// Autoplay next — matches YouTube's default "advance to Up Next" behavior when a
+// video finishes. Reuses the suggested feed's own card click handler (which already
+// does the Shorts check, history tracking, etc.) rather than duplicating that logic.
+function playNextSuggested() {
+  const sugFeed = document.getElementById("suggestedFeed");
+  const firstCard = sugFeed?.querySelector(".video-card");
+  if (firstCard) firstCard.click();
+}
 
 function createYTPlayer(videoId, startSeconds) {
   const start = (startSeconds && startSeconds > 5) ? Math.floor(startSeconds) : 0;
@@ -1804,11 +1815,12 @@ function createYTPlayer(videoId, startSeconds) {
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.PLAYING) playPauseBtn.textContent = "⏸";
         if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "▶";
-        if (e.data === YT.PlayerState.ENDED && currentVideoId) clearResumePosition(currentVideoId);
+        if (e.data === YT.PlayerState.ENDED && currentVideoId) { clearResumePosition(currentVideoId); playNextSuggested(); }
         },
         onError: (e) => {
           if (e.data === 101 || e.data === 150) showAgeRestrictedOverlay(currentVideoId);
           else if (e.data === 100) showHUD('Video not available');
+          else showHUD('Playback error (code ' + e.data + ') — try another video');
         }
     }
   });
@@ -2353,11 +2365,12 @@ resBtn.addEventListener("click", () => {
           }
         }
         if (e.data === YT.PlayerState.PAUSED) playPauseBtn.textContent = "▶";
-        if (e.data === YT.PlayerState.ENDED && currentVideoId) clearResumePosition(currentVideoId);
+        if (e.data === YT.PlayerState.ENDED && currentVideoId) { clearResumePosition(currentVideoId); playNextSuggested(); }
         },
         onError: (e) => {
           if (e.data === 101 || e.data === 150) showAgeRestrictedOverlay(currentVideoId);
           else if (e.data === 100) showHUD('Video not available');
+          else showHUD('Playback error (code ' + e.data + ') — try another video');
         }
     }
   });
@@ -2496,19 +2509,21 @@ function parseDuration(dur) {
 // Returns a map of { videoId: { duration, dimension } }
 async function fetchContentDetails(videoIds) {
   if (!videoIds.length) return {};
+  // YouTube's videos.list endpoint caps at 50 IDs per request — batch larger lists
+  const chunks = [];
+  for (let i = 0; i < videoIds.length; i += 50) chunks.push(videoIds.slice(i, i + 50));
+  const map = {};
   try {
-    const data = await fetchYouTube("videos", {
-      part: "contentDetails",
-      id: videoIds.join(","),
-      maxResults: 50,
-      _: Date.now()
+    const results = await Promise.allSettled(chunks.map(chunk =>
+      fetchYouTube("videos", { part: "contentDetails", id: chunk.join(","), maxResults: 50, _: Date.now() })
+    ));
+    results.forEach(r => {
+      if (r.status === "fulfilled") {
+        (r.value.items || []).forEach(item => { map[item.id] = item.contentDetails || {}; });
+      }
     });
-    const map = {};
-    (data.items || []).forEach(item => {
-      map[item.id] = item.contentDetails || {};
-    });
-    return map;
-  } catch(e) { return {}; }
+  } catch(e) {}
+  return map;
 }
 
 // Check if a single video is a Short using YouTube API contentDetails.
