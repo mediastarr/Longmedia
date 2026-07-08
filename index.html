@@ -3505,7 +3505,21 @@ async function refreshAccessToken() {
     return false;
   } catch (e) { return false; }
 }
-function clearTokens() { localStorage.removeItem("yt_access_token"); localStorage.removeItem("yt_refresh_token"); localStorage.removeItem("yt_token_expiry"); }
+function clearTokens() {
+  localStorage.removeItem("yt_access_token");
+  localStorage.removeItem("yt_refresh_token");
+  localStorage.removeItem("yt_token_expiry");
+  // Reset Worker identity — without this, re-logging in as a different YouTube
+  // account keeps sending the PREVIOUS account's channel ID as X-ViewTube-User,
+  // so history/subscriptions/profile/feed calls stay attributed to the old account.
+  localStorage.removeItem("yt_channel_id");
+  // These local caches aren't scoped to a channel ID — clear them too so a new
+  // account doesn't inherit the previous account's watch history / taste profile.
+  localStorage.removeItem("historyList");
+  localStorage.removeItem("tasteProfile");
+  localStorage.removeItem("resumePositions");
+  historyList = [];
+}
 async function getValidToken() {
   if (isTokenExpired()) { const ok = await refreshAccessToken(); if (!ok) return null; }
   return localStorage.getItem("yt_access_token");
