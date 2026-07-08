@@ -2608,8 +2608,12 @@ function openAsShort(videoId, snippet) {
       }
     });
   } catch(e) {}
-  // Save position to restore on back
-  const returnScrollY = window.scrollY;
+  // Save position to restore on back — reuse savedScrollY (captured by the
+  // caller before the feed was hidden) rather than re-reading window.scrollY
+  // here, since the feed is typically already collapsed by this point.
+  const returnScrollY = (typeof savedScrollY === "number" && feedEl.style.display === "none")
+    ? savedScrollY
+    : window.scrollY;
   const returnTabName = currentTab;
 
   // Pre-seed the pool with this video so Shorts tab plays it immediately
