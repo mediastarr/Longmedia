@@ -5434,7 +5434,7 @@ async function syncProfileToWorker() {
         ),
         categories: profile.categories || {}
       })
-    });
+    }).catch(() => {});
   } catch(e) {}
 }
 
