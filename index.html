@@ -1459,99 +1459,53 @@ async function fetchPersonalizedFeed() {
     collabRecs.forEach(v => collabVideoIds.add(v.videoId));
   } catch(e) {}
 
-  // ── Cross-user engagement scores ──
-  const feedVideoIds = feed.map(item => item.id?.videoId || item.id).filter(Boolean);
-  let engScores = {};
-  try { engScores = await getEngagementScores(feedVideoIds); } catch(e) {}
+  // Note: cross-user engagement scores no longer need to be fetched here —
+  // the Worker's /feed endpoint fetches this itself internally for scoring.
 
   // ── Ranking phase: score each video and sort ──
-  const now = Date.now();
-  const watchSignals = profile5.watchSignals || {};
   const channelWeights = profile5.channels || {};
 
-  feed = feed.map(item => {
-    const snippet = item.snippet || {};
-    const channelId = snippet.channelId || "";
-    const videoId = item.id?.videoId || item.id;
-    const publishedAt = new Date(snippet.publishedAt || 0).getTime();
-    const ageHours = (now - publishedAt) / 3600000;
-
-    let score = 0;
-
-    // 1. Channel affinity score (how much you watch this channel)
-    const chData = channelWeights[channelId] || {};
-    const chWeight = typeof chData === "object" ? (chData.weight || 0) : (chData || 0);
-    score += Math.min(chWeight * 2, 20); // cap at 20
-
-    // 2. Freshness score — newer = higher score, exponential decay
-    const freshnessScore = Math.max(0, 10 - (ageHours / 24) * 3);
-    score += freshnessScore;
-
-    // 3. Keyword match score
-    const titleWords = (snippet.title || "").toLowerCase().split(/\s+/);
-    const kwProfile = profile5.keywords || {};
-    titleWords.forEach(w => { if (kwProfile[w]) score += Math.min(kwProfile[w] * 0.5, 5); });
-
-    // 4. Category match with time-of-day preference
-    const catId = snippet.categoryId || "";
-    if (timeCat && catId === timeCat) score += 5; // time-of-day category boost
-
-    // 5. Discovery bonus — expose to new channels occasionally
-    if (snippet._isDiscovery) score += 3;
-
-    // 6. Skip penalty — if you skip this channel a lot, lower score
-    if (chData.skipCount && chData.totalWatched) {
-      const skipRate = chData.skipCount / chData.totalWatched;
-      if (skipRate > 0.5) score -= 5;
-    }
-
-    // 7. Collaborative filtering boost — similar users watched this
-    if (collabVideoIds.has(videoId)) score += 8;
-
-    // 8. Cross-user engagement score — completion rate + CTR across all users
-    const eng = engScores[videoId];
-    if (eng) {
-      // Average completion rate across all users
-      const avgPct = eng.pctCount > 0 ? (eng.totalPct / eng.pctCount) : 0;
-      if (avgPct > 80) score += 6;
-      else if (avgPct > 60) score += 3;
-      // High CTR relative to impressions
-      if (eng.clicks > 5) score += 2;
-      // Session continuation — users kept watching after this
-      if (eng.sessionTotal > 3) {
-        const contRate = eng.sessionContinued / eng.sessionTotal;
-        if (contRate > 0.7) score += 4; // people kept watching sessions after this
-      }
-    }
-
-    item._score = score;
-    return item;
-  });
-
-  // Sort by score descending, then deduplicate
-  feed.sort((a, b) => (b._score || 0) - (a._score || 0));
-  const seenIds = new Set();
-  feed = feed.filter(item => {
-    const id = item.id?.videoId || item.id;
-    if (!id || seenIds.has(id)) return false;
-    seenIds.add(id);
-    return true;
-  });
-
-  // Re-apply channel diversity spacing on this FINAL ranked order — see comment above
-  const diversified = [];
-  const lastChannelIndex = {};
-  feed.forEach(item => {
-    const chId = item.snippet?.channelId || "";
-    const li = lastChannelIndex[chId];
-    if (li !== undefined && diversified.length - li < 3) {
-      diversified.splice(Math.min(diversified.length + 2, feed.length), 0, item);
+  // ── Ranking phase — delegated to the Worker ──
+  // The actual scoring math (channel affinity, freshness, keywords, bigrams,
+  // category/time-of-day match, discovery bonus, collaborative filtering,
+  // cross-user engagement, skip penalty) and the diversity pass all run on
+  // the Worker now instead of as JS on the glasses. Candidate gathering above
+  // stays client-side since it needs real YouTube API access regardless of
+  // where the scoring happens.
+  try {
+    const feedRes = await fetchWithTimeout(HUB_WORKER_URL + "/feed", {
+      method: "POST",
+      headers: workerHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        candidates: feed,
+        profile: {
+          channels: profile5.channels || {},
+          keywords: profile5.keywords || {},
+          bigrams: profile5.bigrams || {},
+          categories: profile5.categories || {},
+          timeCat
+        },
+        collabIds: [...collabVideoIds]
+      })
+    }, 8000);
+    const feedData = await feedRes.json();
+    if (feedData.items && feedData.items.length) {
+      feed = feedData.items;
     } else {
-      diversified.push(item);
+      throw new Error("empty worker response");
     }
-    lastChannelIndex[chId] = diversified.length - 1;
-  });
-  feed = diversified;
+  } catch(e) {
+    // Worker scoring unreachable or failed — cheap local fallback (channel
+    // affinity only) so Home still has a reasonable order rather than nothing.
+    feed.sort((a, b) => {
+      const wA = channelWeights[a.snippet?.channelId]; const wB = channelWeights[b.snippet?.channelId];
+      const chA = typeof wA === "object" ? (wA.weight || 0) : (wA || 0);
+      const chB = typeof wB === "object" ? (wB.weight || 0) : (wB || 0);
+      return chB - chA;
+    });
+    const seenIds = new Set();
+    feed = feed.filter(item => { const id = item.id?.videoId || item.id; if (!id || seenIds.has(id)) return false; seenIds.add(id); return true; });
+  }
 
   return feed;
 }
