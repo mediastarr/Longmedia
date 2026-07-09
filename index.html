@@ -4968,11 +4968,6 @@ async function _pollCheckNewContent() {
             if (t.startsWith("live") || t.startsWith("🔴") || t.includes("broadcast") ||
                 t.includes("| live") || t.includes("| powered by") || t.includes(": live")) return;
                // Skip non-English titles
-            if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
-            if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
-            if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
-            if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
-            if ((v.title||"").split("").some(c=>c.charCodeAt(0)>591)) return;
             if ((v.title||"").split("").some(function(c){return c.charCodeAt(0)>591;})) return;
             if (_pollBlocklist.has(v.videoId)) return;
             allNew.push({ ...v, source: "subscription" });
