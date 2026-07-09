@@ -1326,6 +1326,35 @@ function withHardTimeout(promise, ms, fallbackValue) {
   ]);
 }
 
+// Session "mindset" tracking — infers whether the user is currently in a
+// Shorts-browsing mode, a long-form-watching mode, or a search/learning mode,
+// based on their most recent actions this session (not their all-time taste
+// profile, which changes slowly). Used to bias the CURRENT feed/search build
+// toward whatever mode they're actually in right now.
+function _logSessionAction(type) {
+  // type: "short" | "longform" | "search"
+  try {
+    let log = JSON.parse(sessionStorage.getItem("sessionActionLog") || "[]");
+    log.push({ type, ts: Date.now() });
+    log = log.slice(-15); // keep last 15 actions
+    sessionStorage.setItem("sessionActionLog", JSON.stringify(log));
+  } catch(e) {}
+}
+function _getSessionMode() {
+  try {
+    const log = JSON.parse(sessionStorage.getItem("sessionActionLog") || "[]");
+    if (log.length < 3) return null; // not enough recent signal to infer a mode
+    const recent = log.slice(-8);
+    const counts = { short: 0, longform: 0, search: 0 };
+    recent.forEach(e => { if (counts[e.type] !== undefined) counts[e.type]++; });
+    const total = recent.length;
+    if (counts.short / total >= 0.6) return "shorts";
+    if (counts.search / total >= 0.4) return "search";
+    if (counts.longform / total >= 0.6) return "longform";
+    return null; // mixed — no strong current mode, let the taste profile lead
+  } catch(e) { return null; }
+}
+
 async function fetchPersonalizedFeed() {
   const token = await getValidToken();
   const profile5 = getTasteProfile();
@@ -1476,6 +1505,7 @@ async function fetchPersonalizedFeed() {
   // stays client-side since it needs real YouTube API access regardless of
   // where the scoring happens.
   try {
+    const mostRecentSearch = (profile5.searchHistory && profile5.searchHistory[0]) || null;
     const feedRes = await fetchWithTimeout(HUB_WORKER_URL + "/feed", {
       method: "POST",
       headers: workerHeaders({ "Content-Type": "application/json" }),
@@ -1488,7 +1518,9 @@ async function fetchPersonalizedFeed() {
           categories: profile5.categories || {},
           timeCat
         },
-        collabIds: [...collabVideoIds]
+        collabIds: [...collabVideoIds],
+        sessionMode: _getSessionMode(),
+        currentSearch: mostRecentSearch
       })
     }, 8000);
     const feedData = await feedRes.json();
@@ -1903,6 +1935,7 @@ function createYTPlayer(videoId, startSeconds) {
 }
 
 function setPlayerVideo(videoId, snippet, startSeconds) {
+  _logSessionAction("longform");
   savedScrollY = window.scrollY;
   currentVideoId = videoId;
   // Reset captions state for the new video
@@ -2742,6 +2775,7 @@ async function preCacheShorts(items) {
 
 // Open a single video in the Shorts player (just like opening from Shorts tab)
 function openAsShort(videoId, snippet) {
+  _logSessionAction("short");
   // Mark as seen — remove red highlight from feed card
   try {
     const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
@@ -4146,6 +4180,7 @@ function triggerSearch(q) {
   if (isLoadingSearch) return;
   lastSearchQuery = q;
   saveSearchToProfile(q);
+  _logSessionAction("search");
   invalidateHomeCache();
   const myGen = ++_homeLoadGeneration;
   startNewFeedLoad();
