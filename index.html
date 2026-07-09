@@ -3698,6 +3698,7 @@ async function refreshAccessToken() {
       body: JSON.stringify({ refresh_token: refreshToken })
     }, 8000);
     const data = await res.json();
+    console.log("[auth] refresh result:", res.status, data.error || "success");
     if (data.access_token) {
       saveTokens(data);
       // Clear any "needs relogin" flag since we just refreshed successfully
@@ -4957,8 +4958,10 @@ async function _pollCheckNewContent() {
     // Runs every poll cycle (5-15 min) — free
     try {
       const res = await fetch(HUB_WORKER_URL + "/poll?since=" + since, { headers: workerHeaders() });
+      console.log("[poll] /poll response:", res.status, "userId:", getViewTubeUserId());
       if (res.ok) {
         const data = await res.json();
+        console.log("[poll] source1 raw videos:", data.videos?.length || 0);
         _pollLastCheck = data.serverTime || Date.now();
         (data.videos || []).forEach(v => {
           if (!_pollKnownIds.has(v.videoId)) {
@@ -4974,9 +4977,7 @@ async function _pollCheckNewContent() {
           }
         });
       }
-    } catch(e) {}
-
-    // ── SOURCE 2: Check subscription channels every 5 min (rate limited) ──
+    } catch(e) { console.error("[poll] source1 fetch failed:", e.message); }
     const lastSubCheck = parseInt(localStorage.getItem("_pollLastSubCheck") || "0");
     const subCheckDue = Date.now() - lastSubCheck > 5 * 60 * 1000;
     if (subCheckDue) {
@@ -5067,6 +5068,7 @@ async function _pollCheckNewContent() {
       }
     }
 
+    console.log("[poll] cycle complete — total new videos found:", allNew.length);
     if (!allNew.length) return;
 
     // Store merged for home tab
@@ -5089,7 +5091,7 @@ async function _pollCheckNewContent() {
     showHUD("🔴 " + _pollBadgeCount + " new — " + parts.join(" · "));
 
   } catch(e) {
-    // Silent fail
+    console.error("[poll] _pollCheckNewContent threw:", e);
   }
 }
 
