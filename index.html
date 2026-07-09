@@ -4106,75 +4106,31 @@ keyboardEl.addEventListener("click", async (e) => {
 /* ── Personalized Search Ranking ── */
 async function rankSearchResultsWithCTR(items, query) {
   if (!items || !items.length) return items;
-  // Get cross-user CTR data for this query
-  let ctrData = {};
-  try { ctrData = await getSearchCTR(query || ""); } catch(e) {}
-  const ranked = rankSearchResults(items);
-  // Boost videos with high CTR from other users
-  return ranked.map(item => {
-    const id = item.id?.videoId || item.id;
-    if (id && ctrData[id]) {
-      item._searchScore = (item._searchScore || 0) + Math.min(ctrData[id] * 2, 10);
-    }
-    return item;
-  }).sort((a,b) => (b._searchScore||0) - (a._searchScore||0));
-}
-
-function rankSearchResults(items) {
-  if (!items || !items.length) return items;
-  const profile = getTasteProfile();
-  const channels = profile.channels || {};
-  const keywords = profile.keywords || {};
-  const categories = profile.categories || {};
-  const watchSignals = profile.watchSignals || {};
-  const now = Date.now();
-
-  return items.map(item => {
-    const snippet = item.snippet || {};
-    const videoId = item.id?.videoId || item.id;
-    const channelId = snippet.channelId || "";
-    const title = (snippet.title || "").toLowerCase();
-    const categoryId = snippet.categoryId || "";
-    const publishedAt = new Date(snippet.publishedAt || 0).getTime();
-    const ageHours = (now - publishedAt) / 3600000;
-    let score = 0;
-
-    // 1. Channel affinity — channels you watch often rank higher
-    const chData = channels[channelId] || {};
-    const chWeight = typeof chData === "object" ? (chData.weight || 0) : (chData || 0);
-    score += Math.min(chWeight * 3, 25);
-
-    // 2. Channel skip penalty — channels you bail on rank lower
-    if (chData.skipCount && chData.totalWatched) {
-      const skipRate = chData.skipCount / chData.totalWatched;
-      if (skipRate > 0.5) score -= 10;
-    }
-
-    // 3. Keyword match — title words matching your taste
-    const titleWords = title.replace(/[^a-z0-9\s]/g, "").split(/\s+/);
-    titleWords.forEach(w => {
-      if (w.length > 2 && keywords[w]) score += Math.min(keywords[w] * 0.8, 8);
-    });
-
-    // 4. Category match — categories you watch often
-    if (categoryId && categories[categoryId]) {
-      score += Math.min(categories[categoryId] * 0.5, 6);
-    }
-
-    // 5. Freshness boost — newer videos rank higher
-    if (ageHours < 6) score += 8;
-    else if (ageHours < 24) score += 4;
-    else if (ageHours < 72) score += 2;
-
-    // 6. Prior watch signal — if you watched this video before, slight boost
-    if (watchSignals[videoId]) {
-      const sig = watchSignals[videoId];
-      if (sig.signal === "loved" || sig.signal === "liked") score += 5;
-    }
-
-    item._searchScore = score;
-    return item;
-  }).sort((a, b) => (b._searchScore || 0) - (a._searchScore || 0));
+  // Ranking (channel affinity, keywords, category, freshness, prior-watch
+  // signal) plus the cross-user CTR boost now happen together on the Worker —
+  // was previously two round trips (fetch /searchctr, then score locally).
+  try {
+    const profile = getTasteProfile();
+    const res = await fetchWithTimeout(HUB_WORKER_URL + "/searchrank", {
+      method: "POST",
+      headers: workerHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        candidates: items,
+        query: query || "",
+        profile: {
+          channels: profile.channels || {},
+          keywords: profile.keywords || {},
+          categories: profile.categories || {},
+          watchSignals: profile.watchSignals || {}
+        }
+      })
+    }, 6000);
+    const data = await res.json();
+    if (data.items && data.items.length) return data.items;
+    return items;
+  } catch(e) {
+    return items;
+  }
 }
 
 let isLoadingSearch = false;
@@ -5481,15 +5437,6 @@ async function getEngagementScores(videoIds) {
   try {
     const ids = videoIds.slice(0, 20).join(",");
     const res = await fetchWithTimeout(HUB_WORKER_URL + "/engage?ids=" + ids, { headers: workerHeaders() }, 5000);
-    if (!res.ok) return {};
-    return await res.json();
-  } catch(e) { return {}; }
-}
-
-// Get search CTR data — which videos users actually clicked for a query
-async function getSearchCTR(query) {
-  try {
-    const res = await fetchWithTimeout(HUB_WORKER_URL + "/searchctr?q=" + encodeURIComponent(query), { headers: workerHeaders() }, 5000);
     if (!res.ok) return {};
     return await res.json();
   } catch(e) { return {}; }
