@@ -956,20 +956,47 @@ function showHUD(text) {
    CHANGE: enriched saveToHistory + taste profile engine
 ----------------------------------------------------------- */
 function saveToHistory(video) {
-  historyList = historyList.filter(v => v.id !== video.id);
-  historyList.unshift({ ...video, watchedAt: Date.now() });
-  if (historyList.length > 500) historyList = historyList.slice(0, 500);
-  localStorage.setItem("historyList", JSON.stringify(historyList));
-  updateTasteProfile(video);
-  // Sync to Worker KV (debounced)
-  clearTimeout(window._historySyncTimer);
-  window._historySyncTimer = setTimeout(() => {
-    fetch(HUB_WORKER_URL + "/history", {
-      method: "POST",
-      headers: workerHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ history: historyList.slice(0, 100) })
-    }).catch(() => {});
-  }, 30000);
+  try {
+    historyList = historyList.filter(v => v.id !== video.id);
+    // Store only what History actually displays/needs — not the full snippet.
+    // Full descriptions and tag lists can run several KB each; keeping those
+    // for up to 500 entries was a real localStorage-quota risk that could
+    // silently abort video playback entirely (this function previously ran
+    // unguarded inside setPlayerVideo, so a quota error here would propagate
+    // up and prevent the player from ever being created).
+    const s = video.snippet || {};
+    const trimmedSnippet = {
+      title: s.title, channelTitle: s.channelTitle, channelId: s.channelId,
+      publishedAt: s.publishedAt, categoryId: s.categoryId,
+      thumbnails: { medium: s.thumbnails?.medium || s.thumbnails?.default },
+      resourceId: s.resourceId, videoOwnerChannelId: s.videoOwnerChannelId, videoOwnerChannelTitle: s.videoOwnerChannelTitle
+    };
+    historyList.unshift({ id: video.id, snippet: trimmedSnippet, watchedAt: Date.now() });
+    if (historyList.length > 500) historyList = historyList.slice(0, 500);
+    try {
+      localStorage.setItem("historyList", JSON.stringify(historyList));
+    } catch(quotaErr) {
+      // Still over quota even after trimming — degrade gracefully by keeping
+      // only the most recent entries instead of losing history-saving entirely.
+      try {
+        historyList = historyList.slice(0, 100);
+        localStorage.setItem("historyList", JSON.stringify(historyList));
+      } catch(e2) {}
+    }
+    updateTasteProfile(video);
+    // Sync to Worker KV (debounced)
+    clearTimeout(window._historySyncTimer);
+    window._historySyncTimer = setTimeout(() => {
+      fetch(HUB_WORKER_URL + "/history", {
+        method: "POST",
+        headers: workerHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ history: historyList.slice(0, 100) })
+      }).catch(() => {});
+    }, 30000);
+  } catch(e) {
+    // Never let a history-saving failure block video playback
+    console.error("saveToHistory failed (non-fatal):", e);
+  }
 }
 
 async function _restoreHistoryFromWorker() {
@@ -1974,10 +2001,11 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   window.scrollTo({ top: 0, behavior: "instant" });
   // Show info panel below medium player
   loadVideoInfoPanel(videoId, snippet);
-  updateSessionContext(snippet);
+  try { updateSessionContext(snippet); } catch(e) {}
   playPauseBtn.textContent = "⏸";
-  initAudioGlow();
-  const resumeAt = startSeconds || getResumePosition(videoId);
+  try { initAudioGlow(); } catch(e) {}
+  let resumeAt = startSeconds || 0;
+  if (!resumeAt) { try { resumeAt = getResumePosition(videoId); } catch(e) {} }
   if (ytReady) createYTPlayer(videoId, resumeAt);
   else { pendingVideoId = videoId; pendingStartSeconds = resumeAt; }
 }
