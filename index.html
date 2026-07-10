@@ -3002,7 +3002,15 @@ homeTab.addEventListener("click", async () => {
 
   const token = await getValidToken();
   const since48h = new Date(Date.now() - 172800000).toISOString();
-  const cat = freshCategory();
+  // Rotate category on repeat taps instead of always using the same one —
+  // otherwise, when there's nothing genuinely new from subscriptions, every
+  // tap re-fetches nearly the same slice of content, which the dedup filter
+  // then rejects as already-shown, making a real reload look like it did
+  // nothing at all.
+  const homeTapRotate = parseInt(localStorage.getItem("_homeTapRotate")||"0");
+  localStorage.setItem("_homeTapRotate", String(homeTapRotate+1));
+  const rotateCats = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
+  const cat = homeTapRotate % 3 === 0 ? freshCategory() : rotateCats[homeTapRotate % rotateCats.length];
   if (token && hasEnoughHistory()) {
     const since24h = new Date(Date.now() - 86400000).toISOString();
     const seen2 = new Set(); const allLogged = [];
