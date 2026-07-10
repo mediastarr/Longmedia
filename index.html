@@ -3150,6 +3150,7 @@ trendingTab.addEventListener("click", async () => {
 });
 
 shortsTab.addEventListener("click", async () => {
+  ++_homeLoadGeneration;
   nextPageToken = null; setActiveTab("shorts"); showHUD("Shorts");
   shortsPageEl.innerHTML = `
     <iframe id="shortsIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
@@ -3601,6 +3602,7 @@ historyTab.addEventListener("click", async () => {
 });
 
 channelTab.addEventListener("click", () => {
+  ++_homeLoadGeneration;
   // Default to whichever channel is currently set (e.g. from tapping a subscriber),
   // otherwise fall back to the logged-in user's own channel — never a hardcoded ID,
   // since that would show the same fixed channel to every user of this app.
@@ -3615,6 +3617,7 @@ channelTab.addEventListener("click", () => {
 });
 
 subsTab.addEventListener("click", async () => {
+  ++_homeLoadGeneration;
   setActiveTab("subs"); showHUD("Subscriptions");
   document.getElementById("subsLoginPanel").style.display = "block";
   const token = await getValidToken();
@@ -3817,6 +3820,7 @@ async function loadSubscriptions() {
 }
 
 playlistTab.addEventListener("click", async () => {
+  ++_homeLoadGeneration;
   setActiveTab("playlists"); showHUD("Playlists");
   const token = await getValidToken();
   if (token) loadPlaylists();
