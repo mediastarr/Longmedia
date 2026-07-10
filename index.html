@@ -1390,36 +1390,48 @@ async function fetchPersonalizedFeed() {
     });
   }
   if (token) {
-    try {
-      const subsRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance", { headers: { Authorization: "Bearer " + token } });
-      const subsData = await subsRes.json();
-      const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
-      if (channelIds.length > 0) {
-        const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 50).join(",") });
-        const uploadPlaylists = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
-        for (let i = uploadPlaylists.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [uploadPlaylists[i], uploadPlaylists[j]] = [uploadPlaylists[j], uploadPlaylists[i]]; }
-        const uploadFetches = uploadPlaylists.slice(0, 5).map(plId =>
-          fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId: plId, maxResults: 10, _: Date.now() })
-        );
-        const uploadResults = await Promise.allSettled(uploadFetches);
-        uploadResults.forEach(r => {
-          if (r.status === "fulfilled") {
-            const pf48h = Date.now() - 172800000;
-        const sorted = (r.value.items || []).sort((a, b) => new Date(b.contentDetails?.videoPublishedAt || b.snippet?.publishedAt || 0) - new Date(a.contentDetails?.videoPublishedAt || a.snippet?.publishedAt || 0));
-        const fresh = sorted.filter(it => new Date(it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt || 0).getTime() > pf48h);
-        const toAdd = fresh.length > 0 ? fresh : sorted; // fallback to all if nothing in 48h
-            addItems(toAdd.slice(0, 4).map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } })), 6);
+    // These two are fully independent of each other — the subscription chain's
+    // own steps genuinely depend on one another (need channel IDs before
+    // fetching channel details, need channel details before upload playlists),
+    // but liked videos has no dependency on any of that and was previously
+    // waiting for the entire subscription sequence to finish before it even
+    // started, for no real reason.
+    await Promise.all([
+      (async () => {
+        try {
+          const subsRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance", { headers: { Authorization: "Bearer " + token } });
+          const subsData = await subsRes.json();
+          const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
+          if (channelIds.length > 0) {
+            const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 50).join(",") });
+            const uploadPlaylists = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
+            for (let i = uploadPlaylists.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [uploadPlaylists[i], uploadPlaylists[j]] = [uploadPlaylists[j], uploadPlaylists[i]]; }
+            const uploadFetches = uploadPlaylists.slice(0, 5).map(plId =>
+              fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId: plId, maxResults: 10, _: Date.now() })
+            );
+            const uploadResults = await Promise.allSettled(uploadFetches);
+            uploadResults.forEach(r => {
+              if (r.status === "fulfilled") {
+                const pf48h = Date.now() - 172800000;
+                const sorted = (r.value.items || []).sort((a, b) => new Date(b.contentDetails?.videoPublishedAt || b.snippet?.publishedAt || 0) - new Date(a.contentDetails?.videoPublishedAt || a.snippet?.publishedAt || 0));
+                const fresh = sorted.filter(it => new Date(it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt || 0).getTime() > pf48h);
+                const toAdd = fresh.length > 0 ? fresh : sorted; // fallback to all if nothing in 48h
+                addItems(toAdd.slice(0, 4).map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } })), 6);
+              }
+            });
           }
-        });
-      }
-    } catch(e) {}
-    try {
-      const llRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=15", { headers: { Authorization: "Bearer " + token } });
-      const llData = await llRes.json();
-      const likedItems = (llData.items || []).map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } }));
-      for (let i = likedItems.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [likedItems[i], likedItems[j]] = [likedItems[j], likedItems[i]]; }
-      addItems(likedItems.slice(0, 5), 3);
-    } catch(e) {}
+        } catch(e) {}
+      })(),
+      (async () => {
+        try {
+          const llRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=15", { headers: { Authorization: "Bearer " + token } });
+          const llData = await llRes.json();
+          const likedItems = (llData.items || []).map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } }));
+          for (let i = likedItems.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [likedItems[i], likedItems[j]] = [likedItems[j], likedItems[i]]; }
+          addItems(likedItems.slice(0, 5), 3);
+        } catch(e) {}
+      })()
+    ]);
   }
   const topChannels = getTopChannels(8); const topKeywords = getTopKeywords(10); const topBigrams = getTopBigrams(6);
   const recentIds = getRecentVideoIds(5); const topCats = getTopCategories(3); const recentSearches = getRecentSearches(5);
