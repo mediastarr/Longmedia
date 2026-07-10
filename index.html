@@ -430,7 +430,7 @@ body.cinema-mode #playerSection { transition: transform 0.55s cubic-bezier(0.22,
 #playerSection.player-fullscreen.cinema.zoom-intro { animation: cinemaZoomIntro 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 body.fullscreen-active .exit-full-btn {
   position: fixed; left: 16px; top: 16px; border-radius: 999px;
-  border: 1px solid rgba(120,130,160,0.7); padding: 8px 16px; font-size: 13px; font-weight: 600;
+  border: 1px solid rgba(120,130,160,0.7); padding: 6px 12px; font-size: 11px; font-weight: 600;
   background: rgba(10,12,20,0.75);
   color: #f5f7ff; cursor: pointer; z-index: 999999999 !important;
   display: none; pointer-events: none;
@@ -465,7 +465,7 @@ body#playerControls {
 }
 #playerControls > button:active { transform: scale(0.92); opacity: 0.7; }
 #playerControls > button, #closeMini { transition: opacity 0.3s ease; }
-#playerSection.ui-hidden #playerControls > button:not(#hideUIBtn), #playerSection.ui-hidden #closeMini { opacity: 0; pointer-events: none; }
+#playerSection.ui-hidden #playerControls > button:not(#hideUIBtn), #playerSection.ui-hidden #closeMini { opacity: 0 !important; pointer-events: none; }
 body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer-events: none; transition: opacity 0.3s ease; }
 #playerSection.ui-hidden #hideUIBtn { opacity: 0.0 !important; }
 #playerSection.ui-hidden #hideUIBtn:hover, #playerSection.ui-hidden #hideUIBtn:focus, #playerSection.ui-hidden #hideUIBtn:active { opacity: 0.35 !important; }
@@ -520,26 +520,26 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 #shortsTransition { position: absolute; inset: 0; z-index: 9; background: #000; opacity: 0; pointer-events: none; }
 #shortsTransition.flash { opacity: 1; }
 
-/* Right-side action bar — TikTok style */
+/* Top action bar, next to the back button */
 #shortsActions {
-  position: absolute; right: 14px; bottom: 100px; z-index: 15;
-  display: flex; flex-direction: column; align-items: center; gap: 18px;
+  position: absolute; top: 20px; left: 100px; z-index: 15;
+  display: flex; flex-direction: row; align-items: flex-start; gap: 10px;
 }
 .shorts-action-btn {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
   cursor: pointer; touch-action: manipulation;
   -webkit-tap-highlight-color: rgba(60,242,255,0.25);
 }
 .shorts-action-icon {
-  width: 44px; height: 44px; border-radius: 999px;
+  width: 32px; height: 32px; border-radius: 999px;
   background: rgba(10,12,20,0.65); border: 1px solid rgba(255,255,255,0.2);
   backdrop-filter: blur(8px);
   display: flex; align-items: center; justify-content: center;
-  font-size: 20px; transition: transform 0.15s ease, background 0.2s ease;
+  font-size: 15px; transition: transform 0.15s ease, background 0.2s ease;
 }
 .shorts-action-icon:active { transform: scale(0.88); }
-.shorts-action-label { font-size: 10px; color: rgba(255,255,255,0.75); letter-spacing: 0.03em; }
-#shortsHeartBtn .shorts-action-icon { font-size: 22px; }
+.shorts-action-label { font-size: 8px; color: rgba(255,255,255,0.75); letter-spacing: 0.03em; }
+#shortsHeartBtn .shorts-action-icon { font-size: 16px; }
 #shortsHeartBtn.hearted .shorts-action-icon {
   background: rgba(255,40,80,0.35);
   border-color: rgba(255,40,80,0.6);
