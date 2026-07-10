@@ -2968,16 +2968,12 @@ function startNewFeedLoad() {
 // feedEl is shared by Home, Trending, Movies, History, and Search — whenever any
 // of them takes it over, Home's cache is no longer showing Home's own content.
 function invalidateHomeCache() { _homeCacheValid = false; }
+let isLoadingHome = false;
 homeTab.addEventListener("click", async () => {
+  if (isLoadingHome) return; isLoadingHome = true;
+  try {
   setActiveTab("home");
   _pollClearBadge();
-  // Skip re-fetching if Home was loaded recently and still has content —
-  // avoids redundant network calls when quickly switching back to Home
-  const cacheAge = Date.now() - _homeLastLoaded;
-  const hasNewVideos = (() => { try { return JSON.parse(localStorage.getItem("hubNewVideos")||"[]").length > 0; } catch(e) { return false; } })();
-  if (_homeCacheValid && cacheAge < 120000 && _feedOwner === "home" && feedEl.children.length > 0 && !hasNewVideos) {
-    return; // just show what's already rendered
-  }
   // Guard against a stale/abandoned earlier load (e.g. one still stuck behind a
   // slow network call) finishing late and overwriting a newer, successful one.
   const myHomeGen = ++_homeLoadGeneration;
@@ -3083,6 +3079,7 @@ homeTab.addEventListener("click", async () => {
   }
   _homeLastLoaded = Date.now();
   _homeCacheValid = (_feedOwner === "home" && feedEl.children.length > 0);
+  } finally { isLoadingHome = false; }
 });
 
 trendingTab.addEventListener("click", async () => {
