@@ -1452,7 +1452,7 @@ async function fetchPersonalizedFeed() {
     return { item:c.item, score, channelId:chId };
   });
   scored.sort((a,b)=>b.score-a.score);
-  const feed = []; const cli = {};
+  let feed = []; const cli = {};
   scored.forEach(c => {
     const li = cli[c.channelId];
     if (li!==undefined && feed.length-li<3) feed.splice(Math.min(feed.length+2,scored.length),0,c.item);
@@ -1525,24 +1525,21 @@ async function fetchPersonalizedFeed() {
     }, 8000);
     const feedData = await feedRes.json();
     if (feedData.items && feedData.items.length) {
-      feed = feedData.items;
-    } else {
-      throw new Error("empty worker response");
+      return feedData.items;
     }
+    throw new Error("empty worker response");
   } catch(e) {
     // Worker scoring unreachable or failed — cheap local fallback (channel
     // affinity only) so Home still has a reasonable order rather than nothing.
-    feed.sort((a, b) => {
+    const sorted = [...feed].sort((a, b) => {
       const wA = channelWeights[a.snippet?.channelId]; const wB = channelWeights[b.snippet?.channelId];
       const chA = typeof wA === "object" ? (wA.weight || 0) : (wA || 0);
       const chB = typeof wB === "object" ? (wB.weight || 0) : (wB || 0);
       return chB - chA;
     });
     const seenIds = new Set();
-    feed = feed.filter(item => { const id = item.id?.videoId || item.id; if (!id || seenIds.has(id)) return false; seenIds.add(id); return true; });
+    return sorted.filter(item => { const id = item.id?.videoId || item.id; if (!id || seenIds.has(id)) return false; seenIds.add(id); return true; });
   }
-
-  return feed;
 }
 
 
@@ -2851,11 +2848,18 @@ function appendFeed(items) {
     }
   }
   const frag = document.createDocumentFragment();
+  const _batchIds = new Set();
   items.forEach((item) => {
     const snippet = item.snippet || {};
     const stats = item.statistics || {};
     const videoId = item.id?.videoId || item.id;
     if (!videoId) return;
+    // Guaranteed final duplicate guard — skip if this video is already
+    // rendered anywhere in this container, or already added earlier in this
+    // same batch, regardless of which upstream step (candidate gathering,
+    // Worker scoring, pagination) let it through twice.
+    if (_batchIds.has(videoId) || target.querySelector('[data-videoid="' + videoId + '"]')) return;
+    _batchIds.add(videoId);
     const card = document.createElement("div");
     card.className = "video-card parallax focusable";
     card.dataset.videoid = videoId;
@@ -2979,6 +2983,7 @@ homeTab.addEventListener("click", async () => {
   const myHomeGen = ++_homeLoadGeneration;
   const mySignal = startNewFeedLoad();
   nextPageToken = null;
+  try { localStorage.removeItem("_homeMoreRotate"); } catch(e) {}
   if (feedEl.children.length === 0) showSkeletons(6);
 
   // Grab hub new videos BEFORE feed loads
@@ -3848,8 +3853,16 @@ async function loadMoreVideos() {
     // Mix fresh (order:date) + popular for infinite scroll batches
     // Requesting extra raw results since shorts filtering removes a chunk —
     // targets ~6 real videos landing per batch after filter
-    const cat = freshCategory();
-    const topKW = getTopKeywords(3);
+    // Rotate keyword selection and category each batch — previously this
+    // always used the same top keywords/category every single scroll,
+    // meaning "load more" kept re-querying nearly the same candidate pool
+    // as the initial load, with almost nothing genuinely new behind it.
+    const homeMoreRotate = parseInt(localStorage.getItem("_homeMoreRotate")||"0");
+    localStorage.setItem("_homeMoreRotate", String(homeMoreRotate+1));
+    const allKW = getTopKeywords(9);
+    const topKW = allKW.length > 3 ? allKW.slice((homeMoreRotate*3) % allKW.length, (homeMoreRotate*3) % allKW.length + 3) : allKW;
+    const rotateCats = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
+    const cat = homeMoreRotate % 3 === 0 ? freshCategory() : rotateCats[homeMoreRotate % rotateCats.length];
     const seen2 = new Set(); const batch = [];
     const [r1, r2] = await Promise.allSettled([
       topKW.length >= 2
@@ -5451,7 +5464,10 @@ async function getCollabRecommendations() {
       headers: workerHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ keywords: topKW, channels: topCH })
     }, 5000);
-    if (!res.ok) return [];
+    if (!res.ok) {
+      try { console.error("[collab] Worker error:", await res.json()); } catch(e2) {}
+      return [];
+    }
     const data = await res.json();
     return data.videos || [];
   } catch(e) { return []; }
