@@ -1910,19 +1910,30 @@ function createYTPlayer(videoId, startSeconds) {
     events: {
       onReady: (e) => {
         isPlayerReady = true;
-        // Auto-detect best available quality for this specific video
-        try {
-          const available = e.target.getAvailableQualityLevels() || [];
-          const preferred = ["hd1440", "hd1080", "hd720", "large", "medium"];
-          const best = preferred.find(q => available.includes(q));
-          if (best) {
-            currentQuality = best;
-            qualityIndex = QUALITY_CYCLE.indexOf(best);
-            if (resBtn) resBtn.textContent = QUALITY_LABELS[best] || best;
-            try { e.target.setPlaybackQuality(best); } catch(err) {}
-            try { e.target.setPlaybackQualityRange(best, best); } catch(err) {}
-          }
-        } catch(err) {}
+        // Only auto-detect the "best" quality if the user hasn't already made
+        // an explicit choice via the quality button — otherwise this silently
+        // overwrites their preference every time the player has to be rebuilt
+        // from scratch (first video each session, or after crash-recovery),
+        // even though the other two places the player gets created/reused
+        // both correctly preserve an explicit choice instead of overriding it.
+        if (currentQuality === "auto") {
+          try {
+            const available = e.target.getAvailableQualityLevels() || [];
+            const preferred = ["hd1440", "hd1080", "hd720", "large", "medium"];
+            const best = preferred.find(q => available.includes(q));
+            if (best) {
+              currentQuality = best;
+              qualityIndex = QUALITY_CYCLE.indexOf(best);
+              if (resBtn) resBtn.textContent = QUALITY_LABELS[best] || best;
+              try { e.target.setPlaybackQuality(best); } catch(err) {}
+              try { e.target.setPlaybackQualityRange(best, best); } catch(err) {}
+            }
+          } catch(err) {}
+        } else {
+          // Re-apply the user's existing choice to this newly-created player
+          try { e.target.setPlaybackQuality(currentQuality); } catch(err) {}
+          try { e.target.setPlaybackQualityRange(currentQuality, currentQuality); } catch(err) {}
+        }
         playPauseBtn.textContent = "⏸";
       },
       onStateChange: (e) => {
