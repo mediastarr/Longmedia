@@ -3964,7 +3964,29 @@ async function loadMoreVideos() {
         const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet);
       }; channelPageEl.appendChild(card);
     });
-  } else { appendFeed(filterAndTrackFeedItems(data.items || [])); }
+    // Channel is one of the two tabs with a genuine "end" (real pagination
+    // token, unlike Home/Trending/Movies' intentional endless rotation) —
+    // previously, once exhausted, scrolling silently stopped with no way to
+    // tell "done" apart from "still loading."
+    if (!nextPageToken && !(data.items||[]).length && !channelPageEl.querySelector(".end-of-results")) {
+      const endMsg = document.createElement("div");
+      endMsg.className = "end-of-results";
+      endMsg.style.cssText = "padding:20px;text-align:center;font-size:12px;opacity:0.5;grid-column:1/-1;";
+      endMsg.textContent = "— end of results —";
+      channelPageEl.appendChild(endMsg);
+    }
+  } else {
+    const newItems = filterAndTrackFeedItems(data.items || []);
+    appendFeed(newItems);
+    // Search is the other tab with a genuine "end" — same reasoning as above.
+    if (!nextPageToken && currentTab === "search" && !newItems.length && !searchFeedEl.querySelector(".end-of-results")) {
+      const endMsg = document.createElement("div");
+      endMsg.className = "end-of-results";
+      endMsg.style.cssText = "padding:20px;text-align:center;font-size:12px;opacity:0.5;grid-column:1/-1;";
+      endMsg.textContent = "— end of results —";
+      searchFeedEl.appendChild(endMsg);
+    }
+  }
 }
 
 async function loadMoreSubs() {
