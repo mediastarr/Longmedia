@@ -1,6 +1,6 @@
 {
-  "name": "Mediastarr",
-  "short_name": "Mediastarr",
+  "name": "ViewTube AR OS",
+  "short_name": "ViewTube",
   "description": "YouTube client optimized for Meta Ray-Ban Display glasses",
   "start_url": "https://mediastarr.github.io/Longmedia/ViewTube.html",
   "display": "standalone",
