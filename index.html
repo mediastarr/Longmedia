@@ -3769,6 +3769,20 @@ async function pollForToken(deviceCode, intervalSeconds, source) {
     }
     authorized = true;
     saveTokens(tokenData);
+    // Fetch and store the channel ID right away — this is what the Channel
+    // tab needs to know it's "your own" channel. Previously this only ever
+    // ran once during app startup based on whatever login state already
+    // existed at that moment, so a login completed mid-session (like this
+    // one) never triggered it, leaving the Channel tab stuck thinking no one
+    // was logged in even though the login itself had genuinely succeeded.
+    if (!localStorage.getItem("yt_channel_id")) {
+      try {
+        const chRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/channels?part=id&mine=true", { headers: { Authorization: "Bearer " + tokenData.access_token } }, 6000);
+        const chData = await chRes.json();
+        const channelId = chData.items?.[0]?.id || "";
+        if (channelId) localStorage.setItem("yt_channel_id", channelId);
+      } catch(e) {}
+    }
     statusEl.textContent = "Logged in ✓";
     showHUD("YouTube logged in ✓");
     if (source === "playlists") loadPlaylists();
