@@ -215,7 +215,7 @@ body.fullscreen-active #playerControls {
   color: #f5f7ff; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
   opacity: 0; pointer-events: none; z-index: 60;
 }
-#feed, .feed-grid { margin-top: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; position: relative; z-index: 10; }
+#feed, .feed-grid, #channelPage, #subsFeed { margin-top: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; position: relative; z-index: 10; }
 
 .video-card {
   display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 16px;
@@ -284,8 +284,8 @@ body.fullscreen-active #playerControls {
 #playlistPage { margin-top: 16px; display: none; position: relative; z-index: 10; }
 .playlist-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
   margin-top: 12px;
 }
 .playlist-card {
@@ -1631,10 +1631,10 @@ function showUIWithMiniPlayer() {
   playlistPageEl.style.display = "none";
   shortsPageEl.style.display = "none";
   document.getElementById("videoInfoPanel").style.display = "none";
-  if (currentTab === "channel") channelPageEl.style.display = "block";
+  if (currentTab === "channel") channelPageEl.style.display = "grid";
   else if (currentTab === "subs") subsPageEl.style.display = "block";
   else if (currentTab === "playlists") playlistPageEl.style.display = "block";
-  else feedContainerFor(currentTab).style.display = "block";
+  else feedContainerFor(currentTab).style.display = "grid";
   requestAnimationFrame(() => window.scrollTo({ top: savedScrollY, behavior: "instant" }));
 }
 
@@ -2998,12 +2998,12 @@ function setActiveTab(tab) {
   // container — show only the one for the active tab, hide the rest. This is
   // what makes it physically impossible for one tab's content to appear under
   // a different tab's selected state.
-  feedEl.style.display = (tab === "home") ? "block" : "none";
-  moviesFeedEl.style.display = (tab === "movies") ? "block" : "none";
-  trendingFeedEl.style.display = (tab === "trending") ? "block" : "none";
-  historyFeedEl.style.display = (tab === "history") ? "block" : "none";
-  searchFeedEl.style.display = (tab === "search") ? "block" : "none";
-  channelPageEl.style.display = (tab === "channel") ? "block" : "none";
+  feedEl.style.display = (tab === "home") ? "grid" : "none";
+  moviesFeedEl.style.display = (tab === "movies") ? "grid" : "none";
+  trendingFeedEl.style.display = (tab === "trending") ? "grid" : "none";
+  historyFeedEl.style.display = (tab === "history") ? "grid" : "none";
+  searchFeedEl.style.display = (tab === "search") ? "grid" : "none";
+  channelPageEl.style.display = (tab === "channel") ? "grid" : "none";
   subsPageEl.style.display = (tab === "subs") ? "block" : "none";
   playlistPageEl.style.display = (tab === "playlists") ? "block" : "none";
   shortsPageEl.style.display = (tab === "shorts") ? "block" : "none";
