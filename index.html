@@ -4335,6 +4335,7 @@ function triggerSearch(q) {
     try {
     currentTab = "search";
     closeKeyboard();
+    searchFeedEl.style.display = "grid";
     showSkeletons(6);
     // Retry across multiple API keys — each fetchYouTube call already rotates
     // through 3 keys internally, so 4 attempts = up to 12 keys tried
