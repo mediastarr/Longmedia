@@ -215,10 +215,10 @@ body.fullscreen-active #playerControls {
   color: #f5f7ff; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
   opacity: 0; pointer-events: none; z-index: 60;
 }
-#feed, .feed-grid { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; position: relative; z-index: 10; }
+#feed, .feed-grid { margin-top: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; position: relative; z-index: 10; }
 
 .video-card {
-  display: flex; gap: 10px; padding: 14px; border-radius: 18px;
+  display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 16px;
   background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.08), rgba(8,10,16,0.96));
   cursor: pointer; position: relative; transform-style: preserve-3d; perspective: 1100px;
   transition: transform 0.15s ease-out;
@@ -227,17 +227,17 @@ body.fullscreen-active #playerControls {
   -webkit-tap-highlight-color: rgba(60,242,255,0.2);
 }
 .skeleton {
-  display: flex; gap: 10px; padding: 14px; border-radius: 18px;
+  display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 16px;
   background: radial-gradient(circle at 0% 0%, rgba(60,242,255,0.04), rgba(8,10,16,0.96));
   min-height: 118px;
 }
 .skeleton-thumb {
-  flex: 0 0 140px; height: 90px; border-radius: 14px;
+  width: 100%; aspect-ratio: 16/9; height: auto; border-radius: 12px;
   background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(60,242,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
 }
-.skeleton-info { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+.skeleton-info { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 6px; }
 .skeleton-line {
   height: 12px; border-radius: 6px;
   background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(60,242,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
@@ -275,12 +275,12 @@ body.fullscreen-active #playerControls {
   opacity: var(--ao-opacity, 0.35); filter: blur(var(--ao-blur, 22px));
   transition: opacity 0.2s ease-out, filter 0.2s ease-out;
 }
-.video-thumb { flex: 0 0 140px; height: 90px; border-radius: 14px; overflow: hidden; background: #11131c; }
+.video-thumb { width: 100%; aspect-ratio: 16/9; height: auto; border-radius: 12px; overflow: hidden; background: #11131c; }
 .video-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.video-info { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
-.video-title { font-size: 14px; font-weight: 500; line-height: 1.35; }
-.video-channel { font-size: 12px; opacity: 0.8; }
-.video-meta { font-size: 12px; opacity: 0.7; }
+.video-info { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; gap: 3px; min-width: 0; }
+.video-title { font-size: 12.5px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.video-channel { font-size: 10.5px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.video-meta { font-size: 10.5px; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #playlistPage { margin-top: 16px; display: none; position: relative; z-index: 10; }
 .playlist-grid {
   display: grid;
