@@ -4210,7 +4210,7 @@ function showSuggestions(list) {
 }
 
 function openKeyboard() { searchPanelEl.style.display = "block"; keyboardEl.style.display = "block"; document.querySelector(".search-input-bar").style.display = "flex"; feedContainerFor(currentTab).style.display = "none"; }
-function closeKeyboard() { keyboardEl.style.display = "none"; searchPanelEl.style.display = "none"; suggestionsEl.style.display = "none"; feedContainerFor(currentTab).style.display = "block"; }
+function closeKeyboard() { keyboardEl.style.display = "none"; searchPanelEl.style.display = "none"; suggestionsEl.style.display = "none"; feedContainerFor(currentTab).style.display = "grid"; }
 
 let _suggestGeneration = 0;
 async function updateSuggestionsForInput() {
