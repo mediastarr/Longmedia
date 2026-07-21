@@ -58,7 +58,8 @@
 *:focus { outline: 2px solid rgba(0,212,255,0.6); outline-offset: -2px; }
 *:focus:not(:focus-visible) { outline: none; }
 *:focus-visible { outline: 2px solid rgba(0,212,255,0.6); outline-offset: -2px; }
-html { background: #000; overflow-x: hidden; max-width: 100vw; }
+html { background: #000; overflow-x: hidden; max-width: 100vw; scrollbar-width: none; -ms-overflow-style: none; }
+html::-webkit-scrollbar { display: none; width: 0; height: 0; }
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
   background-color: #000;
@@ -67,7 +68,12 @@ body {
   overflow-x: hidden;
   max-width: 100vw;
   min-height: 100vh;
+  scrollbar-width: none; -ms-overflow-style: none;
 }
+body::-webkit-scrollbar { display: none; width: 0; height: 0; }
+/* Any other scrollable container in the app (overlays, picker lists, etc.) */
+* { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { display: none; width: 0; height: 0; }
 body.light {
   background: radial-gradient(circle at 0% 0%, #fdfdff 0%, #e4e7ff 40%, #cfd3ff 100%);
   color: #05060a;
