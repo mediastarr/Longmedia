@@ -2089,7 +2089,34 @@ async function loadVideoInfoPanel(videoId, snippet) {
   const publishedAt = snippet.publishedAt || "";
 
   document.getElementById("vipTitle").textContent = title;
-  document.getElementById("vipChannelName").textContent = channel;
+  const vipChannelNameEl = document.getElementById("vipChannelName");
+  vipChannelNameEl.textContent = channel;
+  // Tapping the creator's name opens their channel so you can see their other
+  // videos before deciding to subscribe — minimizes the current video into
+  // the mini-player first (same sequence as the Mini button) rather than
+  // stopping it, so playback isn't lost while browsing the channel.
+  vipChannelNameEl.style.cursor = "pointer";
+  vipChannelNameEl.onclick = () => {
+    if (!channelId) return;
+    if (playerSection.style.display !== "none" && !miniActive) {
+      if (ytPlayer && currentVideoId) {
+        try { const t = ytPlayer.getCurrentTime(); const dur = ytPlayer.getDuration(); if (t > 5 && dur > 0 && t < dur - 10) saveResumePosition(currentVideoId, t); else if (t >= dur - 10) clearResumePosition(currentVideoId); } catch(e) {}
+      }
+      playerSection.classList.remove("player-fullscreen");
+      playerSection.classList.add("player-mini");
+      miniActive = true;
+      uiHidden = false;
+      playerSection.classList.remove("ui-hidden");
+      document.body.classList.remove("ui-hidden");
+      hideUIBtn.textContent = "Hide UI";
+      showUIWithMiniPlayer();
+    }
+    subsReturnScrollY = window.scrollY;
+    currentChannelId = channelId;
+    setActiveTab("channel");
+    loadChannelPage(channelId);
+    showHUD("Opening channel…");
+  };
   document.getElementById("vipStats").textContent = timeAgo(publishedAt);
   document.getElementById("vipSubs").textContent = "";
 
