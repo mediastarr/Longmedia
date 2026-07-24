@@ -1450,7 +1450,31 @@ async function fetchPersonalizedFeed() {
   const lf = [], lw = [];
   const durationParam = preferredDuration !== "any" ? { videoDuration: preferredDuration } : {};
   sS.slice(0,1).forEach(q => { lf.push(fetchYouTube("search",{part:"snippet",q,type:"video",maxResults:6,...durationParam,_:Date.now()})); lw.push(5); });
-  sC.slice(0,2).forEach(ch => { lf.push(fetchYouTube("search",{part:"snippet",channelId:ch.id,type:"video",order:"date",maxResults:4,...durationParam,_:Date.now()})); lw.push(4); });
+  // Previously 2 search.list calls per channel (order:date) — replaced with
+  // channels.list + playlistItems.list on the uploads playlist instead.
+  // Functionally identical result (a channel's most recent uploads), but
+  // neither endpoint counts against the separate, much tighter "Search
+  // Queries per day" quota (100/day) — only the general daily pool, which
+  // has far more headroom. This alone was consuming 2 of Home's ~5 search
+  // calls per load, making it the single biggest driver of hitting that cap.
+  if (sC.length) {
+    lf.push((async () => {
+      try {
+        const ids = sC.slice(0,2).map(ch => ch.id).join(",");
+        const chRes = await fetchYouTube("channels", { part: "contentDetails", id: ids, _: Date.now() });
+        const uploadPlaylists = (chRes.items || []).map(c => c.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
+        const results = await Promise.allSettled(uploadPlaylists.map(plId =>
+          fetchYouTube("playlistItems", { part: "snippet", playlistId: plId, maxResults: 4, _: Date.now() })
+        ));
+        const items = [];
+        results.forEach(r => { if (r.status === "fulfilled") (r.value.items || []).forEach(it => {
+          items.push({ id: it.snippet?.resourceId?.videoId, snippet: it.snippet });
+        }); });
+        return { items };
+      } catch(e) { return { items: [] }; }
+    })());
+    lw.push(4);
+  }
   sB.slice(0,1).forEach(phrase => { lf.push(fetchYouTube("search",{part:"snippet",q:phrase,type:"video",maxResults:6,...durationParam,_:Date.now()})); lw.push(4); });
   if (sK.length>=2) { lf.push(fetchYouTube("search",{part:"snippet",q:sK.slice(0,3).join(" "),type:"video",maxResults:6,...durationParam,_:Date.now()})); lw.push(3); }
   const allCats = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
