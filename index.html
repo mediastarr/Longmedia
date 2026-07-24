@@ -795,7 +795,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
       <div id="deviceUserCode" style="font-size:12px; margin-top:6px; opacity:0.8;"></div>
       <div id="deviceLoginStatus" style="font-size:12px; margin-top:4px; opacity:0.8;"></div>
       <div style="font-size:11px; margin-top:10px; opacity:0.55;">
-        By signing in, you agree to Mediastarr's
+        By signing in, you agree to ViewTube's
         <a href="https://mediastarr.com/privacy" target="_blank" rel="noopener" style="color:#3cf2ff; text-decoration:underline;">Privacy Policy</a>
         and
         <a href="https://mediastarr.com/terms" target="_blank" rel="noopener" style="color:#3cf2ff; text-decoration:underline;">Terms of Use</a>.
@@ -815,7 +815,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
       <div id="playlistLoginCode" style="font-size:12px; margin-top:6px; opacity:0.8;"></div>
       <div id="playlistLoginStatus" style="font-size:12px; margin-top:4px; opacity:0.8;"></div>
       <div style="font-size:11px; margin-top:10px; opacity:0.55;">
-        By signing in, you agree to ViewTube's
+        By signing in, you agree to Mediastarr's
         <a href="https://mediastarr.com/privacy" target="_blank" rel="noopener" style="color:#3cf2ff; text-decoration:underline;">Privacy Policy</a>
         and
         <a href="https://mediastarr.com/terms" target="_blank" rel="noopener" style="color:#3cf2ff; text-decoration:underline;">Terms of Use</a>.
@@ -4394,13 +4394,12 @@ function triggerSearch(q) {
     closeKeyboard();
     searchFeedEl.style.display = "grid";
     showSkeletons(6);
-    // Retry across multiple API keys — each fetchYouTube call already rotates
-    // through 3 keys internally, so 4 attempts = up to 12 keys tried
-    let data = { items: [] };
-    for (let attempt = 0; attempt < 4; attempt++) {
-      data = await fetchYouTube("search", { part: "snippet", q, type: "video", maxResults: 20, _: Date.now() });
-      if (data.items && data.items.length) break;
-    }
+    // Single attempt — retrying doesn't help now that there's one key/project.
+    // A failed search is either genuinely quota-exhausted (retrying just
+    // repeats the identical failure) or a real transient error (better
+    // handled by the user tapping to try again than silently burning more
+    // attempts against the same daily search cap).
+    let data = await fetchYouTube("search", { part: "snippet", q, type: "video", maxResults: 20, _: Date.now() });
     if (myGen !== _homeLoadGeneration) return; // user has since switched tabs/searches — discard
     nextPageToken = data.nextPageToken || null;
     if (data.items && data.items.length) {
