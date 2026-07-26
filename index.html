@@ -843,7 +843,7 @@ async function fetchYouTubeDirect(endpoint, params = {}, retries = 2, options = 
     const res = await fetchWithTimeout(HUB_WORKER_URL + "/yt", {
       method: "POST",
       headers: workerHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ endpoint, params, noCache: true, filterShorts: options.filterShorts, trim: options.trim })
+      body: JSON.stringify({ endpoint, params, noCache: true, filterShorts: options.filterShorts, trim: options.trim, isExplicitSearch: options.isExplicitSearch })
     }, 8000, options.signal);
     if (res.ok) { const data = await res.json(); if (!data.error) return data; }
   } catch(e) { if (e.name === "AbortError") throw e; }
@@ -878,7 +878,7 @@ async function fetchYouTube(endpoint, params = {}, retries = 2, options = {}) {
     const res = await fetchWithTimeout(HUB_WORKER_URL + "/yt", {
       method: "POST",
       headers: workerHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ endpoint, params, filterShorts: options.filterShorts, trim: options.trim })
+      body: JSON.stringify({ endpoint, params, filterShorts: options.filterShorts, trim: options.trim, isExplicitSearch: options.isExplicitSearch })
     }, 8000, options.signal);
     if (res.ok) {
       const data = await res.json();
@@ -4399,7 +4399,7 @@ function triggerSearch(q) {
     // repeats the identical failure) or a real transient error (better
     // handled by the user tapping to try again than silently burning more
     // attempts against the same daily search cap).
-    let data = await fetchYouTube("search", { part: "snippet", q, type: "video", maxResults: 20, _: Date.now() });
+    let data = await fetchYouTube("search", { part: "snippet", q, type: "video", maxResults: 20, _: Date.now() }, 2, { isExplicitSearch: true });
     if (myGen !== _homeLoadGeneration) return; // user has since switched tabs/searches — discard
     nextPageToken = data.nextPageToken || null;
     if (data.items && data.items.length) {
