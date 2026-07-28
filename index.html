@@ -3564,24 +3564,26 @@ moviesTab.addEventListener("click", async () => {
     // Non-search fallback — doesn't depend on search succeeding at all, so
     // Movies still shows something even if every search-based candidate
     // above is blocked (daily search budget exhausted, quota exhausted,
-    // etc.). No videoCategoryId in the request itself — that caused a 400
-    // error when tried, and mostPopular now mixes Music/Movies/Gaming
-    // together by default. Instead, pull a larger pool (50, the API max)
-    // and filter to genuinely Movies-category items using each video's own
-    // returned categoryId field — a reliable response field, unlike the
-    // request-level parameter that failed. Larger pool = more variety when
-    // this fallback is doing most of the work, and a taller page that's
-    // more likely to actually reach the scroll-triggered load-more point.
+    // etc.). Filters by actual video LENGTH rather than category — duration
+    // is a far more reliable signal for "is this a movie" than category
+    // metadata, which proved unreliable (mostPopular mixes Music/Movies/
+    // Gaming, and category matching often caught nothing). Parses the ISO
+    // 8601 duration string the same way Shorts detection already does
+    // elsewhere in this file, keeping only videos 40+ minutes long.
     fetchYouTube("videos",{part:"snippet,contentDetails",chart:"mostPopular",regionCode:userRegion,maxResults:50,_:Date.now()})
       .then(r => {
         const all = r.items || [];
-        const moviesOnly = all.filter(v => v.snippet?.categoryId === "30");
-        // If the strict filter happens to catch nothing this pull, fall back
-        // to the broader unfiltered set rather than contributing zero items —
-        // showing something (even if occasionally not movie-specific) beats
-        // risking an empty tab when this fallback is the only thing left
-        // working (e.g. search budget exhausted).
-        return { items: moviesOnly.length ? moviesOnly : all };
+        const parseDurationSeconds = (iso) => {
+          const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso || "");
+          if (!m) return 0;
+          return (parseInt(m[1]||0)*3600) + (parseInt(m[2]||0)*60) + parseInt(m[3]||0);
+        };
+        const longformOnly = all.filter(v => parseDurationSeconds(v.contentDetails?.duration) >= 2400); // 40+ minutes
+        // If nothing this pull clears the length bar, contribute nothing
+        // rather than falling back to unfiltered content — search is now
+        // the primary, healthy source, so this fallback contributing zero
+        // items on an off pull is safer than contributing short clips.
+        return { items: longformOnly };
       })
   ];
   // 4. If logged in — pull from Watch Later and liked videos for movie taste signals
@@ -3599,8 +3601,33 @@ moviesTab.addEventListener("click", async () => {
   const results=await Promise.allSettled(fetches);
   results.forEach(r=>{ if(r.status==="fulfilled") addU(r.value.items||[]); });
   let items=allItems.filter(v=>v.id?.videoId||v.id).map(v=>({id:v.id?.videoId||v.id,snippet:v.snippet}));
+  // Keyword filter — drop titles that are clearly trailers, reviews,
+  // reactions, etc. rather than the actual full movie.
+  const MOVIE_EXCLUDE_KEYWORDS = ["trailer","teaser","review","reaction","spoiler"];
+  items = items.filter(v => {
+    const title = (v.snippet?.title || "").toLowerCase();
+    return !MOVIE_EXCLUDE_KEYWORDS.some(kw => title.includes(kw));
+  });
   if (!items.length) { moviesFeedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies again to retry.</div>'; isLoadingMovies=false; return; }
   if (myGen !== _homeLoadGeneration) return; // user has since switched tabs — discard
+  // Region restriction check — drop anything not actually playable in the
+  // user's detected region, rather than showing it and having playback fail
+  // with a broken thumbnail. One batched call (1 unit, up to 50 IDs), not
+  // per-video, to keep the cost minimal.
+  try {
+    const idBatch = items.slice(0,50).map(v=>v.id).join(",");
+    const rrRes = await fetchYouTube("videos",{part:"contentDetails",id:idBatch,_:Date.now()});
+    const restricted = new Set();
+    (rrRes.items||[]).forEach(v => {
+      const rr = v.contentDetails?.regionRestriction;
+      if (!rr) return;
+      const blocked = rr.blocked?.includes(userRegion);
+      const notAllowed = rr.allowed && !rr.allowed.includes(userRegion);
+      if (blocked || notAllowed) restricted.add(v.id);
+    });
+    if (restricted.size) items = items.filter(v => !restricted.has(v.id));
+  } catch(e) { /* if this check fails, don't block the whole tab over it */ }
+  if (!items.length) { moviesFeedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies again to retry.</div>'; isLoadingMovies=false; return; }
   // Rank by channel affinity, keyword/category match, and cross-user
   // completion rate instead of just randomly shuffling candidates.
   try {
