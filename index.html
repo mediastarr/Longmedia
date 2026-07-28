@@ -1485,7 +1485,7 @@ async function fetchPersonalizedFeed() {
   const tokenBlockPromise = !token ? Promise.resolve() : Promise.all([
       (async () => {
         try {
-          const subsRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance&fields=items%28snippet%28resourceId%2Ctitle%2CchannelTitle%2Cthumbnails%29%29", { headers: { Authorization: "Bearer " + token } });
+          const subsRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance%29", { headers: { Authorization: "Bearer " + token } });
           const subsData = await subsRes.json();
           const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
           if (channelIds.length > 0) {
@@ -2249,7 +2249,7 @@ async function loadVideoInfoPanel(videoId, snippet) {
       // Subscribe
       subBtn.textContent = "Subscribing…"; subBtn.disabled = true;
       try {
-        const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&fields=id", {
+        const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet", {
           method: "POST",
           headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
           body: JSON.stringify({ snippet: { resourceId: { kind: "youtube#channel", channelId } } })
@@ -3382,7 +3382,7 @@ shortsTab.addEventListener("click", async () => {
   // 8 channels instead of 15 — saves 7 API calls
   if (token) {
     try {
-      const subsRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance&fields=items%28snippet%28resourceId%2Ctitle%2CchannelTitle%2Cthumbnails%29%29", { headers: { Authorization: "Bearer " + token } });
+      const subsRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&order=relevance%29", { headers: { Authorization: "Bearer " + token } });
       const subsData = await subsRes.json();
       let channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
       for (let i = channelIds.length-1; i>0; i--) { const j = Math.floor(Math.random()*(i+1)); [channelIds[i],channelIds[j]]=[channelIds[j],channelIds[i]]; }
@@ -3919,7 +3919,7 @@ async function loadSubscriptions() {
   if (!token) { deviceLoginStatusEl.textContent = "Login required."; return; }
   subsFeedEl.innerHTML = ""; subsNextPageToken = null; showHUD("Loading subscriptions…");
   try {
-    const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&fields=items%28snippet%28resourceId%2Ctitle%2CchannelTitle%2Cthumbnails%29%29", { headers: { Authorization: "Bearer " + token } });
+    const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50%29", { headers: { Authorization: "Bearer " + token } });
     const data = await res.json();
     if (data.error) {
       subsFeedEl.innerHTML = '<div style="font-size:12px;color:#ff6b6b;">API Error ' + data.error.code + ': ' + data.error.message + '</div>';
@@ -4107,7 +4107,7 @@ async function loadMoreVideos() {
 async function loadMoreSubs() {
   if (!subsNextPageToken) return;
   const token = await getValidToken(); if (!token) return;
-  const res = await fetch(`https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20&fields=items%28snippet%28resourceId%2Ctitle%2CchannelTitle%2Cthumbnails%29%29&pageToken=${subsNextPageToken}`, { headers: { Authorization: "Bearer " + token } });
+  const res = await fetch(`https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=20%29&pageToken=${subsNextPageToken}`, { headers: { Authorization: "Bearer " + token } });
   const data = await res.json(); subsNextPageToken = data.nextPageToken || null;
   (data.items || []).forEach(item => {
     const ch = item.snippet; const channelId = ch.resourceId.channelId;
@@ -4840,7 +4840,7 @@ document.getElementById("syncClearBtn").onclick = async function() {
     let pageToken = "";
     let page = 0;
     while (true) {
-      const pageUrl = "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&fields=items%28snippet%28resourceId%2Ctitle%2CchannelTitle%2Cthumbnails%29%29" + (pageToken ? "&pageToken=" + pageToken : "");
+      const pageUrl = "https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50%29" + (pageToken ? "&pageToken=" + pageToken : "");
       const res = await fetch(pageUrl, { headers: { Authorization: "Bearer " + token } });
       const data = await res.json();
       if (data.error) break;
@@ -4988,8 +4988,8 @@ syncStartBtn.onclick=async function(){
   try{let pt="",pages=0,max=isFirst?25:10;while(pages<max){const url="https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=20"+(pt?"&pageToken="+pt:"");const r=await fetchWithTimeout(url,{headers:{Authorization:"Bearer "+token}},8000);const d=await r.json();if(d.error||!d.items)break;d.items.forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,3);const vid=s.resourceId?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);total++;});pt=d.nextPageToken||"";pages++;if(!pt)break;sp(5+Math.round((pages/max)*15),"Liked: "+total+" so far…");}sp(20,"Liked videos: "+total+" signals");}catch(e){}
   sp(22,"Reading Watch Later…");try{const r=await fetchWithTimeout("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=50",{headers:{Authorization:"Bearer "+token}},8000);const d=await r.json();(d.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,2);total++;});sp(30,"Watch Later: "+total+" signals");}catch(e){}
   sp(32,"Reading playlists…");try{const pr=await fetchWithTimeout("https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}},8000);const pd=await pr.json();const plLimit=isFirst?(pd.items||[]).length:8,iPerPl=isFirst?20:10;for(const pl of(pd.items||[]).slice(0,plLimit)){try{const ir=await fetchYouTube("playlistItems",{part:"snippet",playlistId:pl.id,maxResults:iPerPl,_:Date.now()});(ir.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,2);total++;});}catch(e){}}sp(50,"Playlists: "+total+" signals");}catch(e){}
-  sp(52,"Reading subscriptions…");try{const sr=await fetchWithTimeout("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&fields=items%28snippet%28resourceId%2Ctitle%2CchannelTitle%2Cthumbnails%29%29",{headers:{Authorization:"Bearer "+token}},8000);const sd=await sr.json();const cids=(sd.items||[]).map(s=>{extract(null,s.snippet.resourceId.channelId,s.snippet.title,1);return s.snippet.resourceId.channelId;});if(cids.length){const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,50).join(",")});const ups=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);const sc=isFirst?20:5;for(const plId of ups.sort(()=>Math.random()-0.5).slice(0,sc)){try{const ur=await fetchYouTube("playlistItems",{part:"snippet",playlistId:plId,maxResults:8,_:Date.now()});(ur.items||[]).forEach(it=>{extract(it.snippet?.title,null,null,1);total++;});}catch(e){}}}sp(75,"Subscriptions: "+total+" signals");}catch(e){}
-  sp(77,"Reading activity…");try{const ar=await fetchWithTimeout("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50&fields=items%28snippet%28title%2CchannelId%2CchannelTitle%29%2CcontentDetails%28upload%29%29",{headers:{Authorization:"Bearer "+token}},8000);const ad=await ar.json();(ad.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.channelId,s.channelTitle,2);const vid=it.contentDetails?.upload?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);total++;});sp(90,"Activity: "+total+" signals");}catch(e){}
+  sp(52,"Reading subscriptions…");try{const sr=await fetchWithTimeout("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50%29",{headers:{Authorization:"Bearer "+token}},8000);const sd=await sr.json();const cids=(sd.items||[]).map(s=>{extract(null,s.snippet.resourceId.channelId,s.snippet.title,1);return s.snippet.resourceId.channelId;});if(cids.length){const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,50).join(",")});const ups=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);const sc=isFirst?20:5;for(const plId of ups.sort(()=>Math.random()-0.5).slice(0,sc)){try{const ur=await fetchYouTube("playlistItems",{part:"snippet",playlistId:plId,maxResults:8,_:Date.now()});(ur.items||[]).forEach(it=>{extract(it.snippet?.title,null,null,1);total++;});}catch(e){}}}sp(75,"Subscriptions: "+total+" signals");}catch(e){}
+  sp(77,"Reading activity…");try{const ar=await fetchWithTimeout("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50%2CcontentDetails%28upload%29%29",{headers:{Authorization:"Bearer "+token}},8000);const ad=await ar.json();(ad.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.channelId,s.channelTitle,2);const vid=it.contentDetails?.upload?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);total++;});sp(90,"Activity: "+total+" signals");}catch(e){}
   profile.recentVideoIds=profile.recentVideoIds.slice(0,50);profile.syncedAt=Date.now();
   localStorage.setItem("tasteProfile",JSON.stringify(profile));
   // Clear feed dedup so synced content loads fresh on Home
@@ -5028,8 +5028,8 @@ async function silentSync(token){
   const isFirst=!profile.syncedAt,maxPages=isFirst?10:5;
   try{let pt="";for(let p=0;p<maxPages;p++){const url="https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=20"+(pt?"&pageToken="+pt:"");const r=await fetchWithTimeout(url,{headers:{Authorization:"Bearer "+token}},8000);const d=await r.json();if(d.error||!d.items)break;d.items.forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,3);const vid=s.resourceId?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);});pt=d.nextPageToken||"";if(!pt)break;}}catch(e){}
   try{const r=await fetchWithTimeout("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=50",{headers:{Authorization:"Bearer "+token}},8000);const d=await r.json();(d.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,2);});}catch(e){}
-  try{const sr=await fetchWithTimeout("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50&fields=items%28snippet%28resourceId%2Ctitle%2CchannelTitle%2Cthumbnails%29%29",{headers:{Authorization:"Bearer "+token}},8000);const sd=await sr.json();const cids=(sd.items||[]).map(s=>{extract(null,s.snippet.resourceId.channelId,s.snippet.title,1);return s.snippet.resourceId.channelId;});if(cids.length){const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,50).join(",")});const ups=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);for(const plId of ups.sort(()=>Math.random()-0.5).slice(0,isFirst?15:5)){try{const ur=await fetchYouTube("playlistItems",{part:"snippet",playlistId:plId,maxResults:8,_:Date.now()});(ur.items||[]).forEach(it=>{extract(it.snippet?.title,null,null,1);});}catch(e){}}}}catch(e){}
-  try{const ar=await fetchWithTimeout("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50&fields=items%28snippet%28title%2CchannelId%2CchannelTitle%29%2CcontentDetails%28upload%29%29",{headers:{Authorization:"Bearer "+token}},8000);const ad=await ar.json();(ad.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.channelId,s.channelTitle,2);const vid=it.contentDetails?.upload?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);});}catch(e){}
+  try{const sr=await fetchWithTimeout("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50%29",{headers:{Authorization:"Bearer "+token}},8000);const sd=await sr.json();const cids=(sd.items||[]).map(s=>{extract(null,s.snippet.resourceId.channelId,s.snippet.title,1);return s.snippet.resourceId.channelId;});if(cids.length){const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,50).join(",")});const ups=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);for(const plId of ups.sort(()=>Math.random()-0.5).slice(0,isFirst?15:5)){try{const ur=await fetchYouTube("playlistItems",{part:"snippet",playlistId:plId,maxResults:8,_:Date.now()});(ur.items||[]).forEach(it=>{extract(it.snippet?.title,null,null,1);});}catch(e){}}}}catch(e){}
+  try{const ar=await fetchWithTimeout("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50%2CcontentDetails%28upload%29%29",{headers:{Authorization:"Bearer "+token}},8000);const ad=await ar.json();(ad.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.channelId,s.channelTitle,2);const vid=it.contentDetails?.upload?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);});}catch(e){}
   profile.recentVideoIds=profile.recentVideoIds.slice(0,50);profile.syncedAt=Date.now();
   localStorage.setItem("tasteProfile",JSON.stringify(profile));
   // Sync profile to Worker for collaborative filtering
