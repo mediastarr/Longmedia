@@ -3561,8 +3561,6 @@ moviesTab.addEventListener("click", async () => {
     fetchYouTube("search",{part:"snippet",q:usedQ,type:"video",videoDuration:"long",videoEmbeddable:"true",regionCode:userRegion,maxResults:8,order:"viewCount",_:Date.now()}),
     // Non-search fallback — doesn't depend on search succeeding at all, so
     // Movies still shows something even if every search-based candidate
-    // Non-search fallback — doesn't depend on search succeeding at all, so
-    // Movies still shows something even if every search-based candidate
     // above is blocked (daily search budget exhausted, quota exhausted,
     // etc.). Filters by actual video LENGTH rather than category — duration
     // is a far more reliable signal for "is this a movie" than category
