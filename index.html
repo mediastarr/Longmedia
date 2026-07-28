@@ -3573,7 +3573,16 @@ moviesTab.addEventListener("click", async () => {
     // this fallback is doing most of the work, and a taller page that's
     // more likely to actually reach the scroll-triggered load-more point.
     fetchYouTube("videos",{part:"snippet,contentDetails",chart:"mostPopular",regionCode:userRegion,maxResults:50,_:Date.now()})
-      .then(r => ({ items: (r.items||[]).filter(v => v.snippet?.categoryId === "30") }))
+      .then(r => {
+        const all = r.items || [];
+        const moviesOnly = all.filter(v => v.snippet?.categoryId === "30");
+        // If the strict filter happens to catch nothing this pull, fall back
+        // to the broader unfiltered set rather than contributing zero items —
+        // showing something (even if occasionally not movie-specific) beats
+        // risking an empty tab when this fallback is the only thing left
+        // working (e.g. search budget exhausted).
+        return { items: moviesOnly.length ? moviesOnly : all };
+      })
   ];
   // 4. If logged in — pull from Watch Later and liked videos for movie taste signals
   const movToken = await getValidToken();
