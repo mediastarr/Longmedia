@@ -3146,8 +3146,10 @@ homeTab.addEventListener("click", async () => {
     if (popular2.status === "fulfilled") addL(popular2.value.items);
     if (myHomeGen !== _homeLoadGeneration) return; // a newer Home load has since started — discard this stale one
     if (allLogged.length) {
-      renderFeed(await enrichWithDurations(allLogged)); showHUD("For You ✦");
+      const enrichedFeed = await enrichWithDurations(allLogged);
+      renderFeed(enrichedFeed); showHUD("For You ✦");
       nextPageToken = (popular2.status === "fulfilled" && popular2.value.nextPageToken) || null;
+      try { localStorage.setItem("cachedHomeFeed", JSON.stringify(enrichedFeed.slice(0,20))); } catch(e) {}
     } else {
       const fallback2 = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 20, _: Date.now() });
       if (myHomeGen !== _homeLoadGeneration) return;
@@ -6003,6 +6005,20 @@ function applyShortPlayerPatch(card, item) {
     const splash = document.getElementById("bootSplash");
     if (splash) { splash.classList.add("fade-out"); setTimeout(() => splash.remove(), 800); }
   };
+  // Instant paint from last session's saved feed, before any network call.
+  // Doesn't replace the existing fetch/upgrade flow below — just gives the
+  // very first paint real content instead of empty skeletons, using
+  // whatever was actually shown last time Home successfully loaded.
+  try {
+    const cachedHomeFeed = localStorage.getItem("cachedHomeFeed");
+    if (cachedHomeFeed && feedEl.children.length === 0) {
+      const cachedItems = JSON.parse(cachedHomeFeed);
+      if (Array.isArray(cachedItems) && cachedItems.length) {
+        renderFeed(cachedItems);
+        showHUD("Showing last session — refreshing…");
+      }
+    }
+  } catch(e) {}
   showSkeletons(6);
   // Start token refresh AND feed fetch in parallel — don't wait for auth before loading
   const hasRefresh = localStorage.getItem("yt_refresh_token");
