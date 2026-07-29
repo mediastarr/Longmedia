@@ -1894,7 +1894,7 @@ window.onYouTubeIframeAPIReady = function () {
           }
         },
         onError: (e) => {
-          if (e.data === 101 || e.data === 150) showAgeRestrictedOverlay(currentVideoId);
+          if (e.data === 101 || e.data === 150) showEmbedBlockedOverlay(currentVideoId);
           else if (e.data === 100) showHUD('Video not available');
           else showHUD('Playback error (code ' + e.data + ') — try another video');
           recoverPlayerAfterError();
@@ -2012,7 +2012,7 @@ function createYTPlayer(videoId, startSeconds) {
         if (e.data === YT.PlayerState.ENDED && currentVideoId) { clearResumePosition(currentVideoId); playNextSuggested(); }
         },
         onError: (e) => {
-          if (e.data === 101 || e.data === 150) showAgeRestrictedOverlay(currentVideoId);
+          if (e.data === 101 || e.data === 150) showEmbedBlockedOverlay(currentVideoId);
           else if (e.data === 100) showHUD('Video not available');
           else showHUD('Playback error (code ' + e.data + ') — try another video');
           recoverPlayerAfterError();
@@ -2609,7 +2609,7 @@ resBtn.addEventListener("click", () => {
         if (e.data === YT.PlayerState.ENDED && currentVideoId) { clearResumePosition(currentVideoId); playNextSuggested(); }
         },
         onError: (e) => {
-          if (e.data === 101 || e.data === 150) showAgeRestrictedOverlay(currentVideoId);
+          if (e.data === 101 || e.data === 150) showEmbedBlockedOverlay(currentVideoId);
           else if (e.data === 100) showHUD('Video not available');
           else showHUD('Playback error (code ' + e.data + ') — try another video');
           recoverPlayerAfterError();
@@ -3610,24 +3610,9 @@ moviesTab.addEventListener("click", async () => {
   });
   if (!items.length) { moviesFeedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies again to retry.</div>'; isLoadingMovies=false; return; }
   if (myGen !== _homeLoadGeneration) return; // user has since switched tabs — discard
-  // Region restriction check — drop anything not actually playable in the
-  // user's detected region, rather than showing it and having playback fail
-  // with a broken thumbnail. One batched call (1 unit, up to 50 IDs), not
-  // per-video, to keep the cost minimal.
-  try {
-    const idBatch = items.slice(0,50).map(v=>v.id).join(",");
-    const rrRes = await fetchYouTube("videos",{part:"contentDetails",id:idBatch,_:Date.now()});
-    const restricted = new Set();
-    (rrRes.items||[]).forEach(v => {
-      const rr = v.contentDetails?.regionRestriction;
-      if (!rr) return;
-      const blocked = rr.blocked?.includes(userRegion);
-      const notAllowed = rr.allowed && !rr.allowed.includes(userRegion);
-      if (blocked || notAllowed) restricted.add(v.id);
-    });
-    if (restricted.size) items = items.filter(v => !restricted.has(v.id));
-  } catch(e) { /* if this check fails, don't block the whole tab over it */ }
-  if (!items.length) { moviesFeedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies again to retry.</div>'; isLoadingMovies=false; return; }
+  // Region restriction + embeddable check now happens server-side in
+  // /movierank itself (centralized there so any ranking endpoint can reuse
+  // it, rather than duplicating this per-tab on the client).
   // Rank by channel affinity, keyword/category match, and cross-user
   // completion rate instead of just randomly shuffling candidates.
   try {
@@ -3637,6 +3622,7 @@ moviesTab.addEventListener("click", async () => {
       headers: workerHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         candidates: items,
+        userRegion,
         profile: {
           channels: profile.channels || {},
           keywords: profile.keywords || {},
@@ -5426,7 +5412,7 @@ function _startPolling() {
 
 
 /* ── Age-restricted / not embeddable video overlay ── */
-function showAgeRestrictedOverlay(videoId) {
+function showEmbedBlockedOverlay(videoId) {
   const container = document.getElementById("playerSection");
   if (!container) return;
   // Remove existing overlay if any
