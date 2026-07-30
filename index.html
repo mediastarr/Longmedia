@@ -3092,17 +3092,40 @@ let isLoadingHome = false;
 homeTab.addEventListener("click", async () => {
   if (isLoadingHome) return; isLoadingHome = true;
   try {
+  // If new videos are pending, load them the QUICK way — via the existing
+  // lightweight hub-injection mechanism (one batch call for already-known
+  // video IDs), not the full candidate-gathering + scoring pipeline. This
+  // is the actual fast path for "5 new videos" taps.
+  if (_pollBadgeCount > 0) {
+    setActiveTab("home");
+    let hubVideos = [];
+    try {
+      const hubRaw = localStorage.getItem("hubNewVideos");
+      if (hubRaw) { hubVideos = JSON.parse(hubRaw) || []; localStorage.removeItem("hubNewVideos"); }
+    } catch(e) {}
+    _pollClearBadge();
+    if (hubVideos.length) await _injectHubVideos(hubVideos);
+    isLoadingHome = false;
+    return;
+  }
   // If Home was successfully loaded recently and nothing has invalidated it
   // since (switching to another tab that shares feedEl), skip the full
-  // reload entirely — just show what's already there. This is the actual
-  // fix for Home feeling slow on every tap: previously _homeCacheValid was
-  // tracked correctly but never checked, so every single tap ran the full,
-  // expensive candidate-gathering + scoring pipeline regardless of how
-  // recently it had just run.
-  const HOME_CACHE_FRESH_MS = 2 * 60 * 1000; // 2 minutes
+  // reload — but still reshuffle the already-fetched cards for variety,
+  // rather than leaving the exact same static arrangement on every tap.
+  const HOME_CACHE_FRESH_MS = 15 * 1000; // 15 seconds
   if (_homeCacheValid && (Date.now() - _homeLastLoaded) < HOME_CACHE_FRESH_MS) {
     setActiveTab("home");
-    _pollClearBadge();
+    try {
+      const cards = Array.from(feedEl.children);
+      for (let i = cards.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cards[i], cards[j]] = [cards[j], cards[i]];
+      }
+      const frag = document.createDocumentFragment();
+      cards.forEach(c => frag.appendChild(c));
+      feedEl.appendChild(frag);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch(e) {}
     isLoadingHome = false;
     return;
   }
