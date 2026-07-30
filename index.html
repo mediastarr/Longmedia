@@ -3561,7 +3561,28 @@ function playShort(index) {
       const vt=shortsNextPageToken&&shortsNextPageToken!=="seed"?shortsNextPageToken:undefined;
       const more=await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",maxResults:20,pageToken:vt,_:Date.now()}); // 20 more per scroll batch
       shortsNextPageToken=more.nextPageToken||"seed";
-      const fresh=(more.items||[]).filter(v=>v.id&&v.id.videoId&&!shortsSeenIds.has(v.id.videoId));
+      let fresh=(more.items||[]).filter(v=>v.id&&v.id.videoId&&!shortsSeenIds.has(v.id.videoId));
+      // Non-search fallback — search can fail (rate limit, shared daily
+      // quota exhausted) and previously there was nothing else to fall back
+      // on, so "load more" would silently do nothing. mostPopular isn't
+      // subject to the search-specific quota; filter client-side by actual
+      // duration (same approach already proven for Movies' fallback) to
+      // keep only genuinely short-form videos.
+      if (!fresh.length) {
+        try {
+          const fb = await fetchYouTube("videos",{part:"snippet,contentDetails",chart:"mostPopular",regionCode:userRegion,maxResults:50,_:Date.now()});
+          const parseDurationSeconds = (iso) => {
+            const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso || "");
+            if (!m) return 0;
+            return (parseInt(m[1]||0)*3600) + (parseInt(m[2]||0)*60) + parseInt(m[3]||0);
+          };
+          fresh = (fb.items||[]).filter(v => {
+            const secs = parseDurationSeconds(v.contentDetails?.duration);
+            return v.id && secs > 0 && secs <= 180 && !shortsSeenIds.has(v.id);
+          }).map(v => ({ id: { videoId: v.id }, snippet: v.snippet }));
+        } catch(e) {}
+      }
+      if (!fresh.length) { showHUD("No more Shorts right now — try again shortly"); return; }
       fresh.forEach(v=>shortsSeenIds.add(v.id.videoId));
       shortsItems=shortsItems.concat(fresh.map(v=>({id:v.id.videoId,snippet:v.snippet})));
       updateCounter();
