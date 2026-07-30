@@ -6093,6 +6093,32 @@ function applyShortPlayerPatch(card, item) {
   };
   _startupFetch();
 
+  // Lightweight, automatic subscription renewal — YouTube's push
+  // notification subscriptions (PubSubHubbub) expire after a few days and
+  // need periodic renewal, or channels silently stop delivering new-video
+  // alerts with no error anywhere. Previously this only happened via the
+  // "Clear & Rebuild" button, which nobody remembers to tap regularly, and
+  // which also destructively wipes the taste profile/history — this does
+  // NOT touch any of that, it only re-registers the same known channel
+  // list so push notifications keep working.
+  (async () => {
+    try {
+      const RENEW_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
+      const lastRenewed = parseInt(localStorage.getItem("_lastSubRenewal") || "0");
+      if (Date.now() - lastRenewed < RENEW_INTERVAL_MS) return;
+      const savedIds = JSON.parse(localStorage.getItem("subscribedChannelIds") || "[]");
+      if (!savedIds.length) return;
+      const token = await getValidToken();
+      if (!token) return;
+      await fetch(HUB_WORKER_URL + "/subscribe", {
+        method: "POST",
+        headers: workerHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ channelIds: savedIds, replaceAll: true })
+      });
+      localStorage.setItem("_lastSubRenewal", String(Date.now()));
+    } catch(e) {}
+  })();
+
   // Wait for auth to complete (was running in parallel)
   const ok = await authPromise;
   if (ok) {
