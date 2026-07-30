@@ -4129,7 +4129,20 @@ async function loadMoreVideos() {
     }
   } else {
     const newItems = filterAndTrackFeedItems(data.items || []);
+    const targetEl = feedContainerFor(currentTab);
+    const cardsBefore = targetEl.querySelectorAll(".video-card").length;
     appendFeed(newItems);
+    const cardsAfter = targetEl.querySelectorAll(".video-card").length;
+    // A batch can come back non-empty from filterAndTrackFeedItems (its
+    // backfill step doesn't check what's already rendered) but still add
+    // zero actually-new cards, since appendFeed's own final guard correctly
+    // skips anything already in the DOM. That's a real, common outcome when
+    // search fails (e.g. rate-limited) and the only surviving source is a
+    // warm cache returning content already shown. Rather than a silent,
+    // confusing no-op, tell the user plainly what's happening.
+    if (cardsAfter === cardsBefore && ["home","trending"].includes(currentTab)) {
+      showHUD("No new videos right now — try again shortly");
+    }
     // Search is the other tab with a genuine "end" — same reasoning as above.
     if (!nextPageToken && currentTab === "search" && !newItems.length && !searchFeedEl.querySelector(".end-of-results")) {
       const endMsg = document.createElement("div");
