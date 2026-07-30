@@ -4230,6 +4230,19 @@ scrollTopBtn.addEventListener("click", () => {
     }
     if (dirLock === "h") e.preventDefault();
   }, { passive: false });
+
+  // Ensure Up/Down always scrolls the page when focus is on a video card,
+  // regardless of grid position — a consistent fallback for the last-row
+  // case (2 cards side by side, nothing below) where swipe-to-arrow-key
+  // translation may be ambiguous about vertical intent. Doesn't touch
+  // Left/Right, which still moves focus between cards in the same row.
+  document.addEventListener("keydown", function(e) {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    const card = document.activeElement?.closest?.(".video-card");
+    if (!card) return;
+    e.preventDefault();
+    window.scrollBy({ top: e.key === "ArrowDown" ? 220 : -220, behavior: "smooth" });
+  });
 })();
 
 let scrollCooldown = false;
