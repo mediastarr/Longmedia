@@ -3149,6 +3149,7 @@ homeTab.addEventListener("click", async () => {
       const enrichedFeed = await enrichWithDurations(allLogged);
       renderFeed(enrichedFeed); showHUD("For You ✦");
       nextPageToken = (popular2.status === "fulfilled" && popular2.value.nextPageToken) || null;
+      try { localStorage.setItem("cachedHomeFeed", JSON.stringify(enrichedFeed.slice(0,20))); } catch(e) {}
     } else {
       const fallback2 = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 20, _: Date.now() });
       if (myHomeGen !== _homeLoadGeneration) return;
@@ -5990,7 +5991,26 @@ function applyShortPlayerPatch(card, item) {
     const splash = document.getElementById("bootSplash");
     if (splash) { splash.classList.add("fade-out"); setTimeout(() => splash.remove(), 800); }
   };
-  showSkeletons(6);
+  // Instant paint from last session's saved feed, before any network call.
+  // Doesn't replace the fetch/upgrade flow below — just gives the very
+  // first paint real content instead of empty skeletons. Tracks whether
+  // this actually succeeded, so the skeleton call right after doesn't
+  // unconditionally wipe it out (the bug in the previous attempt).
+  let paintedFromCache = false;
+  try {
+    const cachedHomeFeed = localStorage.getItem("cachedHomeFeed");
+    if (cachedHomeFeed && feedEl.children.length === 0) {
+      const cachedItems = JSON.parse(cachedHomeFeed);
+      if (Array.isArray(cachedItems) && cachedItems.length) {
+        renderFeed(cachedItems);
+        showHUD("Showing last session — refreshing…");
+        paintedFromCache = true;
+      }
+    }
+  } catch(e) {}
+  // Only show skeletons if the cache-hit painting above did NOT happen —
+  // otherwise this would immediately wipe the real content just rendered.
+  if (!paintedFromCache) showSkeletons(6);
   // Start token refresh AND feed fetch in parallel — don't wait for auth before loading
   const hasRefresh = localStorage.getItem("yt_refresh_token");
   const authPromise = hasRefresh ? refreshAccessToken() : Promise.resolve(false);
@@ -6026,6 +6046,7 @@ function applyShortPlayerPatch(card, item) {
       if (myStartupFetchGen !== _homeLoadGeneration) return; // a newer Home load has since started — discard this stale one
 
       if (!allItems.length) {
+        if (paintedFromCache) { showHUD("Couldn't refresh — showing last session"); return; }
         feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home again to retry.</div>';
         return;
       }
@@ -6039,7 +6060,8 @@ function applyShortPlayerPatch(card, item) {
       _homeCacheValid = (_feedOwner === "home" && feedEl.children.length > 0);
     } catch(e) {
       if (myStartupFetchGen === _homeLoadGeneration) {
-        feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home to retry.</div>';
+        if (paintedFromCache) { showHUD("Couldn't refresh — showing last session"); }
+        else feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home to retry.</div>';
       }
     }
   };
