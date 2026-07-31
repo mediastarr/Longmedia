@@ -5424,24 +5424,41 @@ async function _pollCheckNewContent() {
     console.log("[poll] cycle complete — total new videos found:", allNew.length);
     if (!allNew.length) return;
 
-    // Store merged for home tab
+    // Only genuine subscription uploads get the red "new" badge/highlight —
+    // watched-channel and topic-based discovery content was previously
+    // mixed into the same signal with no way to visually tell them apart,
+    // which is exactly why "20 new" could show 30+ red cards with barely
+    // any actual subscription uploads among them. Discovery content is
+    // still tracked (stored separately below), just no longer diluting the
+    // one signal that's supposed to mean "someone you follow posted."
+    const subOnly = allNew.filter(v => v.source === "subscription");
+
+    // Store merged for home tab — subscription uploads only, for the red
+    // highlight; discovery content stored under its own key instead.
     try {
       const existing = JSON.parse(localStorage.getItem("hubNewVideos") || "[]");
-      const merged = [...allNew, ...existing].filter((v, i, a) => a.findIndex(x => x.videoId === v.videoId) === i).slice(0, 30);
+      const merged = [...subOnly, ...existing].filter((v, i, a) => a.findIndex(x => x.videoId === v.videoId) === i).slice(0, 30);
       localStorage.setItem("hubNewVideos", JSON.stringify(merged));
+      const discoveryOnly = allNew.filter(v => v.source !== "subscription");
+      if (discoveryOnly.length) {
+        const existingDisc = JSON.parse(localStorage.getItem("hubDiscoveryVideos") || "[]");
+        const mergedDisc = [...discoveryOnly, ...existingDisc].filter((v, i, a) => a.findIndex(x => x.videoId === v.videoId) === i).slice(0, 30);
+        localStorage.setItem("hubDiscoveryVideos", JSON.stringify(mergedDisc));
+      }
     } catch(e) {}
 
     // Badge + HUD — never auto-inject while user is scrolling
     // Only inject when user taps Home tab
-    _pollSetBadge(_pollBadgeCount + allNew.length);
-    const subCount = allNew.filter(v => v.source === "subscription").length;
+    _pollSetBadge(_pollBadgeCount + subOnly.length);
+    const subCount = subOnly.length;
     const watchedCount = allNew.filter(v => v.source === "watched").length;
     const topicCount = allNew.filter(v => v.source === "topic").length;
     const parts = [];
     if (subCount) parts.push(subCount + " from subs");
     if (watchedCount) parts.push(watchedCount + " from channels you watch");
     if (topicCount) parts.push(topicCount + " matching your interests");
-    showHUD("🔴 " + _pollBadgeCount + " new — " + parts.join(" · "));
+    if (subCount) showHUD("🔴 " + _pollBadgeCount + " new from subscriptions" + (parts.length > 1 ? " · " + parts.slice(1).join(" · ") + " (not highlighted)" : ""));
+    else if (parts.length) showHUD(parts.join(" · ") + " (no new subscription uploads)");
 
   } catch(e) {
     console.error("[poll] _pollCheckNewContent threw:", e);
