@@ -5287,7 +5287,7 @@ let _pollLastCheck = null; // timestamp of last successful poll
 
 function _pollSetBadge(count) {
   // Cap at 20 — more than that is noise not signal
-  _pollBadgeCount = Math.min(count, 20);
+  _pollBadgeCount = count;
   const btn = document.getElementById("homeTab");
   if (!btn) return;
   const existing = btn.querySelector(".tab-new-badge");
