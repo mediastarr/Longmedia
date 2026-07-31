@@ -5494,10 +5494,12 @@ async function _pollCheckNewContent() {
 
     // Store merged for home tab — subscription uploads only, for the red
     // highlight; discovery content stored under its own key instead.
+    let mergedCount = 0;
     try {
       const existing = JSON.parse(localStorage.getItem("hubNewVideos") || "[]");
       const merged = [...subOnly, ...existing].filter((v, i, a) => a.findIndex(x => x.videoId === v.videoId) === i).slice(0, 30);
       localStorage.setItem("hubNewVideos", JSON.stringify(merged));
+      mergedCount = merged.length;
       const discoveryOnly = allNew.filter(v => v.source !== "subscription");
       if (discoveryOnly.length) {
         const existingDisc = JSON.parse(localStorage.getItem("hubDiscoveryVideos") || "[]");
@@ -5508,7 +5510,12 @@ async function _pollCheckNewContent() {
 
     // Badge + HUD — never auto-inject while user is scrolling
     // Only inject when user taps Home tab
-    _pollSetBadge(_pollBadgeCount + subOnly.length);
+    // Set to the actual, deduplicated count sitting in hubNewVideos, not an
+    // additive running total — the additive approach double-counted a video
+    // that got detected across multiple poll cycles or by more than one
+    // source, which is why the badge (19) had drifted away from what
+    // actually got shown (5).
+    _pollSetBadge(mergedCount);
     const subCount = subOnly.length;
     const watchedCount = allNew.filter(v => v.source === "watched").length;
     const topicCount = allNew.filter(v => v.source === "topic").length;
