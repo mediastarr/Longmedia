@@ -3104,15 +3104,20 @@ homeTab.addEventListener("click", async () => {
       if (hubRaw) { hubVideos = JSON.parse(hubRaw) || []; localStorage.removeItem("hubNewVideos"); }
     } catch(e) {}
     // Defensive fallback — if the badge says new videos exist but the video
-    // data itself isn't there (a possible timing gap between the badge
-    // being set and hubNewVideos finishing its write), actively re-check
-    // rather than silently showing nothing despite the badge.
+    // data itself isn't there yet, this is likely a genuine timing gap
+    // between multiple background processes that can run close together
+    // (the automatic startup sync, and the regular poll firing ~15 seconds
+    // later) — retry a few times with a brief wait rather than giving up
+    // after a single immediate check.
     if (!hubVideos.length) {
-      try {
-        await _pollCheckNewContent();
-        const retryRaw = localStorage.getItem("hubNewVideos");
-        if (retryRaw) { hubVideos = JSON.parse(retryRaw) || []; localStorage.removeItem("hubNewVideos"); }
-      } catch(e) {}
+      for (let attempt = 0; attempt < 3 && !hubVideos.length; attempt++) {
+        try {
+          if (attempt > 0) await new Promise(r => setTimeout(r, 400));
+          await _pollCheckNewContent();
+          const retryRaw = localStorage.getItem("hubNewVideos");
+          if (retryRaw) { hubVideos = JSON.parse(retryRaw) || []; localStorage.removeItem("hubNewVideos"); }
+        } catch(e) {}
+      }
     }
     _pollClearBadge();
     if (hubVideos.length) await _injectHubVideos(hubVideos);
