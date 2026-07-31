@@ -2108,8 +2108,8 @@ async function loadVideoInfoPanel(videoId, snippet) {
 
   // Fill from snippet immediately (fast)
   const title = snippet.title || "";
-  const channel = snippet.channelTitle || "";
-  const channelId = snippet.channelId || "";
+  const channel = snippet.videoOwnerChannelTitle || snippet.channelTitle || "";
+  const channelId = snippet.videoOwnerChannelId || snippet.channelId || "";
   const publishedAt = snippet.publishedAt || "";
 
   document.getElementById("vipTitle").textContent = title;
