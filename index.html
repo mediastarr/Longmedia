@@ -5553,6 +5553,15 @@ async function _injectHubVideos(hubVideos) {
     try {
       const injectedIds = hubVideos.map(v => v.videoId);
       sessionStorage.setItem("injectedHubIds", JSON.stringify(injectedIds));
+      // Permanently mark these as seen — without this, the same backlog of
+      // already-shown videos gets rediscovered as "new" on every poll cycle
+      // and every app restart, since _pollKnownIds (built from hubSeenIds at
+      // startup) never grows to include them. This was the actual cause of
+      // the ever-growing badge count and stale videos resurfacing repeatedly.
+      const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
+      const mergedSeen = [...new Set([...injectedIds, ...seenHub])].slice(0, 1000);
+      localStorage.setItem("hubSeenIds", JSON.stringify(mergedSeen));
+      if (_pollKnownIds) injectedIds.forEach(id => _pollKnownIds.add(id));
     } catch(e) {}
   } catch(e) {}
 }
