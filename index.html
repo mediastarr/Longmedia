@@ -5374,7 +5374,7 @@ async function _pollCheckNewContent() {
     const subCheckDue = Date.now() - lastSubCheck > 5 * 60 * 1000;
     if (subCheckDue) {
       localStorage.setItem("_pollLastSubCheck", String(Date.now()));
-      // Rotate through channels — check 3 at a time to spread quota usage
+      // Rotate through channels — check 6 at a time.
       // Use actual subscription IDs, fall back to taste profile channels
       const savedSubIds = JSON.parse(localStorage.getItem("subscribedChannelIds") || "[]");
       const allSubIds = savedSubIds.length ? savedSubIds : Object.keys(getTasteProfile().channels || {});
@@ -5382,27 +5382,42 @@ async function _pollCheckNewContent() {
       const subChannelIds = allSubIds.slice(rotateIdx, rotateIdx + 6);
       localStorage.setItem("_pollSubRotate", String((rotateIdx + 6) % Math.max(allSubIds.length, 1)));
       if (subChannelIds.length) {
-        const subResults = await Promise.allSettled(
-          subChannelIds.map(cid =>
-            fetchYouTube("search", { part: "snippet", channelId: cid, type: "video", order: "date", maxResults: 3, publishedAfter: new Date(Date.now() - 86400000).toISOString(), relevanceLanguage: "en", regionCode: userRegion, _: Date.now() })
-          )
-        );
-        // Use session set so same video isn't shown twice in same app session
-        // but DOES show again next time app opens
-        if (!window._src2SessionIds) window._src2SessionIds = new Set();
-        const src2Seen = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
-        subResults.forEach(r => {
-          if (r.status === "fulfilled") (r.value.items || []).forEach(item => {
-            const id = item.id?.videoId;
-            if (id && !src2Seen.has(id) && !window._src2SessionIds.has(id)) {
-              window._src2SessionIds.add(id);
-              // Skip live streams — they stay "new" indefinitely and spam the feed
-              if (item.snippet?.liveBroadcastContent === "live") return;
-              if (_pollBlocklist.has(id)) return;
-              allNew.push({ videoId: id, channelId: item.snippet?.channelId || "", title: item.snippet?.title || "", publishedAt: item.snippet?.publishedAt || "", receivedAt: Date.now(), source: "subscription" });
-            }
+        // channels.list + playlistItems.list instead of search.list per
+        // channel — this is the one mechanism that's proven reliable every
+        // time it's been tested (the same approach "Clear & Rebuild" uses),
+        // and neither endpoint touches the search-specific daily quota that
+        // search.list does, which was causing this check to silently fail
+        // whenever that quota was under pressure.
+        try {
+          const chRes = await fetchYouTube("channels", { part: "contentDetails", id: subChannelIds.join(","), _: Date.now() });
+          const uploadPlaylists = (chRes.items || [])
+            .map(c => ({ channelId: c.id, playlistId: c.contentDetails?.relatedPlaylists?.uploads }))
+            .filter(x => x.playlistId);
+          const subResults = await Promise.allSettled(
+            uploadPlaylists.map(({ channelId, playlistId }) =>
+              fetchYouTube("playlistItems", { part: "snippet", playlistId, maxResults: 3, _: Date.now() })
+                .then(r => ({ channelId, items: r.items || [] }))
+                .catch(() => ({ channelId, items: [] }))
+            )
+          );
+          // Use session set so same video isn't shown twice in same app session
+          // but DOES show again next time app opens
+          if (!window._src2SessionIds) window._src2SessionIds = new Set();
+          const src2Seen = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
+          const since24hMs = Date.now() - 86400000;
+          subResults.forEach(r => {
+            if (r.status === "fulfilled") r.value.items.forEach(item => {
+              const id = item.snippet?.resourceId?.videoId;
+              const publishedAt = item.snippet?.publishedAt || "";
+              if (id && !src2Seen.has(id) && !window._src2SessionIds.has(id) && publishedAt && new Date(publishedAt).getTime() >= since24hMs) {
+                window._src2SessionIds.add(id);
+                if (item.snippet?.liveBroadcastContent === "live") return;
+                if (_pollBlocklist.has(id)) return;
+                allNew.push({ videoId: id, channelId: item.snippet?.channelId || r.value.channelId || "", title: item.snippet?.title || "", publishedAt, receivedAt: Date.now(), source: "subscription" });
+              }
+            });
           });
-        });
+        } catch(e) {}
       }
     }
 
