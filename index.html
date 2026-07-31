@@ -4975,27 +4975,34 @@ const syncStartBtn = document.getElementById("syncStartBtn");
 const syncCloseBtn = document.getElementById("syncCloseBtn");
 syncBtn.onclick=function(){syncOverlay.style.display="flex";syncStatus.textContent="";syncProgressFill.style.width="0%";syncProgress.style.display="none";syncStartBtn.textContent="Start Sync";syncStartBtn.disabled=false;};
 
-async function runSubscriptionSync() {
+async function runSubscriptionSync(isManual = false) {
   const token = await getValidToken();
-  if (!token) { syncStatus.textContent = "Login required — go to Subscriptions tab first."; return; }
+  if (!token) { if (isManual) syncStatus.textContent = "Login required — go to Subscriptions tab first."; return; }
 
-  syncStatus.textContent = "Clearing taste profile…";
-  syncProgress.style.display = "block";
-  syncProgressFill.style.width = "10%";
+  if (isManual) {
+    syncStatus.textContent = "Clearing taste profile…";
+    syncProgress.style.display = "block";
+    syncProgressFill.style.width = "10%";
 
-  // Clear existing taste profile completely
-  localStorage.removeItem("tasteProfile");
-  localStorage.removeItem("feedShownTimed");
-  localStorage.removeItem("feedShownIds");
-  localStorage.removeItem("hubSeenIds");
-  localStorage.removeItem("hubNewVideos");
-  localStorage.removeItem("_pollLastTasteCheck");
-  localStorage.removeItem("_pollLastSubCheck");
-  localStorage.removeItem("_pollSubRotate");
-  _pollKnownIds = null;
-  _pollBadgeCount = 0;
-  _pollClearBadge();
-  localStorage.removeItem("trendingShownTimed");
+    // Full destructive clear — only when the user explicitly taps the
+    // button. Automatic runs (startup, every 2 hours) must NOT do this —
+    // this was wiping hubSeenIds on every restart, directly undoing the
+    // fix that marks shown videos as seen, which is why the "new videos"
+    // backlog kept resetting to a huge number after every restart instead
+    // of staying resolved like it correctly did within a session.
+    localStorage.removeItem("tasteProfile");
+    localStorage.removeItem("feedShownTimed");
+    localStorage.removeItem("feedShownIds");
+    localStorage.removeItem("hubSeenIds");
+    localStorage.removeItem("hubNewVideos");
+    localStorage.removeItem("_pollLastTasteCheck");
+    localStorage.removeItem("_pollLastSubCheck");
+    localStorage.removeItem("_pollSubRotate");
+    _pollKnownIds = null;
+    _pollBadgeCount = 0;
+    _pollClearBadge();
+    localStorage.removeItem("trendingShownTimed");
+  }
 
   syncStatus.textContent = "Fetching your actual YouTube subscriptions…";
   syncProgressFill.style.width = "30%";
@@ -5140,7 +5147,7 @@ async function runSubscriptionSync() {
     syncStatus.textContent = "Error: " + (e.message || "check connection");
   }
 }
-document.getElementById("syncClearBtn").onclick = runSubscriptionSync;
+document.getElementById("syncClearBtn").onclick = () => runSubscriptionSync(true);
 // Run automatically on startup (called earlier in init) and every 2 hours
 // after that — matching the same 2-hour cadence already used elsewhere
 // (the silentSync check a few lines up), so subscription content stays
