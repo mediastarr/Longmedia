@@ -5632,10 +5632,10 @@ async function _pollCheckNewContent() {
       localStorage.setItem("_pollLastTasteCheck", String(now));
 
       // ── SOURCE 3: Channels you watch often (taste profile) ──
-      const topCh = getTopChannels(3);
+      const topCh = getTopChannels(5);
       if (topCh.length) {
         const chResults = await Promise.allSettled(topCh.map(ch =>
-          fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 2, publishedAfter: new Date(Date.now() - 21600000).toISOString(), relevanceLanguage: "en", regionCode: userRegion, _: Date.now() })
+          fetchYouTube("search", { part: "snippet", channelId: ch.id, type: "video", order: "date", maxResults: 3, publishedAfter: new Date(Date.now() - 21600000).toISOString(), relevanceLanguage: "en", regionCode: userRegion, _: Date.now() })
         ));
         const seenIds3 = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
         if (!window._src3SessionIds) window._src3SessionIds = new Set();
