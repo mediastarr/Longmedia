@@ -3513,14 +3513,21 @@ shortsTab.addEventListener("click", async () => {
   // Left/right cycles focus through play/pause → mute → like → back;
   // up/down is completely untouched (still handled by the existing
   // goNext()/goPrev() wiring elsewhere) so the two gestures never collide.
-  const shortsFocusOrder = [shortsPlayPauseBtn, shortsMuteBtn, backBtn2, document.getElementById("shortsNotIntBtn"), shortsHeartBtn, document.getElementById("shortsClearBtn")];
+  // IDs, not cached element references — a reference goes stale the moment
+  // anything replaces the underlying DOM node (e.g. openAsShort clones and
+  // replaces the back button to attach its own scroll-restore behavior),
+  // which was silently breaking this cycle right after opening a short
+  // from Home: the stale reference to the old, now-detached back button
+  // meant its highlight never visibly appeared, making the swipe look
+  // like it skipped straight from mute to Not Interested.
+  const shortsFocusIds = ["shortsPlayPauseBtn", "shortsMuteBtn", "shortsBackBtn", "shortsNotIntBtn", "shortsHeartBtn", "shortsClearBtn"];
   let shortsFocusIdx = 0;
   function setShortsFocus(idx) {
-    shortsFocusOrder.forEach(el => el.classList.remove("shorts-focused"));
-    shortsFocusIdx = ((idx % shortsFocusOrder.length) + shortsFocusOrder.length) % shortsFocusOrder.length;
-    shortsFocusOrder[shortsFocusIdx].classList.add("shorts-focused");
+    shortsFocusIds.forEach(id => document.getElementById(id)?.classList.remove("shorts-focused"));
+    shortsFocusIdx = ((idx % shortsFocusIds.length) + shortsFocusIds.length) % shortsFocusIds.length;
+    document.getElementById(shortsFocusIds[shortsFocusIdx])?.classList.add("shorts-focused");
   }
-  function activateShortsFocus() { shortsFocusOrder[shortsFocusIdx].click(); }
+  function activateShortsFocus() { document.getElementById(shortsFocusIds[shortsFocusIdx])?.click(); }
   // Explicitly claim a known starting state rather than leaving it to
   // whatever the browser/glasses might auto-focus on page load (this was
   // why Not Interested could appear already "selected" before the user
