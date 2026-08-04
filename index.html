@@ -507,11 +507,11 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 /* Top-right close/back — icon-only, matches the top-left cluster's look */
 #shortsBackBtn {
   position: absolute; top: 16px; right: 16px; z-index: 15;
-  width: 32px; height: 32px; border-radius: 999px;
+  width: 28px; height: 28px; border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.25);
   background: rgba(10,12,20,0.55); backdrop-filter: blur(6px);
   display: flex; align-items: center; justify-content: center;
-  color: #f5f7ff; font-size: 13px; cursor: pointer; touch-action: manipulation;
+  color: #f5f7ff; font-size: 16px; cursor: pointer; touch-action: manipulation;
   -webkit-tap-highlight-color: rgba(60,242,255,0.25);
   transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
@@ -519,11 +519,11 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 
 /* Shared style for the new top-left icon buttons */
 .shorts-icon-btn {
-  width: 32px; height: 32px; border-radius: 999px;
+  width: 28px; height: 28px; border-radius: 999px;
   background: rgba(10,12,20,0.55); border: 1px solid rgba(255,255,255,0.25);
   backdrop-filter: blur(6px);
   display: flex; align-items: center; justify-content: center;
-  font-size: 13px; color: #f5f7ff; cursor: pointer; touch-action: manipulation;
+  font-size: 16px; color: #f5f7ff; cursor: pointer; touch-action: manipulation;
   -webkit-tap-highlight-color: rgba(60,242,255,0.25);
   transition: box-shadow 0.15s ease, transform 0.15s ease, background 0.15s ease;
 }
@@ -561,15 +561,15 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   -webkit-tap-highlight-color: rgba(60,242,255,0.25);
 }
 .shorts-action-icon {
-  width: 32px; height: 32px; border-radius: 999px;
+  width: 28px; height: 28px; border-radius: 999px;
   background: rgba(10,12,20,0.55); border: 1px solid rgba(255,255,255,0.25);
   backdrop-filter: blur(6px);
   display: flex; align-items: center; justify-content: center;
-  font-size: 14px; transition: transform 0.15s ease, background 0.2s ease;
+  font-size: 13px; transition: transform 0.15s ease, background 0.2s ease;
 }
 .shorts-action-icon:active { transform: scale(0.88); }
 .shorts-action-label { font-size: 9px; color: rgba(255,255,255,0.8); letter-spacing: 0.03em; }
-#shortsHeartBtn .shorts-action-icon { font-size: 15px; }
+#shortsHeartBtn .shorts-action-icon { font-size: 14px; }
 #shortsHeartBtn.hearted .shorts-action-icon {
   background: rgba(255,40,80,0.35);
   border-color: rgba(255,40,80,0.6);
@@ -2974,7 +2974,19 @@ async function preCacheShorts(items) {
 }
 
 // Open a single video in the Shorts player (just like opening from Shorts tab)
-function openAsShort(videoId, snippet) {
+async function openAsShort(videoId, snippet) {
+  // Defensive check — regardless of how this got called, verify real
+  // duration before committing to the Shorts player. Some call sites
+  // already gate through checkIsShort()/isShort() first, in which case
+  // this just confirms the same result again; but this makes the function
+  // itself safe even for call sites that don't pre-verify, rather than
+  // trusting every caller to have done so correctly.
+  const confirmedShort = await checkIsShort(videoId, snippet);
+  if (!confirmedShort) {
+    setPlayerVideo(videoId, snippet);
+    showHUD("Playing: " + (snippet?.title || ""));
+    return;
+  }
   _logSessionAction("short");
   // Mark as seen — remove red highlight from feed card
   try {
