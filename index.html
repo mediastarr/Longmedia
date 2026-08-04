@@ -507,11 +507,11 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 /* Top-right close/back — icon-only, matches the top-left cluster's look */
 #shortsBackBtn {
   position: absolute; top: 16px; right: 16px; z-index: 15;
-  width: 40px; height: 40px; border-radius: 999px;
+  width: 32px; height: 32px; border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.25);
   background: rgba(10,12,20,0.55); backdrop-filter: blur(6px);
   display: flex; align-items: center; justify-content: center;
-  color: #f5f7ff; font-size: 16px; cursor: pointer; touch-action: manipulation;
+  color: #f5f7ff; font-size: 13px; cursor: pointer; touch-action: manipulation;
   -webkit-tap-highlight-color: rgba(60,242,255,0.25);
   transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
@@ -519,11 +519,11 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 
 /* Shared style for the new top-left icon buttons */
 .shorts-icon-btn {
-  width: 40px; height: 40px; border-radius: 999px;
+  width: 32px; height: 32px; border-radius: 999px;
   background: rgba(10,12,20,0.55); border: 1px solid rgba(255,255,255,0.25);
   backdrop-filter: blur(6px);
   display: flex; align-items: center; justify-content: center;
-  font-size: 16px; color: #f5f7ff; cursor: pointer; touch-action: manipulation;
+  font-size: 13px; color: #f5f7ff; cursor: pointer; touch-action: manipulation;
   -webkit-tap-highlight-color: rgba(60,242,255,0.25);
   transition: box-shadow 0.15s ease, transform 0.15s ease, background 0.15s ease;
 }
@@ -561,15 +561,15 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   -webkit-tap-highlight-color: rgba(60,242,255,0.25);
 }
 .shorts-action-icon {
-  width: 40px; height: 40px; border-radius: 999px;
+  width: 32px; height: 32px; border-radius: 999px;
   background: rgba(10,12,20,0.55); border: 1px solid rgba(255,255,255,0.25);
   backdrop-filter: blur(6px);
   display: flex; align-items: center; justify-content: center;
-  font-size: 17px; transition: transform 0.15s ease, background 0.2s ease;
+  font-size: 14px; transition: transform 0.15s ease, background 0.2s ease;
 }
 .shorts-action-icon:active { transform: scale(0.88); }
 .shorts-action-label { font-size: 9px; color: rgba(255,255,255,0.8); letter-spacing: 0.03em; }
-#shortsHeartBtn .shorts-action-icon { font-size: 18px; }
+#shortsHeartBtn .shorts-action-icon { font-size: 15px; }
 #shortsHeartBtn.hearted .shorts-action-icon {
   background: rgba(255,40,80,0.35);
   border-color: rgba(255,40,80,0.6);
@@ -2892,37 +2892,39 @@ async function fetchContentDetails(videoIds) {
 async function checkIsShort(videoId, snippet) {
   if (_shortsCache[videoId] !== undefined) return _shortsCache[videoId];
 
-  // Explicit flag from Shorts tab
+  // Explicit flag from Shorts tab — trusted as-is, since it comes from an
+  // already duration-verified source (search.list with videoDuration:"short"
+  // or the real API duration check below, not a guess).
   if (snippet && snippet._isShort) {
     _shortsCache[videoId] = true;
     return true;
   }
 
-  // Fast heuristic checks before hitting the API:
-
-  // 1. Title or description contains #shorts
+  // Weak positive signals — a #shorts mention or portrait thumbnail suggest
+  // a video MIGHT be short, but neither actually proves it (a long-form
+  // video can easily have a portrait thumbnail, or mention "#shorts"
+  // somewhere in its description while cross-promoting a creator's own
+  // shorts channel). This was the actual bug: these used to return true
+  // immediately without ever checking real duration, letting long videos
+  // slip through. Now they're just noted, and the real check below still
+  // has to confirm before anything is treated as short.
+  let heuristicSuggestsShort = false;
   if (snippet) {
     const title = (snippet.title || "").toLowerCase();
     const desc = (snippet.description || "").toLowerCase();
     if (title.includes("#shorts") || title.includes("#short") || desc.includes("#shorts")) {
-      _shortsCache[videoId] = true;
-      return true;
+      heuristicSuggestsShort = true;
     }
   }
-
-  // 2. Thumbnail is portrait (vertical) aspect ratio — strong shorts signal
-  // YouTube Shorts thumbnails use /hqdefault.jpg which is 16:9 BUT
-  // the maxresdefault for shorts is often 9:16 (720x1280)
-  // We can check via the thumbnail URL pattern for shorts
   if (snippet && snippet.thumbnails) {
     const thumb = snippet.thumbnails?.maxres || snippet.thumbnails?.standard || snippet.thumbnails?.high;
     if (thumb && thumb.width && thumb.height && thumb.height > thumb.width) {
-      _shortsCache[videoId] = true;
-      return true;
+      heuristicSuggestsShort = true;
     }
   }
 
-  // 3. API duration check (most reliable)
+  // Real API duration check — the only thing that actually confirms
+  // "short," regardless of what the heuristics above suggested.
   try {
     const details = await fetchContentDetails([videoId]);
     const cd = details[videoId];
@@ -2932,10 +2934,15 @@ async function checkIsShort(videoId, snippet) {
       _shortsCache[videoId] = result;
       return result;
     }
-    _shortsCache[videoId] = false;
-    return false;
+    // No duration data available — fall back to the heuristic rather than
+    // always defaulting to false, but never skip this fallback's own
+    // caution: an unconfirmed heuristic alone is still weaker than a real
+    // duration match.
+    _shortsCache[videoId] = heuristicSuggestsShort;
+    return heuristicSuggestsShort;
   } catch(e) {
-    // API failed — default to false (open as regular video)
+    // API failed — default to false (open as regular video), same
+    // conservative fallback as before.
     _shortsCache[videoId] = false;
     return false;
   }
@@ -6319,7 +6326,7 @@ async function enrichWithDurations(items) {
 ================================================================ */
 function isShort(item) {
   const title = (item.snippet?.title || "").toLowerCase();
-  if (title.includes("#shorts") || title.includes("#short")) return true;
+  const titleSuggestsShort = title.includes("#shorts") || title.includes("#short");
   const dur = item.contentDetails?.duration || "";
   if (dur) {
     const match = dur.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
@@ -6328,10 +6335,12 @@ function isShort(item) {
       const m = parseInt(match[2] || 0);
       const s = parseInt(match[3] || 0);
       const total = h * 3600 + m * 60 + s;
-      if (total >= 2 && total <= 150) return true; // 2s–2:30 = SHORT
+      return total >= 2 && total <= 150; // 2s–2:30 = SHORT — real duration decides, regardless of title
     }
   }
-  return false;
+  // No duration data at all — fall back to the weaker title signal only
+  // when there's genuinely nothing else to check against.
+  return titleSuggestsShort;
 }
 
 async function ensureDuration(item) {
