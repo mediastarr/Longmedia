@@ -1693,7 +1693,7 @@ function showUIWithMiniPlayer() {
   // layout — runs on every tab switch, so this is correct regardless of
   // which path was used to leave Shorts (explicit close button, or tapping
   // any other tab directly without going through it).
-  if (tab !== "shorts") {
+  if (currentTab !== "shorts") {
     topbarEl.style.display = "flex";
     document.getElementById("tabs").style.display = "";
   }
