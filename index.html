@@ -3875,7 +3875,7 @@ shortsTab.addEventListener("click", async () => {
     shortsLoadedCommentCount = 0;
     setShortsFocus(getShortsFocusIds().indexOf("shortsCommentsCloseBtn"));
     try {
-      const data = await fetchYouTube("commentThreads", { part: "snippet", videoId: item.id, maxResults: 5, order: "relevance", _: Date.now() });
+      const data = await fetchYouTube("commentThreads", { part: "snippet", videoId: item.id, maxResults: 20, order: "relevance", _: Date.now() });
       const items = data.items || [];
       if (!items.length) { shortsCommentsList.innerHTML = '<div style="opacity:0.5;font-size:12px;">No comments yet</div>'; return; }
       shortsCommentsList.innerHTML = items.map((c, i) => {
