@@ -546,11 +546,6 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   box-shadow: 0 0 0 3px rgba(60,242,255,0.9), 0 0 16px rgba(60,242,255,0.6) !important;
   background: rgba(60,242,255,0.3) !important;
 }
-#shortsCommentsList.shorts-focused {
-  box-shadow: inset 0 0 0 2px rgba(60,242,255,0.7);
-  border-radius: 8px;
-}
-
 #shortsHint { position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 4px; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
 #shortsHint.visible { opacity: 1; }
 .shorts-arrow { font-size: 20px; color: rgba(255,255,255,0.6); animation: shortsArrowBounce 1.2s ease-in-out infinite; }
@@ -3600,44 +3595,35 @@ shortsTab.addEventListener("click", async () => {
   // from Home: the stale reference to the old, now-detached back button
   // meant its highlight never visibly appeared, making the swipe look
   // like it skipped straight from mute to Not Interested.
-  // Dynamic cycle — extends with the comments-close button and a special
-  // scrollable "comments list" item whenever comments are open, rather
-  // than being one fixed list. The comments list isn't a clickable button,
-  // just a highlighted, scrollable target: once focused, up/down scrolls
-  // it instead of switching shorts.
+  // Comments panel scroll-lock — same proven pattern already used for the
+  // playlist popup: the outer panel blocks background swipe/scroll
+  // entirely (stopPropagation + preventDefault), while the inner list only
+  // stops propagation, letting it scroll natively on its own. This means
+  // the comments list doesn't need to be a special focus-cycle item at
+  // all — it just scrolls normally via touch, same as the playlist popup.
   const shortsCommentsPanel = document.getElementById("shortsCommentsPanel");
   const shortsCommentsList = document.getElementById("shortsCommentsList");
-  const SHORTS_COMMENTS_SCROLL_ID = "__shortsCommentsScroll";
   function getShortsFocusIds() {
     const base = ["shortsBackBtn", "shortsPlayPauseBtn", "shortsMuteBtn", "shortsHeartBtn", "shortsCommentBtn", "shortsNotIntBtn", "shortsClearBtn", "shortsSubBtn"];
     if (shortsCommentsPanel.classList.contains("open")) {
-      return base.concat(["shortsCommentsCloseBtn", SHORTS_COMMENTS_SCROLL_ID]);
+      return base.concat(["shortsCommentsCloseBtn"]);
     }
     return base;
   }
   let shortsFocusIdx = 0;
   function setShortsFocus(idx) {
     const ids = getShortsFocusIds();
-    ids.forEach(id => { if (id !== SHORTS_COMMENTS_SCROLL_ID) document.getElementById(id)?.classList.remove("shorts-focused"); });
-    shortsCommentsList.classList.remove("shorts-focused");
+    ids.forEach(id => document.getElementById(id)?.classList.remove("shorts-focused"));
     shortsFocusIdx = ((idx % ids.length) + ids.length) % ids.length;
-    const activeId = ids[shortsFocusIdx];
-    if (activeId === SHORTS_COMMENTS_SCROLL_ID) shortsCommentsList.classList.add("shorts-focused");
-    else document.getElementById(activeId)?.classList.add("shorts-focused");
+    document.getElementById(ids[shortsFocusIdx])?.classList.add("shorts-focused");
   }
   function activateShortsFocus() {
-    const activeId = getShortsFocusIds()[shortsFocusIdx];
-    if (activeId === SHORTS_COMMENTS_SCROLL_ID) return; // not a button, nothing to activate
-    document.getElementById(activeId)?.click();
+    document.getElementById(getShortsFocusIds()[shortsFocusIdx])?.click();
   }
-  // Shared vertical-navigation logic — used by both keyboard (skH) and
-  // swipe (swipeZone touchend) so scrolling comments and switching shorts
-  // stay consistent regardless of which input triggered it.
+  // Vertical navigation — back to simple and unconditional. The scroll-lock
+  // above already ensures swipeZone never receives touches while comments
+  // are open, so this no longer needs to check what's focused.
   function handleShortsVertical(direction) { // direction: 1 = down/next, -1 = up/prev
-    if (getShortsFocusIds()[shortsFocusIdx] === SHORTS_COMMENTS_SCROLL_ID) {
-      shortsCommentsList.scrollBy({ top: direction * 120, behavior: "smooth" });
-      return;
-    }
     if (direction > 0) goNext(); else goPrev();
   }
   // Explicitly claim a known starting state rather than leaving it to
@@ -3863,6 +3849,11 @@ shortsTab.addEventListener("click", async () => {
   // commentThreads.list endpoint already used in the medium player.
   function closeShortsComments() { shortsCommentsPanel.classList.remove("open"); }
   document.getElementById("shortsCommentsCloseBtn").addEventListener("click", closeShortsComments);
+  // Same scroll-lock pattern already proven for the playlist popup — outer
+  // panel blocks all background swipe/scroll, inner list only stops
+  // propagation so it scrolls natively on its own.
+  shortsCommentsPanel.addEventListener("touchmove", e => { e.stopPropagation(); e.preventDefault(); }, { passive: false });
+  shortsCommentsList.addEventListener("touchmove", e => { e.stopPropagation(); }, { passive: false });
   const shortsCommentBtn = document.getElementById("shortsCommentBtn");
   shortsCommentBtn.addEventListener("click", async () => {
     const item = shortsItems[shortsIndex];
