@@ -3489,7 +3489,7 @@ async function openShortsTabSetup() {
   if (_currentShortsKeyHandler) document.removeEventListener("keydown", _currentShortsKeyHandler);
   if (_currentShortsFocusKeyHandler) document.removeEventListener("keydown", _currentShortsFocusKeyHandler);
   ++_homeLoadGeneration;
-  nextPageToken = null; setActiveTab("shorts"); showHUD("Shorts");
+  setActiveTab("shorts"); showHUD("Shorts");
   // Full-bleed: hide the topbar and tabs row while in Shorts, restored on
   // exit (in backBtn2's click handler below) — this is what was eating
   // vertical space above the player.
