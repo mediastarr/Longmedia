@@ -630,7 +630,11 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 }
 #shortsCommentsCloseBtn::before { content: ""; position: absolute; inset: -12px; z-index: 1; }
 #shortsCommentsList { padding: 10px 14px 16px; overflow-y: auto; }
-.shorts-comment-item { margin-bottom: 12px; }
+.shorts-comment-item { margin-bottom: 12px; padding: 6px; border-radius: 8px; transition: box-shadow 0.15s ease, background 0.15s ease; }
+.shorts-comment-item.shorts-focused {
+  box-shadow: 0 0 0 2px rgba(60,242,255,0.8), 0 0 12px rgba(60,242,255,0.4);
+  background: rgba(60,242,255,0.08);
+}
 .shorts-comment-author { color: rgba(255,255,255,0.9); font-size: 12px; font-weight: 600; margin-bottom: 2px; }
 .shorts-comment-text { color: rgba(255,255,255,0.75); font-size: 12px; line-height: 1.4; }
 
@@ -3603,10 +3607,12 @@ shortsTab.addEventListener("click", async () => {
   // all — it just scrolls normally via touch, same as the playlist popup.
   const shortsCommentsPanel = document.getElementById("shortsCommentsPanel");
   const shortsCommentsList = document.getElementById("shortsCommentsList");
+  let shortsLoadedCommentCount = 0;
   function getShortsFocusIds() {
     const base = ["shortsBackBtn", "shortsPlayPauseBtn", "shortsMuteBtn", "shortsHeartBtn", "shortsCommentBtn", "shortsNotIntBtn", "shortsClearBtn", "shortsSubBtn"];
     if (shortsCommentsPanel.classList.contains("open")) {
-      return base.concat(["shortsCommentsCloseBtn"]);
+      const commentIds = Array.from({ length: shortsLoadedCommentCount }, (_, i) => `shortsComment${i}`);
+      return base.concat(["shortsCommentsCloseBtn"], commentIds);
     }
     return base;
   }
@@ -3615,7 +3621,13 @@ shortsTab.addEventListener("click", async () => {
     const ids = getShortsFocusIds();
     ids.forEach(id => document.getElementById(id)?.classList.remove("shorts-focused"));
     shortsFocusIdx = ((idx % ids.length) + ids.length) % ids.length;
-    document.getElementById(ids[shortsFocusIdx])?.classList.add("shorts-focused");
+    const activeEl = document.getElementById(ids[shortsFocusIdx]);
+    activeEl?.classList.add("shorts-focused");
+    // Scroll the focused comment into view — the list is scrollable and a
+    // comment further down could otherwise be highlighted off-screen.
+    if (activeEl && activeEl.classList.contains("shorts-comment-item")) {
+      activeEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
   }
   function activateShortsFocus() {
     document.getElementById(getShortsFocusIds()[shortsFocusIdx])?.click();
@@ -3860,19 +3872,21 @@ shortsTab.addEventListener("click", async () => {
     if (!item) return;
     shortsCommentsPanel.classList.add("open");
     shortsCommentsList.innerHTML = '<div style="opacity:0.5;font-size:12px;">Loading comments…</div>';
+    shortsLoadedCommentCount = 0;
     setShortsFocus(getShortsFocusIds().indexOf("shortsCommentsCloseBtn"));
     try {
       const data = await fetchYouTube("commentThreads", { part: "snippet", videoId: item.id, maxResults: 5, order: "relevance", _: Date.now() });
       const items = data.items || [];
       if (!items.length) { shortsCommentsList.innerHTML = '<div style="opacity:0.5;font-size:12px;">No comments yet</div>'; return; }
-      shortsCommentsList.innerHTML = items.map(c => {
+      shortsCommentsList.innerHTML = items.map((c, i) => {
         const s = c.snippet.topLevelComment.snippet;
         const likes = s.likeCount > 0 ? ` · 👍 ${formatViews(s.likeCount)}` : "";
-        return `<div class="shorts-comment-item">
+        return `<div class="shorts-comment-item" id="shortsComment${i}" tabindex="0">
           <div class="shorts-comment-author">${s.authorDisplayName}${likes}</div>
           <div class="shorts-comment-text">${(s.textDisplay||"").replace(/<[^>]+>/g,"").slice(0,200)}</div>
         </div>`;
       }).join('');
+      shortsLoadedCommentCount = items.length;
     } catch(e) {
       shortsCommentsList.innerHTML = '<div style="opacity:0.5;font-size:12px;">Couldn\'t load comments</div>';
     }
