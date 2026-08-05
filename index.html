@@ -624,10 +624,12 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 }
 #shortsCommentsTitle { color: #f5f7ff; font-size: 14px; font-weight: 700; }
 #shortsCommentsCloseBtn {
+  position: relative;
   width: 26px; height: 26px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.25);
   background: rgba(255,255,255,0.08); color: #f5f7ff; font-size: 13px; cursor: pointer;
   touch-action: manipulation; -webkit-tap-highlight-color: rgba(60,242,255,0.25);
 }
+#shortsCommentsCloseBtn::before { content: ""; position: absolute; inset: -12px; z-index: 1; }
 #shortsCommentsList { padding: 10px 14px 16px; overflow-y: auto; }
 .shorts-comment-item { margin-bottom: 12px; }
 .shorts-comment-author { color: rgba(255,255,255,0.9); font-size: 12px; font-weight: 600; margin-bottom: 2px; }
@@ -4045,6 +4047,10 @@ function playShort(index) {
   swipeZone.addEventListener("touchstart",(e)=>{ swY=e.touches[0].clientY; swX=e.touches[0].clientX; swT=Date.now(); },{passive:true});
   swipeZone.addEventListener("touchend",(e)=>{
     if(transitioning)return;
+    // Comments panel is open — stand down completely and let native
+    // scrolling handle the comments list. Without this, swiping to scroll
+    // comments would get misread as swiping between shorts.
+    if (shortsCommentsPanel.classList.contains("open")) return;
     const dy=swY-e.changedTouches[0].clientY;
     const dx=swX-e.changedTouches[0].clientX;
     const dt=Date.now()-swT;
@@ -4069,7 +4075,7 @@ function playShort(index) {
     if(Math.abs(dy)<(v>0.3?20:50))return;
     if(dy>0)goNext(); else goPrev();
   },{passive:true});
-  let wc=false; shortsPageEl.addEventListener("wheel",(e)=>{ if(wc||transitioning)return; wc=true; setTimeout(()=>wc=false,700); if(e.deltaY>0)goNext(); else goPrev(); },{passive:true});
+  let wc=false; shortsPageEl.addEventListener("wheel",(e)=>{ if(wc||transitioning||shortsCommentsPanel.classList.contains("open"))return; wc=true; setTimeout(()=>wc=false,700); if(e.deltaY>0)goNext(); else goPrev(); },{passive:true});
   function skH(e){if(currentTab!=="shorts")return;if(e.key==="ArrowDown")goNext();if(e.key==="ArrowUp")goPrev();}
   document.addEventListener("keydown",skH); shortsPageEl._cleanup=()=>document.removeEventListener("keydown",skH);
 });
