@@ -529,6 +529,17 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 }
 .shorts-icon-btn:active { transform: scale(0.9); }
 
+/* Invisible expanded touch target — at 28px, a tap even slightly off-center
+   could miss the button and hit the swipe zone underneath instead, which
+   would misread the tap as a swipe (pause triggering exit, mute triggering
+   next-video). This extends the actual clickable/touchable area 10px
+   beyond the visual boundary in every direction without changing how the
+   button looks or is sized visually. */
+#shortsBackBtn, .shorts-icon-btn, .shorts-action-btn { position: relative; }
+#shortsBackBtn::before, .shorts-icon-btn::before, .shorts-action-btn::before {
+  content: ""; position: absolute; inset: -10px; z-index: 1;
+}
+
 /* Focus highlight for left/right-cycled controls (play/pause, mute, like, back) —
    shared by both the new top-left icons and the existing back button/action-btn icons */
 .shorts-icon-btn.shorts-focused, #shortsBackBtn.shorts-focused, .shorts-action-btn.shorts-focused .shorts-action-icon {
@@ -3640,7 +3651,7 @@ shortsTab.addEventListener("click", async () => {
     clearMode = !clearMode;
     if (clearMode) {
       shortsPageEl.classList.add("clear-mode");
-      showHUD("Clear mode on — tap ⊘ again to exit");
+      showHUD("Clear mode on — tap video to exit");
     } else {
       shortsPageEl.classList.remove("clear-mode");
       showHUD("Clear mode off");
@@ -3830,7 +3841,16 @@ function playShort(index) {
     const dt=Date.now()-swT;
     if(Math.abs(dx)>Math.abs(dy)*0.7) return;
     const v=Math.abs(dy)/Math.max(dt,1);
-    if(Math.abs(dy)<(v>0.3?20:50))return;
+    if(Math.abs(dy)<(v>0.3?20:50)) {
+      // A stationary tap, not a swipe — this is what "tap anywhere to exit
+      // clear mode" was supposed to catch, but touch-action:none on this
+      // element can suppress the synthetic click event that logic relied
+      // on. Handling it directly here, where touch events are already
+      // confirmed reliable, is more robust than depending on a click that
+      // may never fire.
+      if (clearMode) { clearMode = false; shortsPageEl.classList.remove("clear-mode"); showHUD("Clear mode off"); }
+      return;
+    }
     if(dy>0)goNext(); else goPrev();
   },{passive:true});
   let wc=false; shortsPageEl.addEventListener("wheel",(e)=>{ if(wc||transitioning)return; wc=true; setTimeout(()=>wc=false,700); if(e.deltaY>0)goNext(); else goPrev(); },{passive:true});
