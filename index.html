@@ -542,7 +542,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 
 /* Focus highlight for left/right-cycled controls (play/pause, mute, like, back) —
    shared by both the new top-left icons and the existing back button/action-btn icons */
-.shorts-icon-btn.shorts-focused, #shortsBackBtn.shorts-focused, .shorts-action-btn.shorts-focused .shorts-action-icon {
+.shorts-icon-btn.shorts-focused, #shortsBackBtn.shorts-focused, #shortsSubBtn.shorts-focused, .shorts-action-btn.shorts-focused .shorts-action-icon {
   box-shadow: 0 0 0 3px rgba(60,242,255,0.9), 0 0 16px rgba(60,242,255,0.6) !important;
   background: rgba(60,242,255,0.3) !important;
 }
@@ -587,11 +587,58 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   box-shadow: 0 0 18px rgba(255,40,80,0.5);
 }
 
+/* Bottom-left channel info bar — avatar, name, Subscribe button */
+#shortsChannelBar {
+  position: absolute; left: 12px; bottom: 24px; z-index: 15;
+  display: flex; align-items: center; gap: 8px; max-width: calc(100% - 90px);
+}
+#shortsChannelAvatar {
+  width: 28px; height: 28px; border-radius: 999px; flex-shrink: 0;
+  background: rgba(10,12,20,0.55) center/cover no-repeat;
+  border: 1px solid rgba(255,255,255,0.25);
+}
+#shortsChannelName {
+  color: #f5f7ff; font-size: 12px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+#shortsSubBtn {
+  border-radius: 999px; border: none; padding: 5px 12px; font-size: 11px; font-weight: 600;
+  background: #f5f7ff; color: #000; cursor: pointer; touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(60,242,255,0.25); flex-shrink: 0;
+}
+
+/* Comments panel — bottom sheet, hidden by default */
+#shortsCommentsPanel {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 20;
+  max-height: 65%; display: none; flex-direction: column;
+  background: rgba(15,17,26,0.97); backdrop-filter: blur(10px);
+  border-top-left-radius: 16px; border-top-right-radius: 16px;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  transform: translateY(100%); transition: transform 0.25s ease;
+}
+#shortsCommentsPanel.open { display: flex; transform: translateY(0); }
+#shortsCommentsHeader {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+#shortsCommentsTitle { color: #f5f7ff; font-size: 14px; font-weight: 700; }
+#shortsCommentsCloseBtn {
+  width: 26px; height: 26px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.08); color: #f5f7ff; font-size: 13px; cursor: pointer;
+  touch-action: manipulation; -webkit-tap-highlight-color: rgba(60,242,255,0.25);
+}
+#shortsCommentsList { padding: 10px 14px 16px; overflow-y: auto; }
+.shorts-comment-item { margin-bottom: 12px; }
+.shorts-comment-author { color: rgba(255,255,255,0.9); font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+.shorts-comment-text { color: rgba(255,255,255,0.75); font-size: 12px; line-height: 1.4; }
+
 /* Clear Mode — hides all UI overlays */
 #shortsPage.clear-mode #shortsBackBtn,
 #shortsPage.clear-mode #shortsCounter,
 #shortsPage.clear-mode #shortsHint,
 #shortsPage.clear-mode #shortsTopLeft,
+#shortsPage.clear-mode #shortsChannelBar,
 #shortsPage.clear-mode #shortsActions { opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
 #shortsPage.clear-mode #shortsClearHint {
   opacity: 1; pointer-events: none;
@@ -3443,21 +3490,37 @@ shortsTab.addEventListener("click", async () => {
       <button id="shortsBackBtn" tabindex="0">✕</button>
       <div id="shortsHint" style="z-index:10;"><div class="shorts-arrow up">▼</div><div class="shorts-hint-text">swipe up/down</div><div class="shorts-arrow down">▼</div></div>
       <div id="shortsActions" style="z-index:10;">
-        <div class="shorts-action-btn" id="shortsNotIntBtn" tabindex="0">
-          <div class="shorts-action-icon">🚫</div>
-          <div class="shorts-action-label">Not Interested</div>
-        </div>
         <div class="shorts-action-btn" id="shortsHeartBtn" tabindex="0">
           <div class="shorts-action-icon">♡</div>
           <div class="shorts-action-label" id="shortsHeartLabel">Like</div>
+        </div>
+        <div class="shorts-action-btn" id="shortsCommentBtn" tabindex="0">
+          <div class="shorts-action-icon">💬</div>
+          <div class="shorts-action-label" id="shortsCommentLabel">Comment</div>
+        </div>
+        <div class="shorts-action-btn" id="shortsNotIntBtn" tabindex="0">
+          <div class="shorts-action-icon">🚫</div>
+          <div class="shorts-action-label">Not Interested</div>
         </div>
         <div class="shorts-action-btn" id="shortsClearBtn" tabindex="0">
           <div class="shorts-action-icon">⊘</div>
           <div class="shorts-action-label">Clear</div>
         </div>
       </div>
+      <div id="shortsChannelBar">
+        <div id="shortsChannelAvatar"></div>
+        <div id="shortsChannelName">Loading…</div>
+        <button id="shortsSubBtn">Subscribe</button>
+      </div>
       <div id="shortsClearHint" style="z-index:10;">Tap to exit clear mode</div>
       <div id="shortsTransition"></div>
+      <div id="shortsCommentsPanel">
+        <div id="shortsCommentsHeader">
+          <div id="shortsCommentsTitle">Comments</div>
+          <button id="shortsCommentsCloseBtn" tabindex="0">✕</button>
+        </div>
+        <div id="shortsCommentsList"></div>
+      </div>
     </div>
   `;
   const shortsIframe = document.getElementById("shortsIframe");
@@ -3467,6 +3530,7 @@ shortsTab.addEventListener("click", async () => {
   const backBtn2 = document.getElementById("shortsBackBtn");
   const shortsHeartBtn = document.getElementById("shortsHeartBtn");
   const shortsHeartLabel = document.getElementById("shortsHeartLabel");
+  const shortsCommentLabel = document.getElementById("shortsCommentLabel");
   const shortsClearBtn = document.getElementById("shortsClearBtn");
   const shortsPlayPauseBtn = document.getElementById("shortsPlayPauseBtn");
   const shortsMuteBtn = document.getElementById("shortsMuteBtn");
@@ -3530,7 +3594,7 @@ shortsTab.addEventListener("click", async () => {
   // from Home: the stale reference to the old, now-detached back button
   // meant its highlight never visibly appeared, making the swipe look
   // like it skipped straight from mute to Not Interested.
-  const shortsFocusIds = ["shortsBackBtn", "shortsPlayPauseBtn", "shortsMuteBtn", "shortsNotIntBtn", "shortsHeartBtn", "shortsClearBtn"];
+  const shortsFocusIds = ["shortsBackBtn", "shortsPlayPauseBtn", "shortsMuteBtn", "shortsHeartBtn", "shortsCommentBtn", "shortsNotIntBtn", "shortsClearBtn", "shortsSubBtn"];
   let shortsFocusIdx = 0;
   function setShortsFocus(idx) {
     shortsFocusIds.forEach(id => document.getElementById(id)?.classList.remove("shorts-focused"));
@@ -3562,6 +3626,24 @@ shortsTab.addEventListener("click", async () => {
   shortsPageEl._cleanupFocus = () => document.removeEventListener("keydown", shortsFocusKeyHandler);
 
   // Heart / Like button — tracks liked shorts locally
+  let shortsCurrentLikeCount = null;
+  let shortsCurrentCommentCount = null;
+  async function updateShortsCounts(item) {
+    shortsCurrentLikeCount = null;
+    shortsCurrentCommentCount = null;
+    updateHeart();
+    shortsCommentLabel.textContent = "Comment";
+    try {
+      const res = await fetchYouTube("videos", { part: "statistics", id: item.id, _: Date.now() });
+      const stats = res.items?.[0]?.statistics;
+      if (!stats || shortsItems[shortsIndex]?.id !== item.id) return; // stale response guard
+      if (stats.likeCount !== undefined) shortsCurrentLikeCount = parseInt(stats.likeCount);
+      if (stats.commentCount !== undefined) shortsCurrentCommentCount = parseInt(stats.commentCount);
+      updateHeart();
+      shortsCommentLabel.textContent = shortsCurrentCommentCount !== null ? formatViews(shortsCurrentCommentCount) : "Comment";
+    } catch(e) {}
+  }
+
   let likedShorts = new Set();
   try { likedShorts = new Set(JSON.parse(localStorage.getItem("likedShorts") || "[]")); } catch(e) {}
   function updateHeart() {
@@ -3569,7 +3651,10 @@ shortsTab.addEventListener("click", async () => {
     const liked = id && likedShorts.has(id);
     shortsHeartBtn.classList.toggle("hearted", liked);
     shortsHeartBtn.querySelector(".shorts-action-icon").textContent = liked ? "♥" : "♡";
-    shortsHeartLabel.textContent = liked ? "Liked" : "Like";
+    // Show the real like count once fetched — liked/not-liked state is
+    // already conveyed by the heart icon and glow, so the label is free to
+    // show the actual number instead, matching the reference layout.
+    shortsHeartLabel.textContent = shortsCurrentLikeCount !== null ? formatViews(shortsCurrentLikeCount) : (liked ? "Liked" : "Like");
   }
   shortsHeartBtn.addEventListener("click", async () => {
     const id = shortsItems[shortsIndex]?.id; if (!id) return;
@@ -3647,10 +3732,131 @@ shortsTab.addEventListener("click", async () => {
     });
   }
 
+  // Channel info bar (avatar, name, Subscribe) — checks real subscription
+  // state the same way the medium player does, with the same guard against
+  // a stale response landing after the user has already moved to a
+  // different short.
+  const shortsChannelAvatar = document.getElementById("shortsChannelAvatar");
+  const shortsChannelName = document.getElementById("shortsChannelName");
+  const shortsSubBtn = document.getElementById("shortsSubBtn");
+  let shortsCurrentChannelId = null;
+  let shortsSubscribed = false;
+  let shortsSubscriptionId = null;
+  async function updateShortsChannelInfo(item) {
+    const snippet = item.snippet || {};
+    const channelId = snippet.channelId || "";
+    shortsCurrentChannelId = channelId;
+    shortsChannelName.textContent = snippet.channelTitle || "Unknown channel";
+    shortsChannelAvatar.style.backgroundImage = "";
+    shortsSubBtn.textContent = "Subscribe";
+    shortsSubBtn.style.background = "#f5f7ff";
+    shortsSubBtn.style.color = "#000";
+    shortsSubscribed = false;
+    shortsSubscriptionId = null;
+    if (!channelId) return;
+    // Channel avatar — small, non-blocking lookup
+    fetchYouTube("channels", { part: "snippet", id: channelId, _: Date.now() }).then(res => {
+      if (shortsCurrentChannelId !== channelId) return;
+      const thumb = res.items?.[0]?.snippet?.thumbnails?.default?.url;
+      if (thumb) shortsChannelAvatar.style.backgroundImage = `url(${thumb})`;
+    }).catch(() => {});
+    // Real subscription state — same pattern as the medium player
+    const token = await getValidToken();
+    if (!token || shortsCurrentChannelId !== channelId) return;
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/subscriptions?part=id&mine=true&forChannelId=${channelId}`,
+        { headers: { Authorization: "Bearer " + token } }
+      );
+      const d = await res.json();
+      if (shortsCurrentChannelId !== channelId) return;
+      if (d.items && d.items.length > 0) {
+        shortsSubscribed = true;
+        shortsSubscriptionId = d.items[0].id;
+        shortsSubBtn.textContent = "Subscribed ✓";
+        shortsSubBtn.style.background = "rgba(60,242,255,0.2)";
+        shortsSubBtn.style.color = "#3cf2ff";
+      }
+    } catch(e) {}
+  }
+  shortsSubBtn.addEventListener("click", async () => {
+    const token = await getValidToken();
+    if (!token) { showHUD("Login required to subscribe"); return; }
+    if (!shortsCurrentChannelId) { showHUD("Channel not available"); return; }
+    const channelId = shortsCurrentChannelId;
+    if (!shortsSubscribed) {
+      shortsSubBtn.textContent = "..."; shortsSubBtn.disabled = true;
+      try {
+        const res = await fetch("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+          body: JSON.stringify({ snippet: { resourceId: { kind: "youtube#channel", channelId } } })
+        });
+        const d = await res.json();
+        if (d.id && shortsCurrentChannelId === channelId) {
+          shortsSubscribed = true; shortsSubscriptionId = d.id;
+          shortsSubBtn.textContent = "Subscribed ✓";
+          shortsSubBtn.style.background = "rgba(60,242,255,0.2)";
+          shortsSubBtn.style.color = "#3cf2ff";
+          showHUD("✓ Subscribed!");
+        } else { shortsSubBtn.textContent = "Subscribe"; showHUD("Subscribe failed — try again"); }
+      } catch(e) { shortsSubBtn.textContent = "Subscribe"; showHUD("Subscribe failed"); }
+      shortsSubBtn.disabled = false;
+    } else {
+      if (!shortsSubscriptionId) { showHUD("Cannot unsubscribe — ID not found"); return; }
+      shortsSubBtn.textContent = "..."; shortsSubBtn.disabled = true;
+      try {
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/subscriptions?id=${shortsSubscriptionId}`, {
+          method: "DELETE", headers: { Authorization: "Bearer " + token }
+        });
+        if (res.status === 204 && shortsCurrentChannelId === channelId) {
+          shortsSubscribed = false; shortsSubscriptionId = null;
+          shortsSubBtn.textContent = "Subscribe";
+          shortsSubBtn.style.background = "#f5f7ff";
+          shortsSubBtn.style.color = "#000";
+          showHUD("Unsubscribed");
+        } else { shortsSubBtn.textContent = "Subscribed ✓"; showHUD("Unsubscribe failed — try again"); }
+      } catch(e) { shortsSubBtn.textContent = "Subscribed ✓"; showHUD("Unsubscribe failed"); }
+      shortsSubBtn.disabled = false;
+    }
+  });
+
+  // Comments panel — fetches the first 5 comments via the same
+  // commentThreads.list endpoint already used in the medium player.
+  const shortsCommentsPanel = document.getElementById("shortsCommentsPanel");
+  const shortsCommentsList = document.getElementById("shortsCommentsList");
+  function closeShortsComments() { shortsCommentsPanel.classList.remove("open"); }
+  document.getElementById("shortsCommentsCloseBtn").addEventListener("click", closeShortsComments);
+  const shortsCommentBtn = document.getElementById("shortsCommentBtn");
+  shortsCommentBtn.addEventListener("click", async () => {
+    const item = shortsItems[shortsIndex];
+    if (!item) return;
+    shortsCommentsPanel.classList.add("open");
+    shortsCommentsList.innerHTML = '<div style="opacity:0.5;font-size:12px;">Loading comments…</div>';
+    try {
+      const data = await fetchYouTube("commentThreads", { part: "snippet", videoId: item.id, maxResults: 5, order: "relevance", _: Date.now() });
+      const items = data.items || [];
+      if (!items.length) { shortsCommentsList.innerHTML = '<div style="opacity:0.5;font-size:12px;">No comments yet</div>'; return; }
+      shortsCommentsList.innerHTML = items.map(c => {
+        const s = c.snippet.topLevelComment.snippet;
+        const likes = s.likeCount > 0 ? ` · 👍 ${formatViews(s.likeCount)}` : "";
+        return `<div class="shorts-comment-item">
+          <div class="shorts-comment-author">${s.authorDisplayName}${likes}</div>
+          <div class="shorts-comment-text">${(s.textDisplay||"").replace(/<[^>]+>/g,"").slice(0,200)}</div>
+        </div>`;
+      }).join('');
+    } catch(e) {
+      shortsCommentsList.innerHTML = '<div style="opacity:0.5;font-size:12px;">Couldn\'t load comments</div>';
+    }
+  });
+
   shortsClearBtn.addEventListener("click", () => {
     clearMode = !clearMode;
     if (clearMode) {
       shortsPageEl.classList.add("clear-mode");
+      closeShortsComments(); // genuinely close, not just visually hide — its
+                              // own .open class would otherwise reappear it
+                              // once clear mode is later turned back off
       showHUD("Clear mode on — tap video to exit");
     } else {
       shortsPageEl.classList.remove("clear-mode");
@@ -3775,6 +3981,9 @@ function playShort(index) {
     shortsIframe.src = EMBED(item.id);
     updateCounter();
     updateHeart();
+    updateShortsChannelInfo(item);
+    updateShortsCounts(item);
+    closeShortsComments();
     if (index >= shortsItems.length - 6 && !shortsLoadingMore) loadMoreShorts();
     // Pre-cache next 3 shorts duration checks
     _preloadNextShorts(index, shortsItems).catch(() => {});
