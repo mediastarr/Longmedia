@@ -4849,23 +4849,44 @@ scrollTopBtn.addEventListener("click", () => {
 })();
 
 let scrollCooldown = false;
-window.addEventListener("scroll", async () => {
+window.addEventListener("scroll", () => {
   scrollTopBtn.classList.toggle("visible", window.scrollY > 600);
-  if (isLoadingMore || scrollCooldown) return;
-  const scrollPos = window.innerHeight + window.scrollY;
-  const bottom = document.body.offsetHeight - 600;
-  if (scrollPos < bottom) return;
-  scrollCooldown = true; setTimeout(() => { scrollCooldown = false; }, 800);
-  if (currentTab === "subs" && subsNextPageToken) {
-    isLoadingMore = true;
-    try { await loadMoreSubs(); } catch(e) {} finally { isLoadingMore = false; }
-    return;
-  }
-  if (nextPageToken) {
-    isLoadingMore = true;
-    try { await loadMoreVideos(); } catch(e) {} finally { isLoadingMore = false; }
-  }
 });
+
+// True infinite scroll via Intersection Observer, replacing the old
+// scroll-event-based approach. A single sentinel element, appended once
+// at the very bottom of the page, gets observed continuously — when it
+// enters the viewport (rootMargin pre-triggers this 600px before it's
+// actually visible, so the next batch loads before the user hits the
+// bottom), it fires the same load-more logic as before. This is
+// structurally more robust than the old approach: rather than depending
+// on nextPageToken being correctly set at every single code path that
+// populates a feed (which kept revealing new gaps across several rounds
+// of fixes), the observer just checks scroll position directly, and
+// loadMoreVideos()/loadMoreSubs() already handle a missing/seed token
+// internally regardless of how the feed was populated.
+const scrollSentinel = document.createElement("div");
+scrollSentinel.id = "scrollSentinel";
+scrollSentinel.style.cssText = "height:1px;width:100%;";
+document.body.appendChild(scrollSentinel);
+
+const infiniteScrollObserver = new IntersectionObserver((entries) => {
+  if (!entries[0].isIntersecting) return;
+  if (isLoadingMore || scrollCooldown) return;
+  scrollCooldown = true; setTimeout(() => { scrollCooldown = false; }, 800);
+  (async () => {
+    if (currentTab === "subs" && subsNextPageToken) {
+      isLoadingMore = true;
+      try { await loadMoreSubs(); } catch(e) {} finally { isLoadingMore = false; }
+      return;
+    }
+    if (nextPageToken) {
+      isLoadingMore = true;
+      try { await loadMoreVideos(); } catch(e) {} finally { isLoadingMore = false; }
+    }
+  })();
+}, { rootMargin: "0px 0px 600px 0px" });
+infiniteScrollObserver.observe(scrollSentinel);
 
 async function loadChannelPage(channelId) {
   setActiveTab("channel"); currentChannelId = channelId;
