@@ -4073,6 +4073,12 @@ function playShort(index) {
   swipeZone.addEventListener("touchstart",(e)=>{ swY=e.touches[0].clientY; swX=e.touches[0].clientX; swT=Date.now(); },{passive:true});
   swipeZone.addEventListener("touchend",(e)=>{
     if(transitioning)return;
+    // Comments panel only covers the bottom ~65% of the screen — a swipe
+    // starting in the upper, still-visible video area lands directly on
+    // this element, bypassing the comments panel's own scroll-lock
+    // entirely. Block goNext/goPrev outright whenever comments are open,
+    // regardless of where on screen the swipe actually started.
+    if (shortsCommentsPanel.classList.contains("open")) return;
     const dy=swY-e.changedTouches[0].clientY;
     const dx=swX-e.changedTouches[0].clientX;
     const dt=Date.now()-swT;
@@ -4097,7 +4103,7 @@ function playShort(index) {
     if(Math.abs(dy)<(v>0.3?20:50))return;
     handleShortsVertical(dy>0 ? 1 : -1);
   },{passive:true});
-  let wc=false; shortsPageEl.addEventListener("wheel",(e)=>{ if(wc||transitioning)return; wc=true; setTimeout(()=>wc=false,700); handleShortsVertical(e.deltaY>0 ? 1 : -1); },{passive:true});
+  let wc=false; shortsPageEl.addEventListener("wheel",(e)=>{ if(wc||transitioning||shortsCommentsPanel.classList.contains("open"))return; wc=true; setTimeout(()=>wc=false,700); handleShortsVertical(e.deltaY>0 ? 1 : -1); },{passive:true});
   function skH(e){if(currentTab!=="shorts")return;if(e.key==="ArrowDown")handleShortsVertical(1);if(e.key==="ArrowUp")handleShortsVertical(-1);}
   document.addEventListener("keydown",skH); shortsPageEl._cleanup=()=>document.removeEventListener("keydown",skH);
 });
