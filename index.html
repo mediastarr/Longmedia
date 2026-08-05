@@ -3102,6 +3102,13 @@ async function openAsShort(videoId, snippet) {
       const newBack = backBtn2.cloneNode(true);
       backBtn2.parentNode.replaceChild(newBack, backBtn2);
       newBack.addEventListener("click", () => {
+        const commentsPanel = document.getElementById("shortsCommentsPanel");
+        if (commentsPanel && commentsPanel.classList.contains("open")) {
+          commentsPanel.classList.remove("open");
+          const sz = document.getElementById("shortsSwipeZone");
+          if (sz) sz.style.pointerEvents = "auto";
+          return;
+        }
         const iframe = document.getElementById("shortsIframe");
         if (iframe) iframe.src = "about:blank";
         _restoreOnBack();
@@ -3540,6 +3547,10 @@ shortsTab.addEventListener("click", async () => {
   // Wire back button immediately before any async work — restores the
   // topbar/tabs hidden above, so leaving Shorts returns the app to normal.
   backBtn2.addEventListener("click", () => {
+    // Layered back — if comments are open, close just that first, rather
+    // than tearing down the whole player (which was also unintentionally
+    // taking clear mode and everything else down with it).
+    if (shortsCommentsPanel.classList.contains("open")) { closeShortsComments(); return; }
     shortsIframe.src = "about:blank";
     shortsPageEl.style.display = "none";
     topbarEl.style.display = "flex";
@@ -4077,7 +4088,7 @@ function playShort(index) {
     if(dy>0)goNext(); else goPrev();
   },{passive:true});
   let wc=false; shortsPageEl.addEventListener("wheel",(e)=>{ if(wc||transitioning||shortsCommentsPanel.classList.contains("open"))return; wc=true; setTimeout(()=>wc=false,700); if(e.deltaY>0)goNext(); else goPrev(); },{passive:true});
-  function skH(e){if(currentTab!=="shorts")return;if(e.key==="ArrowDown")goNext();if(e.key==="ArrowUp")goPrev();}
+  function skH(e){if(currentTab!=="shorts")return;if(e.key==="ArrowDown"){e.preventDefault();goNext();}if(e.key==="ArrowUp"){e.preventDefault();goPrev();}}
   document.addEventListener("keydown",skH); shortsPageEl._cleanup=()=>document.removeEventListener("keydown",skH);
 });
 
