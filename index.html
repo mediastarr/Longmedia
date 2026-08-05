@@ -3827,13 +3827,14 @@ shortsTab.addEventListener("click", async () => {
   // commentThreads.list endpoint already used in the medium player.
   const shortsCommentsPanel = document.getElementById("shortsCommentsPanel");
   const shortsCommentsList = document.getElementById("shortsCommentsList");
-  function closeShortsComments() { shortsCommentsPanel.classList.remove("open"); }
+  function closeShortsComments() { shortsCommentsPanel.classList.remove("open"); swipeZone.style.pointerEvents = "auto"; }
   document.getElementById("shortsCommentsCloseBtn").addEventListener("click", closeShortsComments);
   const shortsCommentBtn = document.getElementById("shortsCommentBtn");
   shortsCommentBtn.addEventListener("click", async () => {
     const item = shortsItems[shortsIndex];
     if (!item) return;
     shortsCommentsPanel.classList.add("open");
+    swipeZone.style.pointerEvents = "none";
     shortsCommentsList.innerHTML = '<div style="opacity:0.5;font-size:12px;">Loading comments…</div>';
     try {
       const data = await fetchYouTube("commentThreads", { part: "snippet", videoId: item.id, maxResults: 5, order: "relevance", _: Date.now() });
