@@ -3478,7 +3478,16 @@ trendingTab.addEventListener("click", async () => {
   }
 });
 
+let _currentShortsKeyHandler = null;
+let _currentShortsFocusKeyHandler = null;
 async function openShortsTabSetup() {
+  // Remove any previous session's global listeners before attaching new
+  // ones — these were accumulating on every repeated open from Home
+  // (never actually removed), each holding a stale closure over a
+  // previous, now-detached session's state, which is exactly why behavior
+  // got progressively worse with each repeat.
+  if (_currentShortsKeyHandler) document.removeEventListener("keydown", _currentShortsKeyHandler);
+  if (_currentShortsFocusKeyHandler) document.removeEventListener("keydown", _currentShortsFocusKeyHandler);
   ++_homeLoadGeneration;
   nextPageToken = null; setActiveTab("shorts"); showHUD("Shorts");
   // Full-bleed: hide the topbar and tabs row while in Shorts, restored on
@@ -3654,6 +3663,7 @@ async function openShortsTabSetup() {
     else if (e.key === "ArrowRight") { e.preventDefault(); setShortsFocus(shortsFocusIdx + 1); }
     else if (e.key === "Enter" && shortsPageEl.querySelector(".shorts-focused")) { e.preventDefault(); activateShortsFocus(); }
   };
+  _currentShortsFocusKeyHandler = shortsFocusKeyHandler;
   document.addEventListener("keydown", shortsFocusKeyHandler);
   let shortsFocusTouchStartX = 0;
   shortsPageEl.addEventListener("touchstart", (e) => { shortsFocusTouchStartX = e.touches[0].clientX; }, { passive: true });
@@ -4122,6 +4132,7 @@ function playShort(index) {
   },{passive:true});
   let wc=false; shortsPageEl.addEventListener("wheel",(e)=>{ if(wc||transitioning||shortsCommentsPanel.classList.contains("open"))return; wc=true; setTimeout(()=>wc=false,700); handleShortsVertical(e.deltaY>0 ? 1 : -1); },{passive:true});
   function skH(e){if(currentTab!=="shorts")return;if(e.key==="ArrowDown")handleShortsVertical(1);if(e.key==="ArrowUp")handleShortsVertical(-1);}
+  _currentShortsKeyHandler = skH;
   document.addEventListener("keydown",skH); shortsPageEl._cleanup=()=>document.removeEventListener("keydown",skH);
 }
 shortsTab.addEventListener("click", openShortsTabSetup);
