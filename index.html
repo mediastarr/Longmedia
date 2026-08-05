@@ -3093,8 +3093,11 @@ async function openAsShort(videoId, snippet) {
   // Stop medium player audio before opening shorts
   if (ytPlayer) { try { ytPlayer.pauseVideo(); } catch(e) {} }
 
-  // Trigger the real Shorts tab — it has working swipe, infinite scroll, everything
-  shortsTab.click();
+  // Trigger the real Shorts tab setup — it has working swipe, infinite
+  // scroll, everything. Genuinely awaited now (previously fired via
+  // shortsTab.click() without waiting, which could let the user interact
+  // with buttons before their handlers had actually finished attaching).
+  await openShortsTabSetup();
 
   // After the tab finishes building its DOM, intercept the back button
   // to restore scroll position instead of reloading home
@@ -3475,7 +3478,7 @@ trendingTab.addEventListener("click", async () => {
   }
 });
 
-shortsTab.addEventListener("click", async () => {
+async function openShortsTabSetup() {
   ++_homeLoadGeneration;
   nextPageToken = null; setActiveTab("shorts"); showHUD("Shorts");
   // Full-bleed: hide the topbar and tabs row while in Shorts, restored on
@@ -4120,7 +4123,8 @@ function playShort(index) {
   let wc=false; shortsPageEl.addEventListener("wheel",(e)=>{ if(wc||transitioning||shortsCommentsPanel.classList.contains("open"))return; wc=true; setTimeout(()=>wc=false,700); handleShortsVertical(e.deltaY>0 ? 1 : -1); },{passive:true});
   function skH(e){if(currentTab!=="shorts")return;if(e.key==="ArrowDown")handleShortsVertical(1);if(e.key==="ArrowUp")handleShortsVertical(-1);}
   document.addEventListener("keydown",skH); shortsPageEl._cleanup=()=>document.removeEventListener("keydown",skH);
-});
+}
+shortsTab.addEventListener("click", openShortsTabSetup);
 
 let lastMovieQuery = "";
 let isLoadingMovies = false;
