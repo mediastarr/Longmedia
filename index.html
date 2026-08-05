@@ -1435,7 +1435,6 @@ async function fetchPersonalizedFeed() {
   const token = await getValidToken();
   const profile5 = getTasteProfile();
   const watchedChannelIds = new Set(Object.keys(profile5.channels || {}));
-  const watchedIds = new Set((getTasteProfile().recentVideoIds || []).slice(0, 50));
 
   // ── Time-of-day context signal ──
   const currentHour = new Date().getHours();
@@ -1463,7 +1462,7 @@ async function fetchPersonalizedFeed() {
     (items || []).forEach(item => {
       const id = item.id?.videoId || item.id;
       const chId = item.snippet?.channelId;
-      if (!id || seen.has(id) || watchedIds.has(id) || recentShownIds.has(id) || blockedIds.has(id) || (chId && blockedChannels.has(chId))) return;
+      if (!id || seen.has(id) || recentShownIds.has(id) || blockedIds.has(id) || (chId && blockedChannels.has(chId))) return;
       seen.add(id); allItems.push({ item, weight });
     });
   }
