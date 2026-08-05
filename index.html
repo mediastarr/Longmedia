@@ -542,9 +542,13 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 
 /* Focus highlight for left/right-cycled controls (play/pause, mute, like, back) —
    shared by both the new top-left icons and the existing back button/action-btn icons */
-.shorts-icon-btn.shorts-focused, #shortsBackBtn.shorts-focused, #shortsSubBtn.shorts-focused, .shorts-action-btn.shorts-focused .shorts-action-icon {
+.shorts-icon-btn.shorts-focused, #shortsBackBtn.shorts-focused, #shortsSubBtn.shorts-focused, #shortsCommentsCloseBtn.shorts-focused, .shorts-action-btn.shorts-focused .shorts-action-icon {
   box-shadow: 0 0 0 3px rgba(60,242,255,0.9), 0 0 16px rgba(60,242,255,0.6) !important;
   background: rgba(60,242,255,0.3) !important;
+}
+#shortsCommentsList.shorts-focused {
+  box-shadow: inset 0 0 0 2px rgba(60,242,255,0.7);
+  border-radius: 8px;
 }
 
 #shortsHint { position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 4px; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
@@ -3102,13 +3106,6 @@ async function openAsShort(videoId, snippet) {
       const newBack = backBtn2.cloneNode(true);
       backBtn2.parentNode.replaceChild(newBack, backBtn2);
       newBack.addEventListener("click", () => {
-        const commentsPanel = document.getElementById("shortsCommentsPanel");
-        if (commentsPanel && commentsPanel.classList.contains("open")) {
-          commentsPanel.classList.remove("open");
-          const sz = document.getElementById("shortsSwipeZone");
-          if (sz) sz.style.pointerEvents = "auto";
-          return;
-        }
         const iframe = document.getElementById("shortsIframe");
         if (iframe) iframe.src = "about:blank";
         _restoreOnBack();
@@ -3547,10 +3544,6 @@ shortsTab.addEventListener("click", async () => {
   // Wire back button immediately before any async work — restores the
   // topbar/tabs hidden above, so leaving Shorts returns the app to normal.
   backBtn2.addEventListener("click", () => {
-    // Layered back — if comments are open, close just that first, rather
-    // than tearing down the whole player (which was also unintentionally
-    // taking clear mode and everything else down with it).
-    if (shortsCommentsPanel.classList.contains("open")) { closeShortsComments(); return; }
     shortsIframe.src = "about:blank";
     shortsPageEl.style.display = "none";
     topbarEl.style.display = "flex";
@@ -3607,14 +3600,46 @@ shortsTab.addEventListener("click", async () => {
   // from Home: the stale reference to the old, now-detached back button
   // meant its highlight never visibly appeared, making the swipe look
   // like it skipped straight from mute to Not Interested.
-  const shortsFocusIds = ["shortsBackBtn", "shortsPlayPauseBtn", "shortsMuteBtn", "shortsHeartBtn", "shortsCommentBtn", "shortsNotIntBtn", "shortsClearBtn", "shortsSubBtn"];
+  // Dynamic cycle — extends with the comments-close button and a special
+  // scrollable "comments list" item whenever comments are open, rather
+  // than being one fixed list. The comments list isn't a clickable button,
+  // just a highlighted, scrollable target: once focused, up/down scrolls
+  // it instead of switching shorts.
+  const shortsCommentsPanel = document.getElementById("shortsCommentsPanel");
+  const shortsCommentsList = document.getElementById("shortsCommentsList");
+  const SHORTS_COMMENTS_SCROLL_ID = "__shortsCommentsScroll";
+  function getShortsFocusIds() {
+    const base = ["shortsBackBtn", "shortsPlayPauseBtn", "shortsMuteBtn", "shortsHeartBtn", "shortsCommentBtn", "shortsNotIntBtn", "shortsClearBtn", "shortsSubBtn"];
+    if (shortsCommentsPanel.classList.contains("open")) {
+      return base.concat(["shortsCommentsCloseBtn", SHORTS_COMMENTS_SCROLL_ID]);
+    }
+    return base;
+  }
   let shortsFocusIdx = 0;
   function setShortsFocus(idx) {
-    shortsFocusIds.forEach(id => document.getElementById(id)?.classList.remove("shorts-focused"));
-    shortsFocusIdx = ((idx % shortsFocusIds.length) + shortsFocusIds.length) % shortsFocusIds.length;
-    document.getElementById(shortsFocusIds[shortsFocusIdx])?.classList.add("shorts-focused");
+    const ids = getShortsFocusIds();
+    ids.forEach(id => { if (id !== SHORTS_COMMENTS_SCROLL_ID) document.getElementById(id)?.classList.remove("shorts-focused"); });
+    shortsCommentsList.classList.remove("shorts-focused");
+    shortsFocusIdx = ((idx % ids.length) + ids.length) % ids.length;
+    const activeId = ids[shortsFocusIdx];
+    if (activeId === SHORTS_COMMENTS_SCROLL_ID) shortsCommentsList.classList.add("shorts-focused");
+    else document.getElementById(activeId)?.classList.add("shorts-focused");
   }
-  function activateShortsFocus() { document.getElementById(shortsFocusIds[shortsFocusIdx])?.click(); }
+  function activateShortsFocus() {
+    const activeId = getShortsFocusIds()[shortsFocusIdx];
+    if (activeId === SHORTS_COMMENTS_SCROLL_ID) return; // not a button, nothing to activate
+    document.getElementById(activeId)?.click();
+  }
+  // Shared vertical-navigation logic — used by both keyboard (skH) and
+  // swipe (swipeZone touchend) so scrolling comments and switching shorts
+  // stay consistent regardless of which input triggered it.
+  function handleShortsVertical(direction) { // direction: 1 = down/next, -1 = up/prev
+    if (getShortsFocusIds()[shortsFocusIdx] === SHORTS_COMMENTS_SCROLL_ID) {
+      shortsCommentsList.scrollBy({ top: direction * 120, behavior: "smooth" });
+      return;
+    }
+    if (direction > 0) goNext(); else goPrev();
+  }
   // Explicitly claim a known starting state rather than leaving it to
   // whatever the browser/glasses might auto-focus on page load (this was
   // why Not Interested could appear already "selected" before the user
@@ -3836,17 +3861,15 @@ shortsTab.addEventListener("click", async () => {
 
   // Comments panel — fetches the first 5 comments via the same
   // commentThreads.list endpoint already used in the medium player.
-  const shortsCommentsPanel = document.getElementById("shortsCommentsPanel");
-  const shortsCommentsList = document.getElementById("shortsCommentsList");
-  function closeShortsComments() { shortsCommentsPanel.classList.remove("open"); swipeZone.style.pointerEvents = "auto"; }
+  function closeShortsComments() { shortsCommentsPanel.classList.remove("open"); }
   document.getElementById("shortsCommentsCloseBtn").addEventListener("click", closeShortsComments);
   const shortsCommentBtn = document.getElementById("shortsCommentBtn");
   shortsCommentBtn.addEventListener("click", async () => {
     const item = shortsItems[shortsIndex];
     if (!item) return;
     shortsCommentsPanel.classList.add("open");
-    swipeZone.style.pointerEvents = "none";
     shortsCommentsList.innerHTML = '<div style="opacity:0.5;font-size:12px;">Loading comments…</div>';
+    setShortsFocus(getShortsFocusIds().indexOf("shortsCommentsCloseBtn"));
     try {
       const data = await fetchYouTube("commentThreads", { part: "snippet", videoId: item.id, maxResults: 5, order: "relevance", _: Date.now() });
       const items = data.items || [];
@@ -4059,10 +4082,6 @@ function playShort(index) {
   swipeZone.addEventListener("touchstart",(e)=>{ swY=e.touches[0].clientY; swX=e.touches[0].clientX; swT=Date.now(); },{passive:true});
   swipeZone.addEventListener("touchend",(e)=>{
     if(transitioning)return;
-    // Comments panel is open — stand down completely and let native
-    // scrolling handle the comments list. Without this, swiping to scroll
-    // comments would get misread as swiping between shorts.
-    if (shortsCommentsPanel.classList.contains("open")) return;
     const dy=swY-e.changedTouches[0].clientY;
     const dx=swX-e.changedTouches[0].clientX;
     const dt=Date.now()-swT;
@@ -4085,10 +4104,10 @@ function playShort(index) {
     }
     if(Math.abs(dx)>Math.abs(dy)*0.7) return;
     if(Math.abs(dy)<(v>0.3?20:50))return;
-    if(dy>0)goNext(); else goPrev();
+    handleShortsVertical(dy>0 ? 1 : -1);
   },{passive:true});
-  let wc=false; shortsPageEl.addEventListener("wheel",(e)=>{ if(wc||transitioning||shortsCommentsPanel.classList.contains("open"))return; wc=true; setTimeout(()=>wc=false,700); if(e.deltaY>0)goNext(); else goPrev(); },{passive:true});
-  function skH(e){if(currentTab!=="shorts")return;if(e.key==="ArrowDown"){e.preventDefault();goNext();}if(e.key==="ArrowUp"){e.preventDefault();goPrev();}}
+  let wc=false; shortsPageEl.addEventListener("wheel",(e)=>{ if(wc||transitioning)return; wc=true; setTimeout(()=>wc=false,700); handleShortsVertical(e.deltaY>0 ? 1 : -1); },{passive:true});
+  function skH(e){if(currentTab!=="shorts")return;if(e.key==="ArrowDown")handleShortsVertical(1);if(e.key==="ArrowUp")handleShortsVertical(-1);}
   document.addEventListener("keydown",skH); shortsPageEl._cleanup=()=>document.removeEventListener("keydown",skH);
 });
 
