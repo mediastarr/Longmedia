@@ -3668,10 +3668,17 @@ async function openShortsTabSetup() {
   _currentShortsFocusKeyHandler = shortsFocusKeyHandler;
   document.addEventListener("keydown", shortsFocusKeyHandler);
   let shortsFocusTouchStartX = 0;
-  shortsPageEl.addEventListener("touchstart", (e) => { shortsFocusTouchStartX = e.touches[0].clientX; }, { passive: true });
+  let shortsFocusTouchStartY = 0;
+  shortsPageEl.addEventListener("touchstart", (e) => { shortsFocusTouchStartX = e.touches[0].clientX; shortsFocusTouchStartY = e.touches[0].clientY; }, { passive: true });
   shortsPageEl.addEventListener("touchend", (e) => {
     const dx = e.changedTouches[0].clientX - shortsFocusTouchStartX;
+    const dy = e.changedTouches[0].clientY - shortsFocusTouchStartY;
     if (Math.abs(dx) < 40) return; // not a deliberate horizontal swipe
+    // Require horizontal movement to be clearly dominant over vertical —
+    // without this, a genuine vertical swipe (switching shorts) with any
+    // natural finger drift exceeding 40px horizontally would incorrectly
+    // cycle focus too, which is exactly what was happening.
+    if (Math.abs(dx) < Math.abs(dy) * 1.5) return;
     if (dx < 0) setShortsFocus(shortsFocusIdx + 1); else setShortsFocus(shortsFocusIdx - 1);
   }, { passive: true });
   shortsPageEl._cleanupFocus = () => document.removeEventListener("keydown", shortsFocusKeyHandler);
@@ -4062,7 +4069,9 @@ function playShort(index) {
       // keep only genuinely short-form videos.
       if (!fresh.length) {
         try {
-          const fb = await fetchYouTube("videos",{part:"snippet,contentDetails",chart:"mostPopular",regionCode:userRegion,maxResults:50,_:Date.now()});
+          const FALLBACK_CATS = ["0","1","10","15","17","20","22","23","24","25","26","28"];
+          const fbCat = FALLBACK_CATS[shortQIdx % FALLBACK_CATS.length];
+          const fb = await fetchYouTube("videos",{part:"snippet,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:fbCat,maxResults:50,_:Date.now()});
           const parseDurationSeconds = (iso) => {
             const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso || "");
             if (!m) return 0;
