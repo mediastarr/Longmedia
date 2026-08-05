@@ -3367,12 +3367,12 @@ homeTab.addEventListener("click", async () => {
     if (allLogged.length) {
       const enrichedFeed = await enrichWithDurations(allLogged);
       renderFeed(enrichedFeed); showHUD("For You ✦");
-      nextPageToken = (popular2.status === "fulfilled" && popular2.value.nextPageToken) || null;
+      nextPageToken = (popular2.status === "fulfilled" && popular2.value.nextPageToken) || "seed";
       try { localStorage.setItem("cachedHomeFeed", JSON.stringify(enrichedFeed.slice(0,20))); } catch(e) {}
     } else {
       const fallback2 = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 20, _: Date.now() });
       if (myHomeGen !== _homeLoadGeneration) return;
-      nextPageToken = fallback2.nextPageToken || null; renderFeed(await enrichWithDurations(fallback2.items || [])); showHUD("Home");
+      nextPageToken = fallback2.nextPageToken || "seed"; renderFeed(await enrichWithDurations(fallback2.items || [])); showHUD("Home");
     }
   } else {
     const seen = new Set(); const allItems = [];
@@ -3388,11 +3388,11 @@ homeTab.addEventListener("click", async () => {
     if (myHomeGen !== _homeLoadGeneration) return; // a newer Home load has since started — discard this stale one
     if (allItems.length) {
       renderFeed(await enrichWithDurations(allItems)); showHUD("Home");
-      nextPageToken = (popular.status === "fulfilled" && popular.value.nextPageToken) || null;
+      nextPageToken = (popular.status === "fulfilled" && popular.value.nextPageToken) || "seed";
     } else {
       const fallback = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 20, _: Date.now() });
       if (myHomeGen !== _homeLoadGeneration) return;
-      nextPageToken = fallback.nextPageToken || null; renderFeed(await enrichWithDurations(fallback.items || [])); showHUD("Home");
+      nextPageToken = fallback.nextPageToken || "seed"; renderFeed(await enrichWithDurations(fallback.items || [])); showHUD("Home");
     }
   }
 
@@ -3468,7 +3468,7 @@ trendingTab.addEventListener("click", async () => {
     const ranked = await getPersonalizedTrending(allItems);
     if (myGen !== _homeLoadGeneration) return; // user has since switched tabs — discard
     renderFeed(await enrichWithDurations(ranked)); showHUD("Trending ✦");
-    nextPageToken = (popular.status==="fulfilled" && popular.value.nextPageToken) || null;
+    nextPageToken = (popular.status==="fulfilled" && popular.value.nextPageToken) || "seed";
   } catch(e) {
     if (myGen === _homeLoadGeneration) {
       trendingFeedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Trending to retry.</div>';
