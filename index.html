@@ -4875,14 +4875,22 @@ const infiniteScrollObserver = new IntersectionObserver((entries) => {
   if (isLoadingMore || scrollCooldown) return;
   scrollCooldown = true; setTimeout(() => { scrollCooldown = false; }, 800);
   (async () => {
-    if (currentTab === "subs" && subsNextPageToken) {
-      isLoadingMore = true;
-      try { await loadMoreSubs(); } catch(e) {} finally { isLoadingMore = false; }
-      return;
-    }
-    if (nextPageToken) {
-      isLoadingMore = true;
-      try { await loadMoreVideos(); } catch(e) {} finally { isLoadingMore = false; }
+    try {
+      if (currentTab === "subs" && subsNextPageToken) {
+        isLoadingMore = true;
+        try { await loadMoreSubs(); } catch(e) {} finally { isLoadingMore = false; }
+      } else if (nextPageToken) {
+        isLoadingMore = true;
+        try { await loadMoreVideos(); } catch(e) {} finally { isLoadingMore = false; }
+      }
+    } finally {
+      // Force a fresh intersection check — without this, the observer
+      // only fires once and never again, since the sentinel tends to stay
+      // within the trigger zone continuously as the user keeps scrolling
+      // down an ever-growing page, and the callback only fires on
+      // entering/exiting transitions, not while continuously intersecting.
+      infiniteScrollObserver.unobserve(scrollSentinel);
+      infiniteScrollObserver.observe(scrollSentinel);
     }
   })();
 }, { rootMargin: "0px 0px 600px 0px" });
