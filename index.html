@@ -3667,20 +3667,8 @@ async function openShortsTabSetup() {
   };
   _currentShortsFocusKeyHandler = shortsFocusKeyHandler;
   document.addEventListener("keydown", shortsFocusKeyHandler);
-  let shortsFocusTouchStartX = 0;
-  let shortsFocusTouchStartY = 0;
-  shortsPageEl.addEventListener("touchstart", (e) => { shortsFocusTouchStartX = e.touches[0].clientX; shortsFocusTouchStartY = e.touches[0].clientY; }, { passive: true });
-  shortsPageEl.addEventListener("touchend", (e) => {
-    const dx = e.changedTouches[0].clientX - shortsFocusTouchStartX;
-    const dy = e.changedTouches[0].clientY - shortsFocusTouchStartY;
-    if (Math.abs(dx) < 40) return; // not a deliberate horizontal swipe
-    // Require horizontal movement to be clearly dominant over vertical —
-    // without this, a genuine vertical swipe (switching shorts) with any
-    // natural finger drift exceeding 40px horizontally would incorrectly
-    // cycle focus too, which is exactly what was happening.
-    if (Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    if (dx < 0) setShortsFocus(shortsFocusIdx + 1); else setShortsFocus(shortsFocusIdx - 1);
-  }, { passive: true });
+  // Horizontal swipe-to-cycle is now handled directly inside swipeZone's
+  // touchend above, consolidated with the vertical-navigation decision.
   shortsPageEl._cleanupFocus = () => document.removeEventListener("keydown", shortsFocusKeyHandler);
 
   // Heart / Like button — tracks liked shorts locally
@@ -3721,11 +3709,13 @@ async function openShortsTabSetup() {
     // Optimistic UI update first, same as the medium player
     if (newLiked) {
       likedShorts.add(id); showHUD("♥ Liked!");
+      if (shortsCurrentLikeCount !== null) shortsCurrentLikeCount++;
       const icon = shortsHeartBtn.querySelector(".shorts-action-icon");
       icon.style.transform = "scale(1.4)";
       setTimeout(() => { icon.style.transform = ""; }, 200);
     } else {
       likedShorts.delete(id); showHUD("Removed like");
+      if (shortsCurrentLikeCount !== null) shortsCurrentLikeCount = Math.max(0, shortsCurrentLikeCount - 1);
     }
     try { localStorage.setItem("likedShorts", JSON.stringify([...likedShorts].slice(0, 500))); } catch(e) {}
     updateHeart();
@@ -3745,7 +3735,8 @@ async function openShortsTabSetup() {
         showHUD("This video cannot be rated");
       } else if (!(res.status === 204 || res.ok)) {
         // Revert the optimistic update if the real call actually failed
-        if (newLiked) likedShorts.delete(id); else likedShorts.add(id);
+        if (newLiked) { likedShorts.delete(id); if (shortsCurrentLikeCount !== null) shortsCurrentLikeCount = Math.max(0, shortsCurrentLikeCount - 1); }
+        else { likedShorts.add(id); if (shortsCurrentLikeCount !== null) shortsCurrentLikeCount++; }
         try { localStorage.setItem("likedShorts", JSON.stringify([...likedShorts].slice(0, 500))); } catch(e) {}
         updateHeart();
         showHUD("Couldn't save like — try again");
@@ -3753,7 +3744,8 @@ async function openShortsTabSetup() {
         sendEngagement(id, shortsItems[shortsIndex]?.snippet?.channelId || "", "liked", 100, undefined, null);
       }
     } catch(e) {
-      if (newLiked) likedShorts.delete(id); else likedShorts.add(id);
+      if (newLiked) { likedShorts.delete(id); if (shortsCurrentLikeCount !== null) shortsCurrentLikeCount = Math.max(0, shortsCurrentLikeCount - 1); }
+      else { likedShorts.add(id); if (shortsCurrentLikeCount !== null) shortsCurrentLikeCount++; }
       try { localStorage.setItem("likedShorts", JSON.stringify([...likedShorts].slice(0, 500))); } catch(e2) {}
       updateHeart();
       showHUD("Couldn't save like — try again");
@@ -4137,7 +4129,12 @@ function playShort(index) {
       if (clearMode) { clearMode = false; shortsPageEl.classList.remove("clear-mode"); showHUD("Clear mode off"); }
       return;
     }
-    if(Math.abs(dx)>Math.abs(dy)*0.7) return;
+    // Horizontal swipe — cycle focus, consolidated here rather than in a
+    // separate listener independently re-evaluating the same gesture
+    // (which was the actual cause of vertical swipes also selecting a
+    // control: two listeners, two separate decisions, occasionally
+    // disagreeing on the same touch).
+    if(Math.abs(dx)>Math.abs(dy)*0.7) { if (dx > 0) setShortsFocus(shortsFocusIdx + 1); else setShortsFocus(shortsFocusIdx - 1); return; }
     if(Math.abs(dy)<(v>0.3?20:50))return;
     handleShortsVertical(dy>0 ? 1 : -1);
   },{passive:true});
