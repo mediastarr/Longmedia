@@ -3530,7 +3530,7 @@ shortsTab.addEventListener("click", async () => {
   // from Home: the stale reference to the old, now-detached back button
   // meant its highlight never visibly appeared, making the swipe look
   // like it skipped straight from mute to Not Interested.
-  const shortsFocusIds = ["shortsPlayPauseBtn", "shortsMuteBtn", "shortsBackBtn", "shortsNotIntBtn", "shortsHeartBtn", "shortsClearBtn"];
+  const shortsFocusIds = ["shortsBackBtn", "shortsPlayPauseBtn", "shortsMuteBtn", "shortsNotIntBtn", "shortsHeartBtn", "shortsClearBtn"];
   let shortsFocusIdx = 0;
   function setShortsFocus(idx) {
     shortsFocusIds.forEach(id => document.getElementById(id)?.classList.remove("shorts-focused"));
@@ -3839,9 +3839,14 @@ function playShort(index) {
     const dy=swY-e.changedTouches[0].clientY;
     const dx=swX-e.changedTouches[0].clientX;
     const dt=Date.now()-swT;
-    if(Math.abs(dx)>Math.abs(dy)*0.7) return;
     const v=Math.abs(dy)/Math.max(dt,1);
-    if(Math.abs(dy)<(v>0.3?20:50)) {
+    // Check for a genuinely small overall movement FIRST, in either
+    // direction — this must come before the horizontal-vs-vertical
+    // classification below, since a real stationary tap can have a slight
+    // drift in either axis (very common with real fingers), and the old
+    // order let any horizontal drift return early before this check was
+    // ever reached, which is exactly what caused clear mode to get stuck.
+    if (Math.abs(dx) < 20 && Math.abs(dy) < (v>0.3?20:50)) {
       // A stationary tap, not a swipe — this is what "tap anywhere to exit
       // clear mode" was supposed to catch, but touch-action:none on this
       // element can suppress the synthetic click event that logic relied
@@ -3851,6 +3856,8 @@ function playShort(index) {
       if (clearMode) { clearMode = false; shortsPageEl.classList.remove("clear-mode"); showHUD("Clear mode off"); }
       return;
     }
+    if(Math.abs(dx)>Math.abs(dy)*0.7) return;
+    if(Math.abs(dy)<(v>0.3?20:50))return;
     if(dy>0)goNext(); else goPrev();
   },{passive:true});
   let wc=false; shortsPageEl.addEventListener("wheel",(e)=>{ if(wc||transitioning)return; wc=true; setTimeout(()=>wc=false,700); if(e.deltaY>0)goNext(); else goPrev(); },{passive:true});
