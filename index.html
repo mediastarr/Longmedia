@@ -629,7 +629,8 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   touch-action: manipulation; -webkit-tap-highlight-color: rgba(60,242,255,0.25);
 }
 #shortsCommentsCloseBtn::before { content: ""; position: absolute; inset: -12px; z-index: 1; }
-#shortsCommentsList { padding: 10px 14px 16px; overflow-y: auto; }
+#shortsCommentsList { padding: 10px 14px 16px; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+#shortsCommentsList::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .shorts-comment-item { margin-bottom: 12px; padding: 6px; border-radius: 8px; transition: box-shadow 0.15s ease, background 0.15s ease; }
 .shorts-comment-item.shorts-focused {
   box-shadow: 0 0 0 2px rgba(60,242,255,0.8), 0 0 12px rgba(60,242,255,0.4);
@@ -3104,6 +3105,7 @@ async function openAsShort(videoId, snippet) {
       backBtn2.parentNode.replaceChild(newBack, backBtn2);
       newBack.addEventListener("click", () => {
         document.body.style.overflow = "";
+        document.documentElement.style.overflowY = "";
         const iframe = document.getElementById("shortsIframe");
         if (iframe) iframe.src = "about:blank";
         _restoreOnBack();
@@ -3485,6 +3487,7 @@ async function openShortsTabSetup() {
   // underneath it (just visually covered), which was keeping the body's
   // native scrollbar visible and functional the whole time Shorts was open.
   document.body.style.overflow = "hidden";
+  document.documentElement.style.overflowY = "hidden";
   // Remove any previous session's global listeners before attaching new
   // ones — these were accumulating on every repeated open from Home
   // (never actually removed), each holding a stale closure over a
@@ -3560,6 +3563,7 @@ async function openShortsTabSetup() {
   // topbar/tabs hidden above, so leaving Shorts returns the app to normal.
   backBtn2.addEventListener("click", () => {
     document.body.style.overflow = "";
+    document.documentElement.style.overflowY = "";
     shortsIframe.src = "about:blank";
     shortsPageEl.style.display = "none";
     topbarEl.style.display = "flex";
