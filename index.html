@@ -6806,8 +6806,8 @@ function applyShortPlayerPatch(card, item) {
 
       const fetches = [
         fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: userRegion, videoCategoryId: cat, maxResults: 20, publishedAfter: since24h, _: Date.now() }, 2, { filterShorts: true, trim: true }),
-        fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, videoCategoryId: cat, maxResults: 20, _: Date.now() }, 2, { filterShorts: true, trim: true }),
-        fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 20, _: Date.now() }, 2, { filterShorts: true, trim: true })
+        fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, videoCategoryId: cat, maxResults: 50, _: Date.now() }, 2, { filterShorts: true, trim: true }),
+        fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 50, _: Date.now() }, 2, { filterShorts: true, trim: true })
       ];
 
       const results = await Promise.allSettled(fetches);
@@ -6819,6 +6819,17 @@ function applyShortPlayerPatch(card, item) {
         if (paintedFromCache) { showHUD("Couldn't refresh — showing last session"); return; }
         feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home again to retry.</div>';
         return;
+      }
+
+      // Safety net — a suspiciously small (but nonzero) batch previously
+      // just rendered as-is with no further attempt. One more general
+      // mostPopular call (cheap, reliable, no category filter to narrow
+      // it) gives a real chance at topping up a thin startup batch.
+      if (allItems.length < 10) {
+        try {
+          const topUp = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 50, _: Date.now() }, 2, { filterShorts: true, trim: true });
+          addU(topUp?.items || []);
+        } catch(e) {}
       }
 
       nextPageToken = "seed";
