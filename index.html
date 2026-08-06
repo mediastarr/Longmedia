@@ -3103,6 +3103,7 @@ async function openAsShort(videoId, snippet) {
       const newBack = backBtn2.cloneNode(true);
       backBtn2.parentNode.replaceChild(newBack, backBtn2);
       newBack.addEventListener("click", () => {
+        document.body.style.overflow = "";
         const iframe = document.getElementById("shortsIframe");
         if (iframe) iframe.src = "about:blank";
         _restoreOnBack();
@@ -3478,6 +3479,12 @@ trendingTab.addEventListener("click", async () => {
 let _currentShortsKeyHandler = null;
 let _currentShortsFocusKeyHandler = null;
 async function openShortsTabSetup() {
+  // Disable body scroll while Shorts is open — restored on exit (in
+  // backBtn2's click handler below). Shorts is a fixed, full-viewport
+  // overlay, but the underlying page content stays present in the DOM
+  // underneath it (just visually covered), which was keeping the body's
+  // native scrollbar visible and functional the whole time Shorts was open.
+  document.body.style.overflow = "hidden";
   // Remove any previous session's global listeners before attaching new
   // ones — these were accumulating on every repeated open from Home
   // (never actually removed), each holding a stale closure over a
@@ -3552,6 +3559,7 @@ async function openShortsTabSetup() {
   // Wire back button immediately before any async work — restores the
   // topbar/tabs hidden above, so leaving Shorts returns the app to normal.
   backBtn2.addEventListener("click", () => {
+    document.body.style.overflow = "";
     shortsIframe.src = "about:blank";
     shortsPageEl.style.display = "none";
     topbarEl.style.display = "flex";
