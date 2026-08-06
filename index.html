@@ -1569,8 +1569,8 @@ async function fetchPersonalizedFeed() {
   if (sK.length>=2) { lf.push(fetchYouTube("search",{part:"snippet",q:sK.slice(0,3).join(" "),type:"video",maxResults:6,...durationParam,_:Date.now()})); lw.push(3); }
   const allCats = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
   const myCats = topCats.length ? topCats : [allCats[Math.floor(Math.random()*allCats.length)]];
-  lf.push(fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:myCats[Math.floor(Math.random()*myCats.length)],maxResults:10,_:Date.now()})); lw.push(2);
-  lf.push(fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:allCats[Math.floor(Math.random()*allCats.length)],maxResults:10,_:Date.now()})); lw.push(1);
+  lf.push(fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:myCats[Math.floor(Math.random()*myCats.length)],maxResults:50,_:Date.now()})); lw.push(2);
+  lf.push(fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:allCats[Math.floor(Math.random()*allCats.length)],maxResults:50,_:Date.now()})); lw.push(1);
 
   const tokenBlockPromise = !token ? Promise.resolve() : Promise.all([
       (async () => {
@@ -1676,6 +1676,22 @@ async function fetchPersonalizedFeed() {
   // the Worker now instead of as JS on the glasses. Candidate gathering above
   // stays client-side since it needs real YouTube API access regardless of
   // where the scoring happens.
+  // Safety net — same principle already applied to _startupFetch: if the
+  // final candidate pool is still suspiciously small (under 10) after
+  // everything above, one more general mostPopular call (cheap, reliable,
+  // no category filter) gives a real chance at a fuller batch before
+  // scoring, rather than sending a thin pool to the Worker as-is.
+  if (feed.length < 10) {
+    try {
+      const topUp = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 50, _: Date.now() });
+      const existingIds = new Set(feed.map(item => item.id?.videoId || item.id));
+      (topUp?.items || []).forEach(item => {
+        const id = item.id?.videoId || item.id;
+        if (id && !existingIds.has(id)) { existingIds.add(id); feed.push(item); }
+      });
+    } catch(e) {}
+  }
+
   try {
     const mostRecentSearch = (profile5.searchHistory && profile5.searchHistory[0]) || null;
     const feedRes = await fetchWithTimeout(HUB_WORKER_URL + "/feed", {
