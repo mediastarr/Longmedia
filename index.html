@@ -504,9 +504,9 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 #shortsTopLeft { position: absolute; top: 16px; left: 16px; z-index: 15; display: flex; gap: 10px; }
 #shortsCounter { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 15; border-radius: 999px; padding: 6px 12px; font-size: 11px; background: rgba(10,12,20,0.55); color: rgba(255,255,255,0.75); border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(6px); letter-spacing: 0.04em; }
 
-/* Top-right close/back — icon-only, matches the top-left cluster's look */
+/* Top-left close/back — icon-only, first in the top-left cluster, left of play/pause */
 #shortsBackBtn {
-  position: absolute; top: 16px; right: 16px; z-index: 15;
+  z-index: 15;
   width: 28px; height: 28px; border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.25);
   background: rgba(10,12,20,0.55); backdrop-filter: blur(6px);
@@ -535,7 +535,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
    next-video). This extends the actual clickable/touchable area 10px
    beyond the visual boundary in every direction without changing how the
    button looks or is sized visually. */
-.shorts-icon-btn, .shorts-action-btn { position: relative; }
+#shortsBackBtn, .shorts-icon-btn, .shorts-action-btn { position: relative; }
 #shortsBackBtn::before, .shorts-icon-btn::before, .shorts-action-btn::before {
   content: ""; position: absolute; inset: -10px; z-index: 1;
 }
@@ -3219,11 +3219,21 @@ function setActiveTab(tab) {
   subsPageEl.style.display = (tab === "subs") ? "block" : "none";
   playlistPageEl.style.display = (tab === "playlists") ? "block" : "none";
   shortsPageEl.style.display = (tab === "shorts") ? "flex" : "none";
-  // Shorts is a fixed overlay, but the page behind it can still be taller
-  // than the viewport — that leaves the browser's native scrollbar visible
-  // through the overlay. Suspend document scrolling while Shorts is open.
-  document.documentElement.style.overflowY = (tab === "shorts") ? "hidden" : "";
-  document.body.style.overflowY = (tab === "shorts") ? "hidden" : "";
+  // Shorts is a fixed overlay; the tabs above already collapse every other
+  // container to display:none, so the document has nothing left to scroll.
+  // Some WebViews still leave a stale native scrollbar painted through the
+  // overlay until something forces a repaint — reset the scroll position,
+  // suspend scrolling, and force a synchronous reflow so that repaint
+  // happens immediately instead of on the next real touch/scroll event.
+  if (tab === "shorts") {
+    window.scrollTo(0, 0);
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    void document.body.offsetHeight; // force reflow
+  } else {
+    document.documentElement.style.overflow = "";
+    document.body.style.overflow = "";
+  }
 }
 
 /* CHANGE: home tab uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
@@ -3499,14 +3509,14 @@ async function openShortsTabSetup() {
   document.getElementById("tabs").style.display = "none";
   shortsPageEl.innerHTML = `
     <div id="shortsPlayerBox">
-      <iframe id="shortsIframe" scrolling="no" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+      <iframe id="shortsIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
       <div id="shortsSwipeZone" style="position:absolute;inset:0;z-index:6;pointer-events:auto;background:transparent;touch-action:none;"></div>
       <div id="shortsTopLeft">
+        <button id="shortsBackBtn" tabindex="0">✕</button>
         <button id="shortsPlayPauseBtn" class="shorts-icon-btn" tabindex="0">⏸</button>
         <button id="shortsMuteBtn" class="shorts-icon-btn" tabindex="0">🔊</button>
       </div>
       <div id="shortsCounter">Loading…</div>
-      <button id="shortsBackBtn" tabindex="0">✕</button>
       <div id="shortsHint" style="z-index:10;"><div class="shorts-arrow up">▼</div><div class="shorts-hint-text">swipe up/down</div><div class="shorts-arrow down">▼</div></div>
       <div id="shortsActions" style="z-index:10;">
         <div class="shorts-action-btn" id="shortsHeartBtn" tabindex="0">
