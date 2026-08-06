@@ -2772,7 +2772,8 @@ const SHORT_QUERIES = [
   "shorts gaming","shorts sports","shorts travel","shorts animals","shorts life hacks",
   "youtube shorts new","best shorts this week","shorts motivation","shorts amazing"
 ];
-const MOVIE_QUERIES = ["full movie","full movie free","full length movie","full movie english","classic film full movie"];
+const MOVIE_EXCLUDE = "-Hindi -Tamil -Telugu -dubbed -Nigerian -Hollywood -trailer -teaser -review -reaction -spoiler";
+const MOVIE_QUERIES = ["full movie","full movie free","full length movie","full movie english","classic film full movie"].map(q => `${q} ${MOVIE_EXCLUDE}`);
 let shortQIdx = Math.floor(Math.random() * SHORT_QUERIES.length);
 let movieQIdx = Math.floor(Math.random() * MOVIE_QUERIES.length);
 
@@ -4165,9 +4166,9 @@ moviesTab.addEventListener("click", async () => {
   const sKW=[...topKW].sort(()=>Math.random()-0.5), sBI=[...topBI].sort(()=>Math.random()-0.5);
   const fetches=[
     // 1. Fresh movies based on YOUR taste keywords (order:date)
-    ...(sKW.length>=2 ? [fetchYouTube("search",{part:"snippet",q:sKW.slice(0,2).join(" ")+" full movie",type:"video",videoDuration:"long",videoEmbeddable:"true",videoCategoryId:"30",order:"date",maxResults:10,publishedAfter:since48h,_:Date.now()})] : []),
-    ...(sBI.length>0 ? [fetchYouTube("search",{part:"snippet",q:sBI[0]+" full movie",type:"video",videoDuration:"long",videoEmbeddable:"true",videoCategoryId:"30",order:"date",maxResults:8,publishedAfter:since48h,_:Date.now()})] : []),
-    ...(recentS.length>0 ? [fetchYouTube("search",{part:"snippet",q:recentS[0]+" full movie",type:"video",videoDuration:"long",videoEmbeddable:"true",videoCategoryId:"30",order:"date",maxResults:8,_:Date.now()})] : []),
+    ...(sKW.length>=2 ? [fetchYouTube("search",{part:"snippet",q:sKW.slice(0,2).join(" ")+" full movie "+MOVIE_EXCLUDE,type:"video",videoDuration:"long",videoEmbeddable:"true",videoCategoryId:"30",order:"date",maxResults:10,publishedAfter:since48h,_:Date.now()})] : []),
+    ...(sBI.length>0 ? [fetchYouTube("search",{part:"snippet",q:sBI[0]+" full movie "+MOVIE_EXCLUDE,type:"video",videoDuration:"long",videoEmbeddable:"true",videoCategoryId:"30",order:"date",maxResults:8,publishedAfter:since48h,_:Date.now()})] : []),
+    ...(recentS.length>0 ? [fetchYouTube("search",{part:"snippet",q:recentS[0]+" full movie "+MOVIE_EXCLUDE,type:"video",videoDuration:"long",videoEmbeddable:"true",videoCategoryId:"30",order:"date",maxResults:8,_:Date.now()})] : []),
     // 2. Fresh general movies (order:date)
     fetchYouTube("search",{part:"snippet",q:usedQ,type:"video",videoDuration:"long",videoEmbeddable:"true",videoCategoryId:"30",regionCode:userRegion,maxResults:10,order:"date",publishedAfter:since48h,_:Date.now()}),
     // 3. Popular movies after
