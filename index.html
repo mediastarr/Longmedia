@@ -2936,7 +2936,7 @@ async function fetchContentDetails(videoIds) {
   const map = {};
   try {
     const results = await Promise.allSettled(chunks.map(chunk =>
-      fetchYouTube("videos", { part: "contentDetails", id: chunk.join(","), maxResults: 50, _: Date.now() })
+      fetchYouTube("videos", { part: "contentDetails", id: chunk.join(","), maxResults: 50, _: Date.now() }, 2, { trim: true })
     ));
     results.forEach(r => {
       if (r.status === "fulfilled") {
@@ -2991,7 +2991,7 @@ async function checkIsShort(videoId, snippet) {
     const details = await fetchContentDetails([videoId]);
     const cd = details[videoId];
     if (cd) {
-      const secs = parseDuration(cd.duration);
+      const secs = (cd._durationSeconds !== undefined && cd._durationSeconds !== null) ? cd._durationSeconds : parseDuration(cd.duration);
       const result = secs !== null && secs > 0 && secs <= 180;
       _shortsCache[videoId] = result;
       return result;
