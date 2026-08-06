@@ -3219,6 +3219,11 @@ function setActiveTab(tab) {
   subsPageEl.style.display = (tab === "subs") ? "block" : "none";
   playlistPageEl.style.display = (tab === "playlists") ? "block" : "none";
   shortsPageEl.style.display = (tab === "shorts") ? "flex" : "none";
+  // Shorts is a fixed overlay, but the page behind it can still be taller
+  // than the viewport — that leaves the browser's native scrollbar visible
+  // through the overlay. Suspend document scrolling while Shorts is open.
+  document.documentElement.style.overflowY = (tab === "shorts") ? "hidden" : "";
+  document.body.style.overflowY = (tab === "shorts") ? "hidden" : "";
 }
 
 /* CHANGE: home tab uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
