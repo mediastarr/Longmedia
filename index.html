@@ -3925,7 +3925,6 @@ async function openShortsTabSetup() {
   });
 
   const token = await getValidToken();
-  let data = { items: [] };
   const pool = [];
   let persistentSeenIds = new Set();
   try { persistentSeenIds = new Set(JSON.parse(localStorage.getItem("shortsSeenHistory") || "[]")); } catch(e) {}
@@ -3951,61 +3950,22 @@ async function openShortsTabSetup() {
     } catch(e) {}
   }
 
-  // SOURCES 2+3+4 all in parallel — taste keywords + generic + For You discovery
-  // Was 9+ sequential/parallel calls. Now 6 calls all at once — much faster load
+  // SOURCES 2+3+4 — taste keywords + generic + For You discovery, plus
+  // genuine 9:16 aspect-ratio verification via oEmbed, now handled
+  // server-side by the /shorts Worker endpoint. This used to be 6 parallel
+  // client-side calls plus manual duration filtering; the Worker now does
+  // the same candidate-gathering, adds real vertical-format verification
+  // (which the client never had at all), and caches the verified result.
   const topKW=getTopKeywords(6), topBI=getTopBigrams(4);
-  const sKW=[...topKW].sort(()=>Math.random()-0.5), sBI=[...topBI].sort(()=>Math.random()-0.5);
-  const recentS = getRecentSearches(2);
-  shortQIdx = Math.floor(Math.random()*SHORT_QUERIES.length);
-  const genericQ = SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length]; shortQIdx++;
-  const topCatsForShorts = getTopCategories(2);
-  const allCatsForShorts = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
-  const catToSearch = topCatsForShorts.length ? topCatsForShorts[0] : allCatsForShorts[Math.floor(Math.random()*allCatsForShorts.length)];
-  const viralQueries = ["shorts viral 2024","shorts trending now","shorts funny viral","shorts satisfying trending","shorts amazing moments"];
-  const viralQ = viralQueries[Math.floor(Math.random()*viralQueries.length)];
-
-  // Build search queries from taste profile for richer discovery
-  const searchQueries = [];
-  // Taste-based (what you like)
-  if (sBI.length>0) searchQueries.push({q:sBI[0]+" shorts", order:"date"});
-  if (sKW.length>0) searchQueries.push({q:sKW.slice(0,2).join(" ")+" shorts", order:"date"});
-  if (recentS.length>0) searchQueries.push({q:recentS[0]+" shorts", order:"date"});
-  // Search-based discovery (trending in your topics)
-  if (sBI.length>1) searchQueries.push({q:sBI[1]+" viral shorts", order:"viewCount"});
-  if (sKW.length>2) searchQueries.push({q:sKW[2]+" short video", order:"relevance"});
-
-  const parallelFetches = [
-    // Taste + search queries (all parallel) — search.list's videoDuration
-    // parameter is a genuine, YouTube-enforced server-side guarantee
-    // (under 4 minutes), so these sources are fully trusted as-is.
-    ...searchQueries.map(({q,order}) =>
-      fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",order,maxResults:8,_:Date.now()})
-    ),
-    // Generic rotation
-    fetchYouTube("search",{part:"snippet",q:genericQ,type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:userRegion,order:"date",maxResults:10,_:Date.now()}),
-    // Discovery: viral
-    fetchYouTube("search",{part:"snippet",q:viralQ,type:"video",videoDuration:"short",videoEmbeddable:"true",order:"viewCount",maxResults:10,_:Date.now()}),
-  ];
-  const parallelResults = await Promise.allSettled(parallelFetches);
-  parallelResults.forEach(r => {
-    if (r.status==="fulfilled") {
-      (r.value.items||[]).forEach(v => { const id=v.id?.videoId||v.id; if(id&&isNew(id)) pool.push({id,snippet:v.snippet}); });
-    }
-  });
-  data = parallelResults.find(r=>r.status==="fulfilled")?.value || {items:[]};
-
-  // Discovery: trending in your category — chart=mostPopular doesn't
-  // support videoDuration at all (that's search.list-only), so this
-  // source needs its own genuine, client-side verification using the
-  // real contentDetails.duration each item includes, rather than a
-  // parameter YouTube silently ignores.
+  let shortsWorkerNextToken = null;
   try {
-    const catPop = await fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:catToSearch,maxResults:20,_:Date.now()});
-    (catPop.items||[]).forEach(v => {
-      const id=v.id?.videoId||v.id;
-      const secs = v.contentDetails?._durationSeconds ?? parseDuration(v.contentDetails?.duration);
-      if (id && isNew(id) && secs!==null && secs>0 && secs<=180) pool.push({id,snippet:v.snippet});
-    });
+    const res = await fetch(HUB_WORKER_URL + "/shorts", {
+      method: "POST",
+      headers: workerHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ userRegion, keywords: [...topKW, ...topBI].slice(0,4), seenIds: pool.map(v=>v.id) })
+    }).then(r => r.json());
+    (res.items || []).forEach(v => { if (v.id && isNew(v.id)) pool.push(v); });
+    shortsWorkerNextToken = res.nextPageToken || null;
   } catch(e) {}
 
     const seen=new Set();
@@ -4024,7 +3984,7 @@ async function openShortsTabSetup() {
   shortsSeenIds = new Set(shortsItems.map(v=>v.id));
   try { localStorage.setItem("shortsSeenHistory",JSON.stringify([...shortsSeenIds,...persistentSeenIds].slice(0,50))); } catch(e) {}
 
-  if (data.nextPageToken) shortsNextPageToken=data.nextPageToken;
+  if (shortsWorkerNextToken) shortsNextPageToken=shortsWorkerNextToken;
   else { const seed=await fetchYouTube("search",{part:"snippet",q:SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length],type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:userRegion,maxResults:1,_:Date.now()}); shortsNextPageToken=seed.nextPageToken||"seed"; }
 
   if (!shortsItems.length) { shortsCounter.textContent="No shorts — tap Back"; return; }
