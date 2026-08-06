@@ -4676,29 +4676,25 @@ async function loadMoreVideos() {
   let data;
   const vt = nextPageToken !== "seed" ? nextPageToken : undefined;
   if (currentTab === "home") {
-    // Mix fresh (order:date) + popular for infinite scroll batches
-    // Requesting extra raw results since shorts filtering removes a chunk —
-    // targets ~6 real videos landing per batch after filter
-    // Rotate keyword selection and category each batch — previously this
-    // always used the same top keywords/category every single scroll,
-    // meaning "load more" kept re-querying nearly the same candidate pool
-    // as the initial load, with almost nothing genuinely new behind it.
-    const homeMoreRotate = parseInt(localStorage.getItem("_homeMoreRotate")||"0");
-    localStorage.setItem("_homeMoreRotate", String(homeMoreRotate+1));
-    const allKW = getTopKeywords(9);
-    const topKW = allKW.length > 3 ? allKW.slice((homeMoreRotate*3) % allKW.length, (homeMoreRotate*3) % allKW.length + 3) : allKW;
-    const rotateCats = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
-    const cat = homeMoreRotate % 3 === 0 ? freshCategory() : rotateCats[homeMoreRotate % rotateCats.length];
-    const seen2 = new Set(); const batch = [];
-    const [r1, r2] = await Promise.allSettled([
-      topKW.length >= 2
-        ? fetchYouTube("search", { part: "snippet", type: "video", q: topKW.slice(0,3).join(" "), order: "date", maxResults: 15, publishedAfter: new Date(Date.now() - 21600000).toISOString(), _: Date.now() }, 2, { filterShorts: true, trim: true })
-        : fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: userRegion, videoCategoryId: cat, maxResults: 15, publishedAfter: new Date(Date.now() - 21600000).toISOString(), _: Date.now() }, 2, { filterShorts: true, trim: true }),
-      fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, videoCategoryId: cat, maxResults: 15, _: Date.now() }, 2, { filterShorts: true, trim: true })
-    ]);
-    [r1, r2].forEach(r => { if (r.status === "fulfilled") (r.value.items||[]).forEach(item => { const id = item.id?.videoId||item.id; if(!id||seen2.has(id)){return;} seen2.add(id); batch.push(item); }); });
-    data = { items: batch, nextPageToken: (r2.status==="fulfilled"&&r2.value.nextPageToken)||"seed" };
-    if (!data.items.length) data = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 20, _: Date.now() }, 2, { filterShorts: true, trim: true });
+    // Hybrid pagination now handled by the Worker — reuses the real
+    // continuation token for a few consecutive batches (genuine, efficient
+    // pagination), then rotates category/keywords for variety. State
+    // persists in localStorage between "load more" taps.
+    const rotateCount = parseInt(localStorage.getItem("_homeRotateCount")||"0");
+    const rotateIdx = parseInt(localStorage.getItem("_homeRotateIdx")||"0");
+    const topKW = getTopKeywords(9);
+    try {
+      const res = await fetch(HUB_WORKER_URL + "/loadMoreFeed", {
+        method: "POST",
+        headers: workerHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ tab: "home", userRegion, nextPageToken, rotateCount, rotateIdx, keywords: topKW.length >= 2 ? topKW.slice(0,3) : [] })
+      }).then(r => r.json());
+      localStorage.setItem("_homeRotateCount", String(res.rotateCount));
+      localStorage.setItem("_homeRotateIdx", String(res.rotateIdx));
+      data = { items: res.items, nextPageToken: res.nextPageToken };
+    } catch(e) {
+      data = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 20, _: Date.now() }, 2, { filterShorts: true, trim: true });
+    }
   }
   if (currentTab === "movies") {
     // Always rotate to a new query for movies — pageTokens expire quickly
@@ -4708,20 +4704,21 @@ async function loadMoreVideos() {
     if (!data.nextPageToken) data.nextPageToken = "seed";
   }
   if (currentTab === "trending") {
-    // Rotate category for each batch to get variety
-    // Requesting extra raw results since shorts filtering removes a chunk —
-    // targets ~6 real videos landing per batch after filter
-    const trendMoreRotate = parseInt(localStorage.getItem("_trendMoreRotate")||"0");
-    const TREND_MORE_CATS = ["0","1","2","10","15","17","20","22","23","24","25","26","27","28"];
-    localStorage.setItem("_trendMoreRotate", String((trendMoreRotate+1)%TREND_MORE_CATS.length));
-    const tcat2 = TREND_MORE_CATS[trendMoreRotate];
-    const [tr1, tr2] = await Promise.allSettled([
-      fetchYouTubeDirect("search",{part:"snippet",type:"video",order:"date",regionCode:userRegion,videoCategoryId:tcat2,maxResults:15,publishedAfter:new Date(Date.now()-172800000).toISOString(),_:Date.now()}, 2, { filterShorts: true, trim: true }),
-      fetchYouTubeDirect("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:tcat2,maxResults:15,_:Date.now()}, 2, { filterShorts: true, trim: true })
-    ]);
-    const tseen = new Set(); const tbatch = [];
-    [tr1,tr2].forEach(r=>{if(r.status==="fulfilled")(r.value.items||[]).forEach(item=>{const id=item.id?.videoId||item.id;if(!id||tseen.has(id))return;tseen.add(id);tbatch.push(item);});});
-    data = {items:tbatch, nextPageToken:"seed"};
+    // Hybrid pagination now handled by the Worker — same pattern as Home.
+    const trendRotateCount = parseInt(localStorage.getItem("_trendRotateCount")||"0");
+    const trendRotateIdx = parseInt(localStorage.getItem("_trendRotateIdx")||"0");
+    try {
+      const res = await fetch(HUB_WORKER_URL + "/loadMoreFeed", {
+        method: "POST",
+        headers: workerHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ tab: "trending", userRegion, nextPageToken, rotateCount: trendRotateCount, rotateIdx: trendRotateIdx, keywords: [] })
+      }).then(r => r.json());
+      localStorage.setItem("_trendRotateCount", String(res.rotateCount));
+      localStorage.setItem("_trendRotateIdx", String(res.rotateIdx));
+      data = { items: res.items, nextPageToken: res.nextPageToken };
+    } catch(e) {
+      data = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 20, _: Date.now() }, 2, { filterShorts: true, trim: true });
+    }
   }
   if (currentTab === "search") data = await fetchYouTube("search", { part: "snippet", q: lastSearchQuery, type: "video", maxResults: 20, pageToken: vt, _: Date.now() });
   if (currentTab === "channel") data = await fetchYouTube("playlistItems", { part: "snippet", playlistId: channelUploadsId, maxResults: 20, pageToken: nextPageToken, _: Date.now() });
