@@ -497,7 +497,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
    correctly on the actual video's edges rather than floating in the
    letterboxed black space beside a narrower, centered video. */
 #shortsPlayerBox { position: relative; aspect-ratio: 9 / 16; height: 100%; max-width: 100%; z-index: 1; }
-#shortsIframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; background: #000; }
+#shortsIframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; background: #000; overflow: hidden; }
 
 
 /* Full-bleed overlay controls — top-left cluster (play/pause, mute) */
@@ -3504,7 +3504,7 @@ async function openShortsTabSetup() {
   document.getElementById("tabs").style.display = "none";
   shortsPageEl.innerHTML = `
     <div id="shortsPlayerBox">
-      <iframe id="shortsIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+      <iframe id="shortsIframe" scrolling="no" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
       <div id="shortsSwipeZone" style="position:absolute;inset:0;z-index:6;pointer-events:auto;background:transparent;touch-action:none;"></div>
       <div id="shortsTopLeft">
         <button id="shortsPlayPauseBtn" class="shorts-icon-btn" tabindex="0">⏸</button>
