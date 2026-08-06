@@ -504,9 +504,9 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 #shortsTopLeft { position: absolute; top: 16px; left: 16px; z-index: 15; display: flex; gap: 10px; }
 #shortsCounter { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 15; border-radius: 999px; padding: 6px 12px; font-size: 11px; background: rgba(10,12,20,0.55); color: rgba(255,255,255,0.75); border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(6px); letter-spacing: 0.04em; }
 
-/* Top-left close/back — icon-only, first in the top-left cluster, left of play/pause */
+/* Top-right close/back — icon-only, matches the top-left cluster's look */
 #shortsBackBtn {
-  z-index: 15;
+  position: absolute; top: 16px; right: 16px; z-index: 15;
   width: 28px; height: 28px; border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.25);
   background: rgba(10,12,20,0.55); backdrop-filter: blur(6px);
@@ -3219,21 +3219,6 @@ function setActiveTab(tab) {
   subsPageEl.style.display = (tab === "subs") ? "block" : "none";
   playlistPageEl.style.display = (tab === "playlists") ? "block" : "none";
   shortsPageEl.style.display = (tab === "shorts") ? "flex" : "none";
-  // Shorts is a fixed overlay; the tabs above already collapse every other
-  // container to display:none, so the document has nothing left to scroll.
-  // Some WebViews still leave a stale native scrollbar painted through the
-  // overlay until something forces a repaint — reset the scroll position,
-  // suspend scrolling, and force a synchronous reflow so that repaint
-  // happens immediately instead of on the next real touch/scroll event.
-  if (tab === "shorts") {
-    window.scrollTo(0, 0);
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    void document.body.offsetHeight; // force reflow
-  } else {
-    document.documentElement.style.overflow = "";
-    document.body.style.overflow = "";
-  }
 }
 
 /* CHANGE: home tab uses personalized feed when history exists; seeds nextPageToken for infinite scroll */
@@ -3508,16 +3493,15 @@ async function openShortsTabSetup() {
   topbarEl.style.display = "none";
   document.getElementById("tabs").style.display = "none";
   shortsPageEl.innerHTML = `
-    <div id="shortsScrollbarMask" style="position:fixed;top:0;right:0;width:28px;height:100vh;background:#000;z-index:99999;pointer-events:none;"></div>
     <div id="shortsPlayerBox">
       <iframe id="shortsIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
       <div id="shortsSwipeZone" style="position:absolute;inset:0;z-index:6;pointer-events:auto;background:transparent;touch-action:none;"></div>
       <div id="shortsTopLeft">
-        <button id="shortsBackBtn" tabindex="0">✕</button>
         <button id="shortsPlayPauseBtn" class="shorts-icon-btn" tabindex="0">⏸</button>
         <button id="shortsMuteBtn" class="shorts-icon-btn" tabindex="0">🔊</button>
       </div>
       <div id="shortsCounter">Loading…</div>
+      <button id="shortsBackBtn" tabindex="0">✕</button>
       <div id="shortsHint" style="z-index:10;"><div class="shorts-arrow up">▼</div><div class="shorts-hint-text">swipe up/down</div><div class="shorts-arrow down">▼</div></div>
       <div id="shortsActions" style="z-index:10;">
         <div class="shorts-action-btn" id="shortsHeartBtn" tabindex="0">
