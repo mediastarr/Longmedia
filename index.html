@@ -4013,7 +4013,7 @@ async function openShortsTabSetup() {
 
   if (!shortsItems.length) { shortsCounter.textContent="No shorts — tap Back"; return; }
 
-  const EMBED = id => `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=1&enablejsapi=1&origin=${location.origin}`;
+  const EMBED = id => `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=1&enablejsapi=1&controls=0&origin=${location.origin}`;
   
 
   function updateCounter() { shortsCounter.textContent=`${shortsIndex+1} / ${shortsItems.length}`; }
