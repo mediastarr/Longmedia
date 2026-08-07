@@ -1021,6 +1021,8 @@ let historyList = JSON.parse(localStorage.getItem("historyList") || "[]");
 let shortsItems = [];
 let shortsSeenIds = new Set();
 let shortsIndex = 0;
+let _shortsWatchStart = 0;
+let _shortsWatchItem = null;
 let lastSearchQuery = "";
 let nextPageToken = null;
 let shortsNextPageToken = null;
@@ -3145,6 +3147,7 @@ async function openAsShort(videoId, snippet) {
       const newBack = backBtn2.cloneNode(true);
       backBtn2.parentNode.replaceChild(newBack, backBtn2);
       newBack.addEventListener("click", () => {
+        if (typeof _recordShortsWatchTime === "function") _recordShortsWatchTime();
         const iframe = document.getElementById("shortsIframe");
         if (iframe) iframe.src = "about:blank";
         if (!document.getElementById("scrollSentinel")) {
@@ -3570,6 +3573,10 @@ async function openShortsTabSetup() {
           <div class="shorts-action-icon">💬</div>
           <div class="shorts-action-label" id="shortsCommentLabel">Comment</div>
         </div>
+        <div class="shorts-action-btn" id="shortsShareBtn" tabindex="0">
+          <div class="shorts-action-icon">↗</div>
+          <div class="shorts-action-label">Share</div>
+        </div>
         <div class="shorts-action-btn" id="shortsNotIntBtn" tabindex="0">
           <div class="shorts-action-icon">🚫</div>
           <div class="shorts-action-label">Not Interested</div>
@@ -3610,6 +3617,7 @@ async function openShortsTabSetup() {
   // Wire back button immediately before any async work — restores the
   // topbar/tabs hidden above, so leaving Shorts returns the app to normal.
   backBtn2.addEventListener("click", () => {
+    _recordShortsWatchTime();
     shortsIframe.src = "about:blank";
     if (!document.getElementById("scrollSentinel")) {
       const s = document.createElement("div");
@@ -3683,7 +3691,7 @@ async function openShortsTabSetup() {
   const shortsCommentsList = document.getElementById("shortsCommentsList");
   let shortsLoadedCommentCount = 0;
   function getShortsFocusIds() {
-    const base = ["shortsBackBtn", "shortsPlayPauseBtn", "shortsMuteBtn", "shortsHeartBtn", "shortsCommentBtn", "shortsNotIntBtn", "shortsClearBtn", "shortsSubBtn"];
+    const base = ["shortsBackBtn", "shortsPlayPauseBtn", "shortsMuteBtn", "shortsHeartBtn", "shortsCommentBtn", "shortsShareBtn", "shortsNotIntBtn", "shortsClearBtn", "shortsSubBtn"];
     if (shortsCommentsPanel.classList.contains("open")) {
       const commentIds = Array.from({ length: shortsLoadedCommentCount }, (_, i) => `shortsComment${i}`);
       return base.concat(["shortsCommentsCloseBtn"], commentIds);
@@ -3763,7 +3771,9 @@ async function openShortsTabSetup() {
     shortsHeartLabel.textContent = shortsCurrentLikeCount !== null ? formatViews(shortsCurrentLikeCount) : (liked ? "Liked" : "Like");
   }
   shortsHeartBtn.addEventListener("click", async () => {
-    const id = shortsItems[shortsIndex]?.id; if (!id) return;
+    const currentItem = shortsItems[shortsIndex]; if (!currentItem) return;
+    const id = currentItem.id;
+    const snippet = currentItem.snippet || {};
     const wasLiked = likedShorts.has(id);
     const newLiked = !wasLiked;
     // Optimistic UI update first, same as the medium player
@@ -3773,6 +3783,18 @@ async function openShortsTabSetup() {
       const icon = shortsHeartBtn.querySelector(".shorts-action-icon");
       icon.style.transform = "scale(1.4)";
       setTimeout(() => { icon.style.transform = ""; }, 200);
+      // Genuinely missing piece — this previously only updated the icon
+      // state and the real YouTube account, with zero effect on future
+      // Shorts recommendations. Now feeds the taste profile (same pattern
+      // as the medium player) and sends a real signal to the Worker.
+      try {
+        const profile = getTasteProfile();
+        if (snippet.channelId) profile.channels[snippet.channelId] = (profile.channels[snippet.channelId] || 0) + 3;
+        const words = (snippet.title || "").toLowerCase().replace(/[^a-z0-9 ]/g,"").split(" ").filter(w=>w.length>3);
+        words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 2; });
+        localStorage.setItem("tasteProfile", JSON.stringify(profile));
+      } catch(e) {}
+      sendEngagement(id, snippet.channelId || "", "liked", 100, undefined, null);
     } else {
       likedShorts.delete(id); showHUD("Removed like");
       if (shortsCurrentLikeCount !== null) shortsCurrentLikeCount = Math.max(0, shortsCurrentLikeCount - 1);
@@ -3810,6 +3832,27 @@ async function openShortsTabSetup() {
       updateHeart();
       showHUD("Couldn't save like — try again");
     }
+  });
+
+  const shortsShareBtn = document.getElementById("shortsShareBtn");
+  shortsShareBtn.addEventListener("click", () => {
+    const currentItem = shortsItems[shortsIndex]; if (!currentItem) return;
+    const id = currentItem.id;
+    const snippet = currentItem.snippet || {};
+    const url = `https://www.youtube.com/watch?v=${id}`;
+    if (navigator.share) navigator.share({ title: snippet.title || "", url }).catch(() => {});
+    else navigator.clipboard?.writeText(url).then(() => showHUD("Link copied!")).catch(() => showHUD("youtube.com/watch?v=" + id));
+    // Same taste-profile update and Worker signal already proven working
+    // for the medium player's share button — completes the same feature
+    // for Shorts.
+    try {
+      const profile = getTasteProfile();
+      if (snippet.channelId) profile.channels[snippet.channelId] = (profile.channels[snippet.channelId] || 0) + 4;
+      const words = (snippet.title || "").toLowerCase().replace(/[^a-z0-9 ]/g,"").split(" ").filter(w=>w.length>3);
+      words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 2; });
+      localStorage.setItem("tasteProfile", JSON.stringify(profile));
+    } catch(e) {}
+    sendEngagement(id, snippet.channelId || "", "shared", undefined, undefined, null);
   });
 
   // Clear Mode — tap Clear to hide UI, tap video to exit
@@ -4099,8 +4142,42 @@ async function openShortsTabSetup() {
 
   function updateCounter() { shortsCounter.textContent=`${shortsIndex+1} / ${shortsItems.length}`; }
 
+function _recordShortsWatchTime() {
+  // Record watch time for the short being left — the genuinely missing
+  // "watched all the way through vs. immediately swiped away" signal.
+  // Called both on every transition (via playShort) and when exiting
+  // Shorts entirely, so the final short watched is never missed.
+  if (!_shortsWatchItem || !_shortsWatchStart) return;
+  const elapsedSecs = (Date.now() - _shortsWatchStart) / 1000;
+  const totalSecs = _shortsWatchItem.contentDetails?._durationSeconds ?? (_shortsWatchItem.contentDetails?.duration ? parseDuration(_shortsWatchItem.contentDetails.duration) : null);
+  const pct = (totalSecs && totalSecs > 0) ? Math.min(elapsedSecs / totalSecs, 1) : null;
+  // Real percentage when duration is known; otherwise a reasonable
+  // elapsed-time heuristic (most Shorts run under 60s, so under 3s
+  // strongly signals a disinterested swipe-away, over 15s signals genuine
+  // engagement) — not every source includes contentDetails.
+  const isHighCompletion = pct !== null ? pct >= 0.8 : elapsedSecs >= 15;
+  const isLowCompletion = pct !== null ? pct < 0.2 : elapsedSecs < 3;
+  if (isHighCompletion || isLowCompletion) {
+    try {
+      const profile = getTasteProfile();
+      const wSnippet = _shortsWatchItem.snippet || {};
+      const weight = isHighCompletion ? 2 : -1;
+      if (wSnippet.channelId) profile.channels[wSnippet.channelId] = Math.max(0, (profile.channels[wSnippet.channelId] || 0) + weight);
+      const words = (wSnippet.title || "").toLowerCase().replace(/[^a-z0-9 ]/g,"").split(" ").filter(w=>w.length>3);
+      words.forEach(w => { profile.keywords[w] = Math.max(0, (profile.keywords[w] || 0) + weight); });
+      localStorage.setItem("tasteProfile", JSON.stringify(profile));
+    } catch(e) {}
+    sendEngagement(_shortsWatchItem.id, _shortsWatchItem.snippet?.channelId || "", isHighCompletion ? "liked" : "casual", pct !== null ? Math.round(pct*100) : (isHighCompletion ? 90 : 5), undefined, null);
+  }
+  _shortsWatchItem = null;
+  _shortsWatchStart = 0;
+}
+
 function playShort(index) {
+    _recordShortsWatchTime();
     const item = shortsItems[index]; if (!item) return;
+    _shortsWatchItem = item;
+    _shortsWatchStart = Date.now();
     shortsIframe.src = EMBED(item.id);
     updateCounter();
     updateHeart();
