@@ -7066,7 +7066,7 @@ function applyShortPlayerPatch(card, item) {
           showHUD("For You ✦");
           const seed = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, videoCategoryId: freshCategory(), maxResults: 20, _: Date.now() });
           if (myStartupGen === _homeLoadGeneration) {
-            nextPageToken = seed.nextPageToken || null;
+            nextPageToken = seed.nextPageToken || "seed";
             _homeLastLoaded = Date.now();
             _homeCacheValid = (_feedOwner === "home" && feedEl.children.length > 0);
           }
@@ -7082,7 +7082,7 @@ function applyShortPlayerPatch(card, item) {
             );
             if (myStartupGen === _homeLoadGeneration) {
               if (fallback.items && fallback.items.length) {
-                nextPageToken = fallback.nextPageToken || null;
+                nextPageToken = fallback.nextPageToken || "seed";
                 renderFeed(await enrichWithDurations(fallback.items));
                 showHUD("Home");
                 _homeLastLoaded = Date.now();
