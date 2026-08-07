@@ -1638,21 +1638,19 @@ async function fetchPersonalizedFeed() {
   try { localStorage.setItem("feedShownTimed",JSON.stringify(updTimed)); } catch(e) {}
   try { localStorage.setItem("feedShownIds",JSON.stringify([...newIds,...shownHistory].slice(0,300))); } catch(e) {}
 
-  // ── DISCOVERY: Videos from channels you've never watched ──
+  // ── DISCOVERY: Videos from channels you've never watched, now with a
+  // real quality threshold via the Worker (previously just order:date with
+  // no filter at all, despite the goal being "highly-rated" content) ──
   const topKWd = getTopKeywords(3);
   const topBId = getTopBigrams(2);
   if (topKWd.length >= 2 || topBId.length) {
-    const discQ = topBId.length ? topBId[0] : topKWd.slice(0,2).join(" ");
     try {
-      const since48h = new Date(Date.now() - 172800000).toISOString();
-      const discRes = await fetchYouTube("search", { part: "snippet", type: "video", q: discQ, order: "date", maxResults: 6, publishedAfter: new Date(Date.now() - 21600000).toISOString(), _: Date.now() });
-      (discRes.items || []).forEach(item => {
-        const chId = item.snippet?.channelId;
-        if (chId && !watchedChannelIds.has(chId)) {
-          item.snippet._isDiscovery = true;
-          feed.push(item);
-        }
-      });
+      const discRes = await fetch(HUB_WORKER_URL + "/discoverNewChannels", {
+        method: "POST",
+        headers: workerHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ keywords: topBId.length ? [topBId[0]] : topKWd.slice(0,2), watchedChannelIds: [...watchedChannelIds], userRegion })
+      }).then(r => r.json());
+      (discRes.items || []).forEach(item => feed.push(item));
     } catch(e) {}
   }
 
@@ -2587,6 +2585,17 @@ async function loadVideoInfoPanel(videoId, snippet) {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
     if (navigator.share) navigator.share({ title, url }).catch(() => {});
     else navigator.clipboard?.writeText(url).then(() => showHUD("Link copied!")).catch(() => showHUD("youtube.com/watch?v=" + videoId));
+    // Share is a strong positive signal — feeds the local taste profile
+    // (same pattern as like, slightly stronger weight) and sends the real
+    // signal to the Worker, which now uses it in scoring too.
+    try {
+      const profile = getTasteProfile();
+      if (snippet.channelId) profile.channels[snippet.channelId] = (profile.channels[snippet.channelId] || 0) + 4;
+      const words = (snippet.title || "").toLowerCase().replace(/[^a-z0-9 ]/g,"").split(" ").filter(w=>w.length>3);
+      words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 2; });
+      localStorage.setItem("tasteProfile", JSON.stringify(profile));
+    } catch(e) {}
+    sendEngagement(videoId, snippet.channelId || "", "shared", undefined, undefined, null);
   };
   document.getElementById("vipSaveBtn").onclick = () => {
     if (!currentVideoId) { showHUD("No video playing"); return; }
@@ -2639,6 +2648,21 @@ async function loadVideoInfoPanel(videoId, snippet) {
   fetches.push(fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, videoCategoryId: topCat || "0", maxResults: 15, _: Date.now() }));
   // 6. General trending — ultimate fallback
   fetches.push(fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 15, _: Date.now() }));
+  // 7. New-channel discovery, balanced against channels you already know —
+  // the actual missing piece the suggested sidebar never had, unlike Home's
+  // own feed which already does this. Same quality-filtered Worker endpoint.
+  try {
+    const _profileForDiscovery = getTasteProfile();
+    const _watchedChannelIds = [...new Set(Object.keys(_profileForDiscovery.channels || {}))];
+    const _discKeywords = topBI.length ? [topBI[0]] : topKW.slice(0,2);
+    if (_discKeywords.length) {
+      fetches.push(fetch(HUB_WORKER_URL + "/discoverNewChannels", {
+        method: "POST",
+        headers: workerHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ keywords: _discKeywords, watchedChannelIds: _watchedChannelIds, userRegion })
+      }).then(r => r.json()));
+    }
+  } catch(e) {}
 
   const results = await Promise.allSettled(fetches);
 
