@@ -497,7 +497,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
    correctly on the actual video's edges rather than floating in the
    letterboxed black space beside a narrower, centered video. */
 #shortsPlayerBox { position: relative; aspect-ratio: 9 / 16; height: 100%; max-width: 100%; z-index: 1; }
-#shortsIframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; background: #000; }
+#shortsIframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; background: #000; overflow: hidden; }
 
 
 /* Full-bleed overlay controls — top-left cluster (play/pause, mute) */
@@ -629,7 +629,8 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   touch-action: manipulation; -webkit-tap-highlight-color: rgba(60,242,255,0.25);
 }
 #shortsCommentsCloseBtn::before { content: ""; position: absolute; inset: -12px; z-index: 1; }
-#shortsCommentsList { padding: 10px 14px 16px; overflow-y: auto; }
+#shortsCommentsList { padding: 10px 14px 16px; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+#shortsCommentsList::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .shorts-comment-item { margin-bottom: 12px; padding: 6px; border-radius: 8px; transition: box-shadow 0.15s ease, background 0.15s ease; }
 .shorts-comment-item.shorts-focused {
   box-shadow: 0 0 0 2px rgba(60,242,255,0.8), 0 0 12px rgba(60,242,255,0.4);
@@ -3103,6 +3104,10 @@ async function openAsShort(videoId, snippet) {
       const newBack = backBtn2.cloneNode(true);
       backBtn2.parentNode.replaceChild(newBack, backBtn2);
       newBack.addEventListener("click", () => {
+        document.body.style.overflow = "";
+        document.documentElement.style.overflowY = "";
+        document.documentElement.style.marginRight = "";
+        document.documentElement.style.paddingRight = "";
         const iframe = document.getElementById("shortsIframe");
         if (iframe) iframe.src = "about:blank";
         _restoreOnBack();
@@ -3478,6 +3483,21 @@ trendingTab.addEventListener("click", async () => {
 let _currentShortsKeyHandler = null;
 let _currentShortsFocusKeyHandler = null;
 async function openShortsTabSetup() {
+  // Disable body scroll while Shorts is open — restored on exit (in
+  // backBtn2's click handler below). Shorts is a fixed, full-viewport
+  // overlay, but the underlying page content stays present in the DOM
+  // underneath it (just visually covered), which was keeping the body's
+  // native scrollbar visible and functional the whole time Shorts was open.
+  document.body.style.overflow = "hidden";
+  document.documentElement.style.overflowY = "hidden";
+  // More aggressive fallback — physically push the scrollbar off-screen.
+  // overflow:hidden alone stopped scrolling (confirmed — the scrollbar
+  // used to move with swipes, now it's frozen) but apparently didn't hide
+  // its visual rendering on this WebView, despite the standard CSS rules
+  // that normally handle this elsewhere. This is a well-known, more
+  // forceful workaround for WebViews that don't fully honor those rules.
+  document.documentElement.style.marginRight = "-20px";
+  document.documentElement.style.paddingRight = "20px";
   // Remove any previous session's global listeners before attaching new
   // ones — these were accumulating on every repeated open from Home
   // (never actually removed), each holding a stale closure over a
@@ -3493,9 +3513,8 @@ async function openShortsTabSetup() {
   topbarEl.style.display = "none";
   document.getElementById("tabs").style.display = "none";
   shortsPageEl.innerHTML = `
-    <div id="shortsScrollbarMask" style="position:fixed;top:0;right:0;width:28px;height:100vh;background:#000;z-index:99999;pointer-events:none;"></div>
     <div id="shortsPlayerBox">
-      <iframe id="shortsIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+      <iframe id="shortsIframe" scrolling="no" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
       <div id="shortsSwipeZone" style="position:absolute;inset:0;z-index:6;pointer-events:auto;background:transparent;touch-action:none;"></div>
       <div id="shortsTopLeft">
         <button id="shortsPlayPauseBtn" class="shorts-icon-btn" tabindex="0">⏸</button>
@@ -3553,6 +3572,10 @@ async function openShortsTabSetup() {
   // Wire back button immediately before any async work — restores the
   // topbar/tabs hidden above, so leaving Shorts returns the app to normal.
   backBtn2.addEventListener("click", () => {
+    document.body.style.overflow = "";
+    document.documentElement.style.overflowY = "";
+    document.documentElement.style.marginRight = "";
+    document.documentElement.style.paddingRight = "";
     shortsIframe.src = "about:blank";
     shortsPageEl.style.display = "none";
     topbarEl.style.display = "flex";
@@ -3926,7 +3949,6 @@ async function openShortsTabSetup() {
   });
 
   const token = await getValidToken();
-  let data = { items: [] };
   const pool = [];
   let persistentSeenIds = new Set();
   try { persistentSeenIds = new Set(JSON.parse(localStorage.getItem("shortsSeenHistory") || "[]")); } catch(e) {}
@@ -3952,61 +3974,22 @@ async function openShortsTabSetup() {
     } catch(e) {}
   }
 
-  // SOURCES 2+3+4 all in parallel — taste keywords + generic + For You discovery
-  // Was 9+ sequential/parallel calls. Now 6 calls all at once — much faster load
+  // SOURCES 2+3+4 — taste keywords + generic + For You discovery, plus
+  // genuine 9:16 aspect-ratio verification via oEmbed, now handled
+  // server-side by the /shorts Worker endpoint. This used to be 6 parallel
+  // client-side calls plus manual duration filtering; the Worker now does
+  // the same candidate-gathering, adds real vertical-format verification
+  // (which the client never had at all), and caches the verified result.
   const topKW=getTopKeywords(6), topBI=getTopBigrams(4);
-  const sKW=[...topKW].sort(()=>Math.random()-0.5), sBI=[...topBI].sort(()=>Math.random()-0.5);
-  const recentS = getRecentSearches(2);
-  shortQIdx = Math.floor(Math.random()*SHORT_QUERIES.length);
-  const genericQ = SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length]; shortQIdx++;
-  const topCatsForShorts = getTopCategories(2);
-  const allCatsForShorts = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
-  const catToSearch = topCatsForShorts.length ? topCatsForShorts[0] : allCatsForShorts[Math.floor(Math.random()*allCatsForShorts.length)];
-  const viralQueries = ["shorts viral 2024","shorts trending now","shorts funny viral","shorts satisfying trending","shorts amazing moments"];
-  const viralQ = viralQueries[Math.floor(Math.random()*viralQueries.length)];
-
-  // Build search queries from taste profile for richer discovery
-  const searchQueries = [];
-  // Taste-based (what you like)
-  if (sBI.length>0) searchQueries.push({q:sBI[0]+" shorts", order:"date"});
-  if (sKW.length>0) searchQueries.push({q:sKW.slice(0,2).join(" ")+" shorts", order:"date"});
-  if (recentS.length>0) searchQueries.push({q:recentS[0]+" shorts", order:"date"});
-  // Search-based discovery (trending in your topics)
-  if (sBI.length>1) searchQueries.push({q:sBI[1]+" viral shorts", order:"viewCount"});
-  if (sKW.length>2) searchQueries.push({q:sKW[2]+" short video", order:"relevance"});
-
-  const parallelFetches = [
-    // Taste + search queries (all parallel) — search.list's videoDuration
-    // parameter is a genuine, YouTube-enforced server-side guarantee
-    // (under 4 minutes), so these sources are fully trusted as-is.
-    ...searchQueries.map(({q,order}) =>
-      fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",order,maxResults:8,_:Date.now()})
-    ),
-    // Generic rotation
-    fetchYouTube("search",{part:"snippet",q:genericQ,type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:userRegion,order:"date",maxResults:10,_:Date.now()}),
-    // Discovery: viral
-    fetchYouTube("search",{part:"snippet",q:viralQ,type:"video",videoDuration:"short",videoEmbeddable:"true",order:"viewCount",maxResults:10,_:Date.now()}),
-  ];
-  const parallelResults = await Promise.allSettled(parallelFetches);
-  parallelResults.forEach(r => {
-    if (r.status==="fulfilled") {
-      (r.value.items||[]).forEach(v => { const id=v.id?.videoId||v.id; if(id&&isNew(id)) pool.push({id,snippet:v.snippet}); });
-    }
-  });
-  data = parallelResults.find(r=>r.status==="fulfilled")?.value || {items:[]};
-
-  // Discovery: trending in your category — chart=mostPopular doesn't
-  // support videoDuration at all (that's search.list-only), so this
-  // source needs its own genuine, client-side verification using the
-  // real contentDetails.duration each item includes, rather than a
-  // parameter YouTube silently ignores.
+  let shortsWorkerNextToken = null;
   try {
-    const catPop = await fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:catToSearch,maxResults:20,_:Date.now()});
-    (catPop.items||[]).forEach(v => {
-      const id=v.id?.videoId||v.id;
-      const secs = v.contentDetails?._durationSeconds ?? parseDuration(v.contentDetails?.duration);
-      if (id && isNew(id) && secs!==null && secs>0 && secs<=180) pool.push({id,snippet:v.snippet});
-    });
+    const res = await fetch(HUB_WORKER_URL + "/shorts", {
+      method: "POST",
+      headers: workerHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ userRegion, keywords: [...topKW, ...topBI].slice(0,4), seenIds: pool.map(v=>v.id) })
+    }).then(r => r.json());
+    (res.items || []).forEach(v => { if (v.id && isNew(v.id)) pool.push(v); });
+    shortsWorkerNextToken = res.nextPageToken || null;
   } catch(e) {}
 
     const seen=new Set();
@@ -4025,7 +4008,7 @@ async function openShortsTabSetup() {
   shortsSeenIds = new Set(shortsItems.map(v=>v.id));
   try { localStorage.setItem("shortsSeenHistory",JSON.stringify([...shortsSeenIds,...persistentSeenIds].slice(0,50))); } catch(e) {}
 
-  if (data.nextPageToken) shortsNextPageToken=data.nextPageToken;
+  if (shortsWorkerNextToken) shortsNextPageToken=shortsWorkerNextToken;
   else { const seed=await fetchYouTube("search",{part:"snippet",q:SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length],type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:userRegion,maxResults:1,_:Date.now()}); shortsNextPageToken=seed.nextPageToken||"seed"; }
 
   if (!shortsItems.length) { shortsCounter.textContent="No shorts — tap Back"; return; }
