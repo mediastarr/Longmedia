@@ -4823,7 +4823,10 @@ async function loadMoreVideos() {
     // Hybrid pagination now handled by the Worker — reuses the real
     // continuation token for a few consecutive batches (genuine, efficient
     // pagination), then rotates category/keywords for variety. State
-    // persists in localStorage between "load more" taps.
+    // persists in localStorage between "load more" taps. Now also sends
+    // the full taste profile so the Worker can score and diversify each
+    // batch the same way the initial load already does, rather than
+    // returning candidates essentially as-is.
     const rotateCount = parseInt(localStorage.getItem("_homeRotateCount")||"0");
     const rotateIdx = parseInt(localStorage.getItem("_homeRotateIdx")||"0");
     const topKW = getTopKeywords(9);
@@ -4831,7 +4834,7 @@ async function loadMoreVideos() {
       const res = await fetch(HUB_WORKER_URL + "/loadMoreFeed", {
         method: "POST",
         headers: workerHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ tab: "home", userRegion, nextPageToken, rotateCount, rotateIdx, keywords: topKW.length >= 2 ? topKW.slice(0,3) : [] })
+        body: JSON.stringify({ tab: "home", userRegion, nextPageToken, rotateCount, rotateIdx, keywords: topKW.length >= 2 ? topKW.slice(0,3) : [], profile: getTasteProfile() })
       }).then(r => r.json());
       localStorage.setItem("_homeRotateCount", String(res.rotateCount));
       localStorage.setItem("_homeRotateIdx", String(res.rotateIdx));
