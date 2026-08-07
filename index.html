@@ -1754,6 +1754,17 @@ function hideUIForVideo() {
 }
 
 function showUIWithMiniPlayer() {
+  // Re-append the infinite-scroll sentinel now that the player (or Shorts)
+  // is closing — same fix already confirmed working. This function already
+  // runs on every path that returns to a feed view, so this covers all of
+  // them at once.
+  if (!document.getElementById("scrollSentinel")) {
+    const _s = document.createElement("div");
+    _s.id = "scrollSentinel";
+    _s.style.cssText = "height:1px;width:100%;";
+    document.body.appendChild(_s);
+    if (typeof infiniteScrollObserver !== "undefined") infiniteScrollObserver.observe(_s);
+  }
   topbarEl.style.display = "flex";
   searchTabEl.style.display = "flex";
   tabsEl.style.display = "flex";
@@ -2176,6 +2187,13 @@ function createYTPlayer(videoId, startSeconds) {
 function setPlayerVideo(videoId, snippet, startSeconds) {
   _logSessionAction("longform");
   savedScrollY = window.scrollY;
+  // Remove the infinite-scroll sentinel while the player is open — same
+  // fix already confirmed working for Shorts. It's always present in the
+  // DOM regardless of which view is active, and its presence alone was
+  // enough to produce a visible scrollbar even with the player itself
+  // covering the viewport.
+  const _sentinelEl = document.getElementById("scrollSentinel");
+  if (_sentinelEl) _sentinelEl.remove();
   currentVideoId = videoId;
   // Reset captions state for the new video
   captionsOn = false;
