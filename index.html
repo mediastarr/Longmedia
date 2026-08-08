@@ -2857,7 +2857,7 @@ function showSkeletons(count = 6) {
 // infinite-scroll pagination in loadMoreVideos (which previously skipped this
 // entirely, so blocked/watched/already-shown videos could reappear once you
 // scrolled past the first page).
-function filterAndTrackFeedItems(items) {
+function filterAndTrackFeedItems(items, isLoadMore) {
   try {
     const watchedSet = new Set(historyList.map(h => h.id?.videoId || h.id).filter(Boolean));
     const shownSet = new Set(JSON.parse(sessionStorage.getItem("feedShownIds") || "[]"));
@@ -2889,7 +2889,7 @@ function filterAndTrackFeedItems(items) {
     // candidates that still pass every real preference check (blocklist,
     // watch history, Shorts filter) even if they were shown earlier this
     // session — showing some repeats beats showing an empty feed.
-    if (filtered.length < 6) {
+    if (filtered.length < 6 && !isLoadMore) {
       const backfill = items.filter(item => {
         const id = item.id?.videoId || item.id;
         if (!id || _sessionDedup.has(id)) return false;
@@ -4901,7 +4901,7 @@ async function loadMoreVideos() {
       channelPageEl.appendChild(endMsg);
     }
   } else {
-    const newItems = filterAndTrackFeedItems(data.items || []);
+    const newItems = filterAndTrackFeedItems(data.items || [], true);
     const targetEl = feedContainerFor(currentTab);
     const cardsBefore = targetEl.querySelectorAll(".video-card").length;
     appendFeed(newItems);
