@@ -3424,7 +3424,7 @@ homeTab.addEventListener("click", async () => {
     function addL(items) { (items||[]).forEach(item => { const id = item.id?.videoId||item.id; if(!id||seen2.has(id)) return; seen2.add(id); allLogged.push(item); }); }
     // Personalized feed + order:date + mostPopular in parallel
     const [pf, fresh2, popular2] = await Promise.allSettled([
-      withHardTimeout(fetchPersonalizedFeed(), 18000, []),
+      withHardTimeout(fetchPersonalizedFeed(), 28000, []),
       fetchYouTube("search", { part: "snippet", type: "video", order: "date", regionCode: userRegion, videoCategoryId: cat, maxResults: 10, publishedAfter: since24h, _: Date.now() }, 2, { signal: mySignal }),
       fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, videoCategoryId: cat, maxResults: 50, _: Date.now() }, 2, { signal: mySignal })
     ]);
@@ -7110,7 +7110,7 @@ function applyShortPlayerPatch(card, item) {
         // stays visible for however long this upgrade takes, and only gets
         // replaced once it actually succeeds.
         if (feedEl.children.length === 0) showSkeletons(6);
-        const items = await withHardTimeout(fetchPersonalizedFeed(), 18000, []);
+        const items = await withHardTimeout(fetchPersonalizedFeed(), 28000, []);
         if (myStartupGen === _homeLoadGeneration && items && items.length) {
           renderFeed(items);
           showHUD("For You ✦");
@@ -7146,6 +7146,12 @@ function applyShortPlayerPatch(card, item) {
               feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home to retry.</div>';
             }
           }
+        } else if (myStartupGen === _homeLoadGeneration && feedEl.children.length > 0) {
+          // Cache already painted something, but the upgrade genuinely failed or
+          // timed out — this previously fell through both branches silently,
+          // leaving stale content on screen with zero indication anything was
+          // even attempted. At minimum, be honest that the refresh didn't happen.
+          showHUD("Couldn't refresh — showing last session");
         }
       }
     }
