@@ -2194,6 +2194,12 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   // covering the viewport.
   const _sentinelEl = document.getElementById("scrollSentinel");
   if (_sentinelEl) _sentinelEl.remove();
+  // Every new video always opens in full-screen mode, not mini — this flag
+  // needs to reflect that. Previously it was never reset here, meaning it
+  // could stay stuck at true from a completely unrelated, earlier
+  // minimize action, silently breaking anything downstream that correctly
+  // assumed it reflected the actual current visual state.
+  miniActive = false;
   currentVideoId = videoId;
   // Reset captions state for the new video
   captionsOn = false;
