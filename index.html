@@ -1647,11 +1647,11 @@ async function fetchPersonalizedFeed() {
   const topBId = getTopBigrams(2);
   if (topKWd.length >= 2 || topBId.length) {
     try {
-      const discRes = await fetch(HUB_WORKER_URL + "/discoverNewChannels", {
+      const discRes = await fetchWithTimeout(HUB_WORKER_URL + "/discoverNewChannels", {
         method: "POST",
         headers: workerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ keywords: topBId.length ? [topBId[0]] : topKWd.slice(0,2), watchedChannelIds: [...watchedChannelIds], userRegion })
-      }).then(r => r.json());
+      }, 8000).then(r => r.json());
       (discRes.items || []).forEach(item => feed.push(item));
     } catch(e) {}
   }
@@ -4839,11 +4839,11 @@ async function loadMoreVideos() {
     const topKW = getTopKeywords(9);
     let _shownIds = []; try { _shownIds = JSON.parse(sessionStorage.getItem("feedShownIds") || "[]"); } catch(e) {}
     try {
-      const res = await fetch(HUB_WORKER_URL + "/loadMoreFeed", {
+      const res = await fetchWithTimeout(HUB_WORKER_URL + "/loadMoreFeed", {
         method: "POST",
         headers: workerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ tab: "home", userRegion, nextPageToken, rotateCount, rotateIdx, totalBatches, keywords: topKW.length >= 2 ? topKW.slice(0,3) : [], profile: getTasteProfile(), excludeIds: _shownIds })
-      }).then(r => r.json());
+      }, 8000).then(r => r.json());
       localStorage.setItem("_homeRotateCount", String(res.rotateCount));
       localStorage.setItem("_homeRotateIdx", String(res.rotateIdx));
       localStorage.setItem("_homeTotalBatches", String(res.totalBatches || totalBatches));
@@ -4864,11 +4864,11 @@ async function loadMoreVideos() {
     const trendRotateCount = parseInt(localStorage.getItem("_trendRotateCount")||"0");
     const trendRotateIdx = parseInt(localStorage.getItem("_trendRotateIdx")||"0");
     try {
-      const res = await fetch(HUB_WORKER_URL + "/loadMoreFeed", {
+      const res = await fetchWithTimeout(HUB_WORKER_URL + "/loadMoreFeed", {
         method: "POST",
         headers: workerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ tab: "trending", userRegion, nextPageToken, rotateCount: trendRotateCount, rotateIdx: trendRotateIdx, keywords: [] })
-      }).then(r => r.json());
+      }, 8000).then(r => r.json());
       localStorage.setItem("_trendRotateCount", String(res.rotateCount));
       localStorage.setItem("_trendRotateIdx", String(res.rotateIdx));
       data = { items: res.items, nextPageToken: res.nextPageToken };
