@@ -6182,7 +6182,17 @@ async function _pollCheckNewContent() {
     let mergedCount = 0;
     try {
       const existing = JSON.parse(localStorage.getItem("hubNewVideos") || "[]");
-      const merged = [...subOnly, ...existing].filter((v, i, a) => a.findIndex(x => x.videoId === v.videoId) === i).slice(0, 30);
+      let merged = [...subOnly, ...existing].filter((v, i, a) => a.findIndex(x => x.videoId === v.videoId) === i).slice(0, 30);
+      // Filter out anything already marked seen — without this, stale
+      // entries from earlier poll cycles that were already injected and
+      // shown (but never removed from this list) kept inflating the badge
+      // count, even though _injectHubVideos() would silently drop them the
+      // moment the user actually tapped Home. This is exactly what caused
+      // a badge saying "20 new" to only ever inject 2.
+      try {
+        const seenForBadge = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
+        merged = merged.filter(v => !seenForBadge.has(v.videoId));
+      } catch(e) {}
       localStorage.setItem("hubNewVideos", JSON.stringify(merged));
       mergedCount = merged.length;
       const discoveryOnly = allNew.filter(v => v.source !== "subscription");
