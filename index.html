@@ -154,6 +154,7 @@ body.light #searchTab { background: none; }
   margin-top: 16px; border-radius: 22px; overflow: hidden; position: relative; z-index: 30;
   background: radial-gradient(circle at 50% 0%, rgba(60,242,255,0.18), rgba(5,6,12,0.98));
   height: 340px; display: none;
+  -webkit-user-select: none; -ms-user-select: none; user-select: none;
 }
 /* CHANGE: top:auto so mini player anchors to bottom-right correctly */
 #playerSection.player-mini { position: fixed; right: 16px; bottom: 16px; top: auto; width: 260px; height: 150px; z-index: 40; }
@@ -2591,7 +2592,7 @@ async function loadVideoInfoPanel(videoId, snippet) {
   document.getElementById("vipBlockChannelBtn").onclick = () => { blockChannel(snippet.channelId||"", snippet.channelTitle||""); };
   document.getElementById("vipShareBtn").onclick = () => {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    if (navigator.share) navigator.share({ title, url }).catch(() => {});
+    if (navigator.share) navigator.share({ title, url }).then(() => showHUD("Shared!")).catch(() => {});
     else navigator.clipboard?.writeText(url).then(() => showHUD("Link copied!")).catch(() => showHUD("youtube.com/watch?v=" + videoId));
     // Share is a strong positive signal — feeds the local taste profile
     // (same pattern as like, slightly stronger weight) and sends the real
@@ -3846,7 +3847,7 @@ async function openShortsTabSetup() {
     const id = currentItem.id;
     const snippet = currentItem.snippet || {};
     const url = `https://www.youtube.com/watch?v=${id}`;
-    if (navigator.share) navigator.share({ title: snippet.title || "", url }).catch(() => {});
+    if (navigator.share) navigator.share({ title: snippet.title || "", url }).then(() => showHUD("Shared!")).catch(() => {});
     else navigator.clipboard?.writeText(url).then(() => showHUD("Link copied!")).catch(() => showHUD("youtube.com/watch?v=" + id));
     // Same taste-profile update and Worker signal already proven working
     // for the medium player's share button — completes the same feature
