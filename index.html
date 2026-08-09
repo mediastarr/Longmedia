@@ -3520,25 +3520,19 @@ trendingTab.addEventListener("click", async () => {
   const mySignal = startNewFeedLoad();
   nextPageToken = null; setActiveTab("trending"); showSkeletons(6);
   try {
-    // Rotate through categories each tap for variety
-    const TREND_CATS = ["0","1","2","10","15","17","20","22","23","24","25","26","27","28"];
-    const trendRotate = parseInt(localStorage.getItem("_trendRotate")||"0");
-    localStorage.setItem("_trendRotate", String((trendRotate+1)%TREND_CATS.length));
-    const rotateCat = TREND_CATS[trendRotate];
-    const myCat = trendRotate === 0 ? (getTopCategoryId()||"0") : rotateCat;
-    const allItems = []; const seen = new Set();
-    function addU(items) { (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); }); }
-    const tSince24h = new Date(Date.now()-86400000).toISOString();
-    // Parallel fetch, cached (fetchYouTube not fetchYouTubeDirect) — benefits
-    // from a warm Worker cache on repeat loads, same pattern as Movies tab
-    const [fresh, popular, general] = await Promise.allSettled([
-      fetchYouTube("search",{part:"snippet",type:"video",order:"date",regionCode:userRegion,videoCategoryId:myCat,maxResults:25,publishedAfter:tSince24h,_:Date.now()}, 2, { filterShorts: true, trim: true, signal: mySignal }),
-      fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:myCat,maxResults:25,_:Date.now()}, 2, { filterShorts: true, trim: true, signal: mySignal }),
-      fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,maxResults:20,_:Date.now()}, 2, { filterShorts: true, trim: true, signal: mySignal })
-    ]);
-    if (fresh.status==="fulfilled") addU(fresh.value.items);
-    if (popular.status==="fulfilled") addU(popular.value.items);
-    if (general.status==="fulfilled") addU(general.value.items);
+    // Simplified to match RayTube's proven model and, critically, the
+    // query shape /loadMoreFeed actually continues — plain mostPopular, no
+    // category filter. The previous category-rotated version produced a
+    // nextPageToken from a fundamentally different query than what
+    // subsequent "load more" calls continue, which is the real reason
+    // Trending's pagination was silently broken from the very first tap:
+    // YouTube's page tokens are tied to the exact query that generated
+    // them, so feeding one query's token into a structurally different
+    // one predictably fails. Variety now comes from client-side scoring
+    // (getPersonalizedTrending's log-decay weighting) on a broad pool,
+    // not from narrowing the source query itself.
+    const data = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 50, _: Date.now() }, 2, { filterShorts: true, trim: true, signal: mySignal });
+    const allItems = data.items || [];
 
     if (myGen !== _homeLoadGeneration) return; // user has since switched tabs — discard
 
@@ -3551,7 +3545,7 @@ trendingTab.addEventListener("click", async () => {
     const ranked = await getPersonalizedTrending(allItems);
     if (myGen !== _homeLoadGeneration) return; // user has since switched tabs — discard
     renderFeed(await enrichWithDurations(ranked)); showHUD("Trending ✦");
-    nextPageToken = (popular.status==="fulfilled" && popular.value.nextPageToken) || "seed";
+    nextPageToken = data.nextPageToken || "seed";
   } catch(e) {
     if (myGen === _homeLoadGeneration) {
       trendingFeedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Trending to retry.</div>';
@@ -4883,20 +4877,14 @@ async function loadMoreVideos() {
     // the full taste profile so the Worker can score and diversify each
     // batch the same way the initial load already does, rather than
     // returning candidates essentially as-is.
-    const rotateCount = parseInt(localStorage.getItem("_homeRotateCount")||"0");
-    const rotateIdx = parseInt(localStorage.getItem("_homeRotateIdx")||"0");
-    const totalBatches = parseInt(localStorage.getItem("_homeTotalBatches")||"0");
     const topKW = getTopKeywords(9);
     let _shownIds = []; try { _shownIds = JSON.parse(sessionStorage.getItem("feedShownIds") || "[]"); } catch(e) {}
     try {
       const res = await fetch(HUB_WORKER_URL + "/loadMoreFeed", {
         method: "POST",
         headers: workerHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ tab: "home", userRegion, nextPageToken, rotateCount, rotateIdx, totalBatches, keywords: topKW.length >= 2 ? topKW.slice(0,3) : [], profile: getTasteProfile(), excludeIds: _shownIds })
+        body: JSON.stringify({ tab: "home", userRegion, nextPageToken, keywords: topKW.length >= 2 ? topKW.slice(0,3) : [], profile: getTasteProfile(), excludeIds: _shownIds })
       }).then(r => r.json());
-      localStorage.setItem("_homeRotateCount", String(res.rotateCount));
-      localStorage.setItem("_homeRotateIdx", String(res.rotateIdx));
-      localStorage.setItem("_homeTotalBatches", String(res.totalBatches || totalBatches));
       data = { items: res.items, nextPageToken: res.nextPageToken };
     } catch(e) {
       data = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 20, _: Date.now() }, 2, { filterShorts: true, trim: true });
@@ -4910,17 +4898,14 @@ async function loadMoreVideos() {
     if (!data.nextPageToken) data.nextPageToken = "seed";
   }
   if (currentTab === "trending") {
-    // Hybrid pagination now handled by the Worker — same pattern as Home.
-    const trendRotateCount = parseInt(localStorage.getItem("_trendRotateCount")||"0");
-    const trendRotateIdx = parseInt(localStorage.getItem("_trendRotateIdx")||"0");
+    // Single continuing query, matching Home's simplified model — no more
+    // rotation state to track between calls.
     try {
       const res = await fetch(HUB_WORKER_URL + "/loadMoreFeed", {
         method: "POST",
         headers: workerHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ tab: "trending", userRegion, nextPageToken, rotateCount: trendRotateCount, rotateIdx: trendRotateIdx, keywords: [] })
+        body: JSON.stringify({ tab: "trending", userRegion, nextPageToken, keywords: [] })
       }).then(r => r.json());
-      localStorage.setItem("_trendRotateCount", String(res.rotateCount));
-      localStorage.setItem("_trendRotateIdx", String(res.rotateIdx));
       data = { items: res.items, nextPageToken: res.nextPageToken };
     } catch(e) {
       data = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 20, _: Date.now() }, 2, { filterShorts: true, trim: true });
