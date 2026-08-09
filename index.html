@@ -3342,7 +3342,7 @@ homeTab.addEventListener("click", async () => {
     let hubVideos = [];
     try {
       const hubRaw = localStorage.getItem("hubNewVideos");
-      if (hubRaw) { hubVideos = JSON.parse(hubRaw) || []; localStorage.removeItem("hubNewVideos"); }
+      if (hubRaw) hubVideos = JSON.parse(hubRaw) || [];
     } catch(e) {}
     // Defensive fallback — if the badge says new videos exist but the video
     // data itself isn't there yet, this is likely a genuine timing gap
@@ -3356,13 +3356,24 @@ homeTab.addEventListener("click", async () => {
           if (attempt > 0) await new Promise(r => setTimeout(r, 400));
           await _pollCheckNewContent();
           const retryRaw = localStorage.getItem("hubNewVideos");
-          if (retryRaw) { hubVideos = JSON.parse(retryRaw) || []; localStorage.removeItem("hubNewVideos"); }
+          if (retryRaw) hubVideos = JSON.parse(retryRaw) || [];
         } catch(e) {}
       }
     }
-    _pollClearBadge();
-    if (hubVideos.length) await _injectHubVideos(hubVideos);
-    else showHUD("Couldn't load new videos — pull to refresh");
+    // Only clear the badge and drop the pending list once we've confirmed
+    // the videos actually loaded — clearing them unconditionally (the old
+    // behavior) meant a single transient fetch failure silently threw the
+    // whole batch away, and since nothing got marked "seen" in that case,
+    // the badge would just reappear with the same stuck videos on the next
+    // poll/restart, forever failing the same way.
+    const injected = hubVideos.length ? await _injectHubVideos(hubVideos) : true;
+    if (injected) {
+      localStorage.removeItem("hubNewVideos");
+      _pollClearBadge();
+      if (!hubVideos.length) showHUD("Couldn't load new videos — pull to refresh");
+    } else {
+      showHUD("Couldn't load new videos — tap Home to retry");
+    }
     if (!nextPageToken) nextPageToken = "seed";
     isLoadingHome = false;
     return;
@@ -6326,7 +6337,7 @@ async function _pollCheckNewContent() {
 }
 
 async function _injectHubVideos(hubVideos) {
-  if (!hubVideos || !hubVideos.length) return;
+  if (!hubVideos || !hubVideos.length) return true;
   try {
     // Filter out already-watched AND explicitly blocked (Not Interested / disliked) videos
     try {
@@ -6335,11 +6346,11 @@ async function _injectHubVideos(hubVideos) {
       const blockSet = new Set(getBlocklist());
       hubVideos = hubVideos.filter(v => !seenSet.has(v.videoId) && !blockSet.has(v.videoId));
     } catch(e) {}
-    if (!hubVideos.length) return;
+    if (!hubVideos.length) return true; // nothing left to show — not a failure, already handled
 
     const ids = hubVideos.map(v => v.videoId).join(",");
     const data = await fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() });
-    if (!data.items || !data.items.length) return;
+    if (!data.items || !data.items.length) return false; // fetch failed/empty — let the caller retry instead of losing these
     const frag = document.createDocumentFragment();
     data.items.forEach(item => {
       const snippet = item.snippet || {};
@@ -6391,7 +6402,11 @@ async function _injectHubVideos(hubVideos) {
       localStorage.setItem("hubSeenIds", JSON.stringify(mergedSeen));
       if (_pollKnownIds) injectedIds.forEach(id => _pollKnownIds.add(id));
     } catch(e) {}
-  } catch(e) {}
+    return true;
+  } catch(e) {
+    console.error("[injectHubVideos] failed:", e);
+    return false;
+  }
 }
 
 function _startPolling() {
