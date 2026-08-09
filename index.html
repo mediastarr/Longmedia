@@ -5038,20 +5038,41 @@ scrollTopBtn.addEventListener("click", () => {
 })();
 
 let scrollCooldown = false;
+let _lastScrollY = window.scrollY;
+let _lastScrollTs = Date.now();
+let _fastScrollMode = false;
 window.addEventListener("scroll", () => {
   scrollTopBtn.classList.toggle("visible", window.scrollY > 600);
+  // Lightweight velocity check, piggybacking on this existing listener
+  // rather than adding a new one. Neural Band swipes are a different input
+  // model than a finger dragging across a touchscreen — a rapid sequence
+  // of swipes could plausibly outrun a fixed pre-fetch distance in a way
+  // less likely with a touchscreen's more naturally-bounded scroll physics.
+  const now = Date.now();
+  const dt = now - _lastScrollTs;
+  if (dt > 50) { // sample every ~50ms+, not on every micro-event
+    const dy = Math.abs(window.scrollY - _lastScrollY);
+    const pxPerSec = (dy / dt) * 1000;
+    const shouldBeFast = pxPerSec > 2500; // fast, deliberate swipe sequence
+    if (shouldBeFast !== _fastScrollMode) {
+      _fastScrollMode = shouldBeFast;
+      swapInfiniteScrollObserver(shouldBeFast ? "0px 0px 1400px 0px" : "0px 0px 600px 0px");
+    }
+    _lastScrollY = window.scrollY;
+    _lastScrollTs = now;
+  }
 });
 
 // True infinite scroll via Intersection Observer, replacing the old
 // scroll-event-based approach. A single sentinel element, appended once
 // at the very bottom of the page, gets observed continuously — when it
-// enters the viewport (rootMargin pre-triggers this 600px before it's
-// actually visible, so the next batch loads before the user hits the
-// bottom), it fires the same load-more logic as before. This is
-// structurally more robust than the old approach: rather than depending
-// on nextPageToken being correctly set at every single code path that
-// populates a feed (which kept revealing new gaps across several rounds
-// of fixes), the observer just checks scroll position directly, and
+// enters the viewport (rootMargin pre-triggers this before it's actually
+// visible, so the next batch loads before the user hits the bottom), it
+// fires the same load-more logic as before. This is structurally more
+// robust than the old approach: rather than depending on nextPageToken
+// being correctly set at every single code path that populates a feed
+// (which kept revealing new gaps across several rounds of fixes), the
+// observer just checks scroll position directly, and
 // loadMoreVideos()/loadMoreSubs() already handle a missing/seed token
 // internally regardless of how the feed was populated.
 const scrollSentinel = document.createElement("div");
@@ -5059,7 +5080,7 @@ scrollSentinel.id = "scrollSentinel";
 scrollSentinel.style.cssText = "height:1px;width:100%;";
 document.body.appendChild(scrollSentinel);
 
-const infiniteScrollObserver = new IntersectionObserver((entries) => {
+function _infiniteScrollCallback(entries) {
   if (!entries[0].isIntersecting) return;
   if (isLoadingMore || scrollCooldown) return;
   scrollCooldown = true; setTimeout(() => { scrollCooldown = false; }, 800);
@@ -5082,8 +5103,20 @@ const infiniteScrollObserver = new IntersectionObserver((entries) => {
       infiniteScrollObserver.observe(scrollSentinel);
     }
   })();
-}, { rootMargin: "0px 0px 600px 0px" });
+}
+
+let infiniteScrollObserver = new IntersectionObserver(_infiniteScrollCallback, { rootMargin: "0px 0px 600px 0px" });
 infiniteScrollObserver.observe(scrollSentinel);
+
+// Swaps to a wider (or back to normal) pre-fetch margin — Intersection
+// Observer's rootMargin can't be changed on an existing instance, so this
+// disconnects and recreates. Only called on genuine fast/normal state
+// transitions above, not per scroll event, so recreation stays infrequent.
+function swapInfiniteScrollObserver(margin) {
+  try { infiniteScrollObserver.disconnect(); } catch(e) {}
+  infiniteScrollObserver = new IntersectionObserver(_infiniteScrollCallback, { rootMargin: margin });
+  infiniteScrollObserver.observe(scrollSentinel);
+}
 
 async function loadChannelPage(channelId) {
   setActiveTab("channel"); currentChannelId = channelId;
