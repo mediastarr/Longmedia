@@ -4865,16 +4865,18 @@ async function loadMoreVideos() {
     // returning candidates essentially as-is.
     const rotateCount = parseInt(localStorage.getItem("_homeRotateCount")||"0");
     const rotateIdx = parseInt(localStorage.getItem("_homeRotateIdx")||"0");
+    const totalBatches = parseInt(localStorage.getItem("_homeTotalBatches")||"0");
     const topKW = getTopKeywords(9);
     let _shownIds = []; try { _shownIds = JSON.parse(sessionStorage.getItem("feedShownIds") || "[]"); } catch(e) {}
     try {
       const res = await fetch(HUB_WORKER_URL + "/loadMoreFeed", {
         method: "POST",
         headers: workerHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ tab: "home", userRegion, nextPageToken, rotateCount, rotateIdx, keywords: topKW.length >= 2 ? topKW.slice(0,3) : [], profile: getTasteProfile(), excludeIds: _shownIds })
+        body: JSON.stringify({ tab: "home", userRegion, nextPageToken, rotateCount, rotateIdx, totalBatches, keywords: topKW.length >= 2 ? topKW.slice(0,3) : [], profile: getTasteProfile(), excludeIds: _shownIds })
       }).then(r => r.json());
       localStorage.setItem("_homeRotateCount", String(res.rotateCount));
       localStorage.setItem("_homeRotateIdx", String(res.rotateIdx));
+      localStorage.setItem("_homeTotalBatches", String(res.totalBatches || totalBatches));
       data = { items: res.items, nextPageToken: res.nextPageToken };
     } catch(e) {
       data = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 20, _: Date.now() }, 2, { filterShorts: true, trim: true });
