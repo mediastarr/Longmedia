@@ -1019,6 +1019,20 @@ let channelNextPageToken = null;
 let channelUploadsId = null;
 let subsReturnScrollY = 0;
 let historyList = JSON.parse(localStorage.getItem("historyList") || "[]");
+let _historyEarlierFull = [];
+let _historyEarlierRendered = 0;
+let _historyAddHistoryCards = null;
+
+// Renders the next batch of "Earlier" history items — real pagination,
+// replacing what was previously a hard cap at 30 with nothing beyond it
+// ever reachable. Called both on initial History load and by the shared
+// Intersection Observer as the user scrolls further.
+function loadMoreHistory() {
+  if (!_historyAddHistoryCards || _historyEarlierRendered >= _historyEarlierFull.length) return;
+  const next = _historyEarlierFull.slice(_historyEarlierRendered, _historyEarlierRendered + 30);
+  _historyAddHistoryCards(next);
+  _historyEarlierRendered += next.length;
+}
 let shortsItems = [];
 let shortsSeenIds = new Set();
 let shortsIndex = 0;
@@ -4491,7 +4505,13 @@ historyTab.addEventListener("click", async () => {
   if (today.length) { addHeader("▸ Today"); addHistoryCards(today); }
   if (yesterday.length) { addHeader("▸ Yesterday"); addHistoryCards(yesterday); }
   if (thisWeek.length) { addHeader("▸ This Week"); addHistoryCards(thisWeek); }
-  if (earlier.length) { addHeader("▸ Earlier"); addHistoryCards(earlier.slice(0, 30)); }
+  if (earlier.length) {
+    addHeader("▸ Earlier");
+    _historyEarlierFull = earlier;
+    _historyEarlierRendered = 0;
+    _historyAddHistoryCards = addHistoryCards;
+    loadMoreHistory();
+  }
   preCacheShorts(historyList.slice(0, 60).map(h => ({ id: h.id?.videoId || h.id, snippet: h.snippet })).filter(x => x.id)).catch(() => {});
   if (!historyList.length) historyFeedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">No watch history yet. Videos you watch will appear here.</div>';
   // Fetch Liked Videos and Watch Later from YouTube
@@ -5089,6 +5109,8 @@ function _infiniteScrollCallback(entries) {
       if (currentTab === "subs" && subsNextPageToken) {
         isLoadingMore = true;
         try { await loadMoreSubs(); } catch(e) {} finally { isLoadingMore = false; }
+      } else if (currentTab === "history" && _historyEarlierRendered < _historyEarlierFull.length) {
+        loadMoreHistory();
       } else if (nextPageToken) {
         isLoadingMore = true;
         try { await loadMoreVideos(); } catch(e) {} finally { isLoadingMore = false; }
