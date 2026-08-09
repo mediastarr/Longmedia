@@ -4878,13 +4878,15 @@ async function loadMoreVideos() {
     // batch the same way the initial load already does, rather than
     // returning candidates essentially as-is.
     const topKW = getTopKeywords(9);
+    const totalBatches = parseInt(localStorage.getItem("_homeTotalBatches")||"0");
     let _shownIds = []; try { _shownIds = JSON.parse(sessionStorage.getItem("feedShownIds") || "[]"); } catch(e) {}
     try {
       const res = await fetch(HUB_WORKER_URL + "/loadMoreFeed", {
         method: "POST",
         headers: workerHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ tab: "home", userRegion, nextPageToken, keywords: topKW.length >= 2 ? topKW.slice(0,3) : [], profile: getTasteProfile(), excludeIds: _shownIds })
+        body: JSON.stringify({ tab: "home", userRegion, nextPageToken, totalBatches, keywords: topKW.length >= 2 ? topKW.slice(0,3) : [], profile: getTasteProfile(), excludeIds: _shownIds })
       }).then(r => r.json());
+      localStorage.setItem("_homeTotalBatches", String(res.totalBatches || totalBatches));
       data = { items: res.items, nextPageToken: res.nextPageToken };
     } catch(e) {
       data = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 20, _: Date.now() }, 2, { filterShorts: true, trim: true });
@@ -4901,11 +4903,13 @@ async function loadMoreVideos() {
     // Single continuing query, matching Home's simplified model — no more
     // rotation state to track between calls.
     try {
+      const trendTotalBatches = parseInt(localStorage.getItem("_trendTotalBatches")||"0");
       const res = await fetch(HUB_WORKER_URL + "/loadMoreFeed", {
         method: "POST",
         headers: workerHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ tab: "trending", userRegion, nextPageToken, keywords: [] })
+        body: JSON.stringify({ tab: "trending", userRegion, nextPageToken, totalBatches: trendTotalBatches, keywords: [] })
       }).then(r => r.json());
+      localStorage.setItem("_trendTotalBatches", String(res.totalBatches || trendTotalBatches));
       data = { items: res.items, nextPageToken: res.nextPageToken };
     } catch(e) {
       data = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 20, _: Date.now() }, 2, { filterShorts: true, trim: true });
