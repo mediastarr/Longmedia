@@ -7155,6 +7155,7 @@ function applyShortPlayerPatch(card, item) {
   })();
 
   // Wait for auth to complete (was running in parallel)
+  let _homeStartupUpgraded = false;
   const ok = await authPromise;
   if (ok) {
     showHUD("Signed in ✓");
@@ -7203,6 +7204,7 @@ function applyShortPlayerPatch(card, item) {
             nextPageToken = seed.nextPageToken || "seed";
             _homeLastLoaded = Date.now();
             _homeCacheValid = (_feedOwner === "home" && feedEl.children.length > 0);
+            _homeStartupUpgraded = true;
           }
         } else if (myStartupGen === _homeLoadGeneration && feedEl.children.length === 0) {
           // The personalized fetch timed out or came back empty, AND the earlier
@@ -7221,6 +7223,7 @@ function applyShortPlayerPatch(card, item) {
                 showHUD("Home");
                 _homeLastLoaded = Date.now();
                 _homeCacheValid = (_feedOwner === "home" && feedEl.children.length > 0);
+                _homeStartupUpgraded = true;
               } else {
                 feedEl.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Home to retry.</div>';
               }
@@ -7238,6 +7241,36 @@ function applyShortPlayerPatch(card, item) {
           showHUD("Couldn't refresh — showing last session");
         }
       }
+    }
+  }
+
+  // Whatever the cause — auth refresh failed, not enough history yet, or the
+  // personalized fetch above timed out — if we're still showing last
+  // session's stale cached feed at this point, don't leave it there
+  // indefinitely. Do one plain, non-personalized refresh (the same source
+  // _startupFetch would have used, had it not skipped itself above to avoid
+  // a cached → generic → personalized flicker).
+  if (paintedFromCache && !_homeStartupUpgraded && currentTab === "home") {
+    try {
+      const fbGen = _homeLoadGeneration;
+      const fb = await withHardTimeout(
+        fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 30, _: Date.now() }),
+        10000, { items: [] }
+      );
+      if (fbGen === _homeLoadGeneration) {
+        if (fb.items && fb.items.length) {
+          nextPageToken = fb.nextPageToken || "seed";
+          renderFeed(await enrichWithDurations(fb.items));
+          showHUD("Home");
+          _homeLastLoaded = Date.now();
+          _homeCacheValid = (_feedOwner === "home" && feedEl.children.length > 0);
+          try { localStorage.setItem("cachedHomeFeed", JSON.stringify(fb.items.slice(0,20))); } catch(e) {}
+        } else {
+          showHUD("Couldn't refresh — showing last session");
+        }
+      }
+    } catch(e) {
+      showHUD("Couldn't refresh — showing last session");
     }
   }
 
