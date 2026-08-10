@@ -2954,13 +2954,23 @@ function renderFeed(items) {
   _feedOwner = currentTab;
   // Explicitly re-attach the infinite scroll observer after every full
   // render — the same fix already proven correct for the player-exit path.
-  // A full reload resets scroll position and rebuilds the entire feed;
-  // rather than assuming the observer stayed correctly attached through
-  // that, this guarantees it's freshly working every time.
   try {
     if (typeof infiniteScrollObserver !== "undefined" && typeof scrollSentinel !== "undefined") {
       infiniteScrollObserver.unobserve(scrollSentinel);
       infiniteScrollObserver.observe(scrollSentinel);
+      // Beyond just re-attaching: if the sentinel is already within the
+      // trigger zone right after this render (a real possibility on a
+      // compact display — the freshly-rendered batch might not be tall
+      // enough to push the sentinel genuinely out of range), the Observer
+      // may never fire a fresh callback for it, since it typically only
+      // fires on a transition into/out of range, not on every check.
+      // Explicitly check the sentinel's actual position and manually
+      // trigger the same load-more path if it's already close enough,
+      // rather than depend entirely on a callback that might not come.
+      const rect = scrollSentinel.getBoundingClientRect();
+      if (rect.top < window.innerHeight + 600) {
+        _infiniteScrollCallback([{ isIntersecting: true }]);
+      }
     }
   } catch(e) {}
 }
