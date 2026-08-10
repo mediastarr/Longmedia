@@ -1619,7 +1619,7 @@ async function fetchPersonalizedFeed() {
         try {
           const llRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=15", { headers: { Authorization: "Bearer " + token } });
           const llData = await llRes.json();
-          const likedItems = (llData.items || []).map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: { ...it.snippet, channelId: it.snippet?.videoOwnerChannelId || it.snippet?.channelId, channelTitle: it.snippet?.videoOwnerChannelTitle || it.snippet?.channelTitle, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } }));
+          const likedItems = (llData.items || []).map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } }));
           for (let i = likedItems.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [likedItems[i], likedItems[j]] = [likedItems[j], likedItems[i]]; }
           addItems(likedItems.slice(0, 5), 3);
         } catch(e) {}
@@ -5793,33 +5793,10 @@ async function runSubscriptionSync(isManual = false) {
     }
 
     syncProgressFill.style.width = "60%";
-    syncStatus.textContent = isManual
-      ? "Building taste profile from " + items.length + " subscriptions…"
-      : "Adding " + items.length + " subscriptions to your taste profile…";
+    syncStatus.textContent = "Building taste profile from " + items.length + " subscriptions…";
 
-    // Automatic runs merge into the existing, real profile — built up over
-    // time from actual watch history, completion rates, likes, shares —
-    // rather than replacing it outright. Previously this always started
-    // from a blank object, meaning every 2 hours and on every app open,
-    // that accumulated personalization got silently discarded and
-    // replaced with a much thinner, subscription-only snapshot. Manual
-    // runs (the button) still start genuinely fresh, matching the
-    // explicit, opt-in reset it's meant to be — its full localStorage
-    // wipe above already cleared tasteProfile before this point runs.
-    const profile = isManual
-      ? { channels: {}, categories: {}, keywords: {}, bigrams: {}, recentVideoIds: [], syncedAt: Date.now() }
-      : getTasteProfile();
-    if (!isManual) {
-      // getTasteProfile() can return a bare {} (no prior profile, or a
-      // parse error) — guarantee every field buildExtract needs actually
-      // exists, rather than risk it throwing on a missing one.
-      profile.channels = profile.channels || {};
-      profile.categories = profile.categories || {};
-      profile.keywords = profile.keywords || {};
-      profile.bigrams = profile.bigrams || {};
-      profile.recentVideoIds = profile.recentVideoIds || [];
-      profile.syncedAt = Date.now();
-    }
+    // Build fresh profile from subscriptions only
+    const profile = { channels: {}, categories: {}, keywords: {}, bigrams: {}, recentVideoIds: [], syncedAt: Date.now() };
     const extract = buildExtract(profile);
 
     // Get channel uploads to learn taste from actual subscribed content
