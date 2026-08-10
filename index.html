@@ -767,12 +767,6 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   <div id="playerSection" class="player parallax fx-bloom fx-ambient fx-glass fx-chroma fx-audio">
     <div id="playerFrame"></div>
     <div id="yt-focus-sink" tabindex="0" aria-hidden="true" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;"></div>
-    <div id="playerSeekBar" style="position:absolute; left:0; right:0; bottom:52px; height:16px; z-index:15; display:flex; align-items:center; padding:0 10px; touch-action:none;">
-      <div id="playerSeekTrack" style="position:relative; width:100%; height:4px; background:rgba(255,255,255,0.25); border-radius:2px; cursor:pointer;">
-        <div id="playerSeekFill" style="position:absolute; left:0; top:0; height:100%; width:0%; background:#3cf2ff; border-radius:2px;"></div>
-        <div id="playerSeekThumb" style="position:absolute; top:50%; left:0%; width:12px; height:12px; margin-left:-6px; margin-top:-6px; border-radius:50%; background:#3cf2ff; box-shadow:0 0 6px rgba(60,242,255,0.8); display:none;"></div>
-      </div>
-    </div>
     <div class="player-controls" id="playerControls">
       <button id="playPauseBtn" tabindex="0" title="Play/Pause">⏸</button>
       <button id="rewindBtn" tabindex="0" title="Rewind 10s">⏪10</button>
@@ -2023,7 +2017,7 @@ window.onYouTubeIframeAPIReady = function () {
     if (!div) { div = document.createElement("div"); div.id = "playerFrame"; container.insertBefore(div, container.firstChild); }
     ytPlayer = new YT.Player("playerFrame", {
       width: "100%", height: "100%",
-      playerVars: { autoplay: 0, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, controls: 0, origin: location.origin },
+      playerVars: { autoplay: 0, rel: 0, playsinline: 1, modestbranding: 1, enablejsapi: 1, origin: location.origin },
       events: {
         onReady: () => { isPlayerReady = true; },
         onStateChange: (e) => {
@@ -2551,7 +2545,7 @@ async function loadVideoInfoPanel(videoId, snippet) {
       if (liked) {
         try {
           const profile = getTasteProfile();
-          if (snippet.channelId) profile.channels[snippet.channelId] = (profile.channels[snippet.channelId] || 0) + 5;
+          if (snippet.channelId) { const ch = profile.channels[snippet.channelId] || { weight: 0 }; ch.weight = (ch.weight||0) + 5; ch.lastWatch = Date.now(); profile.channels[snippet.channelId] = ch; }
           const words = (snippet.title || "").toLowerCase().replace(/[^a-z0-9 ]/g,"").split(" ").filter(w=>w.length>3);
           words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 5; });
           if (snippet.categoryId) profile.categories[snippet.categoryId] = (profile.categories[snippet.categoryId] || 0) + 3;
@@ -2586,7 +2580,7 @@ async function loadVideoInfoPanel(videoId, snippet) {
       if (disliked) {
         try {
           const profile = getTasteProfile();
-          if (snippet.channelId) profile.channels[snippet.channelId] = Math.max(0, (profile.channels[snippet.channelId] || 1) - 3);
+          if (snippet.channelId) { const ch = profile.channels[snippet.channelId] || { weight: 1 }; ch.weight = Math.max(0, (ch.weight||1) - 3); profile.channels[snippet.channelId] = ch; }
           const words = (snippet.title || "").toLowerCase().replace(/[^a-z0-9 ]/g,"").split(" ").filter(w=>w.length>3);
           words.forEach(w => { if (profile.keywords[w]) profile.keywords[w] = Math.max(0, profile.keywords[w] - 3); });
           localStorage.setItem("tasteProfile", JSON.stringify(profile));
@@ -2632,7 +2626,7 @@ async function loadVideoInfoPanel(videoId, snippet) {
     // signal to the Worker, which now uses it in scoring too.
     try {
       const profile = getTasteProfile();
-      if (snippet.channelId) profile.channels[snippet.channelId] = (profile.channels[snippet.channelId] || 0) + 4;
+      if (snippet.channelId) { const ch = profile.channels[snippet.channelId] || { weight: 0 }; ch.weight = (ch.weight||0) + 4; ch.lastWatch = Date.now(); profile.channels[snippet.channelId] = ch; }
       const words = (snippet.title || "").toLowerCase().replace(/[^a-z0-9 ]/g,"").split(" ").filter(w=>w.length>3);
       words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 2; });
       localStorage.setItem("tasteProfile", JSON.stringify(profile));
@@ -2773,54 +2767,6 @@ playPauseBtn.addEventListener("click", () => {
 });
 forwardBtn.addEventListener("click", () => { if (!ytPlayer) return; ytPlayer.seekTo(ytPlayer.getCurrentTime() + 10, true); });
 rewindBtn.addEventListener("click", () => { if (!ytPlayer) return; ytPlayer.seekTo(Math.max(0, ytPlayer.getCurrentTime() - 10), true); });
-
-// Seek bar — the IFrame API has no real-time progress event, so this polls
-// getCurrentTime()/getDuration() on an interval rather than reacting to
-// pushed updates. Reads the shared, global ytPlayer variable directly
-// rather than hooking into each of the three separate YT.Player(...)
-// initializations individually — all three assign to that same variable
-// regardless of which code path created the instance, so this works
-// consistently across all of them without needing to touch any of them.
-const _seekFill = document.getElementById("playerSeekFill");
-const _seekThumb = document.getElementById("playerSeekThumb");
-const _seekTrack = document.getElementById("playerSeekTrack");
-let _seekDragging = false;
-setInterval(() => {
-  if (_seekDragging || !ytPlayer || playerSection.style.display === "none") return;
-  try {
-    const dur = ytPlayer.getDuration ? ytPlayer.getDuration() : 0;
-    if (!dur || dur <= 0) return;
-    const cur = ytPlayer.getCurrentTime ? ytPlayer.getCurrentTime() : 0;
-    const pct = Math.min(100, Math.max(0, (cur / dur) * 100));
-    _seekFill.style.width = pct + "%";
-    _seekThumb.style.left = pct + "%";
-  } catch(e) {}
-}, 250);
-
-function _seekToPointerX(clientX) {
-  if (!ytPlayer || !ytPlayer.getDuration) return;
-  const rect = _seekTrack.getBoundingClientRect();
-  const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-  const dur = ytPlayer.getDuration();
-  if (dur > 0) {
-    ytPlayer.seekTo(pct * dur, true);
-    _seekFill.style.width = (pct * 100) + "%";
-    _seekThumb.style.left = (pct * 100) + "%";
-  }
-}
-_seekTrack.addEventListener("click", (e) => { _seekToPointerX(e.clientX); });
-_seekTrack.addEventListener("touchstart", (e) => {
-  _seekDragging = true;
-  _seekThumb.style.display = "block";
-  _seekToPointerX(e.touches[0].clientX);
-}, { passive: true });
-_seekTrack.addEventListener("touchmove", (e) => {
-  if (_seekDragging) _seekToPointerX(e.touches[0].clientX);
-}, { passive: true });
-_seekTrack.addEventListener("touchend", () => {
-  _seekDragging = false;
-  _seekThumb.style.display = "none";
-}, { passive: true });
 
 const resBtn = document.getElementById("resBtn");
 let captionsOn = false;
@@ -3877,7 +3823,7 @@ async function openShortsTabSetup() {
       // as the medium player) and sends a real signal to the Worker.
       try {
         const profile = getTasteProfile();
-        if (snippet.channelId) profile.channels[snippet.channelId] = (profile.channels[snippet.channelId] || 0) + 3;
+        if (snippet.channelId) { const ch = profile.channels[snippet.channelId] || { weight: 0 }; ch.weight = (ch.weight||0) + 3; ch.lastWatch = Date.now(); profile.channels[snippet.channelId] = ch; }
         const words = (snippet.title || "").toLowerCase().replace(/[^a-z0-9 ]/g,"").split(" ").filter(w=>w.length>3);
         words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 2; });
         localStorage.setItem("tasteProfile", JSON.stringify(profile));
@@ -3951,7 +3897,7 @@ async function openShortsTabSetup() {
     // for Shorts.
     try {
       const profile = getTasteProfile();
-      if (snippet.channelId) profile.channels[snippet.channelId] = (profile.channels[snippet.channelId] || 0) + 4;
+      if (snippet.channelId) { const ch = profile.channels[snippet.channelId] || { weight: 0 }; ch.weight = (ch.weight||0) + 4; ch.lastWatch = Date.now(); profile.channels[snippet.channelId] = ch; }
       const words = (snippet.title || "").toLowerCase().replace(/[^a-z0-9 ]/g,"").split(" ").filter(w=>w.length>3);
       words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 2; });
       localStorage.setItem("tasteProfile", JSON.stringify(profile));
@@ -4266,7 +4212,7 @@ function _recordShortsWatchTime() {
       const profile = getTasteProfile();
       const wSnippet = _shortsWatchItem.snippet || {};
       const weight = isHighCompletion ? 2 : -1;
-      if (wSnippet.channelId) profile.channels[wSnippet.channelId] = Math.max(0, (profile.channels[wSnippet.channelId] || 0) + weight);
+      if (wSnippet.channelId) { const ch = profile.channels[wSnippet.channelId] || { weight: 0 }; ch.weight = Math.max(0, (ch.weight||0) + weight); ch.lastWatch = Date.now(); profile.channels[wSnippet.channelId] = ch; }
       const words = (wSnippet.title || "").toLowerCase().replace(/[^a-z0-9 ]/g,"").split(" ").filter(w=>w.length>3);
       words.forEach(w => { profile.keywords[w] = Math.max(0, (profile.keywords[w] || 0) + weight); });
       localStorage.setItem("tasteProfile", JSON.stringify(profile));
