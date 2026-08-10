@@ -5924,6 +5924,7 @@ async function runSubscriptionSync(isManual = false) {
       }
     } catch(e) {}
 
+    localStorage.setItem("_lastSubSyncTime", String(Date.now()));
     showHUD("Taste profile rebuilt ✦");
     setTimeout(() => {
       syncOverlay.style.display = "none";
@@ -5938,11 +5939,11 @@ async function runSubscriptionSync(isManual = false) {
   }
 }
 document.getElementById("syncClearBtn").onclick = () => runSubscriptionSync(true);
-// Run automatically on startup (called earlier in init) and every 2 hours
-// after that — matching the same 2-hour cadence already used elsewhere
-// (the silentSync check a few lines up), so subscription content stays
-// fresh without needing the button tapped manually.
-setInterval(() => { runSubscriptionSync().catch(() => {}); }, 7200000);
+// Automatic runs are gated by the daily freshness check near startup
+// above — no fixed interval needed here, since subscriptions themselves
+// change infrequently and new-video notification for existing
+// subscriptions already works instantly through the separate
+// PubSubHubbub pipeline, independent of this sync.
 syncCloseBtn.onclick=function(){syncOverlay.style.display="none";};
 syncOverlay.onclick=function(e){if(e.target===syncOverlay)syncOverlay.style.display="none";};
 syncBox.onclick=function(e){e.stopPropagation();};
@@ -7114,13 +7115,13 @@ function applyShortPlayerPatch(card, item) {
   };
   _startupFetch();
 
-  // Run the actual proven Clear & Rebuild logic automatically — see
-  // runSubscriptionSync() below, called on startup and every 2 hours.
-  // Delayed here specifically to avoid competing with Home's own refresh
-  // (_startupFetch above) at the most time-sensitive moment of app open —
-  // both previously started essentially simultaneously, right when Home's
-  // critical path needed the main thread and network most.
-  setTimeout(() => { runSubscriptionSync(); }, 6000);
+  // Clear & Rebuild is manual-only now — silentSync() (below, its own
+  // 2-hour gate) already handles ongoing automatic profile maintenance,
+  // correctly merging signal from Liked Videos, Watch Later,
+  // subscriptions, and recent activity. Running this too was genuinely
+  // redundant work competing for the same startup resources; this
+  // function's real, unique purpose is the explicit, deliberate full
+  // reset the button provides — not something that belongs on a timer.
 
   // Lightweight, automatic subscription renewal — YouTube's push
   // notification subscriptions (PubSubHubbub) expire after a few days and
