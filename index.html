@@ -6414,9 +6414,14 @@ function _startPolling() {
   // Initial poll after 15 seconds
   setTimeout(async () => {
     await _pollCheckNewContent();
-    // Then repeat every 2-6 minutes (randomized)
+    // Then repeat every 20-30 seconds (randomized). Only Source 1 inside
+    // _pollCheckNewContent() genuinely runs this often — it's a zero-quota
+    // read from the Worker's own KV store. Sources 2-4 each have their own
+    // independent gate (5 and 15 minutes respectively) baked into the
+    // function itself, so they're unaffected by this outer interval and
+    // don't run any more often than before.
     function scheduleNext() {
-      const delay = (1 + Math.floor(Math.random() * 2)) * 60 * 1000; // 1-3 min
+      const delay = (20 + Math.floor(Math.random() * 11)) * 1000; // 20-30 sec
       _pollTimer = setTimeout(async () => {
         await _pollCheckNewContent();
         scheduleNext();
