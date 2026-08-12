@@ -4306,29 +4306,56 @@ function playShort(index) {
   async function loadMoreShorts() {
     if (shortsLoadingMore) return; shortsLoadingMore=true;
     try {
-      const topKW = getTopKeywords(4);
-      const seenArr = [...shortsSeenIds].slice(-300); // cap payload size on very long sessions
-      const res = await fetchYouTube_shortsEndpoint(topKW, seenArr);
-      let fresh = (res.items || []).filter(v => v.id && !shortsSeenIds.has(v.id));
+      const q=SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length]; shortQIdx++;
+      const vt=shortsNextPageToken&&shortsNextPageToken!=="seed"?shortsNextPageToken:undefined;
+      const more=await fetchYouTube("search",{part:"snippet",q,type:"video",videoDuration:"short",videoEmbeddable:"true",maxResults:20,pageToken:vt,_:Date.now()}); // 20 more per scroll batch
+      shortsNextPageToken=more.nextPageToken||"seed";
+      let fresh=(more.items||[]).filter(v=>v.id&&v.id.videoId&&!shortsSeenIds.has(v.id.videoId));
+      // Non-search fallback — search can fail (rate limit, shared daily
+      // quota exhausted) and previously there was nothing else to fall back
+      // on, so "load more" would silently do nothing. mostPopular isn't
+      // subject to the search-specific quota; filter client-side by actual
+      // duration (same approach already proven for Movies' fallback) to
+      // keep only genuinely short-form videos.
+      if (!fresh.length) {
+        try {
+          const FALLBACK_CATS = ["0","1","10","15","17","20","22","23","24","25","26","28"];
+          const fbCat = FALLBACK_CATS[shortQIdx % FALLBACK_CATS.length];
+          const fb = await fetchYouTube("videos",{part:"snippet,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:fbCat,maxResults:50,_:Date.now()});
+          const parseDurationSeconds = (iso) => {
+            const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso || "");
+            if (!m) return 0;
+            return (parseInt(m[1]||0)*3600) + (parseInt(m[2]||0)*60) + parseInt(m[3]||0);
+          };
+          fresh = (fb.items||[]).filter(v => {
+            const secs = parseDurationSeconds(v.contentDetails?.duration);
+            return v.id && secs > 0 && secs <= 180 && !shortsSeenIds.has(v.id);
+          }).map(v => ({ id: { videoId: v.id }, snippet: v.snippet }));
+        } catch(e) {}
+      }
       if (!fresh.length) { showHUD("No more Shorts right now — try again shortly"); return; }
-      fresh.forEach(v => shortsSeenIds.add(v.id));
-      shortsItems = shortsItems.concat(fresh.map(v => ({ id: v.id, snippet: v.snippet })));
+      // Genuine oEmbed 9:16 verification on this specific, already-narrowed
+      // batch — videoDuration:"short" alone only confirms under 4 minutes,
+      // not actual vertical format. Wrapped defensively: if this call fails
+      // or times out, falls back to the unverified batch rather than
+      // blocking scroll entirely over a verification step failing.
+      try {
+        const toVerify = fresh.slice(0, 25).map(v => ({ id: v.id.videoId, snippet: v.snippet }));
+        const vres = await fetchWithTimeout(HUB_WORKER_URL + "/verifyShorts", {
+          method: "POST",
+          headers: workerHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ candidates: toVerify })
+        }, 6000).then(r => r.json());
+        if (vres.items && vres.items.length) {
+          fresh = vres.items.map(v => ({ id: { videoId: v.id }, snippet: v.snippet }));
+        }
+        // If verification returns nothing at all, keep the unverified batch
+        // rather than showing "no more Shorts" over a verification miss.
+      } catch(e) {}
+      fresh.forEach(v=>shortsSeenIds.add(v.id.videoId));
+      shortsItems=shortsItems.concat(fresh.map(v=>({id:v.id.videoId,snippet:v.snippet})));
       updateCounter();
-    } catch(e) {
-      showHUD("No more Shorts right now — try again shortly");
     } finally { shortsLoadingMore=false; }
-  }
-
-  // Thin wrapper around the Worker's /shorts endpoint — genuine oEmbed-
-  // based 9:16 aspect-ratio verification happens server-side, rather than
-  // trusting videoDuration:"short" (which only confirms under 4 minutes,
-  // not actual vertical format) the way the old client-side search did.
-  async function fetchYouTube_shortsEndpoint(keywords, seenIds) {
-    return fetch(HUB_WORKER_URL + "/shorts", {
-      method: "POST",
-      headers: workerHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ keywords, userRegion, seenIds })
-    }).then(r => r.json());
   }
   let transitioning=false;
   function transitionTo(index) {
