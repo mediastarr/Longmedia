@@ -2247,6 +2247,16 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
       }
     });
   } catch(e) {}
+  // Server-side record too — makes the Worker the actual source of truth
+  // for "watched," independent of whether localStorage survives every
+  // restart on this WebView. Fire-and-forget: never blocks playback.
+  try {
+    fetch(HUB_WORKER_URL + "/markWatched", {
+      method: "POST",
+      headers: workerHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ videoId })
+    }).catch(() => {});
+  } catch(e) {}
   playerSection.style.display = "block";
   playerSection.classList.remove("player-mini", "player-fullscreen");
   hideUIForVideo();
@@ -4272,6 +4282,13 @@ function playShort(index) {
         card.style.removeProperty("box-shadow");
         card.dataset.hubvideo = "";
       });
+    } catch(e) {}
+    try {
+      fetch(HUB_WORKER_URL + "/markWatched", {
+        method: "POST",
+        headers: workerHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ videoId: item.id })
+      }).catch(() => {});
     } catch(e) {}
     if (index >= shortsItems.length - 6 && !shortsLoadingMore) loadMoreShorts();
     // Pre-cache next 3 shorts duration checks
@@ -6332,6 +6349,24 @@ async function _pollCheckNewContent() {
       try {
         const seenForBadge = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
         merged = merged.filter(v => !seenForBadge.has(v.videoId));
+      } catch(e) {}
+      // Second, server-side check — the Worker's watched record survives
+      // regardless of whether localStorage does on this specific WebView,
+      // which is the actual fix for videos that were genuinely watched
+      // still reappearing as new after a full app restart. Short timeout
+      // and a try/catch around the whole thing so a slow or failed
+      // network call never blocks the badge from updating with what the
+      // local check above already caught.
+      try {
+        if (merged.length) {
+          const fw = await fetchWithTimeout(HUB_WORKER_URL + "/filterWatched", {
+            method: "POST",
+            headers: workerHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ videoIds: merged.map(v => v.videoId) })
+          }, 5000).then(r => r.json());
+          const watchedSet = new Set(fw.watched || []);
+          if (watchedSet.size) merged = merged.filter(v => !watchedSet.has(v.videoId));
+        }
       } catch(e) {}
       localStorage.setItem("hubNewVideos", JSON.stringify(merged));
       mergedCount = merged.length;
