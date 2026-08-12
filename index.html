@@ -4250,6 +4250,21 @@ function _recordShortsWatchTime() {
     } catch(e) {}
     sendEngagement(_shortsWatchItem.id, _shortsWatchItem.snippet?.channelId || "", isHighCompletion ? "liked" : "casual", pct !== null ? Math.round(pct*100) : (isHighCompletion ? 90 : 5), undefined, null);
   }
+  // Server-side watched record — gated on genuine completion, not fired on
+  // every transition. Moved here from playShort(), where it fired
+  // unconditionally on every single swipe: during rapid swiping through
+  // many Shorts, that added real, frequent network load competing
+  // directly with loadMoreShorts()'s own fetch, which is the actual cause
+  // traced for the infinite-scroll regression.
+  if (isHighCompletion && _shortsWatchItem.id) {
+    try {
+      fetch(HUB_WORKER_URL + "/markWatched", {
+        method: "POST",
+        headers: workerHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ videoId: _shortsWatchItem.id })
+      }).catch(() => {});
+    } catch(e) {}
+  }
   _shortsWatchItem = null;
   _shortsWatchStart = 0;
 }
@@ -4282,13 +4297,6 @@ function playShort(index) {
         card.style.removeProperty("box-shadow");
         card.dataset.hubvideo = "";
       });
-    } catch(e) {}
-    try {
-      fetch(HUB_WORKER_URL + "/markWatched", {
-        method: "POST",
-        headers: workerHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ videoId: item.id })
-      }).catch(() => {});
     } catch(e) {}
     if (index >= shortsItems.length - 6 && !shortsLoadingMore) loadMoreShorts();
     // Pre-cache next 3 shorts duration checks
