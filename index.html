@@ -4255,6 +4255,24 @@ function playShort(index) {
     updateShortsChannelInfo(item);
     updateShortsCounts(item);
     closeShortsComments();
+    // Mark as seen in hubSeenIds so it never shows as new again — same
+    // logic already proven correct in the medium player's setPlayerVideo().
+    // Without this, a Short pulled in as a subscription upload would never
+    // get marked seen, and would keep reappearing as "new" on every
+    // restart, since the session-level dedup for that source is
+    // deliberately reset each app open.
+    try {
+      const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
+      if (!seenHub.includes(item.id)) {
+        seenHub.push(item.id);
+        localStorage.setItem("hubSeenIds", JSON.stringify(seenHub.slice(-500)));
+      }
+      document.querySelectorAll('[data-videoid="' + item.id + '"]').forEach(card => {
+        card.style.removeProperty("border");
+        card.style.removeProperty("box-shadow");
+        card.dataset.hubvideo = "";
+      });
+    } catch(e) {}
     if (index >= shortsItems.length - 6 && !shortsLoadingMore) loadMoreShorts();
     // Pre-cache next 3 shorts duration checks
     _preloadNextShorts(index, shortsItems).catch(() => {});
@@ -7260,7 +7278,20 @@ function applyShortPlayerPatch(card, item) {
 
   // Silent background sync every 6 hours
   const tkn = await getValidToken();
-  if (tkn) { const p = getTasteProfile(); if (Date.now() - (p.syncedAt||0) > 7200000) { silentSync(tkn).then(()=>showHUD("Feed updated ✦")).catch(()=>{}); } }
+  if (tkn) {
+    const p = getTasteProfile();
+    // One-time override: propagate the corrected subscription-list fix
+    // immediately rather than waiting for the normal 2-hour gate — the
+    // Worker's registration is still whatever the last sync sent before
+    // this fix existed. Runs once, then the normal gating below resumes.
+    const _forcedResync = localStorage.getItem("_subFixResyncDone");
+    if (!_forcedResync) {
+      localStorage.setItem("_subFixResyncDone", "1");
+      silentSync(tkn).then(()=>showHUD("Feed updated ✦")).catch(()=>{});
+    } else if (Date.now() - (p.syncedAt||0) > 7200000) {
+      silentSync(tkn).then(()=>showHUD("Feed updated ✦")).catch(()=>{});
+    }
+  }
 
   // Restore watch history from Worker KV (syncs across devices)
   _restoreHistoryFromWorker().catch(() => {});
