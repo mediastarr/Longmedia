@@ -6019,7 +6019,8 @@ async function silentSync(token){
   const isFirst=!profile.syncedAt,maxPages=isFirst?10:5;
   try{let pt="";for(let p=0;p<maxPages;p++){const url="https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=LL&maxResults=20"+(pt?"&pageToken="+pt:"");const r=await fetchWithTimeout(url,{headers:{Authorization:"Bearer "+token}},8000);const d=await r.json();if(d.error||!d.items)break;d.items.forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,3);const vid=s.resourceId?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);});pt=d.nextPageToken||"";if(!pt)break;}}catch(e){}
   try{const r=await fetchWithTimeout("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=WL&maxResults=50",{headers:{Authorization:"Bearer "+token}},8000);const d=await r.json();(d.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.videoOwnerChannelId,s.videoOwnerChannelTitle,2);});}catch(e){}
-  try{const sr=await fetchWithTimeout("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}},8000);const sd=await sr.json();const cids=(sd.items||[]).map(s=>{extract(null,s.snippet.resourceId.channelId,s.snippet.title,1);return s.snippet.resourceId.channelId;});if(cids.length){const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,50).join(",")});const ups=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);for(const plId of ups.sort(()=>Math.random()-0.5).slice(0,isFirst?15:5)){try{const ur=await fetchYouTube("playlistItems",{part:"snippet",playlistId:plId,maxResults:8,_:Date.now()});(ur.items||[]).forEach(it=>{extract(it.snippet?.title,null,null,1);});}catch(e){}}}}catch(e){}
+  let _subscribedCids = [];
+  try{const sr=await fetchWithTimeout("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}},8000);const sd=await sr.json();const cids=(sd.items||[]).map(s=>{extract(null,s.snippet.resourceId.channelId,s.snippet.title,1);return s.snippet.resourceId.channelId;});_subscribedCids=cids;if(cids.length){const cr=await fetchYouTube("channels",{part:"contentDetails",id:cids.slice(0,50).join(",")});const ups=(cr.items||[]).map(ch=>ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);for(const plId of ups.sort(()=>Math.random()-0.5).slice(0,isFirst?15:5)){try{const ur=await fetchYouTube("playlistItems",{part:"snippet",playlistId:plId,maxResults:8,_:Date.now()});(ur.items||[]).forEach(it=>{extract(it.snippet?.title,null,null,1);});}catch(e){}}}}catch(e){}
   try{const ar=await fetchWithTimeout("https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&mine=true&maxResults=50",{headers:{Authorization:"Bearer "+token}},8000);const ad=await ar.json();(ad.items||[]).forEach(it=>{const s=it.snippet||{};extract(s.title,s.channelId,s.channelTitle,2);const vid=it.contentDetails?.upload?.videoId;if(vid&&!profile.recentVideoIds.includes(vid))profile.recentVideoIds.push(vid);});}catch(e){}
   profile.recentVideoIds=profile.recentVideoIds.slice(0,50);profile.syncedAt=Date.now();
   localStorage.setItem("tasteProfile",JSON.stringify(profile));
@@ -6027,9 +6028,15 @@ async function silentSync(token){
   syncProfileToWorker();
 
   // Send channel IDs to Worker for PubSubHubbub subscriptions
-  // This is automatic — no user action needed
+  // This is automatic — no user action needed. Uses the genuine
+  // subscription list only (_subscribedCids, from the actual
+  // subscriptions.list response above) — not profile.channels, which
+  // mixes in channels from Liked Videos, Watch Later, and recent
+  // activity too. Registering those non-subscription channels here was
+  // the actual, confirmed cause of non-subscription videos appearing in
+  // the subscription-only red highlight.
   try {
-    const channelIds = Object.keys(profile.channels || {});
+    const channelIds = _subscribedCids;
     if (channelIds.length) localStorage.setItem("subscribedChannelIds", JSON.stringify(channelIds.slice(0, 100)));
     if (channelIds.length > 0) {
       fetch(HUB_WORKER_URL + "/subscribe", {
