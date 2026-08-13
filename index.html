@@ -5932,7 +5932,7 @@ async function runSubscriptionSync(isManual = false) {
     // The Worker will replace the full channel list, removing old ones like Crunchyroll
     try {
       // Save for Source 2 polling
-      const savedIds = allChannelIds || [];
+      const savedIds = channelIds || [];
       if (savedIds.length) localStorage.setItem("subscribedChannelIds", JSON.stringify(savedIds.slice(0, 100)));
       const workerRes = await fetch(HUB_WORKER_URL + "/subscribe", {
         method: "POST",
@@ -6253,10 +6253,13 @@ async function _pollCheckNewContent() {
     const subCheckDue = Date.now() - lastSubCheck > 5 * 60 * 1000;
     if (subCheckDue) {
       localStorage.setItem("_pollLastSubCheck", String(Date.now()));
-      // Rotate through channels — check 6 at a time.
-      // Use actual subscription IDs, fall back to taste profile channels
-      const savedSubIds = JSON.parse(localStorage.getItem("subscribedChannelIds") || "[]");
-      const allSubIds = savedSubIds.length ? savedSubIds : Object.keys(getTasteProfile().channels || {});
+      // Rotate through channels — check 6 at a time. Genuine subscription
+      // IDs only — no fallback to taste-profile channels. That fallback
+      // was the actual, confirmed cause of liked/non-subscription videos
+      // showing up red-highlighted as if they were subscription uploads:
+      // profile.channels includes Liked Videos, Watch Later, and recent
+      // activity too, none of which belong in a subscription-only source.
+      const allSubIds = JSON.parse(localStorage.getItem("subscribedChannelIds") || "[]");
       const rotateIdx = parseInt(localStorage.getItem("_pollSubRotate") || "0");
       const subChannelIds = allSubIds.slice(rotateIdx, rotateIdx + 6);
       localStorage.setItem("_pollSubRotate", String((rotateIdx + 6) % Math.max(allSubIds.length, 1)));
