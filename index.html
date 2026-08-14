@@ -1012,6 +1012,37 @@ async function detectUserRegion() {
   }
 }
 let currentVideoId = null;
+// Genuine accumulated PLAYING-state watch time, not just playhead position —
+// tracks real elapsed time the video was actually playing, so fast-
+// forwarding to the end no longer counts the same as genuinely watching,
+// and stopping partway through (without reaching ENDED) still records
+// however much was genuinely watched, instead of nothing at all.
+let _watchAccumSecs = 0;
+let _watchSegmentStart = null;
+let _watchVideoId = null;
+let _watchTotalSecs = 0;
+function _watchSegmentBegin() {
+  if (_watchSegmentStart === null) _watchSegmentStart = Date.now();
+}
+function _watchSegmentEnd() {
+  if (_watchSegmentStart !== null) {
+    _watchAccumSecs += (Date.now() - _watchSegmentStart) / 1000;
+    _watchSegmentStart = null;
+  }
+}
+// Called whenever a watch session genuinely ends — a new video starts, the
+// player closes entirely, or playback reaches its natural end. Finalizes
+// any still-in-progress segment first, then records the real accumulated
+// time, and resets tracking for whatever comes next.
+function _finalizeWatchSession() {
+  _watchSegmentEnd();
+  if (_watchVideoId && _watchAccumSecs >= 5) {
+    recordWatchDuration(_watchVideoId, _watchAccumSecs, _watchTotalSecs);
+  }
+  _watchAccumSecs = 0;
+  _watchVideoId = null;
+  _watchTotalSecs = 0;
+}
 let miniActive = false;
 let isLight = false;
 let currentChannelId = null;
@@ -1861,6 +1892,7 @@ closeMini.addEventListener("click", () => {
   // every reopen through the fallback recreate path, which can lose autoplay
   // permission after async gaps. Reusing via loadVideoById is more reliable.
   if (ytPlayer) { try { ytPlayer.stopVideo(); } catch(e) {} }
+  _finalizeWatchSession();
   showUIWithMiniPlayer();
   showHUD("Player closed");
 });
@@ -2029,6 +2061,10 @@ window.onYouTubeIframeAPIReady = function () {
         onStateChange: (e) => {
           if (e.data === YT.PlayerState.PLAYING) {
             playPauseBtn.textContent = "⏸";
+            _watchSegmentBegin();
+            if (_watchVideoId === currentVideoId && !_watchTotalSecs) {
+              try { const d = e.target.getDuration ? e.target.getDuration() : 0; if (d > 0) _watchTotalSecs = d; } catch(err) {}
+            }
             // Auto-detect actual quality once playback genuinely starts —
             // getAvailableQualityLevels() very often returns empty right at
             // onReady, before the browser has started buffering, which is
@@ -2058,14 +2094,14 @@ window.onYouTubeIframeAPIReady = function () {
               } catch(err) {}
             }
           }
-          if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "▶";
+          if (e.data === YT.PlayerState.PAUSED) { playPauseBtn.textContent = "▶"; _watchSegmentEnd(); }
           if (e.data === YT.PlayerState.ENDED && currentVideoId) {
             clearResumePosition(currentVideoId);
-            // Record full watch — video completed
-            try {
-              const dur = e.target.getDuration ? e.target.getDuration() : 0;
-              if (dur > 0) recordWatchDuration(currentVideoId, dur, dur);
-            } catch(err) {}
+            // Genuine accumulated watch time, not just "did it reach the
+            // end" — fast-forwarding through most of a video and only
+            // playing the last few seconds no longer records the same
+            // "loved" signal as actually watching it.
+            _finalizeWatchSession();
             playNextSuggested();
           }
         },
@@ -2185,6 +2221,10 @@ function createYTPlayer(videoId, startSeconds) {
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.PLAYING) {
           playPauseBtn.textContent = "⏸";
+          _watchSegmentBegin();
+          if (_watchVideoId === currentVideoId && !_watchTotalSecs) {
+            try { const d = e.target.getDuration ? e.target.getDuration() : 0; if (d > 0) _watchTotalSecs = d; } catch(err) {}
+          }
           // Auto-detect actual quality once playback genuinely starts —
           // getAvailableQualityLevels() very often returns empty right at
           // onReady, before the browser has started buffering, which is
@@ -2204,8 +2244,8 @@ function createYTPlayer(videoId, startSeconds) {
             } catch(err) {}
           }
         }
-        if (e.data === YT.PlayerState.PAUSED)  playPauseBtn.textContent = "▶";
-        if (e.data === YT.PlayerState.ENDED && currentVideoId) { clearResumePosition(currentVideoId); playNextSuggested(); }
+        if (e.data === YT.PlayerState.PAUSED) { playPauseBtn.textContent = "▶"; _watchSegmentEnd(); }
+        if (e.data === YT.PlayerState.ENDED && currentVideoId) { clearResumePosition(currentVideoId); _finalizeWatchSession(); playNextSuggested(); }
         },
         onError: (e) => {
           if (e.data === 101 || e.data === 150) showEmbedBlockedOverlay(currentVideoId);
@@ -2222,6 +2262,11 @@ function createYTPlayer(videoId, startSeconds) {
 
 function setPlayerVideo(videoId, snippet, startSeconds) {
   _logSessionAction("longform");
+  // Finalize whatever video was just playing before switching to this one —
+  // records its genuine accumulated watch time (if any), rather than
+  // silently discarding it the moment a new video starts.
+  _finalizeWatchSession();
+  _watchVideoId = videoId;
   savedScrollY = window.scrollY;
   // Remove the infinite-scroll sentinel while the player is open — same
   // fix already confirmed working for Shorts. It's always present in the
@@ -2831,6 +2876,11 @@ resBtn.addEventListener("click", () => {
   const _wasPlaying = ytPlayer ? ytPlayer.getPlayerState() === YT.PlayerState.PLAYING : true;
   const _resumePos = resumeTime; // capture before destroy
 
+  // Capture the in-progress watch segment before the old player is torn
+  // down — destroy() might not reliably fire PAUSED first, which would
+  // otherwise silently lose whatever was watched in this segment.
+  _watchSegmentEnd();
+
   // Rebuild player with new quality (setPlaybackQuality deprecated since 2021)
   try { if (ytPlayer) { ytPlayer.stopVideo(); ytPlayer.destroy(); } } catch(e) {}
   ytPlayer = null; isPlayerReady = false;
@@ -2860,13 +2910,14 @@ resBtn.addEventListener("click", () => {
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.PLAYING) {
           playPauseBtn.textContent = "⏸";
+          _watchSegmentBegin();
           // Re-apply quality after playback starts (some players need this)
           if (currentQuality !== "auto") {
             try { e.target.setPlaybackQuality(currentQuality); } catch(err) {}
           }
         }
-        if (e.data === YT.PlayerState.PAUSED) playPauseBtn.textContent = "▶";
-        if (e.data === YT.PlayerState.ENDED && currentVideoId) { clearResumePosition(currentVideoId); playNextSuggested(); }
+        if (e.data === YT.PlayerState.PAUSED) { playPauseBtn.textContent = "▶"; _watchSegmentEnd(); }
+        if (e.data === YT.PlayerState.ENDED && currentVideoId) { clearResumePosition(currentVideoId); _finalizeWatchSession(); playNextSuggested(); }
         },
         onError: (e) => {
           if (e.data === 101 || e.data === 150) showEmbedBlockedOverlay(currentVideoId);
