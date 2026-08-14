@@ -2037,7 +2037,18 @@ window.onYouTubeIframeAPIReady = function () {
                 const preferred = ["hd1440", "hd1080", "hd720", "large", "medium"];
                 const best = preferred.find(q => available.includes(q));
                 const rb = document.getElementById("resBtn");
-                if (best && rb) rb.textContent = QUALITY_LABELS[best] || best;
+                if (best) {
+                  if (rb) rb.textContent = QUALITY_LABELS[best] || best;
+                  // Previously this only updated the label — playback stayed
+                  // at whatever YouTube's own "auto" algorithm picked, which
+                  // can genuinely be more conservative than what's actually
+                  // available, especially early in playback. This is the
+                  // instance actually reused for most normal playback, so
+                  // leaving quality unenforced here affected the majority
+                  // of sessions.
+                  try { e.target.setPlaybackQuality(best); } catch(err) {}
+                  try { e.target.setPlaybackQualityRange(best, best); } catch(err) {}
+                }
               } catch(err) {}
             }
           }
@@ -2179,7 +2190,11 @@ function createYTPlayer(videoId, startSeconds) {
               const available = e.target.getAvailableQualityLevels() || [];
               const preferred = ["hd1440", "hd1080", "hd720", "large", "medium"];
               const best = preferred.find(q => available.includes(q));
-              if (best && resBtn) resBtn.textContent = QUALITY_LABELS[best] || best;
+              if (best) {
+                if (resBtn) resBtn.textContent = QUALITY_LABELS[best] || best;
+                try { e.target.setPlaybackQuality(best); } catch(err) {}
+                try { e.target.setPlaybackQualityRange(best, best); } catch(err) {}
+              }
             } catch(err) {}
           }
         }
