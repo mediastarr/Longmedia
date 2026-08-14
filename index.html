@@ -1186,6 +1186,12 @@ function recordWatchDuration(videoId, watchedSecs, totalSecs) {
     else if (pct >= 0.10) { weight = 1; signal = "casual"; }
     else                  { weight = -2; signal = "skip"; }
 
+    // A genuine "watched it through" signal means Home's next visit should
+    // reflect this, not show the same candidates it already had. Doesn't
+    // force an immediate reload — just marks the cache stale, so the next
+    // real Home visit does a genuine re-fetch instead of reshuffling.
+    if (pct >= 0.80) { try { invalidateHomeCache(); } catch(e) {} }
+
     // Send engagement signal to Worker for cross-user aggregation
     try {
       const hist2 = JSON.parse(localStorage.getItem("historyList") || "[]");
@@ -4253,6 +4259,7 @@ function _recordShortsWatchTime() {
   // engagement) — not every source includes contentDetails.
   const isHighCompletion = pct !== null ? pct >= 0.8 : elapsedSecs >= 15;
   const isLowCompletion = pct !== null ? pct < 0.2 : elapsedSecs < 3;
+  if (isHighCompletion) { try { invalidateHomeCache(); } catch(e) {} }
   if (isHighCompletion || isLowCompletion) {
     try {
       const profile = getTasteProfile();
@@ -5024,10 +5031,22 @@ async function loadMoreVideos() {
   nextPageToken = data.nextPageToken || (["home","trending","movies"].includes(currentTab) ? "seed" : null);
   if (currentTab === "channel") {
     preCacheShorts(data.items || []).catch(() => {});
+    let statsMap2 = {};
+    try {
+      const ids2 = (data.items || []).map(it => it.snippet?.resourceId?.videoId).filter(Boolean);
+      if (ids2.length) {
+        const statsRes2 = await fetchYouTube("videos", { part: "statistics", id: ids2.join(","), _: Date.now() });
+        (statsRes2.items || []).forEach(v => { statsMap2[v.id] = v.statistics; });
+      }
+    } catch(e) {}
     (data.items || []).forEach(item => {
       const snippet = item.snippet; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
+      const stats2 = statsMap2[videoId] || {};
+      const views2 = formatViews(stats2.viewCount);
+      const ago2 = timeAgo(snippet.publishedAt);
+      const meta2 = [views2 && views2 + " views", ago2].filter(Boolean).join(" · ");
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
-      card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle || ""}</div></div>`;
+      card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle || ""}</div><div class="video-meta">${meta2}</div></div>`;
       card.onclick = async () => {
         tabsEl.style.display="none"; searchTabEl.style.display="none";
         const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet);
@@ -5250,10 +5269,26 @@ async function loadChannelPage(channelId) {
   const uploads = await fetchYouTube("playlistItems", { part: "snippet", playlistId: channelUploadsId, maxResults: 20, _: Date.now() });
   channelNextPageToken = uploads.nextPageToken || null; nextPageToken = uploads.nextPageToken || null;
   preCacheShorts(uploads.items || []).catch(() => {});
+  // playlistItems.list can't return view counts at all — that only exists
+  // on videos.list, a genuinely separate endpoint. Batch-fetch real stats
+  // for this page's videos in one call, same enrichment pattern already
+  // used elsewhere (enrichWithDurations).
+  let statsMap = {};
+  try {
+    const ids = (uploads.items || []).map(it => it.snippet?.resourceId?.videoId).filter(Boolean);
+    if (ids.length) {
+      const statsRes = await fetchYouTube("videos", { part: "statistics", id: ids.join(","), _: Date.now() });
+      (statsRes.items || []).forEach(v => { statsMap[v.id] = v.statistics; });
+    }
+  } catch(e) {}
   (uploads.items || []).forEach(item => {
     const snippet = item.snippet; const videoId = snippet.resourceId.videoId;
+    const stats = statsMap[videoId] || {};
+    const views = formatViews(stats.viewCount);
+    const ago = timeAgo(snippet.publishedAt);
+    const meta = [views && views + " views", ago].filter(Boolean).join(" · ");
     const card = document.createElement("div"); card.className = "video-card parallax focusable";
-    card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails.medium.url}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle}</div></div>`;
+    card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails.medium.url}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle}</div><div class="video-meta">${meta}</div></div>`;
     card.onclick = async () => {
       tabsEl.style.display="none"; searchTabEl.style.display="none";
       const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet);
