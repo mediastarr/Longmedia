@@ -7422,6 +7422,61 @@ function applyShortPlayerPatch(card, item) {
     localStorage.setItem("_pollSubRotate", "0"); // restart rotation from beginning
   } catch(e) {}
 
+  // Direct, broad subscription-uploads check — runs once on every app open,
+  // checking a much larger batch (30 channels) than the regular background
+  // poll ever covers in one cycle (6 channels per 5 minutes). The existing
+  // poll's slow rotation isn't a speed problem so much as a coverage one —
+  // a channel you're subscribed to might simply not get checked again for
+  // a long time, regardless of how old or new its latest upload actually
+  // is. This runs before the regular poll starts, so a fresh subscription
+  // upload has a real chance of showing up the moment the app opens,
+  // rather than only after the slower rotation happens to reach it.
+  (async function _startupBroadSubCheck() {
+    try {
+      const allSubIds = JSON.parse(localStorage.getItem("subscribedChannelIds") || "[]");
+      if (!allSubIds.length) return;
+      const batch = allSubIds.slice(0, 30);
+      const chRes = await fetchYouTube("channels", { part: "contentDetails", id: batch.join(","), _: Date.now() });
+      const uploadPlaylists = (chRes.items || [])
+        .map(c => ({ channelId: c.id, playlistId: c.contentDetails?.relatedPlaylists?.uploads }))
+        .filter(x => x.playlistId);
+      const results = await Promise.allSettled(
+        uploadPlaylists.map(({ channelId, playlistId }) =>
+          fetchYouTube("playlistItems", { part: "snippet", playlistId, maxResults: 3, _: Date.now() })
+            .then(r => ({ channelId, items: r.items || [] }))
+            .catch(() => ({ channelId, items: [] }))
+        )
+      );
+      const seenHub = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
+      const blocklist = new Set(getBlocklist());
+      const blockedChannels = new Set(getBlockedChannels());
+      const since48hMs = Date.now() - 172800000;
+      const found = [];
+      results.forEach(r => {
+        if (r.status !== "fulfilled") return;
+        r.value.items.forEach(item => {
+          const id = item.snippet?.resourceId?.videoId;
+          const publishedAt = item.snippet?.publishedAt || "";
+          if (!id || seenHub.has(id) || !publishedAt) return;
+          if (new Date(publishedAt).getTime() < since48hMs) return;
+          if (item.snippet?.liveBroadcastContent === "live") return;
+          const chId = item.snippet?.channelId || r.value.channelId || "";
+          if (blocklist.has(id) || (chId && blockedChannels.has(chId))) return;
+          found.push({ videoId: id, channelId: chId, title: item.snippet?.title || "", publishedAt, receivedAt: Date.now(), source: "subscription" });
+        });
+      });
+      if (!found.length) return;
+      const existing = JSON.parse(localStorage.getItem("hubNewVideos") || "[]");
+      const merged = [...found, ...existing]
+        .filter((v, i, a) => a.findIndex(x => x.videoId === v.videoId) === i)
+        .filter(v => !seenHub.has(v.videoId))
+        .slice(0, 30);
+      localStorage.setItem("hubNewVideos", JSON.stringify(merged));
+      if (_pollKnownIds) found.forEach(v => _pollKnownIds.add(v.videoId));
+      _pollSetBadge(merged.length);
+    } catch(e) {}
+  })();
+
   _startPolling();
 
   // Check for live streams every 5 minutes
