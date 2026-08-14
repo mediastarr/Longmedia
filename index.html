@@ -6534,7 +6534,7 @@ function _startPolling() {
     // function itself, so they're unaffected by this outer interval and
     // don't run any more often than before.
     function scheduleNext() {
-      const delay = (20 + Math.floor(Math.random() * 11)) * 1000; // 20-30 sec
+      const delay = (10 + Math.floor(Math.random() * 6)) * 1000; // 10-15 sec
       _pollTimer = setTimeout(async () => {
         await _pollCheckNewContent();
         scheduleNext();
@@ -7423,7 +7423,7 @@ function applyShortPlayerPatch(card, item) {
   } catch(e) {}
 
   // Direct, broad subscription-uploads check — runs once on every app open,
-  // checking a much larger batch (30 channels) than the regular background
+  // checking a much larger batch (50 channels) than the regular background
   // poll ever covers in one cycle (6 channels per 5 minutes). The existing
   // poll's slow rotation isn't a speed problem so much as a coverage one —
   // a channel you're subscribed to might simply not get checked again for
@@ -7435,7 +7435,7 @@ function applyShortPlayerPatch(card, item) {
     try {
       const allSubIds = JSON.parse(localStorage.getItem("subscribedChannelIds") || "[]");
       if (!allSubIds.length) return;
-      const batch = allSubIds.slice(0, 30);
+      const batch = allSubIds.slice(0, 50);
       const chRes = await fetchYouTube("channels", { part: "contentDetails", id: batch.join(","), _: Date.now() });
       const uploadPlaylists = (chRes.items || [])
         .map(c => ({ channelId: c.id, playlistId: c.contentDetails?.relatedPlaylists?.uploads }))
