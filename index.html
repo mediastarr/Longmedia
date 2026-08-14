@@ -1034,10 +1034,10 @@ function _watchSegmentEnd() {
 // player closes entirely, or playback reaches its natural end. Finalizes
 // any still-in-progress segment first, then records the real accumulated
 // time, and resets tracking for whatever comes next.
-function _finalizeWatchSession() {
+function _finalizeWatchSession(reachedEnd) {
   _watchSegmentEnd();
   if (_watchVideoId && _watchAccumSecs >= 5) {
-    recordWatchDuration(_watchVideoId, _watchAccumSecs, _watchTotalSecs);
+    recordWatchDuration(_watchVideoId, _watchAccumSecs, _watchTotalSecs, !!reachedEnd);
   }
   _watchAccumSecs = 0;
   _watchVideoId = null;
@@ -1202,7 +1202,7 @@ async function _restoreHistoryFromWorker() {
   } catch(e) {}
 }
 
-function recordWatchDuration(videoId, watchedSecs, totalSecs) {
+function recordWatchDuration(videoId, watchedSecs, totalSecs, reachedEnd) {
   if (!videoId || !watchedSecs || watchedSecs < 5) return;
   try {
     const profile = getTasteProfile();
@@ -1217,11 +1217,26 @@ function recordWatchDuration(videoId, watchedSecs, totalSecs) {
     else if (pct >= 0.10) { weight = 1; signal = "casual"; }
     else                  { weight = -2; signal = "skip"; }
 
+    // reachedEnd (playback genuinely reached ENDED) is real, honest
+    // information — but only ever used as a modest tie-breaker on top of
+    // already-substantial genuine watch time (50%+), never as a signal on
+    // its own. Without that floor, this would reopen the exact exploit
+    // the accumulated-time tracking was built to close — fast-forwarding
+    // through most of a video and only playing the final few seconds
+    // would otherwise still trigger ENDED and inflate the result.
+    if (reachedEnd && pct >= 0.5 && pct < 0.95) {
+      if (pct >= 0.80) { weight = 5; signal = "loved"; }
+      else { weight = 3; signal = "liked"; }
+    }
+
     // A genuine "watched it through" signal means Home's next visit should
     // reflect this, not show the same candidates it already had. Doesn't
     // force an immediate reload — just marks the cache stale, so the next
-    // real Home visit does a genuine re-fetch instead of reshuffling.
-    if (pct >= 0.80) { try { invalidateHomeCache(); } catch(e) {} }
+    // real Home visit does a genuine re-fetch instead of reshuffling. Checks
+    // the final signal (after any reachedEnd tie-breaker), not raw pct
+    // alone, so a watch genuinely upgraded by reaching the end is treated
+    // consistently with everything else at that same tier.
+    if (signal === "loved" || signal === "liked") { try { invalidateHomeCache(); } catch(e) {} }
 
     // Send engagement signal to Worker for cross-user aggregation
     try {
@@ -1233,7 +1248,7 @@ function recordWatchDuration(videoId, watchedSecs, totalSecs) {
 
     // Store per-video watch signal for future ranking
     profile.watchSignals = profile.watchSignals || {};
-    profile.watchSignals[videoId] = { pct: Math.round(pct*100), signal, secs: watchedSecs, ts: Date.now() };
+    profile.watchSignals[videoId] = { pct: Math.round(pct*100), signal, secs: watchedSecs, reachedEnd: !!reachedEnd, ts: Date.now() };
     // Keep only last 100 signals
     const signals = Object.entries(profile.watchSignals).sort((a,b) => b[1].ts - a[1].ts).slice(0, 100);
     profile.watchSignals = Object.fromEntries(signals);
@@ -2101,7 +2116,7 @@ window.onYouTubeIframeAPIReady = function () {
             // end" — fast-forwarding through most of a video and only
             // playing the last few seconds no longer records the same
             // "loved" signal as actually watching it.
-            _finalizeWatchSession();
+            _finalizeWatchSession(true);
             playNextSuggested();
           }
         },
@@ -2245,7 +2260,7 @@ function createYTPlayer(videoId, startSeconds) {
           }
         }
         if (e.data === YT.PlayerState.PAUSED) { playPauseBtn.textContent = "▶"; _watchSegmentEnd(); }
-        if (e.data === YT.PlayerState.ENDED && currentVideoId) { clearResumePosition(currentVideoId); _finalizeWatchSession(); playNextSuggested(); }
+        if (e.data === YT.PlayerState.ENDED && currentVideoId) { clearResumePosition(currentVideoId); _finalizeWatchSession(true); playNextSuggested(); }
         },
         onError: (e) => {
           if (e.data === 101 || e.data === 150) showEmbedBlockedOverlay(currentVideoId);
@@ -2917,7 +2932,7 @@ resBtn.addEventListener("click", () => {
           }
         }
         if (e.data === YT.PlayerState.PAUSED) { playPauseBtn.textContent = "▶"; _watchSegmentEnd(); }
-        if (e.data === YT.PlayerState.ENDED && currentVideoId) { clearResumePosition(currentVideoId); _finalizeWatchSession(); playNextSuggested(); }
+        if (e.data === YT.PlayerState.ENDED && currentVideoId) { clearResumePosition(currentVideoId); _finalizeWatchSession(true); playNextSuggested(); }
         },
         onError: (e) => {
           if (e.data === 101 || e.data === 150) showEmbedBlockedOverlay(currentVideoId);
