@@ -4063,7 +4063,9 @@ async function openShortsTabSetup() {
   let shortsCurrentChannelId = null;
   let shortsSubscribed = false;
   let shortsSubscriptionId = null;
+  let _shortsChannelCheckGen = 0;
   async function updateShortsChannelInfo(item) {
+    const myGen = ++_shortsChannelCheckGen;
     const snippet = item.snippet || {};
     const channelId = snippet.channelId || "";
     shortsCurrentChannelId = channelId;
@@ -4077,20 +4079,26 @@ async function openShortsTabSetup() {
     if (!channelId) return;
     // Channel avatar — small, non-blocking lookup
     fetchYouTube("channels", { part: "snippet", id: channelId, _: Date.now() }).then(res => {
-      if (shortsCurrentChannelId !== channelId) return;
+      if (myGen !== _shortsChannelCheckGen) return;
       const thumb = res.items?.[0]?.snippet?.thumbnails?.default?.url;
       if (thumb) shortsChannelAvatar.style.backgroundImage = `url(${thumb})`;
     }).catch(() => {});
-    // Real subscription state — same pattern as the medium player
+    // Real subscription state — same pattern as the medium player. Uses a
+    // generation counter, not just a channelId comparison — comparing IDs
+    // alone can't distinguish "this is a fresh check" from "this is a
+    // stale response that happens to match again," which happens if
+    // swiping back to a channel while an earlier check for that same
+    // channel is still in flight — the specific gap that let a stale
+    // "subscribed" result from a previous, unrelated check apply here.
     const token = await getValidToken();
-    if (!token || shortsCurrentChannelId !== channelId) return;
+    if (!token || myGen !== _shortsChannelCheckGen) return;
     try {
       const res = await fetch(
         `https://www.googleapis.com/youtube/v3/subscriptions?part=id&mine=true&forChannelId=${channelId}`,
         { headers: { Authorization: "Bearer " + token } }
       );
       const d = await res.json();
-      if (shortsCurrentChannelId !== channelId) return;
+      if (myGen !== _shortsChannelCheckGen) return;
       if (d.items && d.items.length > 0) {
         shortsSubscribed = true;
         shortsSubscriptionId = d.items[0].id;
