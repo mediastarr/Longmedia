@@ -7431,7 +7431,14 @@ function applyShortPlayerPatch(card, item) {
   // is. This runs before the regular poll starts, so a fresh subscription
   // upload has a real chance of showing up the moment the app opens,
   // rather than only after the slower rotation happens to reach it.
-  (async function _startupBroadSubCheck() {
+  // Awaited deliberately, not fire-and-forget — this and the regular poll
+  // cycle both independently read-modify-write the same hubNewVideos key.
+  // Running them concurrently meant whichever finished last could overwrite
+  // the other's more recent exclusions using its own, separately-read
+  // snapshot — the actual, confirmed cause of an already-watched video
+  // reappearing as new, regardless of which function's fault it seemed to
+  // be individually. Serializing them removes the overlap window entirely.
+  await (async function _startupBroadSubCheck() {
     try {
       const allSubIds = JSON.parse(localStorage.getItem("subscribedChannelIds") || "[]");
       if (!allSubIds.length) return;
