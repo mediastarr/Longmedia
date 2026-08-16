@@ -6058,14 +6058,24 @@ async function runSubscriptionSync(isManual = false) {
       // Save for Source 2 polling
       const savedIds = channelIds || [];
       if (savedIds.length) localStorage.setItem("subscribedChannelIds", JSON.stringify(savedIds.slice(0, 100)));
-      const workerRes = await fetch(HUB_WORKER_URL + "/subscribe", {
+      const doSubscribeManual = () => fetch(HUB_WORKER_URL + "/subscribe", {
         method: "POST",
         headers: workerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ channelIds: channelIds.slice(0, 100), replaceAll: true })
-      });
-      const d = await workerRes.json();
+      }).then(r => r.json());
+      let d = await doSubscribeManual();
+      // Retry once if some channels genuinely failed to register with
+      // Google's hub — a real, silent failure mode distinct from the
+      // channel_subs KV record (which gets written regardless of whether
+      // the actual push-notification registration succeeded).
+      if (d && typeof d.registered === "number" && d.registered < d.total) {
+        await new Promise(r => setTimeout(r, 3000));
+        d = await doSubscribeManual();
+      }
       syncProgressFill.style.width = "100%";
-      syncStatus.textContent = "✓ Done — " + channelIds.length + " subscriptions · " + (d.subscribed || 0) + " registered for real-time alerts";
+      // Worker returns "registered", not "subscribed" — this previously
+      // always showed 0 regardless of how many genuinely succeeded.
+      syncStatus.textContent = "✓ Done — " + channelIds.length + " subscriptions · " + (d.registered || 0) + " registered for real-time alerts";
     } catch(e) {
       syncProgressFill.style.width = "100%";
       syncStatus.textContent = "✓ Profile rebuilt from " + channelIds.length + " subscriptions";
@@ -7377,11 +7387,22 @@ function applyShortPlayerPatch(card, item) {
       if (!savedIds.length) return;
       const token = await getValidToken();
       if (!token) return;
-      await fetch(HUB_WORKER_URL + "/subscribe", {
+      const doSubscribe = () => fetch(HUB_WORKER_URL + "/subscribe", {
         method: "POST",
         headers: workerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ channelIds: savedIds, replaceAll: true })
-      });
+      }).then(r => r.json()).catch(() => null);
+      let result = await doSubscribe();
+      // If some channels genuinely failed to register with Google's hub
+      // (a real, silent failure mode — the channel_subs KV record is
+      // written regardless, but that alone doesn't make Google start
+      // sending pushes if the actual hub.subscribe call itself failed),
+      // retry once after a short delay rather than leaving it stuck until
+      // the next renewal cycle 2 days later.
+      if (result && typeof result.registered === "number" && result.registered < result.total) {
+        await new Promise(r => setTimeout(r, 3000));
+        result = await doSubscribe();
+      }
       localStorage.setItem("_lastSubRenewal", String(Date.now()));
     } catch(e) {}
   })();
