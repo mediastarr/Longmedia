@@ -3612,9 +3612,23 @@ homeTab.addEventListener("click", async () => {
         } catch(e) {}
       }
     }
-    _pollClearBadge();
-    if (hubVideos.length) await _injectHubVideos(hubVideos);
-    else showHUD("Couldn't load new videos — pull to refresh");
+    if (hubVideos.length) {
+      const injected = await _injectHubVideos(hubVideos);
+      if (injected) {
+        _pollClearBadge();
+      } else {
+        // The follow-up videos.list call for these IDs failed or came back
+        // empty (e.g. rate-limited) — restore the data (already removed
+        // from localStorage above) and leave the badge in place, so the
+        // "new videos" signal and the data it needs both survive for a
+        // genuine retry rather than being silently lost.
+        try { localStorage.setItem("hubNewVideos", JSON.stringify(hubVideos)); } catch(e) {}
+        showHUD("Couldn't load new videos — tap Home to retry");
+      }
+    } else {
+      _pollClearBadge();
+      showHUD("Couldn't load new videos — pull to refresh");
+    }
     if (!nextPageToken) nextPageToken = "seed";
     isLoadingHome = false;
     return;
@@ -6758,7 +6772,7 @@ async function _pollCheckNewContent() {
 }
 
 async function _injectHubVideos(hubVideos) {
-  if (!hubVideos || !hubVideos.length) return;
+  if (!hubVideos || !hubVideos.length) return false;
   try {
     // Filter out already-watched AND explicitly blocked (Not Interested / disliked) videos
     try {
@@ -6767,11 +6781,16 @@ async function _injectHubVideos(hubVideos) {
       const blockSet = new Set(getBlocklist());
       hubVideos = hubVideos.filter(v => !seenSet.has(v.videoId) && !blockSet.has(v.videoId));
     } catch(e) {}
-    if (!hubVideos.length) return;
+    // Every candidate was already seen/blocked — nothing genuinely new to
+    // inject, but this isn't a failure; the badge is correctly cleared.
+    if (!hubVideos.length) return true;
 
     const ids = hubVideos.map(v => v.videoId).join(",");
     const data = await fetchYouTube("videos", { part: "snippet,statistics", id: ids, _: Date.now() });
-    if (!data.items || !data.items.length) return;
+    // A real failure — the follow-up call for these specific IDs came back
+    // empty or errored (e.g. rate-limited). The caller needs to know this
+    // didn't work, not silently treat it as "nothing to show."
+    if (!data.items || !data.items.length) return false;
     const frag = document.createDocumentFragment();
     data.items.forEach(item => {
       const snippet = item.snippet || {};
@@ -6823,7 +6842,10 @@ async function _injectHubVideos(hubVideos) {
       localStorage.setItem("hubSeenIds", JSON.stringify(mergedSeen));
       if (_pollKnownIds) injectedIds.forEach(id => _pollKnownIds.add(id));
     } catch(e) {}
-  } catch(e) {}
+    return true;
+  } catch(e) {
+    return false;
+  }
 }
 
 /* ── Genuine instant push via WebSocket ── */
