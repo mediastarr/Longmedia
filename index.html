@@ -6667,6 +6667,42 @@ async function _injectHubVideos(hubVideos) {
   } catch(e) {}
 }
 
+/* ── Genuine instant push via WebSocket ── */
+let _notifWs = null;
+let _notifWsReconnectAttempt = 0;
+function _connectNotificationWebSocket() {
+  try {
+    const wsUrl = HUB_WORKER_URL.replace(/^https:/, "wss:") + "/ws?user=" + encodeURIComponent(getViewTubeUserId()) + "&secret=" + encodeURIComponent(HUB_SECRET);
+    const ws = new WebSocket(wsUrl);
+    _notifWs = ws;
+    ws.onopen = () => { _notifWsReconnectAttempt = 0; };
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        const toItems = (videos) => (videos || []).map(v => ({
+          videoId: v.videoId, channelId: v.channelId || "", title: v.title || "",
+          publishedAt: v.publishedAt || "", receivedAt: v.receivedAt || Date.now(), source: "subscription"
+        }));
+        // Routed through the same atomic merge helper the poll and startup
+        // sweep already use — this is what keeps a genuine instant push
+        // from ever racing against either of them.
+        if (msg.type === "backlog") _mergeIntoHubNewVideos(toItems(msg.videos));
+        else if (msg.type === "new_video" && msg.video) _mergeIntoHubNewVideos(toItems([msg.video]));
+      } catch(e) {}
+    };
+    ws.onclose = () => {
+      if (_notifWs !== ws) return; // superseded by a newer connection attempt
+      // Capped exponential backoff — a flaky glasses network shouldn't
+      // mean either giving up on push entirely or hammering the Worker
+      // with rapid reconnect attempts.
+      const delay = Math.min(30000, 2000 * Math.pow(1.5, _notifWsReconnectAttempt));
+      _notifWsReconnectAttempt++;
+      setTimeout(() => { if (!document.hidden) _connectNotificationWebSocket(); }, delay);
+    };
+    ws.onerror = () => { try { ws.close(); } catch(e) {} };
+  } catch(e) {}
+}
+
 function _startPolling() {
   // Initial poll after 15 seconds
   setTimeout(async () => {
@@ -7633,6 +7669,13 @@ function applyShortPlayerPatch(card, item) {
   })();
 
   _startPolling();
+
+  // Genuine instant push via WebSocket — connects to this user's own
+  // Durable Object instance on the Worker. Kept alongside the existing
+  // poll, not replacing it: if this connection fails or isn't supported
+  // on this specific WebView, the poll-based path still works exactly as
+  // before, just at its normal cadence instead of instantly.
+  _connectNotificationWebSocket();
 
   // Check for live streams every 5 minutes
   _checkLiveStreams();
