@@ -5953,6 +5953,14 @@ async function runSubscriptionSync(isManual = false) {
   const token = await getValidToken();
   if (!token) { if (isManual) syncStatus.textContent = "Login required — go to Subscriptions tab first."; return; }
 
+  // Pauses the background poll for the duration — both this and the poll
+  // independently read-modify-write hubNewVideos, and without this, the
+  // poll's own cycle firing during or right after this finishes could
+  // overwrite this function's own, larger result with its own, smaller
+  // one — the actual, confirmed cause of a badge count changing shortly
+  // after a manual sync completes.
+  if (isManual) window._manualSyncInProgress = true;
+
   if (isManual) {
     syncStatus.textContent = "Clearing taste profile…";
     syncProgress.style.display = "block";
@@ -6150,6 +6158,8 @@ async function runSubscriptionSync(isManual = false) {
 
   } catch(e) {
     syncStatus.textContent = "Error: " + (e.message || "check connection");
+  } finally {
+    if (isManual) window._manualSyncInProgress = false;
   }
 }
 document.getElementById("syncClearBtn").onclick = () => runSubscriptionSync(true);
@@ -6348,6 +6358,12 @@ function _pollClearBadge() {
 }
 
 async function _pollCheckNewContent() {
+  // A manual "Clear & Rebuild" is actively running — skip this cycle
+  // entirely rather than race it. Both independently read-modify-write
+  // hubNewVideos; running concurrently let whichever finished last
+  // silently overwrite the other's result with its own, separately-read
+  // snapshot.
+  if (window._manualSyncInProgress) return;
   try {
     const since = _pollLastCheck || (Date.now() - 86400000);
     const since6h = new Date(Date.now() - 21600000).toISOString(); // last 6 hours only
