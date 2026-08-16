@@ -6877,6 +6877,12 @@ function _connectNotificationWebSocket() {
           if (msg.video.isLive) _handleLivePush(msg.video);
           else _mergeIntoHubNewVideos(toItems([msg.video]));
         }
+        else if (msg.type === "new_video_batch" && msg.videos) {
+          const liveOnes = (msg.videos || []).filter(v => v.isLive);
+          const regularOnes = (msg.videos || []).filter(v => !v.isLive);
+          if (regularOnes.length) _mergeIntoHubNewVideos(toItems(regularOnes));
+          liveOnes.forEach(v => _handleLivePush(v));
+        }
       } catch(e) {}
     };
     ws.onclose = () => {
