@@ -1563,7 +1563,74 @@ function _getSessionMode() {
   } catch(e) { return null; }
 }
 
+// Kept as the proven fallback — see fetchPersonalizedFeed() below, which
+// tries the new server-side /buildHomeFeed path first and falls back to
+// this exact, unchanged logic if that fails or times out.
+// Tries the new server-side gathering-plus-scoring path first — one
+// request instead of the 7-10 separate parallel calls the local fallback
+// makes from the glasses. Falls back to the full, proven local
+// implementation if this fails, times out, or comes back with
+// suspiciously few items, so the feed never depends entirely on the new
+// path working.
 async function fetchPersonalizedFeed() {
+  try {
+    const profile = getTasteProfile();
+    const topChannels = getTopChannels(8);
+    const topKeywords = getTopKeywords(10);
+    const topBigrams = getTopBigrams(6);
+    const recentSearches = getRecentSearches(5);
+    const topCats = getTopCategories(3);
+    const currentHour = new Date().getHours();
+    const timeSlot = currentHour < 6 ? "latenight" : currentHour < 12 ? "morning" : currentHour < 17 ? "afternoon" : currentHour < 21 ? "evening" : "night";
+    const timeContext = profile.timeContext?.[timeSlot] || {};
+    const timeCat = Object.entries(timeContext).sort((a,b) => b[1]-a[1])[0]?.[0] || null;
+    const durPref = profile.durationPref || { short: 0, medium: 0, long: 0 };
+    const preferredDuration = durPref.short > durPref.medium && durPref.short > durPref.long ? "short" :
+                              durPref.long > durPref.medium ? "any" : "medium";
+    let shownHistoryParsed = []; try { shownHistoryParsed = JSON.parse(localStorage.getItem("feedShownTimed") || "[]"); } catch(e) {}
+    const oneDayAgo = Date.now() - 86400000;
+    const recentShownIds = shownHistoryParsed.filter(e => e.ts > oneDayAgo).map(e => e.id);
+
+    let collabVideoIds = [];
+    try {
+      const collabRecs = await getCollabRecommendations();
+      collabVideoIds = collabRecs.map(v => v.videoId);
+    } catch(e) {}
+
+    const token = await getValidToken();
+    const mostRecentSearch = (profile.searchHistory && profile.searchHistory[0]) || null;
+
+    const res = await fetchWithTimeout(HUB_WORKER_URL + "/buildHomeFeed", {
+      method: "POST",
+      headers: workerHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        topChannels, topKeywords, topBigrams, recentSearches, topCats,
+        preferredDuration, userRegion, accessToken: token || undefined,
+        profile: { channels: profile.channels || {}, keywords: profile.keywords || {}, bigrams: profile.bigrams || {}, categories: profile.categories || {}, timeCat },
+        sessionMode: _getSessionMode(), currentSearch: mostRecentSearch,
+        blockedIds: getBlocklist(), blockedChannels: getBlockedChannels(),
+        recentShownIds, collabIds: collabVideoIds
+      })
+    }, 20000);
+    const data = await res.json();
+    if (data.items && data.items.length >= 10) {
+      const newIds = data.items.map(item => item.id?.videoId || item.id || item.videoId).filter(Boolean);
+      const newTimed = newIds.map(id => ({ id, ts: Date.now() }));
+      const updTimed = [...newTimed, ...shownHistoryParsed].filter(e => e.ts > oneDayAgo).slice(0, 200);
+      try { localStorage.setItem("feedShownTimed", JSON.stringify(updTimed)); } catch(e) {}
+      return data.items;
+    }
+    throw new Error("server-side feed too small or empty");
+  } catch(e) {
+    return _fetchPersonalizedFeedLocal();
+  }
+}
+
+
+// Kept as the proven fallback — see fetchPersonalizedFeed() above, which
+// tries the new server-side /buildHomeFeed path first and falls back to
+// this exact, unchanged logic if that fails or times out.
+async function _fetchPersonalizedFeedLocal() {
   const token = await getValidToken();
   const profile5 = getTasteProfile();
   const watchedChannelIds = new Set(Object.keys(profile5.channels || {}));
