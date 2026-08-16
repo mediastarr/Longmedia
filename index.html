@@ -4322,6 +4322,30 @@ async function openShortsTabSetup() {
   try { persistentSeenIds = new Set(JSON.parse(localStorage.getItem("shortsSeenHistory") || "[]")); } catch(e) {}
   function isNew(id) { return !persistentSeenIds.has(id) && !shortsSeenIds.has(id); }
 
+  // Try the server-side pool-building path first — one request instead of
+  // the multiple parallel calls the block below makes from the glasses.
+  // Falls through to that exact, unchanged logic if this fails, times
+  // out, or comes back thin.
+  let usedServerPool = false;
+  try {
+    const seenArr = [...new Set([...persistentSeenIds, ...shortsSeenIds])].slice(-300);
+    const res = await fetchWithTimeout(HUB_WORKER_URL + "/buildShortsPool", {
+      method: "POST",
+      headers: workerHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        topKeywords: getTopKeywords(6), topBigrams: getTopBigrams(4), recentSearches: getRecentSearches(2),
+        topCats: getTopCategories(2), userRegion, accessToken: token || undefined, seenIds: seenArr
+      })
+    }, 15000);
+    const serverData = await res.json();
+    if (serverData.items && serverData.items.length >= 15) {
+      serverData.items.forEach(v => pool.push(v));
+      data = { nextPageToken: serverData.nextPageToken };
+      usedServerPool = true;
+    }
+  } catch(e) {}
+
+  if (!usedServerPool) {
   // SOURCE 1: Newest from subscribed channels (UUSH)
   // 8 channels instead of 15 — saves 7 API calls
   if (token) {
@@ -4398,6 +4422,7 @@ async function openShortsTabSetup() {
       if (id && isNew(id) && secs!==null && secs>0 && secs<=180) pool.push({id,snippet:v.snippet});
     });
   } catch(e) {}
+  } // end of !usedServerPool fallback block
 
     const seen=new Set();
   // If a video was pre-seeded (opened from home tab), keep it at front
