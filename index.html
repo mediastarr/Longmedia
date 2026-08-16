@@ -7619,6 +7619,11 @@ function applyShortPlayerPatch(card, item) {
         });
       });
       if (!found.length) return;
+      // A manual "Clear & Rebuild" may have started after this slow,
+      // multi-channel sweep was already underway — checking only at the
+      // start wouldn't catch that. Skip the write here and let the
+      // manual sync's own, more authoritative result stand instead.
+      if (window._manualSyncInProgress) return;
       const existing = JSON.parse(localStorage.getItem("hubNewVideos") || "[]");
       const merged = [...found, ...existing]
         .filter((v, i, a) => a.findIndex(x => x.videoId === v.videoId) === i)
