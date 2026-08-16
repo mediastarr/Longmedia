@@ -7764,6 +7764,13 @@ function applyShortPlayerPatch(card, item) {
           // timed out — this previously fell through both branches silently,
           // leaving stale content on screen with zero indication anything was
           // even attempted. At minimum, be honest that the refresh didn't happen.
+          // Also — the actual missing piece: nextPageToken was never set on
+          // this path at all, since neither _startupFetch() (which returns
+          // immediately once cache has already painted) nor this failed
+          // upgrade ever touched it. That silently broke infinite scroll on
+          // the cached content until the next full Home reload, with no
+          // visible indication why scrolling wasn't doing anything.
+          if (!nextPageToken) nextPageToken = "seed";
           showHUD("Couldn't refresh — showing last session");
         }
       }
