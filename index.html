@@ -2386,7 +2386,14 @@ function createYTPlayer(videoId, startSeconds) {
   }
 }
 
+let _recentlyPlayedIds = [];
 function setPlayerVideo(videoId, snippet, startSeconds) {
+  // Track this play — used to exclude recently-watched videos from the
+  // suggested-videos pool below, so autoplay can't ping-pong between the
+  // same two mutually-related videos forever. Capped small deliberately —
+  // this only needs to break a short cycle, not become a full watch-history
+  // exclusion (that's already handled separately, more thoroughly).
+  _recentlyPlayedIds = [videoId, ..._recentlyPlayedIds.filter(id => id !== videoId)].slice(0, 8);
   _logSessionAction("longform");
   // Finalize whatever video was just playing before switching to this one —
   // records its genuine accumulated watch time (if any), rather than
@@ -2797,13 +2804,6 @@ async function loadVideoInfoPanel(videoId, snippet) {
       showHUD("Login required");
     }
   };
-  document.getElementById("vipNotIntBtn").onclick = () => {
-    const vid = videoId;
-    const ch = snippet.channelId || "";
-    const t = snippet.title || "";
-    markNotInterested(vid, ch, t);
-    showHUD("Not interested — feed updated");
-  };
   document.getElementById("vipNotIntBtn").onclick = () => { markNotInterested(videoId, snippet.channelId||"", snippet.title||""); };
   document.getElementById("vipBlockChannelBtn").onclick = () => { blockChannel(snippet.channelId||"", snippet.channelTitle||""); };
   document.getElementById("vipShareBtn").onclick = () => {
@@ -2859,7 +2859,7 @@ async function loadVideoInfoPanel(videoId, snippet) {
   const topBI  = getTopBigrams(2);
   const topCat = getTopCategoryId();
 
-  const seen = new Set([videoId]);
+  const seen = new Set([videoId, ..._recentlyPlayedIds]);
   const allItems = [];
 
   function addItems(items) {
