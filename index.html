@@ -1639,7 +1639,15 @@ async function _fetchPersonalizedFeedImpl() {
     }
     throw new Error("server-side feed too small or empty");
   } catch(e) {
-    return _fetchPersonalizedFeedLocal();
+    try {
+      return await _fetchPersonalizedFeedLocal();
+    } catch(e2) {
+      // The local fallback itself failed — this function must still
+      // resolve rather than reject, or the caller (Home's loading state)
+      // would be left stuck indefinitely with no further fallback to
+      // catch it.
+      return [];
+    }
   }
 }
 
