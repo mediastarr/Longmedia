@@ -1565,13 +1565,10 @@ function _getSessionMode() {
 
 // Kept as the proven fallback — see fetchPersonalizedFeed() below, which
 // tries the new server-side /buildHomeFeed path first and falls back to
-// this exact, unchanged logic if that fails or times out.
-// Tries the new server-side gathering-plus-scoring path first — one
-// request instead of the 7-10 separate parallel calls the local fallback
-// makes from the glasses. Falls back to the full, proven local
-// implementation if this fails, times out, or comes back with
-// suspiciously few items, so the feed never depends entirely on the new
-// path working.
+// Reverted — see comment above _fetchPersonalizedFeedLocal() for why. Kept
+// the in-flight dedup (a genuine, separate fix for two call sites racing
+// each other), but this now goes straight to the proven client-side
+// gathering rather than trying a server-side path first.
 let _fetchPersonalizedFeedInFlight = null;
 async function fetchPersonalizedFeed() {
   // Two separate call sites (startup's own upgrade step, and Home's click
@@ -1582,14 +1579,14 @@ async function fetchPersonalizedFeed() {
   // of genuinely new cards visible. A second caller reuses the first's
   // in-flight result instead of starting a competing build.
   if (_fetchPersonalizedFeedInFlight) return _fetchPersonalizedFeedInFlight;
-  _fetchPersonalizedFeedInFlight = _fetchPersonalizedFeedImpl();
+  _fetchPersonalizedFeedInFlight = _fetchPersonalizedFeedLocal();
   try {
     return await _fetchPersonalizedFeedInFlight;
   } finally {
     _fetchPersonalizedFeedInFlight = null;
   }
 }
-async function _fetchPersonalizedFeedImpl() {
+async function _fetchPersonalizedFeedImpl_UNUSED() {
   try {
     const profile = getTasteProfile();
     const topChannels = getTopChannels(8);
