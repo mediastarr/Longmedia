@@ -3684,7 +3684,7 @@ homeTab.addEventListener("click", async () => {
     if (pf.status === "fulfilled") addL(pf.value);
     if (fresh2.status === "fulfilled") addL(fresh2.value.items);
     if (popular2.status === "fulfilled") addL(popular2.value.items);
-    if (myHomeGen !== _homeLoadGeneration) return; // a newer Home load has since started — discard this stale one
+    if (myHomeGen !== _homeLoadGeneration && feedEl.querySelector(".video-card")) return; // a newer Home load has since started AND already rendered — discard this stale one. If nothing has rendered yet (still skeletons), render this anyway rather than leaving Home stuck indefinitely.
     if (allLogged.length) {
       const enrichedFeed = await enrichWithDurations(allLogged);
       renderFeed(enrichedFeed); showHUD("For You ✦");
@@ -3692,7 +3692,7 @@ homeTab.addEventListener("click", async () => {
       try { localStorage.setItem("cachedHomeFeed", JSON.stringify(enrichedFeed.slice(0,20))); } catch(e) {}
     } else {
       const fallback2 = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 50, _: Date.now() });
-      if (myHomeGen !== _homeLoadGeneration) return;
+      if (myHomeGen !== _homeLoadGeneration && feedEl.querySelector(".video-card")) return;
       nextPageToken = fallback2.nextPageToken || "seed"; renderFeed(await enrichWithDurations(fallback2.items || [])); showHUD("Home");
     }
   } else {
@@ -3706,13 +3706,13 @@ homeTab.addEventListener("click", async () => {
     ]);
     if (fresh.status === "fulfilled") addU(fresh.value.items);
     if (popular.status === "fulfilled") addU(popular.value.items);
-    if (myHomeGen !== _homeLoadGeneration) return; // a newer Home load has since started — discard this stale one
+    if (myHomeGen !== _homeLoadGeneration && feedEl.querySelector(".video-card")) return; // a newer Home load has since started AND already rendered — discard this stale one. If nothing has rendered yet (still skeletons), render this anyway rather than leaving Home stuck indefinitely.
     if (allItems.length) {
       renderFeed(await enrichWithDurations(allItems)); showHUD("Home");
       nextPageToken = (popular.status === "fulfilled" && popular.value.nextPageToken) || "seed";
     } else {
       const fallback = await fetchYouTube("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: userRegion, maxResults: 20, _: Date.now() });
-      if (myHomeGen !== _homeLoadGeneration) return;
+      if (myHomeGen !== _homeLoadGeneration && feedEl.querySelector(".video-card")) return;
       nextPageToken = fallback.nextPageToken || "seed"; renderFeed(await enrichWithDurations(fallback.items || [])); showHUD("Home");
     }
   }
