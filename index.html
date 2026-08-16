@@ -1572,7 +1572,24 @@ function _getSessionMode() {
 // implementation if this fails, times out, or comes back with
 // suspiciously few items, so the feed never depends entirely on the new
 // path working.
+let _fetchPersonalizedFeedInFlight = null;
 async function fetchPersonalizedFeed() {
+  // Two separate call sites (startup's own upgrade step, and Home's click
+  // handler) can genuinely fire close together — without this, each would
+  // independently build and render its own feed, with the second's render
+  // overwriting the first's, and most of its candidates then filtered out
+  // as "already shown" by the same-session dedup, leaving only a couple
+  // of genuinely new cards visible. A second caller reuses the first's
+  // in-flight result instead of starting a competing build.
+  if (_fetchPersonalizedFeedInFlight) return _fetchPersonalizedFeedInFlight;
+  _fetchPersonalizedFeedInFlight = _fetchPersonalizedFeedImpl();
+  try {
+    return await _fetchPersonalizedFeedInFlight;
+  } finally {
+    _fetchPersonalizedFeedInFlight = null;
+  }
+}
+async function _fetchPersonalizedFeedImpl() {
   try {
     const profile = getTasteProfile();
     const topChannels = getTopChannels(8);
