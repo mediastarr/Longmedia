@@ -3447,6 +3447,29 @@ function startNewFeedLoad() {
 // feedEl is shared by Home, Trending, Movies, History, and Search — whenever any
 // of them takes it over, Home's cache is no longer showing Home's own content.
 function invalidateHomeCache() { _homeCacheValid = false; }
+
+// The single, genuinely atomic writer for hubNewVideos — every function
+// that discovers new subscription uploads (the regular poll, the startup
+// sweep, manual Clear & Rebuild) calls this instead of doing its own
+// inline read-modify-write. Deliberately has no await anywhere inside —
+// JS can't interrupt a synchronous function partway through, so as long
+// as every writer goes through here, two of them can never interleave
+// and silently overwrite each other's result, regardless of how many
+// different sources want to contribute new videos to this list.
+function _mergeIntoHubNewVideos(newItems) {
+  if (!newItems || !newItems.length) return;
+  try {
+    const seenHub = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
+    const existing = JSON.parse(localStorage.getItem("hubNewVideos") || "[]");
+    const merged = [...newItems, ...existing]
+      .filter((v, i, a) => a.findIndex(x => x.videoId === v.videoId) === i)
+      .filter(v => !seenHub.has(v.videoId))
+      .slice(0, 30);
+    localStorage.setItem("hubNewVideos", JSON.stringify(merged));
+    if (_pollKnownIds) newItems.forEach(v => _pollKnownIds.add(v.videoId));
+    _pollSetBadge(merged.length);
+  } catch(e) {}
+}
 let isLoadingHome = false;
 homeTab.addEventListener("click", async () => {
   if (isLoadingHome) return; isLoadingHome = true;
@@ -6520,44 +6543,30 @@ async function _pollCheckNewContent() {
     // any actual subscription uploads among them. Discovery content is
     // still tracked (stored separately below), just no longer diluting the
     // one signal that's supposed to mean "someone you follow posted."
-    const subOnly = allNew.filter(v => v.source === "subscription");
+    let subOnly = allNew.filter(v => v.source === "subscription");
 
-    // Store merged for home tab — subscription uploads only, for the red
-    // highlight; discovery content stored under its own key instead.
+    // Server-side check — the Worker's watched record survives regardless
+    // of whether localStorage does on this specific WebView, which is the
+    // actual fix for videos that were genuinely watched still reappearing
+    // as new after a full app restart. This runs BEFORE the atomic merge
+    // below, not inside it — the merge itself must stay purely
+    // synchronous for it to actually prevent the race with other writers.
+    try {
+      if (subOnly.length) {
+        const fw = await fetchWithTimeout(HUB_WORKER_URL + "/filterWatched", {
+          method: "POST",
+          headers: workerHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ videoIds: subOnly.map(v => v.videoId) })
+        }, 5000).then(r => r.json());
+        const watchedSet = new Set(fw.watched || []);
+        if (watchedSet.size) subOnly = subOnly.filter(v => !watchedSet.has(v.videoId));
+      }
+    } catch(e) {}
+
+    _mergeIntoHubNewVideos(subOnly);
     let mergedCount = 0;
     try {
-      const existing = JSON.parse(localStorage.getItem("hubNewVideos") || "[]");
-      let merged = [...subOnly, ...existing].filter((v, i, a) => a.findIndex(x => x.videoId === v.videoId) === i).slice(0, 30);
-      // Filter out anything already marked seen — without this, stale
-      // entries from earlier poll cycles that were already injected and
-      // shown (but never removed from this list) kept inflating the badge
-      // count, even though _injectHubVideos() would silently drop them the
-      // moment the user actually tapped Home. This is exactly what caused
-      // a badge saying "20 new" to only ever inject 2.
-      try {
-        const seenForBadge = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
-        merged = merged.filter(v => !seenForBadge.has(v.videoId));
-      } catch(e) {}
-      // Second, server-side check — the Worker's watched record survives
-      // regardless of whether localStorage does on this specific WebView,
-      // which is the actual fix for videos that were genuinely watched
-      // still reappearing as new after a full app restart. Short timeout
-      // and a try/catch around the whole thing so a slow or failed
-      // network call never blocks the badge from updating with what the
-      // local check above already caught.
-      try {
-        if (merged.length) {
-          const fw = await fetchWithTimeout(HUB_WORKER_URL + "/filterWatched", {
-            method: "POST",
-            headers: workerHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ videoIds: merged.map(v => v.videoId) })
-          }, 5000).then(r => r.json());
-          const watchedSet = new Set(fw.watched || []);
-          if (watchedSet.size) merged = merged.filter(v => !watchedSet.has(v.videoId));
-        }
-      } catch(e) {}
-      localStorage.setItem("hubNewVideos", JSON.stringify(merged));
-      mergedCount = merged.length;
+      mergedCount = JSON.parse(localStorage.getItem("hubNewVideos") || "[]").length;
       const discoveryOnly = allNew.filter(v => v.source !== "subscription");
       if (discoveryOnly.length) {
         const existingDisc = JSON.parse(localStorage.getItem("hubDiscoveryVideos") || "[]");
@@ -7619,19 +7628,7 @@ function applyShortPlayerPatch(card, item) {
         });
       });
       if (!found.length) return;
-      // A manual "Clear & Rebuild" may have started after this slow,
-      // multi-channel sweep was already underway — checking only at the
-      // start wouldn't catch that. Skip the write here and let the
-      // manual sync's own, more authoritative result stand instead.
-      if (window._manualSyncInProgress) return;
-      const existing = JSON.parse(localStorage.getItem("hubNewVideos") || "[]");
-      const merged = [...found, ...existing]
-        .filter((v, i, a) => a.findIndex(x => x.videoId === v.videoId) === i)
-        .filter(v => !seenHub.has(v.videoId))
-        .slice(0, 30);
-      localStorage.setItem("hubNewVideos", JSON.stringify(merged));
-      if (_pollKnownIds) found.forEach(v => _pollKnownIds.add(v.videoId));
-      _pollSetBadge(merged.length);
+      _mergeIntoHubNewVideos(found);
     } catch(e) {}
   })();
 
