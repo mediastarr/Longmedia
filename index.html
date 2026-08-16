@@ -4659,6 +4659,28 @@ moviesTab.addEventListener("click", async () => {
   const mySignal = startNewFeedLoad();
   nextPageToken = null; setActiveTab("movies"); showSkeletons(6);
   try {
+  let items = null;
+
+  // Try the server-side path first — one request instead of the several
+  // parallel calls the block below makes from the glasses.
+  try {
+    const profileForRank = getTasteProfile();
+    const movToken0 = await getValidToken();
+    const res = await fetchWithTimeout(HUB_WORKER_URL + "/buildMoviesFeed", {
+      method: "POST",
+      headers: workerHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        topKeywords: getTopKeywords(6), topBigrams: getTopBigrams(3), recentSearches: getRecentSearches(3),
+        userRegion, accessToken: movToken0 || undefined,
+        profile: { channels: profileForRank.channels || {}, keywords: profileForRank.keywords || {}, categories: profileForRank.categories || {} },
+        blockedIds: getBlocklist(), blockedChannels: getBlockedChannels()
+      })
+    }, 15000);
+    const serverData = await res.json();
+    if (serverData.items && serverData.items.length >= 8) items = serverData.items;
+  } catch(e) {}
+
+  if (!items) {
   const allItems=[]; const seen=new Set();
   function addU(items){ (items||[]).forEach(item=>{ const id=item.id?.videoId||item.id; if(!id||seen.has(id))return; seen.add(id); allItems.push(item); }); }
   movieQIdx=Math.floor(Math.random()*MOVIE_QUERIES.length);
@@ -4715,7 +4737,7 @@ moviesTab.addEventListener("click", async () => {
   }
   const results=await Promise.allSettled(fetches);
   results.forEach(r=>{ if(r.status==="fulfilled") addU(r.value.items||[]); });
-  let items=allItems.filter(v=>v.id?.videoId||v.id).map(v=>({id:v.id?.videoId||v.id,snippet:v.snippet}));
+  items=allItems.filter(v=>v.id?.videoId||v.id).map(v=>({id:v.id?.videoId||v.id,snippet:v.snippet}));
   // Keyword filter — drop titles that are clearly trailers, reviews,
   // reactions, etc. rather than the actual full movie.
   const MOVIE_EXCLUDE_KEYWORDS = ["trailer","teaser","review","reaction","spoiler"];
@@ -4755,6 +4777,7 @@ moviesTab.addEventListener("click", async () => {
     // still shows a reasonable mix rather than nothing
     for (let i=items.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [items[i],items[j]]=[items[j],items[i]]; }
   }
+  } // end of !items (server-path-failed) fallback block
   nextPageToken="seed";
   renderFeed(await enrichWithDurations(items)); showHUD("Movies");
   } catch(e) { if (myGen === _homeLoadGeneration) moviesFeedEl.innerHTML='<div style="padding:20px;text-align:center;font-size:13px;opacity:0.7;">Tap Movies to retry.</div>'; } finally { isLoadingMovies = false; }
