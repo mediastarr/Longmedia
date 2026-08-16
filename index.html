@@ -6686,8 +6686,16 @@ function _connectNotificationWebSocket() {
         // Routed through the same atomic merge helper the poll and startup
         // sweep already use — this is what keeps a genuine instant push
         // from ever racing against either of them.
-        if (msg.type === "backlog") _mergeIntoHubNewVideos(toItems(msg.videos));
-        else if (msg.type === "new_video" && msg.video) _mergeIntoHubNewVideos(toItems([msg.video]));
+        if (msg.type === "backlog") {
+          const liveOnes = (msg.videos || []).filter(v => v.isLive);
+          const regularOnes = (msg.videos || []).filter(v => !v.isLive);
+          if (regularOnes.length) _mergeIntoHubNewVideos(toItems(regularOnes));
+          liveOnes.forEach(v => _handleLivePush(v));
+        }
+        else if (msg.type === "new_video" && msg.video) {
+          if (msg.video.isLive) _handleLivePush(msg.video);
+          else _mergeIntoHubNewVideos(toItems([msg.video]));
+        }
       } catch(e) {}
     };
     ws.onclose = () => {
@@ -6765,6 +6773,26 @@ function showEmbedBlockedOverlay(videoId) {
 
 /* ── Live stream detection ── */
 let _liveChannels = new Set();
+
+// Handles an instant live-stream push from the WebSocket — mirrors what
+// the existing polling check already does for a newly-detected live
+// channel, just triggered immediately instead of waiting for the next
+// 5-minute poll cycle.
+function _handleLivePush(live) {
+  if (!live || !live.channelId) return;
+  _liveChannels.add(live.channelId);
+  document.querySelectorAll(".video-card").forEach(card => {
+    if (card.dataset.channelid !== live.channelId) return;
+    if (card.querySelector(".live-badge")) return;
+    const badge = document.createElement("div");
+    badge.className = "live-badge";
+    badge.textContent = "🔴 LIVE";
+    badge.style.cssText = "position:absolute;top:6px;left:6px;background:#ff0000;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;z-index:10;";
+    card.style.position = "relative";
+    card.appendChild(badge);
+  });
+  showHUD("🔴 " + (live.channelTitle || "A channel") + " is LIVE now!");
+}
 let _liveCheckTimer = null;
 
 async function _checkLiveStreams() {
