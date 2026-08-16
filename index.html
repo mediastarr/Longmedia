@@ -1565,10 +1565,17 @@ function _getSessionMode() {
 
 // Kept as the proven fallback — see fetchPersonalizedFeed() below, which
 // tries the new server-side /buildHomeFeed path first and falls back to
-// Reverted — see comment above _fetchPersonalizedFeedLocal() for why. Kept
-// the in-flight dedup (a genuine, separate fix for two call sites racing
-// each other), but this now goes straight to the proven client-side
-// gathering rather than trying a server-side path first.
+// Client-first, server-enhances-later. Every call still goes straight to
+// the proven, quota-resilient client-side gathering for its own result —
+// that never changes, and nothing here makes any call wait on the server
+// path. Once that result is returned, a background attempt at
+// /buildHomeFeed kicks off separately; if it completes, its result is
+// cached for the *next* call to use instantly, skipping gathering
+// entirely. This is safe specifically because the server attempt never
+// blocks or gates the current call — worst case it simply never finishes
+// or never gets used, and every call still falls straight through to the
+// same reliable client path it always did.
+const HOME_SERVER_PREBUILD_FRESH_MS = 5 * 60 * 1000; // matches the Worker's own feed cache TTL
 let _fetchPersonalizedFeedInFlight = null;
 async function fetchPersonalizedFeed() {
   // Two separate call sites (startup's own upgrade step, and Home's click
@@ -1579,14 +1586,44 @@ async function fetchPersonalizedFeed() {
   // of genuinely new cards visible. A second caller reuses the first's
   // in-flight result instead of starting a competing build.
   if (_fetchPersonalizedFeedInFlight) return _fetchPersonalizedFeedInFlight;
-  _fetchPersonalizedFeedInFlight = _fetchPersonalizedFeedLocal();
+  _fetchPersonalizedFeedInFlight = (async () => {
+    // A fresh, already-completed background build from a previous call is
+    // available — use it directly rather than gathering again. Never
+    // waited on, only ever consumed if it's already sitting there done.
+    try {
+      const cached = JSON.parse(localStorage.getItem("_serverPrebuiltHomeFeed") || "null");
+      if (cached && cached.items && cached.items.length && (Date.now() - cached.ts) < HOME_SERVER_PREBUILD_FRESH_MS) {
+        localStorage.removeItem("_serverPrebuiltHomeFeed"); // consume once — a stale reuse across many taps isn't the goal, a fresh gather is
+        _kickOffBackgroundHomePrebuild(); // still keep the pipeline warm for the call after this one
+        return cached.items;
+      }
+    } catch(e) {}
+    const result = await _fetchPersonalizedFeedLocal();
+    _kickOffBackgroundHomePrebuild();
+    return result;
+  })();
   try {
     return await _fetchPersonalizedFeedInFlight;
   } finally {
     _fetchPersonalizedFeedInFlight = null;
   }
 }
-async function _fetchPersonalizedFeedImpl_UNUSED() {
+
+// Fire-and-forget — deliberately never awaited by any caller. Builds the
+// server-side result for whenever the *next* call happens to need it, with
+// zero effect on the call currently in progress either way.
+let _backgroundHomePrebuildRunning = false;
+function _kickOffBackgroundHomePrebuild() {
+  if (_backgroundHomePrebuildRunning) return;
+  _backgroundHomePrebuildRunning = true;
+  _buildHomeFeedServerSide().then(items => {
+    if (items && items.length >= 10) {
+      try { localStorage.setItem("_serverPrebuiltHomeFeed", JSON.stringify({ items, ts: Date.now() })); } catch(e) {}
+    }
+  }).catch(() => {}).finally(() => { _backgroundHomePrebuildRunning = false; });
+}
+
+async function _buildHomeFeedServerSide() {
   try {
     const profile = getTasteProfile();
     const topChannels = getTopChannels(8);
@@ -1625,33 +1662,18 @@ async function _fetchPersonalizedFeedImpl_UNUSED() {
         blockedIds: getBlocklist(), blockedChannels: getBlockedChannels(),
         recentShownIds, collabIds: collabVideoIds
       })
-    }, 20000);
+    }, 25000); // generous — this runs in the background, nothing is waiting on it
     const data = await res.json();
-    if (data.items && data.items.length >= 10) {
-      const newIds = data.items.map(item => item.id?.videoId || item.id || item.videoId).filter(Boolean);
-      const newTimed = newIds.map(id => ({ id, ts: Date.now() }));
-      const updTimed = [...newTimed, ...shownHistoryParsed].filter(e => e.ts > oneDayAgo).slice(0, 200);
-      try { localStorage.setItem("feedShownTimed", JSON.stringify(updTimed)); } catch(e) {}
-      return data.items;
-    }
-    throw new Error("server-side feed too small or empty");
+    return (data.items && data.items.length) ? data.items : [];
   } catch(e) {
-    try {
-      return await _fetchPersonalizedFeedLocal();
-    } catch(e2) {
-      // The local fallback itself failed — this function must still
-      // resolve rather than reject, or the caller (Home's loading state)
-      // would be left stuck indefinitely with no further fallback to
-      // catch it.
-      return [];
-    }
+    return [];
   }
 }
 
-
-// Kept as the proven fallback — see fetchPersonalizedFeed() above, which
-// tries the new server-side /buildHomeFeed path first and falls back to
-// this exact, unchanged logic if that fails or times out.
+// Kept as the reliable, primary path — every call to fetchPersonalizedFeed()
+// goes here first. See fetchPersonalizedFeed() above for how the
+// server-side build now works: strictly as a background enhancement for
+// the *next* call, never something this path waits on or depends on.
 async function _fetchPersonalizedFeedLocal() {
   const token = await getValidToken();
   const profile5 = getTasteProfile();
