@@ -6913,6 +6913,9 @@ function _connectNotificationWebSocket() {
           if (regularOnes.length) _mergeIntoHubNewVideos(toItems(regularOnes));
           liveOnes.forEach(v => _handleLivePush(v));
         }
+        else if (msg.type === "video_watched" && msg.videoId) {
+          _handleWatchedSync(msg.videoId);
+        }
       } catch(e) {}
     };
     ws.onclose = () => {
@@ -7009,6 +7012,36 @@ function _handleLivePush(live) {
     card.appendChild(badge);
   });
   showHUD("🔴 " + (live.channelTitle || "A channel") + " is LIVE now!");
+}
+
+// Cross-device watched sync — another device on this account just watched
+// this video. Clears it from the local "new" queue immediately (rather
+// than waiting for the next /filterWatched cycle to notice) and marks it
+// seen so it can't resurface as new on this device either.
+function _handleWatchedSync(videoId) {
+  if (!videoId) return;
+  try {
+    const seenHub = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
+    if (!seenHub.has(videoId)) {
+      seenHub.add(videoId);
+      localStorage.setItem("hubSeenIds", JSON.stringify([...seenHub].slice(-1000)));
+    }
+    const existing = JSON.parse(localStorage.getItem("hubNewVideos") || "[]");
+    const filtered = existing.filter(v => v.videoId !== videoId);
+    if (filtered.length !== existing.length) {
+      localStorage.setItem("hubNewVideos", JSON.stringify(filtered));
+      _pollSetBadge(filtered.length);
+    }
+    if (_pollKnownIds) _pollKnownIds.add(videoId);
+    // Also clear the red highlight if this video's card is currently
+    // rendered — same cleanup setPlayerVideo already does when this
+    // device is the one doing the watching.
+    document.querySelectorAll('[data-videoid="' + videoId + '"]').forEach(card => {
+      card.style.removeProperty("border");
+      card.style.removeProperty("box-shadow");
+      card.dataset.hubvideo = "";
+    });
+  } catch(e) {}
 }
 let _liveCheckTimer = null;
 
