@@ -1292,6 +1292,10 @@ function recordWatchDuration(videoId, watchedSecs, totalSecs, reachedEnd) {
     profile.watchDurations = profile.watchDurations || {};
     profile.watchDurations[videoId] = { watchedSecs, totalSecs, pct: Math.round(pct * 100), ts: Date.now() };
     localStorage.setItem("tasteProfile", JSON.stringify(profile));
+    // Cross-device sync — same threshold as the Home-cache invalidation
+    // above, so this only fires on genuinely meaningful completions, not
+    // every brief or skipped watch.
+    if (signal === "loved" || signal === "liked") { try { syncProfileToWorker(); } catch(e) {} }
   } catch(e) {}
 }
 
@@ -2832,6 +2836,7 @@ async function loadVideoInfoPanel(videoId, snippet) {
       const words = (snippet.title || "").toLowerCase().replace(/[^a-z0-9 ]/g,"").split(" ").filter(w=>w.length>3);
       words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 2; });
       localStorage.setItem("tasteProfile", JSON.stringify(profile));
+      syncProfileToWorker();
     } catch(e) {}
     sendEngagement(videoId, snippet.channelId || "", "shared", undefined, undefined, null);
   };
@@ -4167,6 +4172,7 @@ async function openShortsTabSetup() {
       const words = (snippet.title || "").toLowerCase().replace(/[^a-z0-9 ]/g,"").split(" ").filter(w=>w.length>3);
       words.forEach(w => { profile.keywords[w] = (profile.keywords[w] || 0) + 2; });
       localStorage.setItem("tasteProfile", JSON.stringify(profile));
+      syncProfileToWorker();
     } catch(e) {}
     sendEngagement(id, snippet.channelId || "", "shared", undefined, undefined, null);
   });
@@ -7222,6 +7228,41 @@ async function syncProfileToWorker() {
   } catch(e) {}
 }
 
+// Pulls whatever the account's other devices have contributed and merges
+// it into this device's own local taste profile. Safe to call on every
+// startup: every merge uses max(), never addition, so re-pulling the same
+// server snapshot repeatedly can't inflate anything (max(x,x)=x is a
+// no-op) — but a genuinely higher value, meaning real new activity
+// happened on another device, still correctly wins and takes effect here.
+async function pullProfileFromWorker() {
+  try {
+    const res = await fetchWithTimeout(HUB_WORKER_URL + "/profile", { headers: workerHeaders() }, 6000);
+    const remote = await res.json();
+    if (!remote || !remote.updatedAt) return; // nothing has ever been synced from any device yet
+
+    const profile = getTasteProfile();
+    profile.channels = profile.channels || {};
+    profile.keywords = profile.keywords || {};
+    profile.categories = profile.categories || {};
+
+    Object.entries(remote.channels || {}).forEach(([id, weight]) => {
+      const existing = profile.channels[id];
+      const existingWeight = typeof existing === "object" ? (existing.weight || 0) : (existing || 0);
+      const merged = Math.max(existingWeight, weight);
+      if (typeof existing === "object") existing.weight = merged;
+      else profile.channels[id] = { weight: merged, lastWatch: Date.now() };
+    });
+    Object.entries(remote.keywords || {}).forEach(([w, weight]) => {
+      profile.keywords[w] = Math.max(profile.keywords[w] || 0, weight);
+    });
+    Object.entries(remote.categories || {}).forEach(([id, weight]) => {
+      profile.categories[id] = Math.max(profile.categories[id] || 0, weight);
+    });
+
+    localStorage.setItem("tasteProfile", JSON.stringify(profile));
+  } catch(e) {}
+}
+
 // Get collaborative recommendations from similar users
 async function getCollabRecommendations() {
   try {
@@ -7812,6 +7853,11 @@ function applyShortPlayerPatch(card, item) {
 
   // Restore watch history from Worker KV (syncs across devices)
   _restoreHistoryFromWorker().catch(() => {});
+  // Cross-device taste profile sync — pulls in whatever this account's
+  // other devices have contributed (likes, shares, completions) since
+  // this device last checked, merged safely via max() so it can never
+  // inflate anything on repeated pulls.
+  pullProfileFromWorker().catch(() => {});
 
   // Start background polling for new content
   // Reset taste check timer so all sources run on first poll
