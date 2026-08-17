@@ -4966,8 +4966,24 @@ const HUB_SECRET = "viewtube-hub-secret-2024";
 function getViewTubeUserId() {
   return localStorage.getItem("yt_channel_id") || "default";
 }
+// A genuinely per-device identifier — distinct from the account-level
+// channel ID above, and critical for it: two devices signed into the same
+// YouTube account share the same channel ID, but each has its own,
+// separate localStorage, so this value is naturally unique per device
+// once generated. Without this, the notification system had no way to
+// tell "the phone" apart from "the glasses" — both looked identical from
+// the server's perspective, which is what let one device's poll silently
+// drain notifications meant for both.
+function getViewTubeDeviceId() {
+  let id = localStorage.getItem("viewtube_device_id");
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() : "dev-" + Date.now() + "-" + Math.random().toString(36).slice(2));
+    localStorage.setItem("viewtube_device_id", id);
+  }
+  return id;
+}
 function workerHeaders(extra) {
-  return Object.assign({ "X-ViewTube-Secret": HUB_SECRET, "X-ViewTube-User": getViewTubeUserId() }, extra || {});
+  return Object.assign({ "X-ViewTube-Secret": HUB_SECRET, "X-ViewTube-User": getViewTubeUserId(), "X-ViewTube-Device": getViewTubeDeviceId() }, extra || {});
 }
 
 let _deviceLoginActive = false;
@@ -6853,7 +6869,7 @@ let _notifWs = null;
 let _notifWsReconnectAttempt = 0;
 function _connectNotificationWebSocket() {
   try {
-    const wsUrl = HUB_WORKER_URL.replace(/^https:/, "wss:") + "/ws?user=" + encodeURIComponent(getViewTubeUserId()) + "&secret=" + encodeURIComponent(HUB_SECRET);
+    const wsUrl = HUB_WORKER_URL.replace(/^https:/, "wss:") + "/ws?user=" + encodeURIComponent(getViewTubeUserId()) + "&secret=" + encodeURIComponent(HUB_SECRET) + "&device=" + encodeURIComponent(getViewTubeDeviceId());
     const ws = new WebSocket(wsUrl);
     _notifWs = ws;
     ws.onopen = () => { _notifWsReconnectAttempt = 0; };
