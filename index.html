@@ -3576,6 +3576,14 @@ function _mergeIntoHubNewVideos(newItems) {
   if (!newItems || !newItems.length) return;
   try {
     const seenHub = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
+    const blockedIds = new Set(getBlocklist());
+    const blockedChannels = new Set(getBlockedChannels());
+    // The polling path already filters against both of these — this path
+    // (instant WebSocket push) previously didn't at all, which is exactly
+    // what let a blocked channel's videos keep arriving as "new" via push
+    // even after being explicitly blocked through "Don't recommend channel."
+    newItems = newItems.filter(v => !blockedIds.has(v.videoId) && !(v.channelId && blockedChannels.has(v.channelId)));
+    if (!newItems.length) return;
     const existing = JSON.parse(localStorage.getItem("hubNewVideos") || "[]");
     const merged = [...newItems, ...existing]
       .filter((v, i, a) => a.findIndex(x => x.videoId === v.videoId) === i)
@@ -7323,6 +7331,18 @@ function blockChannel(channelId, channelTitle) {
     localStorage.setItem("tasteProfile", JSON.stringify(profile));
   } catch(e) {}
   sendEngagement("", channelId, "channel_blocked", 0, false, null);
+  // Purge anything from this channel already sitting in the pending
+  // "new" queue — otherwise videos queued before this block was set would
+  // keep showing as new until the next full clear, even though nothing
+  // further from this channel can get in from here on.
+  try {
+    const existing = JSON.parse(localStorage.getItem("hubNewVideos") || "[]");
+    const filtered = existing.filter(v => v.channelId !== channelId);
+    if (filtered.length !== existing.length) {
+      localStorage.setItem("hubNewVideos", JSON.stringify(filtered));
+      _pollSetBadge(filtered.length);
+    }
+  } catch(e) {}
   showHUD("🚫 Won't recommend " + (channelTitle || "this channel") + " anymore");
 }
 
