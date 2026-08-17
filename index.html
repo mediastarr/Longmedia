@@ -1749,8 +1749,8 @@ async function _fetchPersonalizedFeedLocal() {
   if (sK.length>=2) { lf.push(fetchYouTube("search",{part:"snippet",q:sK.slice(0,3).join(" "),type:"video",maxResults:6,...durationParam,_:Date.now()})); lw.push(3); }
   const allCats = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
   const myCats = topCats.length ? topCats : [allCats[Math.floor(Math.random()*allCats.length)]];
-  lf.push(fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:myCats[Math.floor(Math.random()*myCats.length)],maxResults:50,_:Date.now()})); lw.push(2);
-  lf.push(fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:allCats[Math.floor(Math.random()*allCats.length)],maxResults:50,_:Date.now()})); lw.push(1);
+  lf.push(fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:myCats[Math.floor(Math.random()*myCats.length)],maxResults:25,_:Date.now()})); lw.push(2);
+  lf.push(fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:allCats[Math.floor(Math.random()*allCats.length)],maxResults:25,_:Date.now()})); lw.push(1);
 
   const tokenBlockPromise = !token ? Promise.resolve() : Promise.all([
       (async () => {
@@ -1762,7 +1762,7 @@ async function _fetchPersonalizedFeedLocal() {
             const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 50).join(",") });
             const uploadPlaylists = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
             for (let i = uploadPlaylists.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [uploadPlaylists[i], uploadPlaylists[j]] = [uploadPlaylists[j], uploadPlaylists[i]]; }
-            const uploadFetches = uploadPlaylists.slice(0, 5).map(plId =>
+            const uploadFetches = uploadPlaylists.slice(0, 8).map(plId =>
               fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId: plId, maxResults: 10, _: Date.now() })
             );
             const uploadResults = await Promise.allSettled(uploadFetches);
@@ -1772,7 +1772,7 @@ async function _fetchPersonalizedFeedLocal() {
                 const sorted = (r.value.items || []).sort((a, b) => new Date(b.contentDetails?.videoPublishedAt || b.snippet?.publishedAt || 0) - new Date(a.contentDetails?.videoPublishedAt || a.snippet?.publishedAt || 0));
                 const fresh = sorted.filter(it => new Date(it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt || 0).getTime() > pf48h);
                 const toAdd = fresh.length > 0 ? fresh : sorted; // fallback to all if nothing in 48h
-                addItems(toAdd.slice(0, 4).map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } })), 6);
+                addItems(toAdd.slice(0, 6).map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: { ...it.snippet, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } })), 6);
               }
             });
           }
@@ -1784,7 +1784,7 @@ async function _fetchPersonalizedFeedLocal() {
           const llData = await llRes.json();
           const likedItems = (llData.items || []).map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: { ...it.snippet, channelId: it.snippet?.videoOwnerChannelId || it.snippet?.channelId, channelTitle: it.snippet?.videoOwnerChannelTitle || it.snippet?.channelTitle, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } }));
           for (let i = likedItems.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [likedItems[i], likedItems[j]] = [likedItems[j], likedItems[i]]; }
-          addItems(likedItems.slice(0, 5), 3);
+          addItems(likedItems.slice(0, 10), 3);
         } catch(e) {}
       })()
     ]);
