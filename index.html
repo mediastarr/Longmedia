@@ -4790,13 +4790,32 @@ moviesTab.addEventListener("click", async () => {
           if (!m) return 0;
           return (parseInt(m[1]||0)*3600) + (parseInt(m[2]||0)*60) + parseInt(m[3]||0);
         };
-        const longformOnly = all.filter(v => parseDurationSeconds(v.contentDetails?.duration) >= 2400); // 40+ minutes
+        let longformOnly = all.filter(v => parseDurationSeconds(v.contentDetails?.duration) >= 2400); // 40+ minutes
+        // Shuffle before returning — under quota exhaustion this pool barely
+        // changes between taps, so repeated taps were consistently landing
+        // on the exact same slice. A different arrangement each time at
+        // least surfaces different candidates from the same underlying pool.
+        for (let i = longformOnly.length - 1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [longformOnly[i],longformOnly[j]]=[longformOnly[j],longformOnly[i]]; }
         // If nothing this pull clears the length bar, contribute nothing
         // rather than falling back to unfiltered content — search is now
         // the primary, healthy source, so this fallback contributing zero
         // items on an off pull is safer than contributing short clips.
         return { items: longformOnly };
+      }),
+    // A genuinely category-scoped companion to the fallback above — Film &
+    // Animation specifically, not filtered by duration at all here (that's
+    // the other fallback's job). Additive, not a replacement: category
+    // filtering alone was previously found to often return nothing on its
+    // own, but combined with the duration-only pool above, this adds real
+    // movie-specific signal without reintroducing that risk — if this
+    // returns nothing, the pool above still carries the fallback entirely.
+    fetchYouTube("videos",{part:"snippet,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:"30",maxResults:30,_:Date.now()})
+      .then(r => {
+        let items = r.items || [];
+        for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [items[i],items[j]]=[items[j],items[i]]; }
+        return { items };
       })
+      .catch(() => ({ items: [] }))
   ];
   // 4. If logged in — pull from Watch Later and liked videos for movie taste signals
   const movToken = await getValidToken();
