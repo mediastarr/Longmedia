@@ -6949,6 +6949,9 @@ function _connectNotificationWebSocket() {
           if (btn) btn.classList.add("has-fresh-feed");
           if (currentTab !== "home") showHUD("Home refreshed ✦");
         }
+        else if (msg.type === "channel_went_offline" && msg.channelId) {
+          _handleLiveOfflinePush(msg.channelId, msg.channelTitle);
+        }
       } catch(e) {}
     };
     ws.onclose = () => {
@@ -7045,6 +7048,20 @@ function _handleLivePush(live) {
     card.appendChild(badge);
   });
   showHUD("🔴 " + (live.channelTitle || "A channel") + " is LIVE now!");
+}
+
+// Reverse of _handleLivePush — a channel that was live no longer is.
+// Without this, a LIVE badge could linger until this channel's own slot
+// happens to come up again in the rotation, which with a large
+// subscription list can be a genuine while.
+function _handleLiveOfflinePush(channelId, channelTitle) {
+  if (!channelId) return;
+  _liveChannels.delete(channelId);
+  document.querySelectorAll(".video-card").forEach(card => {
+    if (card.dataset.channelid !== channelId) return;
+    const badge = card.querySelector(".live-badge");
+    if (badge) badge.remove();
+  });
 }
 
 // Cross-device watched sync — another device on this account just watched
