@@ -1626,9 +1626,13 @@ async function fetchPersonalizedFeed() {
 // server-side result for whenever the *next* call happens to need it, with
 // zero effect on the call currently in progress either way.
 let _backgroundHomePrebuildRunning = false;
+let _lastBackgroundHomePrebuildAt = 0;
+const HOME_PREBUILD_COOLDOWN_MS = 45000; // don't let rapid repeated taps each spawn a competing background gather
 function _kickOffBackgroundHomePrebuild() {
   if (_backgroundHomePrebuildRunning) return;
+  if ((Date.now() - _lastBackgroundHomePrebuildAt) < HOME_PREBUILD_COOLDOWN_MS) return;
   _backgroundHomePrebuildRunning = true;
+  _lastBackgroundHomePrebuildAt = Date.now();
   _buildHomeFeedServerSide().then(items => {
     if (items && items.length >= 10) {
       try { localStorage.setItem("_serverPrebuiltHomeFeed", JSON.stringify({ items, ts: Date.now() })); } catch(e) {}
