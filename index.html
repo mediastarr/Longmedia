@@ -729,6 +729,15 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   border-color: #ff4444;
   box-shadow: 0 0 18px rgba(255,68,68,0.6);
 }
+/* Distinct from the red subscription badge above — a subtle cyan glow
+   meaning "a fresh background-built feed is ready," not "new subscription
+   uploads." Deliberately quieter (no pulsing animation) since this is a
+   background improvement becoming available, not something demanding
+   immediate attention the way a new upload does. */
+#homeTab.has-fresh-feed {
+  border-color: rgba(60,242,255,0.7);
+  box-shadow: 0 0 14px rgba(60,242,255,0.45);
+}
 </style>
 </head>
 <body>
@@ -3603,6 +3612,7 @@ function _mergeIntoHubNewVideos(newItems) {
 let isLoadingHome = false;
 homeTab.addEventListener("click", async () => {
   if (isLoadingHome) return; isLoadingHome = true;
+  homeTab.classList.remove("has-fresh-feed");
   try {
   // If new videos are pending, load them the QUICK way — via the existing
   // lightweight hub-injection mechanism (one batch call for already-known
@@ -6929,6 +6939,15 @@ function _connectNotificationWebSocket() {
           // state only, and should genuinely reset with a fresh day
           // rather than persisting stale across a future session.
           try { sessionStorage.setItem("_searchQuotaExhaustedToday", "1"); } catch(e) {}
+        }
+        else if (msg.type === "home_feed_ready") {
+          // The background prebuild just finished with a genuinely good
+          // result — same subtle cyan indicator style as elsewhere, not
+          // the red subscription badge, since this means something
+          // different (a refresh is ready, not new uploads exist).
+          const btn = document.getElementById("homeTab");
+          if (btn) btn.classList.add("has-fresh-feed");
+          if (currentTab !== "home") showHUD("Home refreshed ✦");
         }
       } catch(e) {}
     };
