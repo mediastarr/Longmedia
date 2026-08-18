@@ -1742,7 +1742,7 @@ async function _fetchPersonalizedFeedLocal() {
   const sC = shuffle(topChannels), sK = shuffle(topKeywords), sB = shuffle(topBigrams), sS = shuffle(recentSearches), sR = shuffle(recentIds);
   const lf = [], lw = [];
   const durationParam = preferredDuration !== "any" ? { videoDuration: preferredDuration } : {};
-  if (!searchQuotaKnownExhausted) sS.slice(0,1).forEach(q => { lf.push(fetchYouTube("search",{part:"snippet",q,type:"video",maxResults:6,...durationParam,_:Date.now()})); lw.push(5); });
+  if (!searchQuotaKnownExhausted) sS.slice(0,1).forEach(q => { lf.push(fetchYouTube("search",{part:"snippet",q,type:"video",order:"date",maxResults:6,...durationParam,_:Date.now()})); lw.push(5); });
   // Previously 2 search.list calls per channel (order:date) — replaced with
   // channels.list + playlistItems.list on the uploads playlist instead.
   // Functionally identical result (a channel's most recent uploads), but
@@ -1768,8 +1768,8 @@ async function _fetchPersonalizedFeedLocal() {
     })());
     lw.push(4);
   }
-  if (!searchQuotaKnownExhausted) sB.slice(0,1).forEach(phrase => { lf.push(fetchYouTube("search",{part:"snippet",q:phrase,type:"video",maxResults:6,...durationParam,_:Date.now()})); lw.push(4); });
-  if (!searchQuotaKnownExhausted && sK.length>=2) { lf.push(fetchYouTube("search",{part:"snippet",q:sK.slice(0,3).join(" "),type:"video",maxResults:6,...durationParam,_:Date.now()})); lw.push(3); }
+  if (!searchQuotaKnownExhausted) sB.slice(0,1).forEach(phrase => { lf.push(fetchYouTube("search",{part:"snippet",q:phrase,type:"video",order:"date",maxResults:6,...durationParam,_:Date.now()})); lw.push(4); });
+  if (!searchQuotaKnownExhausted && sK.length>=2) { lf.push(fetchYouTube("search",{part:"snippet",q:sK.slice(0,3).join(" "),type:"video",order:"date",maxResults:6,...durationParam,_:Date.now()})); lw.push(3); }
   const allCats = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
   const myCats = topCats.length ? topCats : [allCats[Math.floor(Math.random()*allCats.length)]];
   lf.push(fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:myCats[Math.floor(Math.random()*myCats.length)],maxResults:25,_:Date.now()})); lw.push(2);
@@ -1783,9 +1783,24 @@ async function _fetchPersonalizedFeedLocal() {
           const channelIds = (subsData.items || []).map(s => s.snippet.resourceId.channelId);
           if (channelIds.length > 0) {
             const chRes = await fetchYouTube("channels", { part: "contentDetails", id: channelIds.slice(0, 50).join(",") });
-            const uploadPlaylists = (chRes.items || []).map(ch => ch.contentDetails?.relatedPlaylists?.uploads).filter(Boolean);
-            for (let i = uploadPlaylists.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [uploadPlaylists[i], uploadPlaylists[j]] = [uploadPlaylists[j], uploadPlaylists[i]]; }
-            const uploadFetches = uploadPlaylists.slice(0, 8).map(plId =>
+            let uploadPlaylists = (chRes.items || []).map(ch => ({ pl: ch.contentDetails?.relatedPlaylists?.uploads, id: ch.id })).filter(x => x.pl);
+            // Prioritize by your actual taste-profile weight where known —
+            // channels you genuinely, actively watch are a real, achievable
+            // signal for "channels that usually release videos I care
+            // about," rather than the pure random shuffle this used before.
+            // Channels not yet in your profile (new subscriptions, or ones
+            // you haven't built affinity with yet) are shuffled in after,
+            // so there's still room for those to surface too.
+            const known = uploadPlaylists.filter(x => profile5.channels?.[x.id]);
+            const unknown = uploadPlaylists.filter(x => !profile5.channels?.[x.id]);
+            known.sort((a, b) => {
+              const wa = typeof profile5.channels[a.id] === "object" ? (profile5.channels[a.id].weight||0) : (profile5.channels[a.id]||0);
+              const wb = typeof profile5.channels[b.id] === "object" ? (profile5.channels[b.id].weight||0) : (profile5.channels[b.id]||0);
+              return wb - wa;
+            });
+            for (let i = unknown.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [unknown[i], unknown[j]] = [unknown[j], unknown[i]]; }
+            uploadPlaylists = [...known, ...unknown].map(x => x.pl);
+            const uploadFetches = uploadPlaylists.slice(0, 10).map(plId =>
               fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId: plId, maxResults: 10, _: Date.now() })
             );
             const uploadResults = await Promise.allSettled(uploadFetches);
@@ -1803,11 +1818,11 @@ async function _fetchPersonalizedFeedLocal() {
       })(),
       (async () => {
         try {
-          const llRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=15", { headers: { Authorization: "Bearer " + token } });
+          const llRes = await fetchWithTimeout("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=LL&maxResults=30", { headers: { Authorization: "Bearer " + token } });
           const llData = await llRes.json();
           const likedItems = (llData.items || []).map(it => ({ id: it.snippet?.resourceId?.videoId, snippet: { ...it.snippet, channelId: it.snippet?.videoOwnerChannelId || it.snippet?.channelId, channelTitle: it.snippet?.videoOwnerChannelTitle || it.snippet?.channelTitle, publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt } }));
           for (let i = likedItems.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [likedItems[i], likedItems[j]] = [likedItems[j], likedItems[i]]; }
-          addItems(likedItems.slice(0, 10), 3);
+          addItems(likedItems.slice(0, 25), 3);
         } catch(e) {}
       })()
     ]);
