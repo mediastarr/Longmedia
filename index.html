@@ -1682,6 +1682,12 @@ async function _fetchPersonalizedFeedLocal() {
   const token = await getValidToken();
   const profile5 = getTasteProfile();
   const watchedChannelIds = new Set(Object.keys(profile5.channels || {}));
+  // Set the moment any request this session learns (via the WebSocket
+  // push) that today's search budget is gone — checked below to skip
+  // these specific network calls entirely rather than making them and
+  // discovering the same exhaustion yet again.
+  let searchQuotaKnownExhausted = false;
+  try { searchQuotaKnownExhausted = sessionStorage.getItem("_searchQuotaExhaustedToday") === "1"; } catch(e) {}
 
   // ── Time-of-day context signal ──
   const currentHour = new Date().getHours();
@@ -1723,7 +1729,7 @@ async function _fetchPersonalizedFeedLocal() {
   const sC = shuffle(topChannels), sK = shuffle(topKeywords), sB = shuffle(topBigrams), sS = shuffle(recentSearches), sR = shuffle(recentIds);
   const lf = [], lw = [];
   const durationParam = preferredDuration !== "any" ? { videoDuration: preferredDuration } : {};
-  sS.slice(0,1).forEach(q => { lf.push(fetchYouTube("search",{part:"snippet",q,type:"video",maxResults:6,...durationParam,_:Date.now()})); lw.push(5); });
+  if (!searchQuotaKnownExhausted) sS.slice(0,1).forEach(q => { lf.push(fetchYouTube("search",{part:"snippet",q,type:"video",maxResults:6,...durationParam,_:Date.now()})); lw.push(5); });
   // Previously 2 search.list calls per channel (order:date) — replaced with
   // channels.list + playlistItems.list on the uploads playlist instead.
   // Functionally identical result (a channel's most recent uploads), but
@@ -1749,8 +1755,8 @@ async function _fetchPersonalizedFeedLocal() {
     })());
     lw.push(4);
   }
-  sB.slice(0,1).forEach(phrase => { lf.push(fetchYouTube("search",{part:"snippet",q:phrase,type:"video",maxResults:6,...durationParam,_:Date.now()})); lw.push(4); });
-  if (sK.length>=2) { lf.push(fetchYouTube("search",{part:"snippet",q:sK.slice(0,3).join(" "),type:"video",maxResults:6,...durationParam,_:Date.now()})); lw.push(3); }
+  if (!searchQuotaKnownExhausted) sB.slice(0,1).forEach(phrase => { lf.push(fetchYouTube("search",{part:"snippet",q:phrase,type:"video",maxResults:6,...durationParam,_:Date.now()})); lw.push(4); });
+  if (!searchQuotaKnownExhausted && sK.length>=2) { lf.push(fetchYouTube("search",{part:"snippet",q:sK.slice(0,3).join(" "),type:"video",maxResults:6,...durationParam,_:Date.now()})); lw.push(3); }
   const allCats = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
   const myCats = topCats.length ? topCats : [allCats[Math.floor(Math.random()*allCats.length)]];
   lf.push(fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:myCats[Math.floor(Math.random()*myCats.length)],maxResults:25,_:Date.now()})); lw.push(2);
@@ -6915,6 +6921,14 @@ function _connectNotificationWebSocket() {
         }
         else if (msg.type === "video_watched" && msg.videoId) {
           _handleWatchedSync(msg.videoId);
+        }
+        else if (msg.type === "search_quota_exhausted") {
+          // The server just learned, from some other request this session
+          // (any tab, any recent load), that today's search budget is
+          // gone. SessionStorage, not localStorage — this is today's
+          // state only, and should genuinely reset with a fresh day
+          // rather than persisting stale across a future session.
+          try { sessionStorage.setItem("_searchQuotaExhaustedToday", "1"); } catch(e) {}
         }
       } catch(e) {}
     };
