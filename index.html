@@ -482,6 +482,10 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 #resBtn { display: inline-block; }
 #playerSection.player-mini #resBtn { display: none; }
 #playerSection.player-fullscreen #resBtn { display: inline-block; }
+#speedBtn { display: inline-block; }
+#playerSection.player-mini #speedBtn { display: none; }
+#playerSection.player-fullscreen #speedBtn { display: inline-block; }
+#playerSection.player-fullscreen.ui-hidden #speedBtn { opacity: 0; pointer-events: none; }
 #playerSection.player-fullscreen .player-controls { bottom: 48px; }
 #playerSection.player-fullscreen .player-controls button { padding: 3px 7px; font-size: 9px; min-height: 22px; min-width: 22px; }
 #playerSection.player-fullscreen #closeMini { padding: 3px 6px; font-size: 9px; min-height: 22px; min-width: 22px; top: 8px; right: 8px; }
@@ -782,6 +786,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
       <button id="forwardBtn" tabindex="0" title="Forward 10s">10⏩</button>
       <button id="ccBtn" tabindex="0" title="Captions">CC</button>
       <button id="resBtn" tabindex="0" title="Quality">720p</button>
+      <button id="speedBtn" tabindex="0" title="Playback speed">1x</button>
       <button id="fullBtn" tabindex="0" title="Fullscreen">⛶</button>
       <button id="hideUIBtn" tabindex="0" title="Hide UI">···</button>
       <button id="addToPlaylistBtn" tabindex="0" style="display:none;"></button>
@@ -2311,6 +2316,7 @@ function createYTPlayer(videoId, startSeconds) {
         ytPlayer.loadVideoById(videoId);
       }
       if (currentQuality !== "auto") { try { ytPlayer.setPlaybackQuality(currentQuality); } catch(e) {} }
+      if (currentSpeed !== 1) { try { ytPlayer.setPlaybackRate(currentSpeed); } catch(e) {} }
       playPauseBtn.textContent = "⏸";
       // Verify the reused player actually switched to the requested video.
       // loadVideoById can silently fail to update the visible iframe content
@@ -2380,6 +2386,7 @@ function createYTPlayer(videoId, startSeconds) {
           try { e.target.setPlaybackQuality(currentQuality); } catch(err) {}
           try { e.target.setPlaybackQualityRange(currentQuality, currentQuality); } catch(err) {}
         }
+        if (currentSpeed !== 1) { try { e.target.setPlaybackRate(currentSpeed); } catch(err) {} }
         playPauseBtn.textContent = "⏸";
       },
       onStateChange: (e) => {
@@ -3010,6 +3017,21 @@ forwardBtn.addEventListener("click", () => { if (!ytPlayer) return; ytPlayer.see
 rewindBtn.addEventListener("click", () => { if (!ytPlayer) return; ytPlayer.seekTo(Math.max(0, ytPlayer.getCurrentTime() - 10), true); });
 
 const resBtn = document.getElementById("resBtn");
+// Playback speed — unlike quality, this persists across videos within a
+// session (matches real YouTube behavior) rather than resetting per-video,
+// so it's applied in every place the player gets (re)created but never
+// reset alongside currentQuality.
+const speedBtn = document.getElementById("speedBtn");
+const SPEED_CYCLE = [1, 1.25, 1.5, 1.75, 2, 0.5, 0.75];
+let currentSpeed = 1;
+let speedIndex = 0;
+speedBtn.addEventListener("click", () => {
+  speedIndex = (speedIndex + 1) % SPEED_CYCLE.length;
+  currentSpeed = SPEED_CYCLE[speedIndex];
+  speedBtn.textContent = currentSpeed + "x";
+  showHUD(currentSpeed + "x speed");
+  if (ytPlayer) { try { ytPlayer.setPlaybackRate(currentSpeed); } catch(e) {} }
+});
 let captionsOn = false;
 const ccBtn = document.getElementById("ccBtn");
 ccBtn.addEventListener("click", () => {
@@ -3068,6 +3090,7 @@ resBtn.addEventListener("click", () => {
           try { e.target.setPlaybackQuality(currentQuality); } catch(err) {}
           try { e.target.setPlaybackQualityRange(currentQuality, currentQuality); } catch(err) {}
         }
+        if (currentSpeed !== 1) { try { e.target.setPlaybackRate(currentSpeed); } catch(err) {} }
         // Restore play/pause state from before quality change
         if (_wasPlaying !== false) { e.target.playVideo(); playPauseBtn.textContent = "⏸"; }
         else { e.target.pauseVideo(); playPauseBtn.textContent = "▶"; }
@@ -6380,6 +6403,12 @@ async function runSubscriptionSync(isManual = false) {
       const since24hMs = Date.now() - 86400000;
       const catchUpItems = [];
       const catchUpSeen = new Set();
+      // Without this, a video already marked seen (e.g. just watched as a
+      // Short, closed, then app restarted) gets swept right back into
+      // hubNewVideos on the very next startup — this sweep pulls anything
+      // published in the last 24h from subscriptions with no regard for
+      // watch state, unlike every other writer of hubNewVideos.
+      const catchUpSeenHub = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
       const targetIds = channelIds.slice(0, 50);
       const chRes = await fetchYouTube("channels", { part: "contentDetails", id: targetIds.join(","), _: Date.now() });
       const uploadPlaylists = (chRes.items || [])
@@ -6396,7 +6425,7 @@ async function runSubscriptionSync(isManual = false) {
           r.value.items.forEach(item => {
             const id = item.snippet?.resourceId?.videoId;
             const publishedAt = item.snippet?.publishedAt || "";
-            if (id && !catchUpSeen.has(id) && publishedAt && new Date(publishedAt).getTime() >= since24hMs) {
+            if (id && !catchUpSeen.has(id) && !catchUpSeenHub.has(id) && publishedAt && new Date(publishedAt).getTime() >= since24hMs) {
               catchUpSeen.add(id);
               catchUpItems.push({
                 videoId: id,
