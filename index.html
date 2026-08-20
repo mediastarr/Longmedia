@@ -7785,6 +7785,14 @@ function applyShortPlayerPatch(card, item) {
         renderFeed(cachedItems);
         showHUD("Showing last session — refreshing…");
         paintedFromCache = true;
+        // Without this, nextPageToken stays null until the personalized
+        // upgrade below finishes (or forever, if it's skipped entirely —
+        // not logged in, not enough history yet, or just still in flight).
+        // A scroll during that window hit a silent no-op with no retry
+        // once the upgrade did land — pagination should work the instant
+        // there's anything on screen, cached or fresh, not depend on a
+        // later step's timing.
+        nextPageToken = "seed";
       }
     }
   } catch(e) {}
