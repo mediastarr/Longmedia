@@ -2475,7 +2475,7 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
     const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
     if (!seenHub.includes(videoId)) {
       seenHub.push(videoId);
-      localStorage.setItem("hubSeenIds", JSON.stringify(seenHub.slice(-500)));
+      localStorage.setItem("hubSeenIds", JSON.stringify(seenHub.slice(-3000)));
     }
     // Remove red border from ALL cards with this videoId immediately
     document.querySelectorAll('[data-videoid="' + videoId + '"]').forEach(card => {
@@ -3419,7 +3419,7 @@ async function openAsShort(videoId, snippet) {
     const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
     if (!seenHub.includes(videoId)) {
       seenHub.push(videoId);
-      localStorage.setItem("hubSeenIds", JSON.stringify(seenHub.slice(-500)));
+      localStorage.setItem("hubSeenIds", JSON.stringify(seenHub.slice(-3000)));
     }
     document.querySelectorAll('[data-videoid="' + videoId + '"]').forEach(card => {
       card.style.border = "";
@@ -3660,7 +3660,14 @@ homeTab.addEventListener("click", async () => {
   // lightweight hub-injection mechanism (one batch call for already-known
   // video IDs), not the full candidate-gathering + scoring pipeline. This
   // is the actual fast path for "5 new videos" taps.
-  if (_pollBadgeCount > 0) {
+  //
+  // Requires an existing rendered feed to inject into — on a cold app
+  // start (feedEl empty), there's nothing to inject on top of, so this
+  // handful of "new" videos would silently become the ENTIRE Home tab
+  // with no path to load more, since this branch never establishes real
+  // pagination state. Falling through to the full load below still picks
+  // up and injects these same hubVideos once a real feed exists underneath.
+  if (_pollBadgeCount > 0 && feedEl.querySelector(".video-card")) {
     setActiveTab("home");
     let hubVideos = [];
     try {
@@ -4259,7 +4266,7 @@ async function openShortsTabSetup() {
         const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
         if (!seenHub.includes(videoId)) {
           seenHub.push(videoId);
-          localStorage.setItem("hubSeenIds", JSON.stringify(seenHub.slice(-500)));
+          localStorage.setItem("hubSeenIds", JSON.stringify(seenHub.slice(-3000)));
         }
       } catch(e) {}
       // Skip to next short
@@ -4551,7 +4558,7 @@ async function openShortsTabSetup() {
   }
   shortsIndex=0;
   shortsSeenIds = new Set(shortsItems.map(v=>v.id));
-  try { localStorage.setItem("shortsSeenHistory",JSON.stringify([...shortsSeenIds,...persistentSeenIds].slice(0,50))); } catch(e) {}
+  try { localStorage.setItem("shortsSeenHistory",JSON.stringify([...shortsSeenIds,...persistentSeenIds].slice(0,3000))); } catch(e) {}
 
   if (data.nextPageToken) shortsNextPageToken=data.nextPageToken;
   else { const seed=await fetchYouTube("search",{part:"snippet",q:SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length],type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:userRegion,maxResults:1,_:Date.now()}); shortsNextPageToken=seed.nextPageToken||"seed"; }
@@ -4631,7 +4638,7 @@ function playShort(index) {
       const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
       if (!seenHub.includes(item.id)) {
         seenHub.push(item.id);
-        localStorage.setItem("hubSeenIds", JSON.stringify(seenHub.slice(-500)));
+        localStorage.setItem("hubSeenIds", JSON.stringify(seenHub.slice(-3000)));
       }
       document.querySelectorAll('[data-videoid="' + item.id + '"]').forEach(card => {
         card.style.removeProperty("border");
@@ -6944,7 +6951,7 @@ async function _injectHubVideos(hubVideos) {
       // startup) never grows to include them. This was the actual cause of
       // the ever-growing badge count and stale videos resurfacing repeatedly.
       const seenHub = JSON.parse(localStorage.getItem("hubSeenIds") || "[]");
-      const mergedSeen = [...new Set([...injectedIds, ...seenHub])].slice(0, 1000);
+      const mergedSeen = [...new Set([...injectedIds, ...seenHub])].slice(0, 3000);
       localStorage.setItem("hubSeenIds", JSON.stringify(mergedSeen));
       if (_pollKnownIds) injectedIds.forEach(id => _pollKnownIds.add(id));
     } catch(e) {}
@@ -7134,7 +7141,7 @@ function _handleWatchedSync(videoId) {
     const seenHub = new Set(JSON.parse(localStorage.getItem("hubSeenIds") || "[]"));
     if (!seenHub.has(videoId)) {
       seenHub.add(videoId);
-      localStorage.setItem("hubSeenIds", JSON.stringify([...seenHub].slice(-1000)));
+      localStorage.setItem("hubSeenIds", JSON.stringify([...seenHub].slice(-3000)));
     }
     const existing = JSON.parse(localStorage.getItem("hubNewVideos") || "[]");
     const filtered = existing.filter(v => v.videoId !== videoId);
@@ -8034,7 +8041,18 @@ function applyShortPlayerPatch(card, item) {
       const id = item.id?.videoId || item.id;
       if (id) seenHub.add(id);
     });
-    localStorage.setItem("hubSeenIds", JSON.stringify([...seenHub].slice(-1000)));
+    // Shorts never go through saveToHistory (historyList is regular-player-
+    // only), so without this they had no durable backup at all — only the
+    // raw hubSeenIds array itself, capped and independently written from
+    // several places. shortsSeenHistory is Shorts' own equivalent record;
+    // folding it in here gives Shorts the same startup-reseed protection
+    // regular videos already had, so a watched Short can't quietly fall
+    // out of hubSeenIds and reappear as new after a day of normal use.
+    try {
+      const shortsHist = JSON.parse(localStorage.getItem("shortsSeenHistory") || "[]");
+      shortsHist.forEach(id => { if (id) seenHub.add(id); });
+    } catch(e) {}
+    localStorage.setItem("hubSeenIds", JSON.stringify([...seenHub].slice(-3000)));
   } catch(e) {}
 
   // Reset poll state on every app open so fresh videos always get through
