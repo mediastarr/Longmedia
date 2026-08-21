@@ -2094,6 +2094,7 @@ fullBtn.addEventListener("click", () => {
   playerSection.classList.remove("player-mini");
   playerSection.classList.add("player-fullscreen");
   document.body.classList.add("fullscreen-active");
+  vtPushBackable();
   enableCinemaMode();
   playCinemaZoomIntro();
   setTimeout(() => { playerSection.classList.add("settled"); }, 550);
@@ -2460,6 +2461,7 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   // assumed it reflected the actual current visual state.
   miniActive = false;
   currentVideoId = videoId;
+  vtPushBackable();
   // Reset captions state for the new video
   captionsOn = false;
   try { const cb = document.getElementById("ccBtn"); if (cb) { cb.style.opacity = "0.6"; cb.style.background = ""; } } catch(e) {}
@@ -3506,6 +3508,7 @@ async function openAsShort(videoId, snippet) {
   // shortsTab.click() without waiting, which could let the user interact
   // with buttons before their handlers had actually finished attaching).
   await openShortsTabSetup();
+  vtPushBackable();
 
   // After the tab finishes building its DOM, intercept the back button
   // to restore scroll position instead of reloading home
@@ -5789,13 +5792,23 @@ function vtPushBackable() {
 // killing video playback would be a worse surprise than occasionally
 // needing the on-screen button instead.
 function vtHandleBackGesture() {
+  if (document.body.classList.contains("fullscreen-active")) { document.getElementById("exitFullBtn")?.click(); return; }
+  // Shorts comments panel is layered ON TOP of the Shorts player itself —
+  // currentTab is still "shorts" while it's open, so this must be checked
+  // before the general Shorts case below, or a pinch here would skip past
+  // the comments panel and close the whole Shorts player instead of just
+  // backing out of comments first.
+  const scp = document.getElementById("shortsCommentsPanel");
+  if (scp && scp.classList.contains("open")) { document.getElementById("shortsCommentsCloseBtn")?.click(); return; }
+  if (currentTab === "shorts") { document.getElementById("shortsBackBtn")?.click(); return; }
   if (plOverlay && plOverlay.style.display === "flex") { document.getElementById("plPickerClose")?.click(); return; }
   if (syncOverlay && syncOverlay.style.display === "flex") { document.getElementById("syncCloseBtn")?.click(); return; }
   if (channelPageEl && channelPageEl.style.display !== "none") { document.getElementById("channelBackBtn")?.click(); return; }
-  const scp = document.getElementById("shortsCommentsPanel");
-  if (scp && scp.classList.contains("open")) { document.getElementById("shortsCommentsCloseBtn")?.click(); return; }
   if (playlistItemsView && playlistItemsView.style.display !== "none") { document.getElementById("playlistBackBtn")?.click(); return; }
   if (searchPanelEl && searchPanelEl.style.display !== "none") { document.getElementById("searchBack")?.click(); return; }
+  // Medium player — checked last, since fullscreen (above) is layered on
+  // top of this same visible state and must be peeled back first.
+  if (playerSection && playerSection.style.display !== "none") { document.getElementById("closeMini")?.click(); return; }
 }
 // Seeds a clean initial entry per the spec's own guidance, so the very
 // first popstate the app ever sees (if the wearer backs out from the true
