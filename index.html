@@ -4435,6 +4435,7 @@ async function openShortsTabSetup() {
     const item = shortsItems[shortsIndex];
     if (!item) return;
     shortsCommentsPanel.classList.add("open");
+    vtPushBackable();
     shortsCommentsList.innerHTML = '<div style="opacity:0.5;font-size:12px;">Loading comments…</div>';
     shortsLoadedCommentCount = 0;
     setShortsFocus(getShortsFocusIds().indexOf("shortsCommentsCloseBtn"));
@@ -5362,6 +5363,7 @@ async function loadPlaylists() {
 
 async function openPlaylist(playlistId, title) {
   playlistGrid.style.display = "none"; playlistItemsView.style.display = "block";
+  vtPushBackable();
   playlistItemsTitle.textContent = title;
   playlistItemsList.innerHTML = `<div style="font-size:12px;opacity:0.6;padding:12px 0;">Loading…</div>`; showHUD("Loading playlist…");
   try {
@@ -5753,6 +5755,51 @@ function showSuggestions(list) {
   suggestionsEl.style.display = "block";
 }
 
+// ── Back-gesture safety net (popstate) ──
+// The glasses' native back gesture is handled by the OS shell: per Meta's
+// own Web Apps spec, if a real history entry exists it calls history.back()
+// on the page (firing popstate here); otherwise it shows the native system
+// menu instead of ever reaching this app at all. Without a real entry per
+// screen, there's nothing for the shell to go back through — meaning the
+// gesture wouldn't route to us no matter which key, if any, it also
+// happens to fire. This runs ALONGSIDE every existing on-screen back/close
+// button, unchanged — never replacing them, just catching the gesture too.
+function vtPushBackable() {
+  try { history.pushState({ vtBack: true }, "", location.href); } catch(e) {}
+}
+// Checks what's actually visible right now and closes just that, mirroring
+// the same live-visibility pattern the existing Escape handler already
+// uses elsewhere in this file, rather than trusting popstate's own state
+// object — stays correct even if an entry ever gets out of sync. Delegates
+// to each screen's real on-screen button via .click() rather than calling
+// internal functions directly, since a few of these buttons get
+// re-created/rebound at runtime (Shorts' own back button in particular) —
+// .click() always hits whatever's currently attached, so there's no risk
+// of holding a stale reference.
+//
+// Deliberately scoped to screens that are unambiguously "step back one
+// level": search, the playlist-add overlay, playlist detail view, and
+// Shorts' comments panel. Channel page and the Shorts tab itself are
+// driven through the same shared tab-switching system as Home/Trending/
+// Movies, and entangling that with history state risked side effects on
+// ordinary tab switching that weren't worth taking on in this pass.
+// Mini-player's close button stops playback entirely rather than just
+// dismissing a screen, so it's excluded too — a back gesture unexpectedly
+// killing video playback would be a worse surprise than occasionally
+// needing the on-screen button instead.
+function vtHandleBackGesture() {
+  if (plOverlay && plOverlay.style.display === "flex") { document.getElementById("plPickerClose")?.click(); return; }
+  const scp = document.getElementById("shortsCommentsPanel");
+  if (scp && scp.classList.contains("open")) { document.getElementById("shortsCommentsCloseBtn")?.click(); return; }
+  if (playlistItemsView && playlistItemsView.style.display !== "none") { document.getElementById("playlistBackBtn")?.click(); return; }
+  if (searchPanelEl && searchPanelEl.style.display !== "none") { document.getElementById("searchBack")?.click(); return; }
+}
+// Seeds a clean initial entry per the spec's own guidance, so the very
+// first popstate the app ever sees (if the wearer backs out from the true
+// root) isn't landing on an entry this code itself never pushed.
+try { history.replaceState({ vtBack: false }, "", location.href); } catch(e) {}
+window.addEventListener("popstate", vtHandleBackGesture);
+
 function openKeyboard() {
   searchPanelEl.style.display = "block"; keyboardEl.style.display = "block"; document.querySelector(".search-input-bar").style.display = "flex"; feedContainerFor(currentTab).style.display = "none";
   // Focus lands on the actual text field first, not the on-screen keyboard —
@@ -5765,6 +5812,7 @@ function openKeyboard() {
   // .focus() alone never opens the composer itself (requires an actual
   // user pinch), so this is purely about making the field reachable at all.
   searchInput.focus();
+  vtPushBackable();
 }
 function closeKeyboard() { keyboardEl.style.display = "none"; searchPanelEl.style.display = "none"; suggestionsEl.style.display = "none"; feedContainerFor(currentTab).style.display = "grid"; }
 
@@ -6221,6 +6269,7 @@ const plPickerList = document.getElementById("plPickerList");
 const plPickerStatus = document.getElementById("plPickerStatus");
 function openPicker() {
   plOverlay.style.display="flex";
+  vtPushBackable();
   const list = document.getElementById("plPickerList");
   if (list) {
     list.scrollTop = 0;
