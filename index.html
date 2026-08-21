@@ -2955,13 +2955,57 @@ async function loadVideoInfoPanel(videoId, snippet) {
 
   results.forEach(r => { if (r.status === "fulfilled") addItems(r.value.items); });
 
+  // Rank candidates server-side — reuses the exact same personal-taste +
+  // collaborative-engagement scoring Home was just tuned with, plus a
+  // same-channel-as-current-video bonus and a content-similarity pass
+  // against THIS video specifically (not just general taste), which is
+  // the actual gap Up Next had: candidates were only ever gathered, never
+  // ranked, so display order was just whichever source's fetch resolved
+  // first. Hard-timeout-guarded with the unranked gathering order as the
+  // fallback value — if ranking is slow, fails, or the Worker call errors
+  // for any reason, this falls back to exactly the old behavior rather
+  // than leaving Up Next empty or stuck.
+  let rankedItems = allItems;
+  try {
+    const rankCandidates = allItems.map(item => ({
+      videoId: item._vid,
+      channelId: item.snippet?.channelId || "",
+      title: item.snippet?.title || "",
+      publishedAt: item.snippet?.publishedAt || "",
+      categoryId: item.snippet?.categoryId || ""
+    }));
+    const ranked = await withHardTimeout(
+      fetch(HUB_WORKER_URL + "/rankSuggested", {
+        method: "POST",
+        headers: workerHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          currentTitle: title,
+          currentChannelId: channelId,
+          candidates: rankCandidates,
+          profile: getTasteProfile()
+        })
+      }).then(r => r.json()),
+      4000,
+      null
+    );
+    if (myGeneration !== _vipGeneration) return; // a newer video opened while ranking was in flight
+    if (ranked && Array.isArray(ranked.items) && ranked.items.length) {
+      // Re-attach each ranked result to its original full item (snippet,
+      // statistics, etc.) by videoId — the Worker only ever needed and
+      // returned the trimmed fields above, not the full candidate objects.
+      const byId = new Map(allItems.map(item => [item._vid, item]));
+      const merged = ranked.items.map(r => byId.get(r.videoId || r.id)).filter(Boolean);
+      if (merged.length) rankedItems = merged;
+    }
+  } catch(e) {} // any failure at all — rankedItems already defaulted to the unranked order above
+
   sugFeed.innerHTML = "";
 
-  if (!allItems.length) {
+  if (!rankedItems.length) {
     sugFeed.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;opacity:0.6;">No suggestions — check connection.</div>';
     return;
   }
-  allItems.forEach(item => {
+  rankedItems.forEach(item => {
     const s = item.snippet || {};
     const vid = item._vid || item.id?.videoId || item.id;
     if (!vid) return;
