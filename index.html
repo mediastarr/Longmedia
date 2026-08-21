@@ -7998,6 +7998,47 @@ function applyShortPlayerPatch(card, item) {
   };
   _startupFetch();
 
+  // ── Offline mode: service worker registration ──
+  // Per Meta's Web Apps spec (Service Workers + Cache API), this precaches
+  // the app shell so it loads instantly even with zero connectivity,
+  // instead of showing a blank/broken page. Feature-detected and wrapped
+  // so registration failing (unsupported firmware, non-HTTPS local
+  // testing) never blocks or breaks anything else — the app already works
+  // fine without it, this only makes it more resilient when available.
+  // The actual caching logic lives in sw.js (a service worker must be its
+  // own file, can't be inline) — see that file for what is and isn't
+  // cached and why.
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch((e) => { /* not fatal — app works fine without offline support */ });
+  }
+
+  // ── Offline mode: online/offline UI indicator ──
+  // The spec explicitly warns against silently failing or showing broken
+  // content when offline — this is a persistent banner (matching the
+  // existing reAuthBanner pattern below) rather than a toast, since a
+  // toast disappears and a wearer could easily forget they're offline
+  // mid-browse. Purely a status display: doesn't block interaction, and
+  // whatever's already on screen (cached shell, any previously-loaded
+  // feed) stays fully usable underneath it.
+  let _offlineBanner = null;
+  function _updateOfflineBanner() {
+    if (!navigator.onLine) {
+      if (_offlineBanner) return;
+      _offlineBanner = document.createElement("div");
+      _offlineBanner.id = "offlineBanner";
+      _offlineBanner.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:999998;background:linear-gradient(135deg,rgba(80,90,110,0.95),rgba(30,34,48,0.95));color:#fff;padding:10px 16px;font-size:12px;font-weight:600;text-align:center;";
+      _offlineBanner.textContent = "📡 Offline — showing what's already loaded";
+      document.body.appendChild(_offlineBanner);
+    } else if (_offlineBanner) {
+      _offlineBanner.remove();
+      _offlineBanner = null;
+      showHUD("Back online");
+    }
+  }
+  window.addEventListener("online", _updateOfflineBanner);
+  window.addEventListener("offline", _updateOfflineBanner);
+  _updateOfflineBanner(); // catch the case where the app was already opened offline
+
   // Clear & Rebuild is manual-only now — silentSync() (below, its own
   // 2-hour gate) already handles ongoing automatic profile maintenance,
   // correctly merging signal from Liked Videos, Watch Later,
