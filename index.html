@@ -2156,10 +2156,26 @@ setInterval(() => {
 }, 150);
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    // Close playlist overlay if open
-    if (plOverlay && plOverlay.style.display === "flex") { closePicker(); return; }
-    playerSection.classList.remove("player-fullscreen"); document.body.classList.remove("fullscreen-active"); disableCinemaMode(); showUIWithMiniPlayer(); showHUD("Exited Fullscreen");
+  // Escape and Backspace both trigger the same comprehensive dispatcher the
+  // popstate listener already uses (vtHandleBackGesture, defined further
+  // below) — this was the actual missing half of the puzzle, not something
+  // wrong with popstate itself. Raytube's own working version treats Escape
+  // as the documented back/cancel gesture (thumb + middle-finger pinch)
+  // via a real keydown handler running ALONGSIDE popstate, not replaced by
+  // it. This file only ever wired popstate to the full per-screen
+  // dispatcher — Escape's existing handling here was narrow (fullscreen
+  // exit and the playlist overlay only), so every other screen (Shorts,
+  // the medium player, sync overlay, channel page, playlist detail,
+  // search) never had a keydown path to close them at all, regardless of
+  // what the gesture actually sends.
+  //
+  // Backspace is excluded while the real text field is genuinely focused
+  // (searchInput) — it needs to delete characters there. Escape is NOT
+  // excluded even then, matching Raytube's own explicit reasoning: it's
+  // the documented gesture and needs to keep working mid-search too,
+  // since there's no separate on-screen Cancel button for it.
+  if (e.key === "Escape" || (e.key === "Backspace" && document.activeElement !== searchInput)) {
+    vtHandleBackGesture();
   }
   // When playlist overlay is open, arrow keys navigate the list
   if (plOverlay && plOverlay.style.display === "flex") {
