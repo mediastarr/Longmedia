@@ -5753,7 +5753,19 @@ function showSuggestions(list) {
   suggestionsEl.style.display = "block";
 }
 
-function openKeyboard() { searchPanelEl.style.display = "block"; keyboardEl.style.display = "block"; document.querySelector(".search-input-bar").style.display = "flex"; feedContainerFor(currentTab).style.display = "none"; }
+function openKeyboard() {
+  searchPanelEl.style.display = "block"; keyboardEl.style.display = "block"; document.querySelector(".search-input-bar").style.display = "flex"; feedContainerFor(currentTab).style.display = "none";
+  // Focus lands on the actual text field first, not the on-screen keyboard —
+  // the field itself is what the on-glasses handwriting/voice composer opens
+  // on when pinched (standard <input type="text">, composer-eligible per
+  // Meta's Web Apps spec). Landing here first means a pinch tries the
+  // composer as the fast path; a swipe down reaches the existing on-screen
+  // keyboard immediately after, unchanged, as the fallback either way —
+  // older firmware, composer unavailable, or the wearer just prefers typing.
+  // .focus() alone never opens the composer itself (requires an actual
+  // user pinch), so this is purely about making the field reachable at all.
+  searchInput.focus();
+}
 function closeKeyboard() { keyboardEl.style.display = "none"; searchPanelEl.style.display = "none"; suggestionsEl.style.display = "none"; feedContainerFor(currentTab).style.display = "grid"; }
 
 let _suggestGeneration = 0;
@@ -5769,6 +5781,15 @@ searchTabEl.addEventListener("click", openKeyboard);
 searchBack.addEventListener("click", closeKeyboard);
 searchGo.addEventListener("click", () => { const q = searchInput.value.trim() || "music"; triggerSearch(q); });
 searchInput.addEventListener("input", updateSuggestionsForInput);
+// Completes the loop with the keyboard's own ArrowUp handling added below —
+// swiping down from the field reaches the on-screen keyboard's first key,
+// swiping up from that same key returns here. Without this, the field was
+// a navigation dead end: nothing moved focus off it once landed there.
+searchInput.addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowDown") return;
+  const firstKey = document.querySelector("#kbRow0 .key-btn");
+  if (firstKey) { e.preventDefault(); firstKey.focus(); }
+});
 // Keyboard wrap-around navigation — within same row only
 // P swipe right → Q (wraps to start of same row)
 // L swipe right → A (wraps to start of same row)
@@ -5777,9 +5798,20 @@ searchInput.addEventListener("input", updateSuggestionsForInput);
 // A swipe left → L (wraps to end of same row)
 // Z swipe left → M (wraps to end of same row)
 document.getElementById("keyboard").addEventListener("keydown", (e) => {
-  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
   const focused = document.activeElement;
   if (!focused || !focused.classList.contains("key-btn")) return;
+
+  // Row 0 (top row) swipe up → back to the search field, closing the loop
+  // with searchInput's own ArrowDown handling above. Every other row still
+  // falls through to whatever handles vertical movement between rows —
+  // unchanged, only row 0 gets this new case.
+  if (e.key === "ArrowUp" && focused.closest(".keyboard-row")?.id === "kbRow0") {
+    e.preventDefault();
+    searchInput.focus();
+    return;
+  }
+
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
 
   // Get the row this key belongs to
   const row = focused.closest(".keyboard-row");
