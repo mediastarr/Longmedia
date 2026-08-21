@@ -5676,6 +5676,7 @@ function swapInfiniteScrollObserver(margin) {
 
 async function loadChannelPage(channelId) {
   setActiveTab("channel"); currentChannelId = channelId;
+  vtPushBackable();
   const info = await fetchYouTube("channels", { part: "snippet,statistics,contentDetails", id: channelId });
   const channelInfo = info.items?.[0]; if (!channelInfo) return;
   channelPageEl.innerHTML = `<button class="playlist-back-btn" id="channelBackBtn">← Back</button><div class="channel-banner parallax"><div class="banner-logo"></div><div class="banner-text">Mediastarr</div></div><div class="channel-header parallax"><img class="channel-pic" src="${channelInfo.snippet.thumbnails?.default?.url}"><div class="channel-meta"><div class="channel-name">${channelInfo.snippet.title}</div><div class="channel-subs">${channelInfo.statistics?.subscriberCount} subscribers</div></div></div>`;
@@ -5789,6 +5790,8 @@ function vtPushBackable() {
 // needing the on-screen button instead.
 function vtHandleBackGesture() {
   if (plOverlay && plOverlay.style.display === "flex") { document.getElementById("plPickerClose")?.click(); return; }
+  if (syncOverlay && syncOverlay.style.display === "flex") { document.getElementById("syncCloseBtn")?.click(); return; }
+  if (channelPageEl && channelPageEl.style.display !== "none") { document.getElementById("channelBackBtn")?.click(); return; }
   const scp = document.getElementById("shortsCommentsPanel");
   if (scp && scp.classList.contains("open")) { document.getElementById("shortsCommentsCloseBtn")?.click(); return; }
   if (playlistItemsView && playlistItemsView.style.display !== "none") { document.getElementById("playlistBackBtn")?.click(); return; }
@@ -6375,7 +6378,7 @@ const syncProgress = document.getElementById("syncProgress");
 const syncProgressFill = document.getElementById("syncProgressFill");
 const syncStartBtn = document.getElementById("syncStartBtn");
 const syncCloseBtn = document.getElementById("syncCloseBtn");
-syncBtn.onclick=function(){syncOverlay.style.display="flex";syncStatus.textContent="";syncProgressFill.style.width="0%";syncProgress.style.display="none";syncStartBtn.textContent="Start Sync";syncStartBtn.disabled=false;};
+syncBtn.onclick=function(){syncOverlay.style.display="flex";syncStatus.textContent="";syncProgressFill.style.width="0%";syncProgress.style.display="none";syncStartBtn.textContent="Start Sync";syncStartBtn.disabled=false;vtPushBackable();};
 
 async function runSubscriptionSync(isManual = false) {
   const token = await getValidToken();
