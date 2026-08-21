@@ -4487,7 +4487,22 @@ async function openShortsTabSetup() {
   let data = { items: [] };
   const pool = [];
   let persistentSeenIds = new Set();
-  try { persistentSeenIds = new Set(JSON.parse(localStorage.getItem("shortsSeenHistory") || "[]")); } catch(e) {}
+  // Only the most recent slice feeds this "don't offer me this again right
+  // now" pool filter. shortsSeenHistory itself holds up to 3000 entries —
+  // correct for its OTHER job as a durable hubSeenIds backup (see the
+  // "watched Short still shows as new" fix earlier this session) — but
+  // reading that full list here as well was an unintended side effect of
+  // that same fix: it made this filter reject against thousands of
+  // historically-seen ids instead of just recent ones, which could
+  // legitimately exhaust an entire small candidate pool (~40-70 items
+  // from a handful of queries) down to nothing, producing "No shorts —
+  // tap Back" even when plenty of genuinely fresh shorts exist. These are
+  // two separate concerns that happened to share one storage key; each
+  // needs its own window into it.
+  try {
+    const fullHistory = JSON.parse(localStorage.getItem("shortsSeenHistory") || "[]");
+    persistentSeenIds = new Set(fullHistory.slice(0, 150)); // newest-first, so this is genuinely the most recent 150
+  } catch(e) {}
   function isNew(id) { return !persistentSeenIds.has(id) && !shortsSeenIds.has(id); }
 
   // Try the server-side pool-building path first — one request instead of
@@ -4496,7 +4511,14 @@ async function openShortsTabSetup() {
   // out, or comes back thin.
   let usedServerPool = false;
   try {
-    const seenArr = [...new Set([...persistentSeenIds, ...shortsSeenIds])].slice(-300);
+    // shortsSeenIds (this session's current batch) goes first — those must
+    // never repeat and are the smallest, most certain set — followed by
+    // the already-recent-sliced persistentSeenIds above, then capped at
+    // 300 total. Previously this combined the FULL (up to 3000) history
+    // with shortsSeenIds before slicing the last 300 — since the full
+    // history is newest-first, slicing from the end actually grabbed
+    // mostly its OLDEST entries instead of its most recent ones.
+    const seenArr = [...new Set([...shortsSeenIds, ...persistentSeenIds])].slice(0, 300);
     const res = await fetchWithTimeout(HUB_WORKER_URL + "/buildShortsPool", {
       method: "POST",
       headers: workerHeaders({ "Content-Type": "application/json" }),
@@ -4815,7 +4837,7 @@ function playShort(index) {
   _currentShortsKeyHandler = skH;
   document.addEventListener("keydown",skH); shortsPageEl._cleanup=()=>document.removeEventListener("keydown",skH);
 }
-shortsTab.addEventListener("click", openShortsTabSetup);
+shortsTab.addEventListener("click", () => { openShortsTabSetup(); vtPushBackable(); });
 
 let lastMovieQuery = "";
 let isLoadingMovies = false;
@@ -5769,7 +5791,18 @@ function showSuggestions(list) {
 // happens to fire. This runs ALONGSIDE every existing on-screen back/close
 // button, unchanged — never replacing them, just catching the gesture too.
 function vtPushBackable() {
-  try { history.pushState({ vtBack: true }, "", location.href); } catch(e) {}
+  // Deferred by one tick rather than called synchronously in place. No
+  // confirmed root cause was found for why this didn't seem to register
+  // reliably around heavier transitions (opening a new video, switching
+  // into Shorts) while working fine for simple overlays like comments —
+  // but a pushState call landing in the middle of a busier synchronous
+  // burst of DOM/state work is a plausible, common cause of exactly that
+  // pattern, and deferring it is a safe change either way: it can't make
+  // a working case worse, only remove a possible contention window for
+  // the cases that weren't working.
+  setTimeout(() => {
+    try { history.pushState({ vtBack: true }, "", location.href); } catch(e) {}
+  }, 0);
 }
 // Checks what's actually visible right now and closes just that, mirroring
 // the same live-visibility pattern the existing Escape handler already
