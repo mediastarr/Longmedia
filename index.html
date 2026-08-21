@@ -8045,34 +8045,6 @@ function applyShortPlayerPatch(card, item) {
       }
     }
   };
-  // ── TEMPORARY DIAGNOSTIC — remove once the actual back-gesture event is
-  // identified. Two attempts at wiring the back gesture (keydown-based,
-  // then popstate-based) haven't worked, which means the assumption about
-  // which browser event this gesture actually produces on this specific
-  // hardware/firmware is wrong, not just the implementation around it.
-  // This logs every plausible candidate event so the real one can be
-  // identified from actual hardware instead of a third guess.
-  (function() {
-    const panel = document.createElement("div");
-    panel.id = "vtDebugPanel";
-    panel.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999999;background:rgba(0,0,0,0.9);color:#0f0;font-family:monospace;font-size:11px;padding:6px;max-height:140px;overflow-y:auto;pointer-events:none;white-space:pre-wrap;";
-    panel.textContent = "Debug log — perform the pinch gesture now\n";
-    document.body.appendChild(panel);
-    const log = (msg) => {
-      const line = new Date().toISOString().slice(11,23) + "  " + msg + "\n";
-      panel.textContent += line;
-      panel.scrollTop = panel.scrollHeight;
-      const lines = panel.textContent.split("\n");
-      if (lines.length > 40) panel.textContent = lines.slice(-40).join("\n");
-    };
-    window.addEventListener("keydown", (e) => log(`keydown  key="${e.key}" code="${e.code}" keyCode=${e.keyCode}`), true);
-    window.addEventListener("keyup", (e) => log(`keyup    key="${e.key}" code="${e.code}" keyCode=${e.keyCode}`), true);
-    window.addEventListener("popstate", () => log(`popstate fired (history.length now ${history.length})`), true);
-    window.addEventListener("beforeunload", () => log(`beforeunload fired`));
-    document.addEventListener("visibilitychange", () => log(`visibilitychange -> ${document.visibilityState}`));
-    log(`ready — history.length starts at ${history.length}`);
-  })();
-
   _startupFetch();
 
   // ── Offline mode: service worker registration ──
