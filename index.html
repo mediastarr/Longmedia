@@ -4000,6 +4000,7 @@ async function openShortsTabSetup() {
   shortsPageEl.innerHTML = `
     <div id="shortsPlayerBox">
       <iframe id="shortsIframe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+      <div id="shorts-focus-sink" tabindex="0" aria-hidden="true" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;"></div>
       <div id="shortsSwipeZone" style="position:absolute;inset:0;z-index:6;pointer-events:auto;background:transparent;touch-action:none;"></div>
       <div id="shortsTopLeft">
         <button id="shortsPlayPauseBtn" class="shorts-icon-btn" tabindex="0">⏸</button>
@@ -4073,7 +4074,19 @@ async function openShortsTabSetup() {
     shortsPageEl.style.display = "none";
     topbarEl.style.display = "flex";
     document.getElementById("tabs").style.display = "";
-    setActiveTab("home"); homeTab.click(); showHUD("Home");
+    // setActiveTab only toggles which container is visible — it never
+    // touches feedEl's innerHTML, so whatever was already rendered there
+    // (including any red-highlighted "new" videos injected before Shorts
+    // was opened) is still sitting in the DOM untouched. Previously this
+    // called homeTab.click(), which re-runs Home's full click handler —
+    // that handler only reuses the existing feed if you're within its own
+    // 15-second freshness window, so any Shorts session longer than that
+    // triggered a genuine full reload, wiping the untouched feed (and its
+    // red highlights) for no reason, since nothing about it was actually
+    // stale. Just showing what's already there is both correct and instant.
+    setActiveTab("home");
+    if (!feedEl.querySelector(".video-card")) { homeTab.click(); }
+    else { showHUD("Home"); }
   });
 
   // Real play/pause + mute state via YouTube's postMessage control protocol
@@ -4706,6 +4719,19 @@ function playShort(index) {
     _shortsWatchItem = item;
     _shortsWatchStart = Date.now();
     shortsIframe.src = EMBED(item.id);
+    // Reclaim keyboard/D-pad focus after the cross-origin YouTube iframe
+    // loads — same fix already proven necessary for the medium player.
+    // Keydown events that land while focus is inside a cross-origin iframe
+    // never bubble out to this document's listeners at all (a real browser
+    // security boundary, not a bug in our handler) — without stealing focus
+    // back onto something in our own page, the pinch-to-go-back gesture
+    // (and every other keyboard/D-pad shortcut) silently stops reaching us
+    // for as long as a Short is loaded, which is effectively the entire
+    // time someone is in this tab.
+    setTimeout(() => {
+      const sink = document.getElementById("shorts-focus-sink");
+      if (sink) sink.focus({ preventScroll: true });
+    }, 600);
     updateCounter();
     updateHeart();
     updateShortsChannelInfo(item);
