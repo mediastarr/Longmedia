@@ -937,55 +937,6 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
 </div>
 
 <script>
-// ── TEMPORARY DIAGNOSTIC — deliberately the very first thing this script
-// does, before any app code runs at all. Two separate, standard back-
-// gesture mechanisms (popstate alone, then popstate + comprehensive
-// Escape/Backspace) have both been tried and both reportedly failed —
-// and the debug panel itself wasn't showing up on Home or Shorts either,
-// most likely because it previously lived deep inside the async startup
-// sequence, dependent on everything ahead of it completing first. This
-// has zero dependency on anything else in the app — only document,
-// window, history, and location, all of which exist the instant this
-// script tag starts executing. Remove this whole block once the actual
-// event (or its absence) is identified.
-(function() {
-  const panel = document.createElement("div");
-  panel.id = "vtDebugPanel";
-  // A safe fixed offset rather than a live measurement of the topbar —
-  // this runs before the app has rendered anything itself, so there's
-  // nothing yet to measure reliably. 70px clears a typical topbar height
-  // comfortably without depending on it.
-  panel.style.cssText = "position:fixed;top:70px;left:0;right:0;z-index:9999999;background:rgba(0,0,0,0.92);color:#0f0;font-family:monospace;font-size:10px;padding:6px;max-height:180px;overflow-y:auto;pointer-events:none;white-space:pre-wrap;";
-  panel.textContent = "Debug log — perform the pinch gesture now\n";
-  document.body.appendChild(panel);
-  const log = (msg) => {
-    const line = new Date().toISOString().slice(11,23) + "  " + msg + "\n";
-    panel.textContent += line;
-    panel.scrollTop = panel.scrollHeight;
-    const lines = panel.textContent.split("\n");
-    if (lines.length > 60) panel.textContent = lines.slice(-60).join("\n");
-  };
-  // Every plausible candidate, capture phase (true) so nothing upstream
-  // can suppress it before it's logged, even if something else calls
-  // stopPropagation later in the bubble phase.
-  window.addEventListener("keydown", (e) => log(`keydown       key="${e.key}" code="${e.code}" keyCode=${e.keyCode}`), true);
-  window.addEventListener("keyup", (e) => log(`keyup         key="${e.key}" code="${e.code}" keyCode=${e.keyCode}`), true);
-  window.addEventListener("popstate", () => log(`popstate      (history.length now ${history.length})`), true);
-  window.addEventListener("hashchange", () => log(`hashchange    -> ${location.hash}`), true);
-  window.addEventListener("beforeunload", () => log(`beforeunload`));
-  window.addEventListener("pagehide", (e) => log(`pagehide      persisted=${e.persisted}`));
-  window.addEventListener("pageshow", (e) => log(`pageshow      persisted=${e.persisted}`));
-  window.addEventListener("blur", () => log(`window blur`));
-  window.addEventListener("focus", () => log(`window focus`));
-  document.addEventListener("visibilitychange", () => log(`visibilitychange -> ${document.visibilityState}`));
-  document.addEventListener("fullscreenchange", () => log(`fullscreenchange -> ${!!document.fullscreenElement}`));
-  // Genuinely unlikely for a hand gesture (not a screen touch), but cheap
-  // to rule out completely rather than assume.
-  window.addEventListener("touchstart", (e) => log(`touchstart    touches=${e.touches.length}`), true);
-  window.addEventListener("pointerdown", (e) => log(`pointerdown   type="${e.pointerType}"`), true);
-  log(`ready — history.length starts at ${history.length}`);
-})();
-
 const API_KEYS = []; // Keys managed server-side in Worker
 
 
@@ -8110,7 +8061,6 @@ function applyShortPlayerPatch(card, item) {
       }
     }
   };
-
   _startupFetch();
 
   // ── Offline mode: service worker registration ──
