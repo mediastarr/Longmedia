@@ -2644,7 +2644,7 @@ async function loadVideoInfoPanel(videoId, snippet) {
     const ch = channelData.value.items[0];
     const subs = formatViews(ch.statistics?.subscriberCount);
     document.getElementById("vipSubs").textContent = subs ? subs + " Subscribers" : "";
-    const avatarUrl = ch.snippet?.thumbnails?.default?.url;
+    const avatarUrl = ch.snippet?.thumbnails?.high?.url || ch.snippet?.thumbnails?.medium?.url || ch.snippet?.thumbnails?.default?.url;
     const avatarEl = document.getElementById("vipAvatar");
     if (avatarUrl) avatarEl.innerHTML = `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;">`;
   }
@@ -3016,7 +3016,7 @@ async function loadVideoInfoPanel(videoId, snippet) {
     const s = item.snippet || {};
     const vid = item._vid || item.id?.videoId || item.id;
     if (!vid) return;
-    const thumb = s.thumbnails?.high?.url || s.thumbnails?.medium?.url || s.thumbnails?.default?.url || "";
+    const thumb = s.thumbnails?.maxres?.url || s.thumbnails?.standard?.url || s.thumbnails?.high?.url || s.thumbnails?.medium?.url || s.thumbnails?.default?.url || "";
     const views = item.statistics ? formatViews(item.statistics.viewCount) : "";
     const ago = timeAgo(s.publishedAt);
     const meta = [views && views + " views", ago].filter(Boolean).join(" · ");
@@ -3578,7 +3578,7 @@ function appendFeed(items) {
       card.style.position = "relative";
       card.appendChild(badge);
     }
-    const thumb = snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || "";
+    const thumb = snippet.thumbnails?.maxres?.url || snippet.thumbnails?.standard?.url || snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || "";
     const views = formatViews(stats.viewCount);
     const ago = timeAgo(snippet.publishedAt);
     const meta = [views && views + " views", ago].filter(Boolean).join(" · ");
@@ -4358,7 +4358,7 @@ async function openShortsTabSetup() {
     // Channel avatar — small, non-blocking lookup
     fetchYouTube("channels", { part: "snippet", id: channelId, _: Date.now() }).then(res => {
       if (myGen !== _shortsChannelCheckGen) return;
-      const thumb = res.items?.[0]?.snippet?.thumbnails?.default?.url;
+      const thumb = res.items?.[0]?.snippet?.thumbnails?.high?.url || res.items?.[0]?.snippet?.thumbnails?.medium?.url || res.items?.[0]?.snippet?.thumbnails?.default?.url;
       if (thumb) shortsChannelAvatar.style.backgroundImage = `url(${thumb})`;
     }).catch(() => {});
     // Real subscription state — same pattern as the medium player. Uses a
@@ -5057,7 +5057,7 @@ historyTab.addEventListener("click", async () => {
       const diff = now - (h.watchedAt || 0);
       const ago = diff < 3600000 ? Math.floor(diff/60000)+"m ago" : diff < DAY ? Math.floor(diff/3600000)+"h ago" : diff < 2*DAY ? "yesterday" : Math.floor(diff/DAY)+"d ago";
       const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = vid;
-      card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.high?.url||snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"Untitled")+'</div><div class="video-channel">'+(snippet.channelTitle||"")+'</div><div class="video-meta">Watched '+ago+'</div></div>';
+      card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.maxres?.url||snippet.thumbnails?.standard?.url||snippet.thumbnails?.high?.url||snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"Untitled")+'</div><div class="video-channel">'+(snippet.channelTitle||"")+'</div><div class="video-meta">Watched '+ago+'</div></div>';
       const resumeT = getResumePosition(vid);
       const resumeLabel = resumeT > 5 ? " ▶ "+Math.floor(resumeT/60)+":"+(String(Math.floor(resumeT%60)).padStart(2,"0")) : "";
       card.querySelector(".video-meta").textContent = "Watched "+ago+resumeLabel;
@@ -5099,7 +5099,7 @@ historyTab.addEventListener("click", async () => {
         llData.items.forEach(it => {
           const snippet = it.snippet || {}; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
           const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = videoId;
-          card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.high?.url||snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Liked</div></div>';
+          card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.maxres?.url||snippet.thumbnails?.standard?.url||snippet.thumbnails?.high?.url||snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Liked</div></div>';
           card.onclick = async () => {
             tabsEl.style.display="none"; searchTabEl.style.display="none";
             const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); }
@@ -5117,7 +5117,7 @@ historyTab.addEventListener("click", async () => {
         wlData.items.forEach(it => {
           const snippet = it.snippet || {}; const videoId = snippet.resourceId?.videoId; if (!videoId) return;
           const card = document.createElement("div"); card.className = "video-card parallax focusable"; card.dataset.videoid = videoId;
-          card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.high?.url||snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Watch Later</div></div>';
+          card.innerHTML = '<div class="video-thumb"><img src="'+(snippet.thumbnails?.maxres?.url||snippet.thumbnails?.standard?.url||snippet.thumbnails?.high?.url||snippet.thumbnails?.medium?.url||snippet.thumbnails?.default?.url||"")+'" loading="lazy"></div><div class="video-info"><div class="video-title">'+(snippet.title||"")+'</div><div class="video-channel">'+(snippet.videoOwnerChannelTitle||snippet.channelTitle||"")+'</div><div class="video-meta">Watch Later</div></div>';
           card.onclick = async () => {
             tabsEl.style.display="none"; searchTabEl.style.display="none";
             const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: "+(snippet.title||"")); }
@@ -5442,7 +5442,7 @@ async function openPlaylist(playlistId, title) {
     let rendered = 0;
     data.items.forEach((item, i) => {
       const snippet = item.snippet; const videoId = snippet.resourceId?.videoId || item.contentDetails?.videoId; if (!videoId) return;
-      const thumb = snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || "";
+      const thumb = snippet.thumbnails?.maxres?.url || snippet.thumbnails?.standard?.url || snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || "";
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
       card.innerHTML = `<div class="video-thumb"><img src="${thumb}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.videoOwnerChannelTitle || snippet.channelTitle || ""}</div><div class="video-meta">#${i + 1} in playlist</div></div>`;
       card.onclick = async () => {
@@ -5531,7 +5531,7 @@ async function loadMoreVideos() {
       const ago2 = timeAgo(snippet.publishedAt);
       const meta2 = [views2 && views2 + " views", ago2].filter(Boolean).join(" · ");
       const card = document.createElement("div"); card.className = "video-card parallax focusable";
-      card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle || ""}</div><div class="video-meta">${meta2}</div></div>`;
+      card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails?.maxres?.url || snippet.thumbnails?.standard?.url || snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || ""}" loading="lazy"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle || ""}</div><div class="video-meta">${meta2}</div></div>`;
       card.onclick = async () => {
         tabsEl.style.display="none"; searchTabEl.style.display="none";
         const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet);
@@ -5740,7 +5740,7 @@ async function loadChannelPage(channelId) {
   setActiveTab("channel"); currentChannelId = channelId;
   const info = await fetchYouTube("channels", { part: "snippet,statistics,contentDetails", id: channelId });
   const channelInfo = info.items?.[0]; if (!channelInfo) return;
-  channelPageEl.innerHTML = `<button class="playlist-back-btn" id="channelBackBtn">← Back</button><div class="channel-banner parallax"><div class="banner-logo"></div><div class="banner-text">Mediastarr</div></div><div class="channel-header parallax"><img class="channel-pic" src="${channelInfo.snippet.thumbnails?.default?.url}"><div class="channel-meta"><div class="channel-name">${channelInfo.snippet.title}</div><div class="channel-subs">${channelInfo.statistics?.subscriberCount} subscribers</div></div></div>`;
+  channelPageEl.innerHTML = `<button class="playlist-back-btn" id="channelBackBtn">← Back</button><div class="channel-banner parallax"><div class="banner-logo"></div><div class="banner-text">Mediastarr</div></div><div class="channel-header parallax"><img class="channel-pic" src="${channelInfo.snippet.thumbnails?.high?.url || channelInfo.snippet.thumbnails?.medium?.url || channelInfo.snippet.thumbnails?.default?.url}"><div class="channel-meta"><div class="channel-name">${channelInfo.snippet.title}</div><div class="channel-subs">${channelInfo.statistics?.subscriberCount} subscribers</div></div></div>`;
   const channelBackBtn = document.getElementById("channelBackBtn");
   if (channelBackBtn) {
     channelBackBtn.addEventListener("click", () => {
@@ -5773,7 +5773,7 @@ async function loadChannelPage(channelId) {
     const ago = timeAgo(snippet.publishedAt);
     const meta = [views && views + " views", ago].filter(Boolean).join(" · ");
     const card = document.createElement("div"); card.className = "video-card parallax focusable";
-    card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails.medium.url}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle}</div><div class="video-meta">${meta}</div></div>`;
+    card.innerHTML = `<div class="video-thumb"><img src="${snippet.thumbnails?.maxres?.url || snippet.thumbnails?.standard?.url || snippet.thumbnails?.high?.url || snippet.thumbnails.medium.url}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.channelTitle}</div><div class="video-meta">${meta}</div></div>`;
     card.onclick = async () => {
       tabsEl.style.display="none"; searchTabEl.style.display="none";
       const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else setPlayerVideo(videoId, snippet);
@@ -7034,7 +7034,7 @@ async function _injectHubVideos(hubVideos) {
     }
       card.style.border = "1px solid rgba(255,68,68,0.7)";
       card.style.boxShadow = "0 0 14px rgba(255,68,68,0.35)";
-      const thumb = snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || "";
+      const thumb = snippet.thumbnails?.maxres?.url || snippet.thumbnails?.standard?.url || snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || "";
       const ago = timeAgo(snippet.publishedAt);
       card.innerHTML = '<div class="video-thumb"><img src="' + thumb + '" loading="lazy"></div><div class="video-info"><div class="video-title">' + (snippet.title||"") + '</div><div class="video-channel">' + (snippet.channelTitle||"") + '</div><div class="video-meta" style="color:rgba(255,100,100,0.9);">🔴 New · ' + ago + '</div></div>';
       card.onclick = async () => {
