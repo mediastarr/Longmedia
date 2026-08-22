@@ -2171,7 +2171,21 @@ function vtHandleBackGesture() {
   if (plOverlay && plOverlay.style.display === "flex") { closePicker(); return; }
   if (syncOverlay && syncOverlay.style.display === "flex") { document.getElementById("syncCloseBtn")?.click(); return; }
   if (searchPanelEl && searchPanelEl.style.display !== "none") { closeKeyboard(); return; }
-  if (channelPageEl && channelPageEl.style.display !== "none" && currentTab === "channel") { document.getElementById("channelBackBtn")?.click(); return; }
+  if (channelPageEl && channelPageEl.style.display !== "none") {
+    const cbb = document.getElementById("channelBackBtn");
+    // channelBackBtn is (re)created fresh inside loadChannelPage() itself,
+    // after its data has actually loaded — so there's a brief window,
+    // right after tapping into a channel (from Subscriptions or the
+    // Channel tab), where the page is already visible but this button
+    // doesn't exist in the DOM yet. Pinching back during that window
+    // previously just silently did nothing. Falling straight back to
+    // Subscriptions here — the only place channel pages are ever opened
+    // from in this app — means the gesture still does something correct
+    // even in that gap, instead of eating the input.
+    if (cbb) { cbb.click(); }
+    else { channelPageEl.style.display = "none"; setActiveTab("subs"); showHUD("Subscriptions"); }
+    return;
+  }
   if (playlistItemsView && playlistItemsView.style.display !== "none") { document.getElementById("playlistBackBtn")?.click(); return; }
   if (playerSection && playerSection.style.display !== "none") { document.getElementById("closeMini")?.click(); return; }
 }
@@ -3785,7 +3799,18 @@ homeTab.addEventListener("click", async () => {
   // a clear signal they scrolled through everything looking for more
   // content, not just re-tapping for variety — do a genuine full reload
   // instead of reshuffling the same small set they've already seen.
-  const HOME_CACHE_FRESH_MS = 15 * 1000; // 15 seconds
+  // 20 minutes, not 15 seconds — _homeCacheValid is already correctly
+  // invalidated by real changes elsewhere (a new search, a "loved" watch
+  // signal, switching to Movies/Trending, etc. all call
+  // invalidateHomeCache() directly), so this timer isn't the real
+  // staleness signal — it's just a backstop against showing something
+  // genuinely hours-old. 15 seconds meant any Shorts session longer than
+  // that forced a full reload on return, which wipes feedEl's actual DOM
+  // nodes (innerHTML reset + re-render) and loses anything attached to
+  // them, including red "new from subscriptions" highlighting that hadn't
+  // been cleared yet — a routine Shorts session is often well over 15s,
+  // so this was firing almost every time, not just for genuinely stale visits.
+  const HOME_CACHE_FRESH_MS = 20 * 60 * 1000;
   const nearBottom = (window.innerHeight + window.scrollY) >= (document.body.offsetHeight - 800);
   if (_homeCacheValid && !nearBottom && (Date.now() - _homeLastLoaded) < HOME_CACHE_FRESH_MS) {
     setActiveTab("home");
@@ -4074,19 +4099,18 @@ async function openShortsTabSetup() {
     shortsPageEl.style.display = "none";
     topbarEl.style.display = "flex";
     document.getElementById("tabs").style.display = "";
-    // setActiveTab only toggles which container is visible — it never
-    // touches feedEl's innerHTML, so whatever was already rendered there
-    // (including any red-highlighted "new" videos injected before Shorts
-    // was opened) is still sitting in the DOM untouched. Previously this
-    // called homeTab.click(), which re-runs Home's full click handler —
-    // that handler only reuses the existing feed if you're within its own
-    // 15-second freshness window, so any Shorts session longer than that
-    // triggered a genuine full reload, wiping the untouched feed (and its
-    // red highlights) for no reason, since nothing about it was actually
-    // stale. Just showing what's already there is both correct and instant.
-    setActiveTab("home");
-    if (!feedEl.querySelector(".video-card")) { homeTab.click(); }
-    else { showHUD("Home"); }
+    // Back to calling homeTab's own click handler directly — it already
+    // does the right thing on its own: it checks for and injects any
+    // newly-arrived, red-highlighted subscription videos FIRST (found
+    // while the user was away in Shorts), and only falls through to a
+    // genuine reload if the cache has actually gone stale. The earlier
+    // version of this fix bypassed that handler entirely to stop it from
+    // wiping the feed on every return — but that handler is also the ONLY
+    // place the new-video badge gets checked and injected, so skipping it
+    // silently broke that too. The real fix is below, in the handler
+    // itself: the freshness window it was using to decide "reload or
+    // reuse" was far too short for a normal Shorts session.
+    setActiveTab("home"); homeTab.click(); showHUD("Home");
   });
 
   // Real play/pause + mute state via YouTube's postMessage control protocol
