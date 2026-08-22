@@ -821,7 +821,8 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
   </div>
   <div id="searchPanel">
     <div class="search-input-bar">
-      <input id="searchInput" type="text" placeholder="Search videos..." />
+      <input id="searchInput" type="text" placeholder="Search, write, or speak..." />
+      <button id="voiceSearchBtn" class="topbar-btn" style="display:none; min-width:44px; padding:10px 12px;" title="Voice search">🎤</button>
       <button id="searchBack">Back</button>
       <button id="searchGo">Go</button>
     </div>
@@ -2154,11 +2155,32 @@ setInterval(() => {
   if (isFullscreen && isBlank) { playerSection.classList.remove("player-fullscreen"); document.body.classList.remove("fullscreen-active"); disableCinemaMode(); }
 }, 150);
 
+// ── Back gesture (thumb + middle-finger pinch on Ray-Ban Display) ──
+// The glasses surface this gesture as a real keydown — Escape from the
+// pinch-and-hold path, Backspace from the pinch-and-release path — so
+// both are treated as "go back" everywhere in the app, not just as a
+// fullscreen-exit shortcut. One dispatcher covers every screen/overlay
+// that can currently be "on top", checked in the order they'd actually
+// stack, so the gesture always closes whatever the person is looking at
+// rather than jumping straight to Home from three layers deep.
+function vtHandleBackGesture() {
+  if (document.body.classList.contains("fullscreen-active")) { document.getElementById("exitFullBtn")?.click(); return; }
+  const scp = document.getElementById("shortsCommentsPanel");
+  if (scp && scp.classList.contains("open")) { document.getElementById("shortsCommentsCloseBtn")?.click(); return; }
+  if (currentTab === "shorts") { document.getElementById("shortsBackBtn")?.click(); return; }
+  if (plOverlay && plOverlay.style.display === "flex") { closePicker(); return; }
+  if (syncOverlay && syncOverlay.style.display === "flex") { document.getElementById("syncCloseBtn")?.click(); return; }
+  if (searchPanelEl && searchPanelEl.style.display !== "none") { closeKeyboard(); return; }
+  if (channelPageEl && channelPageEl.style.display !== "none" && currentTab === "channel") { document.getElementById("channelBackBtn")?.click(); return; }
+  if (playlistItemsView && playlistItemsView.style.display !== "none") { document.getElementById("playlistBackBtn")?.click(); return; }
+  if (playerSection && playerSection.style.display !== "none") { document.getElementById("closeMini")?.click(); return; }
+}
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    // Close playlist overlay if open
+  if (e.key === "Escape" || (e.key === "Backspace" && document.activeElement !== searchInput)) {
+    // Close playlist overlay if open — keeps arrow-key list navigation below intact
     if (plOverlay && plOverlay.style.display === "flex") { closePicker(); return; }
-    playerSection.classList.remove("player-fullscreen"); document.body.classList.remove("fullscreen-active"); disableCinemaMode(); showUIWithMiniPlayer(); showHUD("Exited Fullscreen");
+    vtHandleBackGesture();
+    return;
   }
   // When playlist overlay is open, arrow keys navigate the list
   if (plOverlay && plOverlay.style.display === "flex") {
@@ -5769,6 +5791,48 @@ searchTabEl.addEventListener("click", openKeyboard);
 searchBack.addEventListener("click", closeKeyboard);
 searchGo.addEventListener("click", () => { const q = searchInput.value.trim() || "music"; triggerSearch(q); });
 searchInput.addEventListener("input", updateSuggestionsForInput);
+// ── Voice search — complements the on-screen keyboard, doesn't replace it.
+// Feature-detected: the mic button only appears if this browser/WebView
+// actually supports SpeechRecognition; the keyboard stays the fallback
+// (and remains fully usable) either way. A handwriting/voice composer
+// built into the platform itself, if present, would attach to the real
+// <input> on focus regardless of this — this button is the explicit,
+// always-visible alternative for when that's not available.
+const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+let _voiceRecognizer = null;
+let _voiceListening = false;
+if (SpeechRecognitionCtor) {
+  const vBtn = document.getElementById("voiceSearchBtn");
+  vBtn.style.display = "inline-block";
+  vBtn.addEventListener("click", () => {
+    if (_voiceListening) { try { _voiceRecognizer?.stop(); } catch(e) {} return; }
+    _voiceRecognizer = new SpeechRecognitionCtor();
+    _voiceRecognizer.lang = navigator.language || "en-US";
+    _voiceRecognizer.interimResults = false;
+    _voiceRecognizer.maxAlternatives = 1;
+    _voiceRecognizer.onstart = () => {
+      _voiceListening = true;
+      vBtn.textContent = "●";
+      vBtn.style.background = "radial-gradient(circle at 0% 0%, rgba(255,80,80,0.4), rgba(10,12,20,0.9))";
+      showHUD("Listening…");
+    };
+    _voiceRecognizer.onresult = (e) => {
+      const heard = e.results[0]?.[0]?.transcript || "";
+      if (heard) {
+        const sep = searchInput.value && !searchInput.value.endsWith(" ") ? " " : "";
+        searchInput.value = searchInput.value + sep + heard;
+        searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    };
+    _voiceRecognizer.onerror = () => { showHUD("Couldn't hear that — try again"); };
+    _voiceRecognizer.onend = () => {
+      _voiceListening = false;
+      vBtn.textContent = "🎤";
+      vBtn.style.background = "";
+    };
+    try { _voiceRecognizer.start(); } catch(e) {}
+  });
+}
 // Keyboard wrap-around navigation — within same row only
 // P swipe right → Q (wraps to start of same row)
 // L swipe right → A (wraps to start of same row)
@@ -7783,6 +7847,24 @@ function applyShortPlayerPatch(card, item) {
   };
 }
 
+// ── Offline mode — service worker + Cache API ──
+// Caches the app shell (this HTML document plus whatever else it fetches
+// as same-origin static assets) so the app can still open — home splash,
+// last-rendered UI — without a network connection. It deliberately does
+// NOT try to cache YouTube API responses or video playback itself: that
+// data requires a live connection by nature, and caching it would risk
+// serving badly stale feeds/thumbnails. This only covers "the app opens
+// and isn't a blank white screen," not "videos play offline."
+// Registered fire-and-forget, after the real startup work below — a
+// missing or failed registration (unsupported browser, no HTTPS in some
+// dev context) should never block or affect anything else here.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {
+      // No offline shell this session — everything else still works normally online.
+    });
+  });
+}
 (async function init() {
   // Warm the Worker connection and actually WAIT for it (briefly) —
   // this establishes the TCP/TLS handshake to Cloudflare before the first
