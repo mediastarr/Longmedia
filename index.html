@@ -1805,7 +1805,14 @@ async function _fetchPersonalizedFeedLocal() {
             });
             for (let i = unknown.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [unknown[i], unknown[j]] = [unknown[j], unknown[i]]; }
             uploadPlaylists = [...known, ...unknown].map(x => x.pl);
-            const uploadFetches = uploadPlaylists.slice(0, 10).map(plId =>
+            // Was capped at 10 — meaning anyone with more than ~20
+            // subscriptions had well over half never checked on a given
+            // Home load, even though up to 50 are fetched from
+            // subscriptions.list above. channels.list + playlistItems.list
+            // don't touch the search-specific daily quota (only the
+            // general pool, which has far more headroom), so widening
+            // this is safe.
+            const uploadFetches = uploadPlaylists.slice(0, 20).map(plId =>
               fetchYouTube("playlistItems", { part: "snippet,contentDetails", playlistId: plId, maxResults: 10, _: Date.now() })
             );
             const uploadResults = await Promise.allSettled(uploadFetches);
@@ -7208,8 +7215,12 @@ let _liveCheckTimer = null;
 
 async function _checkLiveStreams() {
   try {
-    const key = API_KEYS[keyIndex % API_KEYS.length];
-    const res = await fetch(HUB_WORKER_URL + "/live?key=" + key, {
+    // The Worker's /live handler serves the cached live-channels list from
+    // KV directly and never reads a "key" query param — so no client-side
+    // API key lookup is needed here at all. (It previously referenced an
+    // undeclared `keyIndex`, which threw on every call and was silently
+    // swallowed by this try/catch — meaning this 5-minute poll never ran.)
+    const res = await fetch(HUB_WORKER_URL + "/live", {
       headers: workerHeaders()
     });
     if (!res.ok) return;
@@ -7524,7 +7535,9 @@ function blockChannel(channelId, channelTitle) {
     profile.channels[channelId] = { weight: 0, blocked: true };
     localStorage.setItem("tasteProfile", JSON.stringify(profile));
   } catch(e) {}
-  sendEngagement("", channelId, "channel_blocked", 0, false, null);
+  // Same reasoning as markNotInterested — pct omitted, not 0, so this
+  // doesn't falsely pollute the channel's avgPct completion stat.
+  sendEngagement("", channelId, "channel_blocked", undefined, false, null);
   // Purge anything from this channel already sitting in the pending
   // "new" queue — otherwise videos queued before this block was set would
   // keep showing as new until the next full clear, even though nothing
@@ -7589,7 +7602,12 @@ function markNotInterested(videoId, channelId, title) {
   } catch(e) {}
 
   // Send not-interested signal to Worker for cross-user learning
-  sendEngagement(videoId, channelId, "not_interested", 0, false, null);
+  // pct is deliberately omitted (not 0) — no video was actually watched here,
+  // and the Worker's /engage handler treats any defined pct as a real
+  // watch-percentage data point, folding it into that channel's avgPct stat.
+  // Sending 0 was quietly dragging a channel's average completion rate down
+  // every time someone marked a video not-interested, for every user's scoring.
+  sendEngagement(videoId, channelId, "not_interested", undefined, false, null);
 
   // Remove card from feed
   document.querySelectorAll(`[data-videoid="${videoId}"]`).forEach(card => {
