@@ -2101,6 +2101,7 @@ fullBtn.addEventListener("click", () => {
   playerSection.classList.remove("player-mini");
   playerSection.classList.add("player-fullscreen");
   document.body.classList.add("fullscreen-active");
+  vtPushBackHistory();
   enableCinemaMode();
   playCinemaZoomIntro();
   setTimeout(() => { playerSection.classList.add("settled"); }, 550);
@@ -2274,6 +2275,26 @@ function vtHandleBackGesture() {
   }
   return false;
 }
+
+// ---------------- Back gesture: history-based fallback ----------------
+// The pinch gesture isn't guaranteed to arrive as a keydown event at all —
+// on this hardware it may instead trigger the browser's own native
+// back-navigation. Without a real history entry to pop, that would do
+// nothing at all, regardless of what vtHandleBackGesture() checks for.
+// Every "back-able" state pushes exactly one history entry the moment it
+// opens (see vtPushBackHistory() call sites throughout); popstate below
+// runs the exact same dispatcher, so this converges on identical behavior
+// to the keydown path above rather than needing its own separate logic.
+let vtBackHistoryPushed = false;
+function vtPushBackHistory() {
+  if (vtBackHistoryPushed) return; // already have an entry to pop — layering multiple states on top of each other (e.g. opening the playlist picker while the player is open) still only ever needs one to go "back" from at a time
+  vtBackHistoryPushed = true;
+  try { history.pushState({ vtBack: true }, "", location.href); } catch(e) {}
+}
+window.addEventListener("popstate", () => {
+  vtBackHistoryPushed = false; // the entry that was pushed is the one that just got popped
+  vtHandleBackGesture();
+});
 
 let ytPlayer = null;
 let ytReady = false;
@@ -2511,6 +2532,7 @@ function createYTPlayer(videoId, startSeconds) {
 
 let _recentlyPlayedIds = [];
 function setPlayerVideo(videoId, snippet, startSeconds) {
+  vtPushBackHistory();
   // Track this play — used to exclude recently-watched videos from the
   // suggested-videos pool below, so autoplay can't ping-pong between the
   // same two mutually-related videos forever. Capped small deliberately —
@@ -4030,6 +4052,7 @@ trendingTab.addEventListener("click", async () => {
 let _currentShortsKeyHandler = null;
 let _currentShortsFocusKeyHandler = null;
 async function openShortsTabSetup() {
+  vtPushBackHistory();
   // Remove the infinite-scroll sentinel from the DOM entirely while
   // Shorts is open, rather than just disabling scroll via CSS — this
   // element didn't exist in earlier versions that never showed this
@@ -4512,6 +4535,7 @@ async function openShortsTabSetup() {
   shortsCommentBtn.addEventListener("click", async () => {
     const item = shortsItems[shortsIndex];
     if (!item) return;
+    vtPushBackHistory();
     shortsCommentsPanel.classList.add("open");
     shortsCommentsList.innerHTML = '<div style="opacity:0.5;font-size:12px;">Loading comments…</div>';
     shortsLoadedCommentCount = 0;
@@ -4563,17 +4587,7 @@ async function openShortsTabSetup() {
   function isNew(id) { return !persistentSeenIds.has(id) && !shortsSeenIds.has(id); }
 
   let data = { items: [] };
-  let pool = [];
-  // Retry once on a genuinely empty pool — a cold-start timeout on the very
-  // first attempt (Worker instance, DNS/TLS, and the oEmbed verification
-  // step all cold) can legitimately come back empty even though nothing is
-  // actually broken; a second attempt right after reliably succeeds once
-  // things are warm. This is exactly what manually tapping Back and
-  // reopening Shorts was already doing — automating it here means that
-  // transient case never shows "No shorts" to begin with.
-  for (let attempt = 0; attempt < 2 && pool.length === 0; attempt++) {
-  data = { items: [] };
-  pool = [];
+  const pool = [];
 
   // Try the server-side pool-building path first — one request instead of
   // the multiple parallel calls the block below makes from the glasses.
@@ -4697,21 +4711,22 @@ async function openShortsTabSetup() {
   // to YouTube. Bounded to a reasonable batch, and any failure/timeout
   // falls back to the unverified pool rather than ever emptying Shorts.
   try {
-    // Capped at 24, not 50 — /verifyShorts itself only ever processes the
-    // first 25 candidates it's sent regardless, and a tighter batch also
-    // bounds the worst-case latency this adds to the overall Shorts-open
-    // flow, which matters most on a cold connection.
-    const toVerify = pool.slice(0, 24).map(v => ({ id: v.id, snippet: v.snippet }));
+    // Since the retry loop was removed (it doubled worst-case latency
+    // without reliably helping — a real regression reported after adding
+    // it), this is now the ONLY defense against a cold-start timeout, so
+    // it's tightened further: 16 items, 3s timeout, both meaningfully
+    // smaller than before.
+    const toVerify = pool.slice(0, 16).map(v => ({ id: v.id, snippet: v.snippet }));
     if (toVerify.length) {
       const vres = await fetchWithTimeout(HUB_WORKER_URL + "/verifyShorts", {
         method: "POST",
         headers: workerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ candidates: toVerify })
-      }, 5000).then(r => r.json());
-      if (vres.items && vres.items.length >= Math.min(8, Math.ceil(toVerify.length * 0.3))) {
+      }, 3000).then(r => r.json());
+      if (vres.items && vres.items.length >= Math.min(6, Math.ceil(toVerify.length * 0.3))) {
         const verifiedIds = new Set(vres.items.map(v => v.id));
-        const rest = pool.slice(24);
-        const replaced = pool.slice(0, 24).filter(v => verifiedIds.has(v.id));
+        const rest = pool.slice(16);
+        const replaced = pool.slice(0, 16).filter(v => verifiedIds.has(v.id));
         pool.length = 0;
         pool.push(...replaced, ...rest);
       }
@@ -4721,7 +4736,6 @@ async function openShortsTabSetup() {
     }
   } catch(e) {}
   } // end of !usedServerPool fallback block
-  } // end of retry-once loop
 
     const seen=new Set();
   // If a video was pre-seeded (opened from home tab), keep it at front
@@ -5496,6 +5510,7 @@ async function loadPlaylists() {
 }
 
 async function openPlaylist(playlistId, title) {
+  vtPushBackHistory();
   playlistGrid.style.display = "none"; playlistItemsView.style.display = "block";
   playlistItemsTitle.textContent = title;
   playlistItemsList.innerHTML = `<div style="font-size:12px;opacity:0.6;padding:12px 0;">Loading…</div>`; showHUD("Loading playlist…");
@@ -5808,6 +5823,7 @@ function swapInfiniteScrollObserver(margin) {
 }
 
 async function loadChannelPage(channelId) {
+  vtPushBackHistory();
   setActiveTab("channel"); currentChannelId = channelId;
   const info = await fetchYouTube("channels", { part: "snippet,statistics,contentDetails", id: channelId });
   const channelInfo = info.items?.[0]; if (!channelInfo) return;
@@ -5888,7 +5904,7 @@ function showSuggestions(list) {
   suggestionsEl.style.display = "block";
 }
 
-function openKeyboard() { searchPanelEl.style.display = "block"; keyboardEl.style.display = "block"; document.querySelector(".search-input-bar").style.display = "flex"; feedContainerFor(currentTab).style.display = "none"; }
+function openKeyboard() { vtPushBackHistory(); searchPanelEl.style.display = "block"; keyboardEl.style.display = "block"; document.querySelector(".search-input-bar").style.display = "flex"; feedContainerFor(currentTab).style.display = "none"; }
 function closeKeyboard() { keyboardEl.style.display = "none"; searchPanelEl.style.display = "none"; suggestionsEl.style.display = "none"; feedContainerFor(currentTab).style.display = "grid"; }
 
 let _suggestGeneration = 0;
@@ -6323,6 +6339,7 @@ const plOverlay = document.getElementById("plOverlay");
 const plPickerList = document.getElementById("plPickerList");
 const plPickerStatus = document.getElementById("plPickerStatus");
 function openPicker() {
+  vtPushBackHistory();
   plOverlay.style.display="flex";
   const list = document.getElementById("plPickerList");
   if (list) {
@@ -6429,7 +6446,7 @@ const syncProgress = document.getElementById("syncProgress");
 const syncProgressFill = document.getElementById("syncProgressFill");
 const syncStartBtn = document.getElementById("syncStartBtn");
 const syncCloseBtn = document.getElementById("syncCloseBtn");
-syncBtn.onclick=function(){syncOverlay.style.display="flex";syncStatus.textContent="";syncProgressFill.style.width="0%";syncProgress.style.display="none";syncStartBtn.textContent="Start Sync";syncStartBtn.disabled=false;};
+syncBtn.onclick=function(){vtPushBackHistory();syncOverlay.style.display="flex";syncStatus.textContent="";syncProgressFill.style.width="0%";syncProgress.style.display="none";syncStartBtn.textContent="Start Sync";syncStartBtn.disabled=false;};
 
 async function runSubscriptionSync(isManual = false) {
   const token = await getValidToken();
