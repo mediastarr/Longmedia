@@ -4560,6 +4560,16 @@ async function openShortsTabSetup() {
   if (sBI.length>1) searchQueries.push({q:sBI[1]+" viral shorts", order:"viewCount"});
   if (sKW.length>2) searchQueries.push({q:sKW[2]+" short video", order:"relevance"});
 
+  // Dedicated fresh/unproven-content source, genuinely time-boxed — every
+  // query above sorts by relevance, view count, or plain "date" with no
+  // real cutoff, meaning it still returns however-old content if nothing
+  // newer happens to match. This is the one query with a real
+  // publishedAfter floor (last 48h), matching the same source the
+  // server-side pool build already has, so this client-only fallback path
+  // doesn't quietly lose genuine freshness whenever it's the one in use.
+  const freshQShort = SHORT_QUERIES[Math.floor(Math.random()*SHORT_QUERIES.length)];
+  const freshSinceIsoShort = new Date(Date.now() - 48*3600*1000).toISOString();
+
   const parallelFetches = [
     // Taste + search queries (all parallel) — search.list's videoDuration
     // parameter is a genuine, YouTube-enforced server-side guarantee
@@ -4571,6 +4581,8 @@ async function openShortsTabSetup() {
     fetchYouTube("search",{part:"snippet",q:genericQ,type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:userRegion,order:"date",maxResults:10,_:Date.now()}),
     // Discovery: viral
     fetchYouTube("search",{part:"snippet",q:viralQ,type:"video",videoDuration:"short",videoEmbeddable:"true",order:"viewCount",maxResults:10,_:Date.now()}),
+    // Discovery: genuinely fresh (last 48h), not just date-sorted
+    fetchYouTube("search",{part:"snippet",q:freshQShort,type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:userRegion,order:"date",publishedAfter:freshSinceIsoShort,maxResults:10,_:Date.now()}),
   ];
   const parallelResults = await Promise.allSettled(parallelFetches);
   parallelResults.forEach(r => {
@@ -4592,6 +4604,35 @@ async function openShortsTabSetup() {
       const secs = v.contentDetails?._durationSeconds ?? parseDuration(v.contentDetails?.duration);
       if (id && isNew(id) && secs!==null && secs>0 && secs<=180) pool.push({id,snippet:v.snippet});
     });
+  } catch(e) {}
+  // Genuine 9:16 aspect-ratio verification via oEmbed — every source above
+  // (this fallback path included) only ever confirms duration, and
+  // duration alone doesn't guarantee actual vertical format. Routed
+  // through the Worker's existing /verifyShorts endpoint (same one
+  // loadMoreShorts() already uses) rather than calling YouTube's oEmbed
+  // directly from the glasses — keeps the network cost and any CORS
+  // concerns server-side, consistent with how the rest of this app talks
+  // to YouTube. Bounded to a reasonable batch, and any failure/timeout
+  // falls back to the unverified pool rather than ever emptying Shorts.
+  try {
+    const toVerify = pool.slice(0, 50).map(v => ({ id: v.id, snippet: v.snippet }));
+    if (toVerify.length) {
+      const vres = await fetchWithTimeout(HUB_WORKER_URL + "/verifyShorts", {
+        method: "POST",
+        headers: workerHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ candidates: toVerify })
+      }, 8000).then(r => r.json());
+      if (vres.items && vres.items.length >= Math.min(10, Math.ceil(toVerify.length * 0.3))) {
+        const verifiedIds = new Set(vres.items.map(v => v.id));
+        const rest = pool.slice(50);
+        const replaced = pool.slice(0, 50).filter(v => verifiedIds.has(v.id));
+        pool.length = 0;
+        pool.push(...replaced, ...rest);
+      }
+      // Otherwise — verification came back too thin to trust (likely a
+      // real oEmbed-side problem, not every candidate genuinely failing) —
+      // leave the pool exactly as gathered above.
+    }
   } catch(e) {}
   } // end of !usedServerPool fallback block
 
