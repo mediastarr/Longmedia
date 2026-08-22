@@ -2162,10 +2162,15 @@ setInterval(() => {
 }, 150);
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    // Close playlist overlay if open
-    if (plOverlay && plOverlay.style.display === "flex") { closePicker(); return; }
-    playerSection.classList.remove("player-fullscreen"); document.body.classList.remove("fullscreen-active"); disableCinemaMode(); showUIWithMiniPlayer(); showHUD("Exited Fullscreen");
+  // Meta Ray-Ban Display glasses surface the thumb + middle-finger pinch
+  // gesture as these two key events — pinch-and-hold as Escape,
+  // pinch-and-release as Backspace — so both are treated as the same
+  // back/cancel action. Backspace is exempted only while actually typing
+  // in the search field, so real character deletion still works there;
+  // Escape still acts as back/cancel even mid-search, matching what a
+  // physical back button would do.
+  if (e.key === "Escape" || (e.key === "Backspace" && document.activeElement !== searchInput)) {
+    if (vtHandleBackGesture()) { e.preventDefault(); return; }
   }
   // When playlist overlay is open, arrow keys navigate the list
   if (plOverlay && plOverlay.style.display === "flex") {
@@ -2203,6 +2208,72 @@ document.addEventListener("keydown", (e) => {
     return; // block all other keys from reaching page handlers
   }
 });
+
+// Single back/cancel dispatcher for the thumb + middle-finger pinch
+// gesture (wired to both Escape and Backspace above). Checks every
+// overlay/panel/player state that could currently be "in front," in the
+// order they'd actually be layered on screen — highest overlay first,
+// down to the base feed — and closes/exits the first match found.
+// Deliberately reuses each panel's own existing close button via a real
+// .click() rather than duplicating its cleanup logic here: several of
+// these (Shorts comments, Shorts back) are closures scoped inside
+// openShortsTabSetup() and aren't callable from this outer scope at all,
+// so clicking the actual DOM button is both the safe option and the one
+// that can never drift out of sync with what that button already does.
+// Returns true if it handled something, so the caller knows not to let
+// the key fall through to anything else.
+function vtHandleBackGesture() {
+  // 1. Add to Playlist picker — topmost overlay (z-index 100002)
+  if (plOverlay && plOverlay.style.display === "flex") { closePicker(); return true; }
+  // 2. Sync from YouTube panel (z-index 100001)
+  if (syncOverlay && syncOverlay.style.display === "flex") {
+    document.getElementById("syncCloseBtn")?.click();
+    return true;
+  }
+  // 3. Shorts comments panel — sits above the Shorts player itself.
+  // Queried fresh, not a captured reference — its DOM is rebuilt inside
+  // openShortsTabSetup() every time Shorts opens, a scope this dispatcher
+  // lives outside of.
+  const shortsCommentsPanelEl = document.getElementById("shortsCommentsPanel");
+  if (shortsCommentsPanelEl && shortsCommentsPanelEl.classList.contains("open")) {
+    document.getElementById("shortsCommentsCloseBtn")?.click();
+    return true;
+  }
+  // 4. Fullscreen video player — exit back to the medium player, not all
+  // the way out of the video entirely
+  if (document.body.classList.contains("fullscreen-active")) {
+    document.getElementById("exitFullBtn")?.click();
+    return true;
+  }
+  // 5. Shorts tab — leave Shorts, return to wherever it was opened from
+  if (currentTab === "shorts") {
+    document.getElementById("shortsBackBtn")?.click();
+    return true;
+  }
+  // 6. Search keyboard open
+  if (searchPanelEl && searchPanelEl.style.display !== "none") { closeKeyboard(); return true; }
+  // 7. Channel page open (e.g. opened from a card in Subscriptions)
+  if (channelPageEl && channelPageEl.style.display === "grid") {
+    const cbb = document.getElementById("channelBackBtn");
+    if (cbb) cbb.click();
+    // Channel page can still be mid-load (async loadChannelPage) when this
+    // fires, before its own Back button exists yet — same fallback
+    // loadChannelPage() itself already falls back to in that window.
+    else setActiveTab("subs");
+    return true;
+  }
+  // 8. Playlist items view (inside a single playlist)
+  if (playlistItemsView && playlistItemsView.style.display !== "none") {
+    playlistBackBtn?.click();
+    return true;
+  }
+  // 9. Medium/mini video player — close it back to the feed
+  if (playerSection && playerSection.style.display !== "none") {
+    closeMini?.click();
+    return true;
+  }
+  return false;
+}
 
 let ytPlayer = null;
 let ytReady = false;
