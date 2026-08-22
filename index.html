@@ -2094,7 +2094,6 @@ fullBtn.addEventListener("click", () => {
   playerSection.classList.remove("player-mini");
   playerSection.classList.add("player-fullscreen");
   document.body.classList.add("fullscreen-active");
-  vtPushBackable();
   enableCinemaMode();
   playCinemaZoomIntro();
   setTimeout(() => { playerSection.classList.add("settled"); }, 550);
@@ -2156,26 +2155,10 @@ setInterval(() => {
 }, 150);
 
 document.addEventListener("keydown", (e) => {
-  // Escape and Backspace both trigger the same comprehensive dispatcher the
-  // popstate listener already uses (vtHandleBackGesture, defined further
-  // below) — this was the actual missing half of the puzzle, not something
-  // wrong with popstate itself. Raytube's own working version treats Escape
-  // as the documented back/cancel gesture (thumb + middle-finger pinch)
-  // via a real keydown handler running ALONGSIDE popstate, not replaced by
-  // it. This file only ever wired popstate to the full per-screen
-  // dispatcher — Escape's existing handling here was narrow (fullscreen
-  // exit and the playlist overlay only), so every other screen (Shorts,
-  // the medium player, sync overlay, channel page, playlist detail,
-  // search) never had a keydown path to close them at all, regardless of
-  // what the gesture actually sends.
-  //
-  // Backspace is excluded while the real text field is genuinely focused
-  // (searchInput) — it needs to delete characters there. Escape is NOT
-  // excluded even then, matching Raytube's own explicit reasoning: it's
-  // the documented gesture and needs to keep working mid-search too,
-  // since there's no separate on-screen Cancel button for it.
-  if (e.key === "Escape" || (e.key === "Backspace" && document.activeElement !== searchInput)) {
-    vtHandleBackGesture();
+  if (e.key === "Escape") {
+    // Close playlist overlay if open
+    if (plOverlay && plOverlay.style.display === "flex") { closePicker(); return; }
+    playerSection.classList.remove("player-fullscreen"); document.body.classList.remove("fullscreen-active"); disableCinemaMode(); showUIWithMiniPlayer(); showHUD("Exited Fullscreen");
   }
   // When playlist overlay is open, arrow keys navigate the list
   if (plOverlay && plOverlay.style.display === "flex") {
@@ -2477,7 +2460,6 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   // assumed it reflected the actual current visual state.
   miniActive = false;
   currentVideoId = videoId;
-  vtPushBackable();
   // Reset captions state for the new video
   captionsOn = false;
   try { const cb = document.getElementById("ccBtn"); if (cb) { cb.style.opacity = "0.6"; cb.style.background = ""; } } catch(e) {}
@@ -3524,7 +3506,6 @@ async function openAsShort(videoId, snippet) {
   // shortsTab.click() without waiting, which could let the user interact
   // with buttons before their handlers had actually finished attaching).
   await openShortsTabSetup();
-  vtPushBackable();
 
   // After the tab finishes building its DOM, intercept the back button
   // to restore scroll position instead of reloading home
@@ -4454,7 +4435,6 @@ async function openShortsTabSetup() {
     const item = shortsItems[shortsIndex];
     if (!item) return;
     shortsCommentsPanel.classList.add("open");
-    vtPushBackable();
     shortsCommentsList.innerHTML = '<div style="opacity:0.5;font-size:12px;">Loading comments…</div>';
     shortsLoadedCommentCount = 0;
     setShortsFocus(getShortsFocusIds().indexOf("shortsCommentsCloseBtn"));
@@ -4506,15 +4486,14 @@ async function openShortsTabSetup() {
   // Only the most recent slice feeds this "don't offer me this again right
   // now" pool filter. shortsSeenHistory itself holds up to 3000 entries —
   // correct for its OTHER job as a durable hubSeenIds backup (see the
-  // "watched Short still shows as new" fix earlier this session) — but
-  // reading that full list here as well was an unintended side effect of
-  // that same fix: it made this filter reject against thousands of
+  // "watched Short still shows as new" fix earlier) — but reading that
+  // full list here too meant this filter rejected against thousands of
   // historically-seen ids instead of just recent ones, which could
-  // legitimately exhaust an entire small candidate pool (~40-70 items
-  // from a handful of queries) down to nothing, producing "No shorts —
-  // tap Back" even when plenty of genuinely fresh shorts exist. These are
-  // two separate concerns that happened to share one storage key; each
-  // needs its own window into it.
+  // legitimately exhaust an entire small candidate pool (~40-70 items from
+  // a handful of queries) down to nothing, producing "No shorts — tap
+  // Back" even when plenty of genuinely fresh shorts exist. These are two
+  // separate concerns that happened to share one storage key; each needs
+  // its own window into it.
   try {
     const fullHistory = JSON.parse(localStorage.getItem("shortsSeenHistory") || "[]");
     persistentSeenIds = new Set(fullHistory.slice(0, 150)); // newest-first, so this is genuinely the most recent 150
@@ -4853,7 +4832,7 @@ function playShort(index) {
   _currentShortsKeyHandler = skH;
   document.addEventListener("keydown",skH); shortsPageEl._cleanup=()=>document.removeEventListener("keydown",skH);
 }
-shortsTab.addEventListener("click", () => { openShortsTabSetup(); vtPushBackable(); });
+shortsTab.addEventListener("click", openShortsTabSetup);
 
 let lastMovieQuery = "";
 let isLoadingMovies = false;
@@ -5404,7 +5383,6 @@ async function loadPlaylists() {
 
 async function openPlaylist(playlistId, title) {
   playlistGrid.style.display = "none"; playlistItemsView.style.display = "block";
-  vtPushBackable();
   playlistItemsTitle.textContent = title;
   playlistItemsList.innerHTML = `<div style="font-size:12px;opacity:0.6;padding:12px 0;">Loading…</div>`; showHUD("Loading playlist…");
   try {
@@ -5717,7 +5695,6 @@ function swapInfiniteScrollObserver(margin) {
 
 async function loadChannelPage(channelId) {
   setActiveTab("channel"); currentChannelId = channelId;
-  vtPushBackable();
   const info = await fetchYouTube("channels", { part: "snippet,statistics,contentDetails", id: channelId });
   const channelInfo = info.items?.[0]; if (!channelInfo) return;
   channelPageEl.innerHTML = `<button class="playlist-back-btn" id="channelBackBtn">← Back</button><div class="channel-banner parallax"><div class="banner-logo"></div><div class="banner-text">Mediastarr</div></div><div class="channel-header parallax"><img class="channel-pic" src="${channelInfo.snippet.thumbnails?.default?.url}"><div class="channel-meta"><div class="channel-name">${channelInfo.snippet.title}</div><div class="channel-subs">${channelInfo.statistics?.subscriberCount} subscribers</div></div></div>`;
@@ -5797,88 +5774,7 @@ function showSuggestions(list) {
   suggestionsEl.style.display = "block";
 }
 
-// ── Back-gesture safety net (popstate) ──
-// The glasses' native back gesture is handled by the OS shell: per Meta's
-// own Web Apps spec, if a real history entry exists it calls history.back()
-// on the page (firing popstate here); otherwise it shows the native system
-// menu instead of ever reaching this app at all. Without a real entry per
-// screen, there's nothing for the shell to go back through — meaning the
-// gesture wouldn't route to us no matter which key, if any, it also
-// happens to fire. This runs ALONGSIDE every existing on-screen back/close
-// button, unchanged — never replacing them, just catching the gesture too.
-function vtPushBackable() {
-  // Deferred by one tick rather than called synchronously in place. No
-  // confirmed root cause was found for why this didn't seem to register
-  // reliably around heavier transitions (opening a new video, switching
-  // into Shorts) while working fine for simple overlays like comments —
-  // but a pushState call landing in the middle of a busier synchronous
-  // burst of DOM/state work is a plausible, common cause of exactly that
-  // pattern, and deferring it is a safe change either way: it can't make
-  // a working case worse, only remove a possible contention window for
-  // the cases that weren't working.
-  setTimeout(() => {
-    try { history.pushState({ vtBack: true }, "", location.href); } catch(e) {}
-  }, 0);
-}
-// Checks what's actually visible right now and closes just that, mirroring
-// the same live-visibility pattern the existing Escape handler already
-// uses elsewhere in this file, rather than trusting popstate's own state
-// object — stays correct even if an entry ever gets out of sync. Delegates
-// to each screen's real on-screen button via .click() rather than calling
-// internal functions directly, since a few of these buttons get
-// re-created/rebound at runtime (Shorts' own back button in particular) —
-// .click() always hits whatever's currently attached, so there's no risk
-// of holding a stale reference.
-//
-// Deliberately scoped to screens that are unambiguously "step back one
-// level": search, the playlist-add overlay, playlist detail view, and
-// Shorts' comments panel. Channel page and the Shorts tab itself are
-// driven through the same shared tab-switching system as Home/Trending/
-// Movies, and entangling that with history state risked side effects on
-// ordinary tab switching that weren't worth taking on in this pass.
-// Mini-player's close button stops playback entirely rather than just
-// dismissing a screen, so it's excluded too — a back gesture unexpectedly
-// killing video playback would be a worse surprise than occasionally
-// needing the on-screen button instead.
-function vtHandleBackGesture() {
-  if (document.body.classList.contains("fullscreen-active")) { document.getElementById("exitFullBtn")?.click(); return; }
-  // Shorts comments panel is layered ON TOP of the Shorts player itself —
-  // currentTab is still "shorts" while it's open, so this must be checked
-  // before the general Shorts case below, or a pinch here would skip past
-  // the comments panel and close the whole Shorts player instead of just
-  // backing out of comments first.
-  const scp = document.getElementById("shortsCommentsPanel");
-  if (scp && scp.classList.contains("open")) { document.getElementById("shortsCommentsCloseBtn")?.click(); return; }
-  if (currentTab === "shorts") { document.getElementById("shortsBackBtn")?.click(); return; }
-  if (plOverlay && plOverlay.style.display === "flex") { document.getElementById("plPickerClose")?.click(); return; }
-  if (syncOverlay && syncOverlay.style.display === "flex") { document.getElementById("syncCloseBtn")?.click(); return; }
-  if (channelPageEl && channelPageEl.style.display !== "none") { document.getElementById("channelBackBtn")?.click(); return; }
-  if (playlistItemsView && playlistItemsView.style.display !== "none") { document.getElementById("playlistBackBtn")?.click(); return; }
-  if (searchPanelEl && searchPanelEl.style.display !== "none") { document.getElementById("searchBack")?.click(); return; }
-  // Medium player — checked last, since fullscreen (above) is layered on
-  // top of this same visible state and must be peeled back first.
-  if (playerSection && playerSection.style.display !== "none") { document.getElementById("closeMini")?.click(); return; }
-}
-// Seeds a clean initial entry per the spec's own guidance, so the very
-// first popstate the app ever sees (if the wearer backs out from the true
-// root) isn't landing on an entry this code itself never pushed.
-try { history.replaceState({ vtBack: false }, "", location.href); } catch(e) {}
-window.addEventListener("popstate", vtHandleBackGesture);
-
-function openKeyboard() {
-  searchPanelEl.style.display = "block"; keyboardEl.style.display = "block"; document.querySelector(".search-input-bar").style.display = "flex"; feedContainerFor(currentTab).style.display = "none";
-  // Focus lands on the actual text field first, not the on-screen keyboard —
-  // the field itself is what the on-glasses handwriting/voice composer opens
-  // on when pinched (standard <input type="text">, composer-eligible per
-  // Meta's Web Apps spec). Landing here first means a pinch tries the
-  // composer as the fast path; a swipe down reaches the existing on-screen
-  // keyboard immediately after, unchanged, as the fallback either way —
-  // older firmware, composer unavailable, or the wearer just prefers typing.
-  // .focus() alone never opens the composer itself (requires an actual
-  // user pinch), so this is purely about making the field reachable at all.
-  searchInput.focus();
-  vtPushBackable();
-}
+function openKeyboard() { searchPanelEl.style.display = "block"; keyboardEl.style.display = "block"; document.querySelector(".search-input-bar").style.display = "flex"; feedContainerFor(currentTab).style.display = "none"; }
 function closeKeyboard() { keyboardEl.style.display = "none"; searchPanelEl.style.display = "none"; suggestionsEl.style.display = "none"; feedContainerFor(currentTab).style.display = "grid"; }
 
 let _suggestGeneration = 0;
@@ -5894,15 +5790,6 @@ searchTabEl.addEventListener("click", openKeyboard);
 searchBack.addEventListener("click", closeKeyboard);
 searchGo.addEventListener("click", () => { const q = searchInput.value.trim() || "music"; triggerSearch(q); });
 searchInput.addEventListener("input", updateSuggestionsForInput);
-// Completes the loop with the keyboard's own ArrowUp handling added below —
-// swiping down from the field reaches the on-screen keyboard's first key,
-// swiping up from that same key returns here. Without this, the field was
-// a navigation dead end: nothing moved focus off it once landed there.
-searchInput.addEventListener("keydown", (e) => {
-  if (e.key !== "ArrowDown") return;
-  const firstKey = document.querySelector("#kbRow0 .key-btn");
-  if (firstKey) { e.preventDefault(); firstKey.focus(); }
-});
 // Keyboard wrap-around navigation — within same row only
 // P swipe right → Q (wraps to start of same row)
 // L swipe right → A (wraps to start of same row)
@@ -5911,20 +5798,9 @@ searchInput.addEventListener("keydown", (e) => {
 // A swipe left → L (wraps to end of same row)
 // Z swipe left → M (wraps to end of same row)
 document.getElementById("keyboard").addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
   const focused = document.activeElement;
   if (!focused || !focused.classList.contains("key-btn")) return;
-
-  // Row 0 (top row) swipe up → back to the search field, closing the loop
-  // with searchInput's own ArrowDown handling above. Every other row still
-  // falls through to whatever handles vertical movement between rows —
-  // unchanged, only row 0 gets this new case.
-  if (e.key === "ArrowUp" && focused.closest(".keyboard-row")?.id === "kbRow0") {
-    e.preventDefault();
-    searchInput.focus();
-    return;
-  }
-
-  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
 
   // Get the row this key belongs to
   const row = focused.closest(".keyboard-row");
@@ -6334,7 +6210,6 @@ const plPickerList = document.getElementById("plPickerList");
 const plPickerStatus = document.getElementById("plPickerStatus");
 function openPicker() {
   plOverlay.style.display="flex";
-  vtPushBackable();
   const list = document.getElementById("plPickerList");
   if (list) {
     list.scrollTop = 0;
@@ -6440,7 +6315,7 @@ const syncProgress = document.getElementById("syncProgress");
 const syncProgressFill = document.getElementById("syncProgressFill");
 const syncStartBtn = document.getElementById("syncStartBtn");
 const syncCloseBtn = document.getElementById("syncCloseBtn");
-syncBtn.onclick=function(){syncOverlay.style.display="flex";syncStatus.textContent="";syncProgressFill.style.width="0%";syncProgress.style.display="none";syncStartBtn.textContent="Start Sync";syncStartBtn.disabled=false;vtPushBackable();};
+syncBtn.onclick=function(){syncOverlay.style.display="flex";syncStatus.textContent="";syncProgressFill.style.width="0%";syncProgress.style.display="none";syncStartBtn.textContent="Start Sync";syncStartBtn.disabled=false;};
 
 async function runSubscriptionSync(isManual = false) {
   const token = await getValidToken();
@@ -8062,47 +7937,6 @@ function applyShortPlayerPatch(card, item) {
     }
   };
   _startupFetch();
-
-  // ── Offline mode: service worker registration ──
-  // Per Meta's Web Apps spec (Service Workers + Cache API), this precaches
-  // the app shell so it loads instantly even with zero connectivity,
-  // instead of showing a blank/broken page. Feature-detected and wrapped
-  // so registration failing (unsupported firmware, non-HTTPS local
-  // testing) never blocks or breaks anything else — the app already works
-  // fine without it, this only makes it more resilient when available.
-  // The actual caching logic lives in sw.js (a service worker must be its
-  // own file, can't be inline) — see that file for what is and isn't
-  // cached and why.
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").catch((e) => { /* not fatal — app works fine without offline support */ });
-  }
-
-  // ── Offline mode: online/offline UI indicator ──
-  // The spec explicitly warns against silently failing or showing broken
-  // content when offline — this is a persistent banner (matching the
-  // existing reAuthBanner pattern below) rather than a toast, since a
-  // toast disappears and a wearer could easily forget they're offline
-  // mid-browse. Purely a status display: doesn't block interaction, and
-  // whatever's already on screen (cached shell, any previously-loaded
-  // feed) stays fully usable underneath it.
-  let _offlineBanner = null;
-  function _updateOfflineBanner() {
-    if (!navigator.onLine) {
-      if (_offlineBanner) return;
-      _offlineBanner = document.createElement("div");
-      _offlineBanner.id = "offlineBanner";
-      _offlineBanner.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:999998;background:linear-gradient(135deg,rgba(80,90,110,0.95),rgba(30,34,48,0.95));color:#fff;padding:10px 16px;font-size:12px;font-weight:600;text-align:center;";
-      _offlineBanner.textContent = "📡 Offline — showing what's already loaded";
-      document.body.appendChild(_offlineBanner);
-    } else if (_offlineBanner) {
-      _offlineBanner.remove();
-      _offlineBanner = null;
-      showHUD("Back online");
-    }
-  }
-  window.addEventListener("online", _updateOfflineBanner);
-  window.addEventListener("offline", _updateOfflineBanner);
-  _updateOfflineBanner(); // catch the case where the app was already opened offline
 
   // Clear & Rebuild is manual-only now — silentSync() (below, its own
   // 2-hour gate) already handles ongoing automatic profile maintenance,
