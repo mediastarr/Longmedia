@@ -4505,7 +4505,18 @@ async function openShortsTabSetup() {
   let data = { items: [] };
   const pool = [];
   let persistentSeenIds = new Set();
-  try { persistentSeenIds = new Set(JSON.parse(localStorage.getItem("shortsSeenHistory") || "[]")); } catch(e) {}
+  // Only the most recent slice feeds this "don't offer me this again right
+  // now" filter. shortsSeenHistory itself holds up to 3000 entries — correct
+  // for its other job as a durable seen-videos backup — but reading that
+  // full list here too meant this filter rejected against thousands of
+  // historically-seen ids instead of just recent ones, which could exhaust
+  // an entire small candidate pool (~40-70 items from a handful of queries)
+  // down to nothing, producing an empty/stuck Shorts tab even when plenty
+  // of genuinely fresh shorts exist.
+  try {
+    const fullHistory = JSON.parse(localStorage.getItem("shortsSeenHistory") || "[]");
+    persistentSeenIds = new Set(fullHistory.slice(0, 150)); // newest-first, so this is genuinely the most recent 150
+  } catch(e) {}
   function isNew(id) { return !persistentSeenIds.has(id) && !shortsSeenIds.has(id); }
 
   // Try the server-side pool-building path first — one request instead of
@@ -4514,7 +4525,13 @@ async function openShortsTabSetup() {
   // out, or comes back thin.
   let usedServerPool = false;
   try {
-    const seenArr = [...new Set([...persistentSeenIds, ...shortsSeenIds])].slice(-300);
+    // shortsSeenIds (this session's current batch) first — smallest, most
+    // certain set — followed by the recent-sliced persistentSeenIds, capped
+    // at 300 total. Previously this combined the FULL history with
+    // shortsSeenIds before slicing the last 300 — since the full history is
+    // newest-first, slicing from the end actually grabbed mostly its OLDEST
+    // entries instead of its most recent ones.
+    const seenArr = [...new Set([...shortsSeenIds, ...persistentSeenIds])].slice(0, 300);
     const res = await fetchWithTimeout(HUB_WORKER_URL + "/buildShortsPool", {
       method: "POST",
       headers: workerHeaders({ "Content-Type": "application/json" }),
