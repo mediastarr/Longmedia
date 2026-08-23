@@ -2043,45 +2043,6 @@ backBtn.addEventListener("click", () => {
   showHUD("Mini-player");
 });
 
-// Bridges the topbar row (Theme/Sync/Mini) down into the player controls
-// when a video is open — previously missing entirely, so swipe/arrow
-// navigation could reach Mini and then had nowhere further to go, even
-// though the player's own X↔play/pause chain (below) already existed.
-// Only actually moves focus when there's a player to move focus into —
-// otherwise ArrowDown here does nothing, same as any other unhandled key.
-themeToggle.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowDown" && playerSection.style.display !== "none") {
-    e.preventDefault();
-    closeMini.focus();
-  }
-});
-// syncBtn itself isn't declared as a const until much later in the script
-// (in the Sync-from-YouTube section) — referencing that binding here would
-// throw (temporal dead zone), which previously halted the entire script at
-// this exact point and silently killed init() further down, leaving the
-// boot splash on screen forever with no visible error. A direct element
-// lookup has no such ordering requirement.
-document.getElementById("syncBtn").addEventListener("keydown", (e) => {
-  if (e.key === "ArrowDown" && playerSection.style.display !== "none") {
-    e.preventDefault();
-    closeMini.focus();
-  }
-});
-backBtn.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowDown" && playerSection.style.display !== "none") {
-    e.preventDefault();
-    closeMini.focus();
-  }
-});
-// Reverse direction — from the player's own top control (X) back up to
-// the topbar, completing the cycle in both directions.
-closeMini.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowUp") {
-    e.preventDefault();
-    backBtn.focus();
-  }
-});
-
 // When focus is on closeMini (X) and user swipes down → go to play button
 closeMini.addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown" || e.key === "Tab") {
@@ -2091,16 +2052,6 @@ closeMini.addEventListener("keydown", (e) => {
 });
 
 closeMini.addEventListener("click", () => {
-  // Reset the back-gesture history flag the moment this state is closed
-  // through its own explicit close action, not just via the gesture's own
-  // popstate handler — otherwise a video closed this way (tap, not
-  // gesture) leaves the flag permanently marked "already pushed," so the
-  // NEXT video open silently skips pushing its own entry (guarded against
-  // double-pushing), leaving nothing for a subsequent gesture-triggered
-  // native back-navigation to pop. This is exactly the kind of gap that
-  // can make a gesture fail unpredictably depending on how the previous
-  // session's player happened to get closed.
-  vtBackHistoryPushed = false;
   // Save resume position before closing
   if (ytPlayer && currentVideoId) {
     try { const t = ytPlayer.getCurrentTime(); const dur = ytPlayer.getDuration(); if (t > 5 && dur > 0 && t < dur - 10) saveResumePosition(currentVideoId, t); else if (t >= dur - 10) clearResumePosition(currentVideoId); } catch(e) {}
@@ -2230,21 +2181,6 @@ setInterval(() => {
     // could never match anything and made the whole fix a no-op.
     const frameEl = document.getElementById("playerFrame");
     if (frameEl && activeEl === frameEl) {
-      const sink = document.getElementById("yt-focus-sink");
-      if (sink) sink.focus({ preventScroll: true });
-    }
-  }
-  // Same protection for the Shorts iframe — the swipe-zone overlay on top
-  // of it stops it from stealing TOUCH events, but a cross-origin iframe
-  // can still grab keyboard focus purely from navigating to new content
-  // (loading a fresh video), independent of any touch-event capturing.
-  // That's a genuine risk on the very first Short opened after a cold app
-  // boot specifically — later shorts swap videos via shortsIframe.src
-  // assignment, a real navigation each time too, so this stays a
-  // continuous check rather than a one-time reclaim.
-  if (currentTab === "shorts") {
-    const shortsFrameEl = document.getElementById("shortsIframe");
-    if (shortsFrameEl && document.activeElement === shortsFrameEl) {
       const sink = document.getElementById("yt-focus-sink");
       if (sink) sink.focus({ preventScroll: true });
     }
@@ -3251,34 +3187,7 @@ playPauseBtn.addEventListener("keydown", (e) => {
     e.preventDefault();
     closeMini.focus();
   }
-  // Continues the same downward chain (topbar → X → play/pause) on into
-  // the video info panel's Like button, below the medium player — only
-  // when that panel is actually visible (i.e., medium view, not
-  // fullscreen or mini, where it's hidden and there'd be nothing to focus).
-  if (e.key === "ArrowDown") {
-    const vip = document.getElementById("videoInfoPanel");
-    const likeBtn = document.getElementById("vipLikeBtn");
-    if (vip && vip.style.display !== "none" && likeBtn) {
-      e.preventDefault();
-      likeBtn.focus();
-    }
-  }
 });
-
-// Reverse hop back up out of the info panel — wired once here at page
-// load rather than inside loadVideoInfoPanel(), which reassigns this
-// button's onclick fresh on every single video open; an addEventListener
-// added there would silently stack up a duplicate keydown listener per
-// video watched in a session instead of staying at exactly one.
-const _vipLikeBtnEl = document.getElementById("vipLikeBtn");
-if (_vipLikeBtnEl) {
-  _vipLikeBtnEl.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      playPauseBtn.focus();
-    }
-  });
-}
 
 playPauseBtn.addEventListener("click", () => {
   if (!ytPlayer) return;
@@ -3750,7 +3659,6 @@ async function openAsShort(videoId, snippet) {
       const newBack = backBtn2.cloneNode(true);
       backBtn2.parentNode.replaceChild(newBack, backBtn2);
       newBack.addEventListener("click", () => {
-        vtBackHistoryPushed = false;
         if (typeof _recordShortsWatchTime === "function") _recordShortsWatchTime();
         const iframe = document.getElementById("shortsIframe");
         if (iframe) iframe.src = "about:blank";
@@ -4275,12 +4183,6 @@ async function openShortsTabSetup() {
   // Wire back button immediately before any async work — restores the
   // topbar/tabs hidden above, so leaving Shorts returns the app to normal.
   backBtn2.addEventListener("click", () => {
-    // Same reasoning as closeMini's own reset — without this, closing
-    // Shorts via the on-screen button (not the gesture) leaves the flag
-    // stuck "already pushed," so the next back-able state opened silently
-    // skips pushing its own entry, leaving nothing for a later
-    // gesture-triggered native back-navigation to pop.
-    vtBackHistoryPushed = false;
     _recordShortsWatchTime();
     shortsIframe.src = "about:blank";
     if (!document.getElementById("scrollSentinel")) {
@@ -8491,23 +8393,7 @@ function applyShortPlayerPatch(card, item) {
   // snapshot — the actual, confirmed cause of an already-watched video
   // reappearing as new, regardless of which function's fault it seemed to
   // be individually. Serializing them removes the overlap window entirely.
-  //
-  // Extracted into a standalone, reusable function (was previously an
-  // inline IIFE run only here) — see the periodic call to this same
-  // function further down, which is the actual fix for new uploads
-  // silently going quiet over a long, never-restarted session. The
-  // continuous mechanisms (WebSocket push, the 10-15s KV poll) are what's
-  // supposed to keep this current without needing a restart, but a long
-  // session gives more surface for any one of them to silently degrade
-  // (a dropped WebSocket connection that never fires its own close event
-  // is a known real possibility over flaky WiFi) — and the fact that only
-  // a full Clear & Rebuild, whose own "catching up" step is functionally
-  // this same broad sweep, could bring new uploads back mid-session
-  // pointed straight at this: the continuous incremental mechanisms had
-  // gone quiet, but a fresh, one-shot full sweep like this one never
-  // depended on any of them having stayed alive.
-  async function _broadSubUploadsSweep() {
-    if (window._manualSyncInProgress) return;
+  await (async function _startupBroadSubCheck() {
     try {
       const allSubIds = JSON.parse(localStorage.getItem("subscribedChannelIds") || "[]");
       if (!allSubIds.length) return;
@@ -8544,15 +8430,7 @@ function applyShortPlayerPatch(card, item) {
       if (!found.length) return;
       _mergeIntoHubNewVideos(found);
     } catch(e) {}
-  }
-  await _broadSubUploadsSweep();
-  // Safety net for long, never-restarted sessions — re-runs the exact same
-  // broad sweep every 45 minutes for as long as the app stays open, so new
-  // uploads can't stay silently missed for the rest of a session just
-  // because the WebSocket or the faster incremental poll happened to go
-  // quiet at some point. Never runs while the page is hidden/backgrounded,
-  // matching the same guard already used for live-stream checks.
-  setInterval(() => { if (!document.hidden) _broadSubUploadsSweep(); }, 45 * 60 * 1000);
+  })();
 
   _startPolling();
 
