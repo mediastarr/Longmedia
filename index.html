@@ -4671,7 +4671,20 @@ async function openShortsTabSetup() {
   const genericQ = SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length]; shortQIdx++;
   const topCatsForShorts = getTopCategories(2);
   const allCatsForShorts = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
-  const catToSearch = topCatsForShorts.length ? topCatsForShorts[0] : allCatsForShorts[Math.floor(Math.random()*allCatsForShorts.length)];
+  // Several categories, not one — this is the ONLY source in this whole
+  // gathering pass that doesn't touch search.list at all (chart=mostPopular
+  // via videos.list), so it's what's actually left once the shared daily
+  // search quota (95/day, spent across every tab in the app, not just
+  // Shorts) runs out. A single random category coming back thin or empty
+  // — genuinely common for some category/region pairs, since most
+  // mostPopular results in a given category simply aren't Shorts-length —
+  // previously meant this source contributed nothing at all on that draw,
+  // with no other quota-independent source to fall back to.
+  const catsToSearch = [...new Set([
+    ...topCatsForShorts,
+    allCatsForShorts[Math.floor(Math.random()*allCatsForShorts.length)],
+    allCatsForShorts[Math.floor(Math.random()*allCatsForShorts.length)]
+  ])].slice(0, 4);
   const viralQueries = ["shorts viral 2024","shorts trending now","shorts funny viral","shorts satisfying trending","shorts amazing moments"];
   const viralQ = viralQueries[Math.floor(Math.random()*viralQueries.length)];
 
@@ -4721,13 +4734,20 @@ async function openShortsTabSetup() {
   // support videoDuration at all (that's search.list-only), so this
   // source needs its own genuine, client-side verification using the
   // real contentDetails.duration each item includes, rather than a
-  // parameter YouTube silently ignores.
+  // parameter YouTube silently ignores. Fired across several categories
+  // in parallel (see catsToSearch above) — the one source that keeps
+  // working with zero search-quota cost at all.
   try {
-    const catPop = await fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:catToSearch,maxResults:20,_:Date.now()});
-    (catPop.items||[]).forEach(v => {
-      const id=v.id?.videoId||v.id;
-      const secs = v.contentDetails?._durationSeconds ?? parseDuration(v.contentDetails?.duration);
-      if (id && isNew(id) && secs!==null && secs>0 && secs<=180) pool.push({id,snippet:v.snippet});
+    const catResults = await Promise.allSettled(catsToSearch.map(cat =>
+      fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:cat,maxResults:20,_:Date.now()})
+    ));
+    catResults.forEach(r => {
+      if (r.status !== "fulfilled") return;
+      (r.value.items||[]).forEach(v => {
+        const id=v.id?.videoId||v.id;
+        const secs = v.contentDetails?._durationSeconds ?? parseDuration(v.contentDetails?.duration);
+        if (id && isNew(id) && secs!==null && secs>0 && secs<=180) pool.push({id,snippet:v.snippet});
+      });
     });
   } catch(e) {}
   // Genuine 9:16 aspect-ratio verification via oEmbed — every source above
@@ -4785,7 +4805,18 @@ async function openShortsTabSetup() {
   if (data.nextPageToken) shortsNextPageToken=data.nextPageToken;
   else { const seed=await fetchYouTube("search",{part:"snippet",q:SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length],type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:userRegion,maxResults:1,_:Date.now()}); shortsNextPageToken=seed.nextPageToken||"seed"; }
 
-  if (!shortsItems.length) { shortsCounter.textContent="No shorts — tap Back"; return; }
+  if (!shortsItems.length) {
+    // Distinguish the actual cause rather than a generic message — the
+    // most common real cause is the shared daily search quota (spent
+    // across every tab in the app, not just Shorts) running out, which
+    // the retry loop above can't fix since it's not a transient failure.
+    // sessionStorage._searchQuotaExhaustedToday is set the moment ANY
+    // request this session — from any tab — first hits that exhaustion.
+    let quotaExhausted = false;
+    try { quotaExhausted = sessionStorage.getItem("_searchQuotaExhaustedToday") === "1"; } catch(e) {}
+    shortsCounter.textContent = quotaExhausted ? "Search limit reached today — tap Back" : "No shorts — tap Back";
+    return;
+  }
 
   const EMBED = id => `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=1&enablejsapi=1&origin=${location.origin}`;
   
