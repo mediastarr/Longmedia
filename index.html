@@ -1148,6 +1148,18 @@ const playlistBackBtn = document.getElementById("playlistBackBtn");
 const playlistItemsTitle = document.getElementById("playlistItemsTitle");
 const playlistItemsList = document.getElementById("playlistItemsList");
 
+// Establish real DOM focus on the topbar the instant this script runs —
+// synchronously, not gated on any timer or async work. On this hardware,
+// swipe navigation only works through actual DOM focus + keydown
+// listeners (there's no native "move focus" behavior it can fall back
+// on), so if nothing has ever truly been focused, every swipe listener
+// below silently does nothing. Previously this only ran inside the
+// 1400ms boot-splash-dismiss timeout, which is too late if the page
+// paints from cache faster than that (a real, common case) — a swipe
+// attempted before that timeout fires would find nothing focused yet.
+// Doing it here, before any other code runs, removes that race entirely.
+themeToggle.focus({ preventScroll: true });
+
 function showHUD(text) {
   hudEl.textContent = text; hudEl.style.opacity = 1;
   setTimeout(() => (hudEl.style.opacity = 0), 1200);
@@ -8134,18 +8146,6 @@ function applyShortPlayerPatch(card, item) {
   const splashTimeout = setTimeout(() => {
     const splash = document.getElementById("bootSplash");
     if (splash) { splash.classList.add("fade-out"); setTimeout(() => splash.remove(), 800); }
-    // Establish real DOM focus on the topbar the moment the app becomes
-    // usable — without this, whatever "Theme is selected" the hardware
-    // shows at cold boot is only a native visual highlight, not actual
-    // focus. Swipe-down is implemented here purely via keydown listeners
-    // on specific elements (there's no reliable native "move focus down"
-    // behavior to lean on), so if nothing has ever truly been focused,
-    // those listeners never fire — the swipe silently does nothing. This
-    // matches the observed pattern where swipe-down only starts working
-    // after the medium player has been opened and closed once, since
-    // opening the player is the first time anything in the app actually
-    // calls .focus() on a real element.
-    themeToggle.focus({ preventScroll: true });
   }, 1400);
 
   // Global error catch — prevents stuck boot screen
