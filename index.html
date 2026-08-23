@@ -2160,6 +2160,31 @@ setInterval(() => {
   if (!isFullscreen && isCinema) disableCinemaMode();
   if (!isFullscreen && isFSBody) document.body.classList.remove("fullscreen-active");
   if (isFullscreen && isBlank) { playerSection.classList.remove("player-fullscreen"); document.body.classList.remove("fullscreen-active"); disableCinemaMode(); }
+  // Keep the pinch-back gesture reaching the document-level keydown
+  // listener while the medium/mini player is open — a cross-origin
+  // iframe that currently holds DOM focus receives keydown events in its
+  // own content window, never bubbling up to this page's listener at
+  // all, regardless of what the gesture actually sends. setPlayerVideo()
+  // already reclaims focus once, 600ms after a video starts, but the
+  // player can silently re-grab it afterward (buffering, an ad, tapping
+  // the video). This is the same fix applied continuously instead of
+  // once, scoped to exactly when it matters.
+  if (!isHidden && !isFullscreen) {
+    const activeEl = document.activeElement;
+    // The correct target here is #playerFrame ITSELF, not a descendant of
+    // it — YouTube's IFrame API replaces that div with an <iframe> that
+    // keeps the same id (confirmed by the getElementById("playerFrame")
+    // checks elsewhere in this file, which exist specifically to detect
+    // when it's missing and needs recreating — that only makes sense if
+    // the id normally survives creation). The previous version of this
+    // check queried "#playerFrame iframe" (a descendant selector), which
+    // could never match anything and made the whole fix a no-op.
+    const frameEl = document.getElementById("playerFrame");
+    if (frameEl && activeEl === frameEl) {
+      const sink = document.getElementById("yt-focus-sink");
+      if (sink) sink.focus({ preventScroll: true });
+    }
+  }
 }, 150);
 
 document.addEventListener("keydown", (e) => {
@@ -2285,6 +2310,21 @@ function vtHandleBackGesture() {
 // opens (see vtPushBackHistory() call sites throughout); popstate below
 // runs the exact same dispatcher, so this converges on identical behavior
 // to the keydown path above rather than needing its own separate logic.
+//
+// Browsers automatically save/restore scroll position per history entry
+// by default (history.scrollRestoration === "auto") — when popstate fires
+// from a native back gesture, the browser can silently jump scroll to
+// whatever it recorded for the entry being restored to (typically 0, from
+// the very first history entry at page load) around the same moment our
+// own showUIWithMiniPlayer()/closeMini restore savedScrollY, and the
+// native one can win the race. This is exactly why gesture-triggered
+// closes were landing at the top of the page while tapping the same
+// on-screen close button correctly returned to the saved position — both
+// call the identical close handler, but only the gesture path goes
+// through a popstate a browser might apply its own scroll restoration on
+// top of. Disabling it here makes scroll position entirely our own JS's
+// responsibility, with nothing native left to race against.
+try { history.scrollRestoration = "manual"; } catch(e) {}
 let vtBackHistoryPushed = false;
 function vtPushBackHistory() {
   if (vtBackHistoryPushed) return; // already have an entry to pop — layering multiple states on top of each other (e.g. opening the playlist picker while the player is open) still only ever needs one to go "back" from at a time
@@ -3134,7 +3174,10 @@ async function loadVideoInfoPanel(videoId, snippet) {
 
 }
 function postToPlayer(cmd) {
-  const frame = document.querySelector("#playerFrame iframe");
+  // #playerFrame is itself the iframe once created (see the fix note
+  // above near the periodic focus-reclaim check) — not a wrapper around
+  // one — so this needs a direct id lookup, not a descendant selector.
+  const frame = document.getElementById("playerFrame");
   if (frame && frame.contentWindow) frame.contentWindow.postMessage(JSON.stringify(cmd), "*");
 }
 
@@ -4652,7 +4695,20 @@ async function openShortsTabSetup() {
   const genericQ = SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length]; shortQIdx++;
   const topCatsForShorts = getTopCategories(2);
   const allCatsForShorts = ["0","1","2","10","15","17","20","22","23","24","25","26","28"];
-  const catToSearch = topCatsForShorts.length ? topCatsForShorts[0] : allCatsForShorts[Math.floor(Math.random()*allCatsForShorts.length)];
+  // Several categories, not one — this is the ONLY source in this whole
+  // gathering pass that doesn't touch search.list at all (chart=mostPopular
+  // via videos.list), so it's what's actually left once the shared daily
+  // search quota (95/day, spent across every tab in the app, not just
+  // Shorts) runs out. A single random category coming back thin or empty
+  // — genuinely common for some category/region pairs, since most
+  // mostPopular results in a given category simply aren't Shorts-length —
+  // previously meant this source contributed nothing at all on that draw,
+  // with no other quota-independent source to fall back to.
+  const catsToSearch = [...new Set([
+    ...topCatsForShorts,
+    allCatsForShorts[Math.floor(Math.random()*allCatsForShorts.length)],
+    allCatsForShorts[Math.floor(Math.random()*allCatsForShorts.length)]
+  ])].slice(0, 4);
   const viralQueries = ["shorts viral 2024","shorts trending now","shorts funny viral","shorts satisfying trending","shorts amazing moments"];
   const viralQ = viralQueries[Math.floor(Math.random()*viralQueries.length)];
 
@@ -4702,13 +4758,20 @@ async function openShortsTabSetup() {
   // support videoDuration at all (that's search.list-only), so this
   // source needs its own genuine, client-side verification using the
   // real contentDetails.duration each item includes, rather than a
-  // parameter YouTube silently ignores.
+  // parameter YouTube silently ignores. Fired across several categories
+  // in parallel (see catsToSearch above) — the one source that keeps
+  // working with zero search-quota cost at all.
   try {
-    const catPop = await fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:catToSearch,maxResults:20,_:Date.now()});
-    (catPop.items||[]).forEach(v => {
-      const id=v.id?.videoId||v.id;
-      const secs = v.contentDetails?._durationSeconds ?? parseDuration(v.contentDetails?.duration);
-      if (id && isNew(id) && secs!==null && secs>0 && secs<=180) pool.push({id,snippet:v.snippet});
+    const catResults = await Promise.allSettled(catsToSearch.map(cat =>
+      fetchYouTube("videos",{part:"snippet,statistics,contentDetails",chart:"mostPopular",regionCode:userRegion,videoCategoryId:cat,maxResults:20,_:Date.now()})
+    ));
+    catResults.forEach(r => {
+      if (r.status !== "fulfilled") return;
+      (r.value.items||[]).forEach(v => {
+        const id=v.id?.videoId||v.id;
+        const secs = v.contentDetails?._durationSeconds ?? parseDuration(v.contentDetails?.duration);
+        if (id && isNew(id) && secs!==null && secs>0 && secs<=180) pool.push({id,snippet:v.snippet});
+      });
     });
   } catch(e) {}
   // Genuine 9:16 aspect-ratio verification via oEmbed — every source above
@@ -4766,7 +4829,18 @@ async function openShortsTabSetup() {
   if (data.nextPageToken) shortsNextPageToken=data.nextPageToken;
   else { const seed=await fetchYouTube("search",{part:"snippet",q:SHORT_QUERIES[shortQIdx%SHORT_QUERIES.length],type:"video",videoDuration:"short",videoEmbeddable:"true",regionCode:userRegion,maxResults:1,_:Date.now()}); shortsNextPageToken=seed.nextPageToken||"seed"; }
 
-  if (!shortsItems.length) { shortsCounter.textContent="No shorts — tap Back"; return; }
+  if (!shortsItems.length) {
+    // Distinguish the actual cause rather than a generic message — the
+    // most common real cause is the shared daily search quota (spent
+    // across every tab in the app, not just Shorts) running out, which
+    // the retry loop above can't fix since it's not a transient failure.
+    // sessionStorage._searchQuotaExhaustedToday is set the moment ANY
+    // request this session — from any tab — first hits that exhaustion.
+    let quotaExhausted = false;
+    try { quotaExhausted = sessionStorage.getItem("_searchQuotaExhaustedToday") === "1"; } catch(e) {}
+    shortsCounter.textContent = quotaExhausted ? "Search limit reached today — tap Back" : "No shorts — tap Back";
+    return;
+  }
 
   const EMBED = id => `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=1&enablejsapi=1&origin=${location.origin}`;
   
@@ -7170,15 +7244,47 @@ async function _injectHubVideos(hubVideos) {
 /* ── Genuine instant push via WebSocket ── */
 let _notifWs = null;
 let _notifWsReconnectAttempt = 0;
+// Heartbeat — periodically pings the Worker's Durable Object and expects a
+// pong back. Without this, a connection that dies silently over flaky
+// glasses WiFi (a NAT/proxy dropping it without ever sending a clean close
+// frame — a genuine, common failure mode) leaves the browser's WebSocket
+// object reporting readyState OPEN indefinitely: no onclose ever fires, so
+// the existing reconnect logic below never triggers, and pushes for new
+// subscription uploads just silently vanish with no visible error. This
+// makes that failure detectable and self-healing instead of permanent
+// until the next full app restart.
+let _notifPingInterval = null;
+let _notifLastPongAt = 0;
+const NOTIF_PING_INTERVAL_MS = 20000;
+const NOTIF_PONG_TIMEOUT_MS = 50000; // tolerates one missed ping before declaring the connection dead
+function _stopNotifHeartbeat() {
+  if (_notifPingInterval) { clearInterval(_notifPingInterval); _notifPingInterval = null; }
+}
+function _startNotifHeartbeat(ws) {
+  _stopNotifHeartbeat();
+  _notifLastPongAt = Date.now();
+  _notifPingInterval = setInterval(() => {
+    if (_notifWs !== ws || ws.readyState !== WebSocket.OPEN) { _stopNotifHeartbeat(); return; }
+    if (Date.now() - _notifLastPongAt > NOTIF_PONG_TIMEOUT_MS) {
+      // No pong in too long — the connection is silently dead. Force it
+      // closed so the existing onclose → reconnect logic takes over,
+      // rather than leaving this pinging a corpse indefinitely.
+      try { ws.close(); } catch(e) {}
+      return;
+    }
+    try { ws.send(JSON.stringify({ type: "ping" })); } catch(e) {}
+  }, NOTIF_PING_INTERVAL_MS);
+}
 function _connectNotificationWebSocket() {
   try {
     const wsUrl = HUB_WORKER_URL.replace(/^https:/, "wss:") + "/ws?user=" + encodeURIComponent(getViewTubeUserId()) + "&secret=" + encodeURIComponent(HUB_SECRET) + "&device=" + encodeURIComponent(getViewTubeDeviceId());
     const ws = new WebSocket(wsUrl);
     _notifWs = ws;
-    ws.onopen = () => { _notifWsReconnectAttempt = 0; };
+    ws.onopen = () => { _notifWsReconnectAttempt = 0; _startNotifHeartbeat(ws); };
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
+        if (msg.type === "pong") { _notifLastPongAt = Date.now(); return; }
         const toItems = (videos) => (videos || []).map(v => ({
           videoId: v.videoId, channelId: v.channelId || "", title: v.title || "",
           publishedAt: v.publishedAt || "", receivedAt: v.receivedAt || Date.now(), source: "subscription"
@@ -7228,6 +7334,7 @@ function _connectNotificationWebSocket() {
       } catch(e) {}
     };
     ws.onclose = () => {
+      _stopNotifHeartbeat();
       if (_notifWs !== ws) return; // superseded by a newer connection attempt
       // Capped exponential backoff — a flaky glasses network shouldn't
       // mean either giving up on push entirely or hammering the Worker
@@ -8319,7 +8426,19 @@ function applyShortPlayerPatch(card, item) {
   // snapshot — the actual, confirmed cause of an already-watched video
   // reappearing as new, regardless of which function's fault it seemed to
   // be individually. Serializing them removes the overlap window entirely.
-  await (async function _startupBroadSubCheck() {
+  // Named (not an anonymous IIFE) so the same sweep can also be re-run
+  // periodically below — this is the actual fix for new uploads silently
+  // going quiet over a long, never-restarted session, and for making sure
+  // freshly-uploaded videos surface as red-highlighted as soon as
+  // possible rather than only on the next full app restart. The
+  // continuous mechanisms (WebSocket push, the 10-15s KV poll) are what's
+  // supposed to keep this current without needing a restart, but a long
+  // session gives more surface for either to silently degrade (a dropped
+  // WebSocket connection that never fires its own close event is a known
+  // real possibility over flaky WiFi) — a fresh, one-shot broad sweep
+  // like this never depends on either having stayed alive.
+  async function _broadSubUploadsSweep() {
+    if (window._manualSyncInProgress) return;
     try {
       const allSubIds = JSON.parse(localStorage.getItem("subscribedChannelIds") || "[]");
       if (!allSubIds.length) return;
@@ -8356,7 +8475,17 @@ function applyShortPlayerPatch(card, item) {
       if (!found.length) return;
       _mergeIntoHubNewVideos(found);
     } catch(e) {}
-  })();
+  }
+  await _broadSubUploadsSweep();
+  // Safety net for long, never-restarted sessions — re-runs the exact same
+  // broad sweep every 5 minutes for as long as the app stays open, so a
+  // freshly-uploaded video surfaces as red-highlighted as close to the
+  // moment it's actually posted as this polling-based approach allows,
+  // rather than waiting on the next app restart or the slower rotation in
+  // the regular background poll to happen to reach that channel. Never
+  // runs while the page is hidden/backgrounded, matching the same guard
+  // already used for live-stream checks.
+  setInterval(() => { if (!document.hidden) _broadSubUploadsSweep(); }, 5 * 60 * 1000);
 
   _startPolling();
 
