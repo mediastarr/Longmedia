@@ -7567,6 +7567,20 @@ function _renderDescription(desc) {
       textEl.style.cssText = expanded ? "" : "display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;";
       toggleBtn.textContent = expanded ? "Show less" : "Show more";
     };
+    // Without an explicit handler here, swipe-up from this button falls
+    // through to whatever this hardware's own default navigation does —
+    // which, with nothing to anchor it, was jumping down to the first Up
+    // Next card instead of continuing up toward the player. This button
+    // sits above the channel/action-button rows in the panel (inserted
+    // right after the stats line), so "up" from here should reach back
+    // toward the player controls, not toward content further down the
+    // page — wiring it directly to playPauseBtn is what makes that work.
+    toggleBtn.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        playPauseBtn.focus();
+      }
+    });
     el.appendChild(toggleBtn);
   }
 }
