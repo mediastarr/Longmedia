@@ -2055,7 +2055,13 @@ themeToggle.addEventListener("keydown", (e) => {
     closeMini.focus();
   }
 });
-syncBtn.addEventListener("keydown", (e) => {
+// syncBtn itself isn't declared as a const until much later in the script
+// (in the Sync-from-YouTube section) — referencing that binding here would
+// throw (temporal dead zone), which previously halted the entire script at
+// this exact point and silently killed init() further down, leaving the
+// boot splash on screen forever with no visible error. A direct element
+// lookup has no such ordering requirement.
+document.getElementById("syncBtn").addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown" && playerSection.style.display !== "none") {
     e.preventDefault();
     closeMini.focus();
