@@ -2181,8 +2181,15 @@ setInterval(() => {
     // could never match anything and made the whole fix a no-op.
     const frameEl = document.getElementById("playerFrame");
     if (frameEl && activeEl === frameEl) {
-      const sink = document.getElementById("yt-focus-sink");
-      if (sink) sink.focus({ preventScroll: true });
+      // Focus the X (close) button, not the invisible #yt-focus-sink —
+      // the sink has no keydown listeners at all, so reclaiming focus
+      // onto it silently kills swipe navigation the instant this fires
+      // (the actual cause of "can't swipe down to X after a video
+      // opens": this interval runs every 150ms and re-grabs focus from
+      // the iframe constantly during normal playback). closeMini already
+      // has its own working ArrowUp/ArrowDown handlers, so landing here
+      // both reclaims focus from the iframe AND keeps navigation usable.
+      closeMini.focus({ preventScroll: true });
     }
   }
 }, 150);
@@ -2661,10 +2668,15 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   else { pendingVideoId = videoId; pendingStartSeconds = resumeAt; }
 
   // Reclaim keyboard/D-pad focus after the YouTube iframe loads —
-  // prevents Neural Band input from being trapped inside the cross-origin player
+  // prevents Neural Band input from being trapped inside the cross-origin
+  // player. Focuses the X (close) button, not the invisible
+  // #yt-focus-sink — the sink has no keydown listeners, so landing there
+  // silently kills swipe navigation the moment a video opens (the actual
+  // cause of "can't swipe down to X on the medium player"). closeMini
+  // already has working ArrowUp/ArrowDown handlers, so this both reclaims
+  // focus from the iframe and leaves navigation usable right away.
   setTimeout(() => {
-    const sink = document.getElementById("yt-focus-sink");
-    if (sink) sink.focus({ preventScroll: true });
+    closeMini.focus({ preventScroll: true });
   }, 600);
   saveToHistory({ id: videoId, snippet });
   // Show info panel below medium player
