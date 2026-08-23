@@ -4587,7 +4587,17 @@ async function openShortsTabSetup() {
   function isNew(id) { return !persistentSeenIds.has(id) && !shortsSeenIds.has(id); }
 
   let data = { items: [] };
-  const pool = [];
+  let pool = [];
+  // Retry once on a genuinely empty pool — a cold-start timeout on the very
+  // first attempt (Worker instance, DNS/TLS, and the oEmbed verification
+  // step all cold) can legitimately come back empty even though nothing is
+  // actually broken; a second attempt right after reliably succeeds once
+  // things are warm. This is exactly what manually tapping Back and
+  // reopening Shorts was already doing — automating it here means that
+  // transient case never shows "No shorts" to begin with.
+  for (let attempt = 0; attempt < 2 && pool.length === 0; attempt++) {
+  data = { items: [] };
+  pool = [];
 
   // Try the server-side pool-building path first — one request instead of
   // the multiple parallel calls the block below makes from the glasses.
@@ -4711,22 +4721,21 @@ async function openShortsTabSetup() {
   // to YouTube. Bounded to a reasonable batch, and any failure/timeout
   // falls back to the unverified pool rather than ever emptying Shorts.
   try {
-    // Since the retry loop was removed (it doubled worst-case latency
-    // without reliably helping — a real regression reported after adding
-    // it), this is now the ONLY defense against a cold-start timeout, so
-    // it's tightened further: 16 items, 3s timeout, both meaningfully
-    // smaller than before.
-    const toVerify = pool.slice(0, 16).map(v => ({ id: v.id, snippet: v.snippet }));
+    // Capped at 24, not 50 — /verifyShorts itself only ever processes the
+    // first 25 candidates it's sent regardless, and a tighter batch also
+    // bounds the worst-case latency this adds to the overall Shorts-open
+    // flow, which matters most on a cold connection.
+    const toVerify = pool.slice(0, 24).map(v => ({ id: v.id, snippet: v.snippet }));
     if (toVerify.length) {
       const vres = await fetchWithTimeout(HUB_WORKER_URL + "/verifyShorts", {
         method: "POST",
         headers: workerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ candidates: toVerify })
-      }, 3000).then(r => r.json());
-      if (vres.items && vres.items.length >= Math.min(6, Math.ceil(toVerify.length * 0.3))) {
+      }, 5000).then(r => r.json());
+      if (vres.items && vres.items.length >= Math.min(8, Math.ceil(toVerify.length * 0.3))) {
         const verifiedIds = new Set(vres.items.map(v => v.id));
-        const rest = pool.slice(16);
-        const replaced = pool.slice(0, 16).filter(v => verifiedIds.has(v.id));
+        const rest = pool.slice(24);
+        const replaced = pool.slice(0, 24).filter(v => verifiedIds.has(v.id));
         pool.length = 0;
         pool.push(...replaced, ...rest);
       }
@@ -4736,6 +4745,7 @@ async function openShortsTabSetup() {
     }
   } catch(e) {}
   } // end of !usedServerPool fallback block
+  } // end of retry-once loop
 
     const seen=new Set();
   // If a video was pre-seeded (opened from home tab), keep it at front
