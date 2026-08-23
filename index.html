@@ -2050,6 +2050,46 @@ backBtn.addEventListener("click", () => {
   showHUD("Mini-player");
 });
 
+// Bridges the topbar row (Theme/Sync/Mini) down into the player controls
+// when a video is open — without this, swipe-down from the topbar has
+// nowhere to go once a video is playing, even though the player's own
+// X↔play/pause chain (below) already existed.
+//
+// syncBtn itself isn't declared as a const until much later in the script
+// (in the Sync-from-YouTube section, well below this point) — referencing
+// that binding here would throw (temporal dead zone) and halt the whole
+// script at this exact line, which is exactly what caused the boot-splash
+// hang the last time this was attempted. Using a direct element lookup
+// instead has no such ordering requirement, since the actual DOM element
+// already exists by the time this script runs (it's static HTML, parsed
+// before the closing </body> where this <script> tag sits).
+themeToggle.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown" && playerSection.style.display !== "none") {
+    e.preventDefault();
+    closeMini.focus();
+  }
+});
+document.getElementById("syncBtn").addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown" && playerSection.style.display !== "none") {
+    e.preventDefault();
+    closeMini.focus();
+  }
+});
+backBtn.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown" && playerSection.style.display !== "none") {
+    e.preventDefault();
+    closeMini.focus();
+  }
+});
+// Reverse direction — from the player's own top control (X) back up to
+// the topbar, completing the cycle in both directions.
+closeMini.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowUp") {
+    e.preventDefault();
+    backBtn.focus();
+  }
+});
+
 // When focus is on closeMini (X) and user swipes down → go to play button
 closeMini.addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown" || e.key === "Tab") {
@@ -3202,7 +3242,35 @@ playPauseBtn.addEventListener("keydown", (e) => {
     e.preventDefault();
     closeMini.focus();
   }
+  // Continues the same downward chain (topbar → X → play/pause) on into
+  // the video info panel's Like button, below the medium player — only
+  // when that panel is actually visible (medium view, not fullscreen or
+  // mini, where it's hidden and there'd be nothing to focus).
+  if (e.key === "ArrowDown") {
+    const vip = document.getElementById("videoInfoPanel");
+    const likeBtn = document.getElementById("vipLikeBtn");
+    if (vip && vip.style.display !== "none" && likeBtn) {
+      e.preventDefault();
+      likeBtn.focus();
+    }
+  }
 });
+
+// Reverse hop back up out of the info panel — wired once here at page
+// load, not inside loadVideoInfoPanel() (which reassigns this button's
+// onclick fresh on every video open — an addEventListener added there
+// would silently stack up a duplicate keydown listener per video watched
+// in a session). vipLikeBtn is static HTML, present before this script
+// tag runs, so a direct lookup here has no ordering concerns.
+const _vipLikeBtnEl = document.getElementById("vipLikeBtn");
+if (_vipLikeBtnEl) {
+  _vipLikeBtnEl.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      playPauseBtn.focus();
+    }
+  });
+}
 
 playPauseBtn.addEventListener("click", () => {
   if (!ytPlayer) return;
