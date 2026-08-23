@@ -2019,6 +2019,13 @@ function showUIWithMiniPlayer() {
   else if (currentTab === "playlists") playlistPageEl.style.display = "block";
   else feedContainerFor(currentTab).style.display = "grid";
   requestAnimationFrame(() => window.scrollTo({ top: savedScrollY, behavior: "instant" }));
+  // Defensive re-apply — on this hardware, closing the player can cause
+  // focus to land on the first focusable element on the page (the Theme
+  // button, top-left) shortly after this function runs, and a native
+  // focus-triggered scroll-into-view can silently override the restore
+  // above if it happens on a later tick. Catching that a beat later wins
+  // the race without needing to guess at exactly when or why it happens.
+  setTimeout(() => { if (window.scrollY !== savedScrollY) window.scrollTo({ top: savedScrollY, behavior: "instant" }); }, 120);
 }
 
 /* CHANGE: back button scrolls to the selected video card after exiting fullscreen */
@@ -2043,11 +2050,11 @@ backBtn.addEventListener("click", () => {
   showHUD("Mini-player");
 });
 
-// Bridges the topbar row (Theme/Sync/Mini) down into the player controls
-// when a video is open — without this, swipe/arrow navigation reaches
-// the topbar and has nowhere further to go, even though the player's own
-// X↔play/pause chain (below) already existed. Only actually moves focus
-// when there's a player to move focus into.
+// Bridges the topbar row (Theme/Sync/Mini) downward — into the player
+// controls when a video is open, or into the search/tabs row when it's
+// not. Previously this only handled the player case, so on a fresh app
+// open (no player yet) ArrowDown from the topbar had nowhere to go and
+// silently did nothing at all.
 //
 // syncBtn itself isn't declared as a const until much later in the script
 // (in the Sync-from-YouTube section, well below this point) — referencing
@@ -2057,24 +2064,14 @@ backBtn.addEventListener("click", () => {
 // instead has no such ordering requirement, since the actual DOM element
 // already exists by the time this script runs (it's static HTML, parsed
 // before the closing </body> where this <script> tag sits).
-themeToggle.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowDown" && playerSection.style.display !== "none") {
-    e.preventDefault();
-    closeMini.focus();
-  }
-});
-document.getElementById("syncBtn").addEventListener("keydown", (e) => {
-  if (e.key === "ArrowDown" && playerSection.style.display !== "none") {
-    e.preventDefault();
-    closeMini.focus();
-  }
-});
-backBtn.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowDown" && playerSection.style.display !== "none") {
-    e.preventDefault();
-    closeMini.focus();
-  }
-});
+function vtTopbarArrowDown(e) {
+  e.preventDefault();
+  if (playerSection.style.display !== "none") { closeMini.focus(); return; }
+  document.querySelector(".search-open-btn")?.focus();
+}
+themeToggle.addEventListener("keydown", (e) => { if (e.key === "ArrowDown") vtTopbarArrowDown(e); });
+document.getElementById("syncBtn").addEventListener("keydown", (e) => { if (e.key === "ArrowDown") vtTopbarArrowDown(e); });
+backBtn.addEventListener("keydown", (e) => { if (e.key === "ArrowDown") vtTopbarArrowDown(e); });
 // Reverse direction — from the player's own top control (X) back up to
 // the topbar, completing the cycle in both directions.
 closeMini.addEventListener("keydown", (e) => {
@@ -2082,6 +2079,16 @@ closeMini.addEventListener("keydown", (e) => {
     e.preventDefault();
     backBtn.focus();
   }
+});
+// Continues the topbar's downward chain on into the search/tabs row when
+// no player is open — Open Keyboard down to the first tab (Home), and
+// back up again from there.
+document.querySelector(".search-open-btn")?.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowUp") { e.preventDefault(); backBtn.focus(); }
+  else if (e.key === "ArrowDown") { e.preventDefault(); document.getElementById("homeTab")?.focus(); }
+});
+document.getElementById("homeTab")?.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowUp") { e.preventDefault(); document.querySelector(".search-open-btn")?.focus(); }
 });
 
 // When focus is on closeMini (X) and user swipes down → go to play button
