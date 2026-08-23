@@ -2160,6 +2160,25 @@ setInterval(() => {
   if (!isFullscreen && isCinema) disableCinemaMode();
   if (!isFullscreen && isFSBody) document.body.classList.remove("fullscreen-active");
   if (isFullscreen && isBlank) { playerSection.classList.remove("player-fullscreen"); document.body.classList.remove("fullscreen-active"); disableCinemaMode(); }
+  // Keep the pinch-back gesture reaching the document-level keydown
+  // listener while the medium/mini player is open — a cross-origin
+  // iframe that currently holds DOM focus receives keydown events in its
+  // own content window, never bubbling up to this page's listener at
+  // all, regardless of what the gesture actually sends. setPlayerVideo()
+  // already reclaims focus once, 600ms after a video starts, but the
+  // player can silently re-grab it afterward (buffering, an ad, tapping
+  // the video) — Shorts never has this problem since its swipe-zone
+  // overlay physically sits on top of its iframe and can never lose
+  // focus to it in the first place. This is the same fix applied
+  // continuously instead of once, scoped to exactly when it matters.
+  if (!isHidden && !isFullscreen) {
+    const activeEl = document.activeElement;
+    const frameEl = document.querySelector("#playerFrame iframe");
+    if (frameEl && activeEl === frameEl) {
+      const sink = document.getElementById("yt-focus-sink");
+      if (sink) sink.focus({ preventScroll: true });
+    }
+  }
 }, 150);
 
 document.addEventListener("keydown", (e) => {
