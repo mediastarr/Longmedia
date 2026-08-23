@@ -1148,18 +1148,6 @@ const playlistBackBtn = document.getElementById("playlistBackBtn");
 const playlistItemsTitle = document.getElementById("playlistItemsTitle");
 const playlistItemsList = document.getElementById("playlistItemsList");
 
-// Establish real DOM focus on the topbar the instant this script runs —
-// synchronously, not gated on any timer or async work. On this hardware,
-// swipe navigation only works through actual DOM focus + keydown
-// listeners (there's no native "move focus" behavior it can fall back
-// on), so if nothing has ever truly been focused, every swipe listener
-// below silently does nothing. Previously this only ran inside the
-// 1400ms boot-splash-dismiss timeout, which is too late if the page
-// paints from cache faster than that (a real, common case) — a swipe
-// attempted before that timeout fires would find nothing focused yet.
-// Doing it here, before any other code runs, removes that race entirely.
-themeToggle.focus({ preventScroll: true });
-
 function showHUD(text) {
   hudEl.textContent = text; hudEl.style.opacity = 1;
   setTimeout(() => (hudEl.style.opacity = 0), 1200);
@@ -2031,13 +2019,6 @@ function showUIWithMiniPlayer() {
   else if (currentTab === "playlists") playlistPageEl.style.display = "block";
   else feedContainerFor(currentTab).style.display = "grid";
   requestAnimationFrame(() => window.scrollTo({ top: savedScrollY, behavior: "instant" }));
-  // Defensive re-apply — on this hardware, closing the player can cause
-  // focus to land on the first focusable element on the page (the Theme
-  // button, top-left) shortly after this function runs, and a native
-  // focus-triggered scroll-into-view can silently override the restore
-  // above if it happens on a later tick. Catching that a beat later wins
-  // the race without needing to guess at exactly when or why it happens.
-  setTimeout(() => { if (window.scrollY !== savedScrollY) window.scrollTo({ top: savedScrollY, behavior: "instant" }); }, 120);
 }
 
 /* CHANGE: back button scrolls to the selected video card after exiting fullscreen */
@@ -2062,47 +2043,6 @@ backBtn.addEventListener("click", () => {
   showHUD("Mini-player");
 });
 
-// Bridges the topbar row (Theme/Sync/Mini) downward — into the player
-// controls when a video is open, or into the search/tabs row when it's
-// not. Previously this only handled the player case, so on a fresh app
-// open (no player yet) ArrowDown from the topbar had nowhere to go and
-// silently did nothing at all — the app looked stuck on the Theme button.
-//
-// syncBtn itself isn't declared as a const until much later in the script
-// (in the Sync-from-YouTube section, well below this point) — referencing
-// that binding here would throw (temporal dead zone) and halt the whole
-// script at this exact line, which is exactly what caused the boot-splash
-// hang the last time this was attempted. Using a direct element lookup
-// instead has no such ordering requirement, since the actual DOM element
-// already exists by the time this script runs (it's static HTML, parsed
-// before the closing </body> where this <script> tag sits).
-function vtTopbarArrowDown(e) {
-  e.preventDefault();
-  if (playerSection.style.display !== "none") { closeMini.focus(); return; }
-  document.querySelector(".search-open-btn")?.focus();
-}
-themeToggle.addEventListener("keydown", (e) => { if (e.key === "ArrowDown") vtTopbarArrowDown(e); });
-document.getElementById("syncBtn").addEventListener("keydown", (e) => { if (e.key === "ArrowDown") vtTopbarArrowDown(e); });
-backBtn.addEventListener("keydown", (e) => { if (e.key === "ArrowDown") vtTopbarArrowDown(e); });
-// Reverse direction — from the player's own top control (X) back up to
-// the topbar, completing the cycle in both directions.
-closeMini.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowUp") {
-    e.preventDefault();
-    backBtn.focus();
-  }
-});
-// Continues the topbar's downward chain on into the search/tabs row when
-// no player is open — Open Keyboard down to the first tab (Home), and
-// back up again from there.
-document.querySelector(".search-open-btn")?.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowUp") { e.preventDefault(); backBtn.focus(); }
-  else if (e.key === "ArrowDown") { e.preventDefault(); document.getElementById("homeTab")?.focus(); }
-});
-document.getElementById("homeTab")?.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowUp") { e.preventDefault(); document.querySelector(".search-open-btn")?.focus(); }
-});
-
 // When focus is on closeMini (X) and user swipes down → go to play button
 closeMini.addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown" || e.key === "Tab") {
@@ -2112,14 +2052,6 @@ closeMini.addEventListener("keydown", (e) => {
 });
 
 closeMini.addEventListener("click", () => {
-  // Reset the back-gesture history flag the moment this state is closed
-  // through its own explicit close action, not just via the gesture's own
-  // popstate handler — otherwise a video closed this way (tap, not
-  // gesture) leaves the flag permanently marked "already pushed," so the
-  // NEXT video open silently skips pushing its own entry, leaving nothing
-  // for a subsequent gesture-triggered native back-navigation to pop.
-  // This is the actual cause of the first-time-only gesture failure.
-  vtBackHistoryPushed = false;
   // Save resume position before closing
   if (ytPlayer && currentVideoId) {
     try { const t = ytPlayer.getCurrentTime(); const dur = ytPlayer.getDuration(); if (t > 5 && dur > 0 && t < dur - 10) saveResumePosition(currentVideoId, t); else if (t >= dur - 10) clearResumePosition(currentVideoId); } catch(e) {}
@@ -3255,35 +3187,7 @@ playPauseBtn.addEventListener("keydown", (e) => {
     e.preventDefault();
     closeMini.focus();
   }
-  // Continues the same downward chain (topbar → X → play/pause) on into
-  // the video info panel's Like button, below the medium player — only
-  // when that panel is actually visible (medium view, not fullscreen or
-  // mini, where it's hidden and there'd be nothing to focus).
-  if (e.key === "ArrowDown") {
-    const vip = document.getElementById("videoInfoPanel");
-    const likeBtn = document.getElementById("vipLikeBtn");
-    if (vip && vip.style.display !== "none" && likeBtn) {
-      e.preventDefault();
-      likeBtn.focus();
-    }
-  }
 });
-
-// Reverse hop back up out of the info panel — wired once here at page
-// load, not inside loadVideoInfoPanel() (which reassigns this button's
-// onclick fresh on every video open — an addEventListener added there
-// would silently stack up a duplicate keydown listener per video watched
-// in a session). vipLikeBtn is static HTML, present before this script
-// tag runs, so a direct lookup here has no ordering concerns.
-const _vipLikeBtnEl = document.getElementById("vipLikeBtn");
-if (_vipLikeBtnEl) {
-  _vipLikeBtnEl.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      playPauseBtn.focus();
-    }
-  });
-}
 
 playPauseBtn.addEventListener("click", () => {
   if (!ytPlayer) return;
@@ -3755,7 +3659,6 @@ async function openAsShort(videoId, snippet) {
       const newBack = backBtn2.cloneNode(true);
       backBtn2.parentNode.replaceChild(newBack, backBtn2);
       newBack.addEventListener("click", () => {
-        vtBackHistoryPushed = false;
         if (typeof _recordShortsWatchTime === "function") _recordShortsWatchTime();
         const iframe = document.getElementById("shortsIframe");
         if (iframe) iframe.src = "about:blank";
@@ -4280,7 +4183,6 @@ async function openShortsTabSetup() {
   // Wire back button immediately before any async work — restores the
   // topbar/tabs hidden above, so leaving Shorts returns the app to normal.
   backBtn2.addEventListener("click", () => {
-    vtBackHistoryPushed = false;
     _recordShortsWatchTime();
     shortsIframe.src = "about:blank";
     if (!document.getElementById("scrollSentinel")) {
@@ -7342,15 +7244,47 @@ async function _injectHubVideos(hubVideos) {
 /* ── Genuine instant push via WebSocket ── */
 let _notifWs = null;
 let _notifWsReconnectAttempt = 0;
+// Heartbeat — periodically pings the Worker's Durable Object and expects a
+// pong back. Without this, a connection that dies silently over flaky
+// glasses WiFi (a NAT/proxy dropping it without ever sending a clean close
+// frame — a genuine, common failure mode) leaves the browser's WebSocket
+// object reporting readyState OPEN indefinitely: no onclose ever fires, so
+// the existing reconnect logic below never triggers, and pushes for new
+// subscription uploads just silently vanish with no visible error. This
+// makes that failure detectable and self-healing instead of permanent
+// until the next full app restart.
+let _notifPingInterval = null;
+let _notifLastPongAt = 0;
+const NOTIF_PING_INTERVAL_MS = 20000;
+const NOTIF_PONG_TIMEOUT_MS = 50000; // tolerates one missed ping before declaring the connection dead
+function _stopNotifHeartbeat() {
+  if (_notifPingInterval) { clearInterval(_notifPingInterval); _notifPingInterval = null; }
+}
+function _startNotifHeartbeat(ws) {
+  _stopNotifHeartbeat();
+  _notifLastPongAt = Date.now();
+  _notifPingInterval = setInterval(() => {
+    if (_notifWs !== ws || ws.readyState !== WebSocket.OPEN) { _stopNotifHeartbeat(); return; }
+    if (Date.now() - _notifLastPongAt > NOTIF_PONG_TIMEOUT_MS) {
+      // No pong in too long — the connection is silently dead. Force it
+      // closed so the existing onclose → reconnect logic takes over,
+      // rather than leaving this pinging a corpse indefinitely.
+      try { ws.close(); } catch(e) {}
+      return;
+    }
+    try { ws.send(JSON.stringify({ type: "ping" })); } catch(e) {}
+  }, NOTIF_PING_INTERVAL_MS);
+}
 function _connectNotificationWebSocket() {
   try {
     const wsUrl = HUB_WORKER_URL.replace(/^https:/, "wss:") + "/ws?user=" + encodeURIComponent(getViewTubeUserId()) + "&secret=" + encodeURIComponent(HUB_SECRET) + "&device=" + encodeURIComponent(getViewTubeDeviceId());
     const ws = new WebSocket(wsUrl);
     _notifWs = ws;
-    ws.onopen = () => { _notifWsReconnectAttempt = 0; };
+    ws.onopen = () => { _notifWsReconnectAttempt = 0; _startNotifHeartbeat(ws); };
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
+        if (msg.type === "pong") { _notifLastPongAt = Date.now(); return; }
         const toItems = (videos) => (videos || []).map(v => ({
           videoId: v.videoId, channelId: v.channelId || "", title: v.title || "",
           publishedAt: v.publishedAt || "", receivedAt: v.receivedAt || Date.now(), source: "subscription"
@@ -7400,6 +7334,7 @@ function _connectNotificationWebSocket() {
       } catch(e) {}
     };
     ws.onclose = () => {
+      _stopNotifHeartbeat();
       if (_notifWs !== ws) return; // superseded by a newer connection attempt
       // Capped exponential backoff — a flaky glasses network shouldn't
       // mean either giving up on push entirely or hammering the Worker
@@ -8493,13 +8428,15 @@ function applyShortPlayerPatch(card, item) {
   // be individually. Serializing them removes the overlap window entirely.
   // Named (not an anonymous IIFE) so the same sweep can also be re-run
   // periodically below — this is the actual fix for new uploads silently
-  // going quiet over a long, never-restarted session. The continuous
-  // mechanisms (WebSocket push, the 10-15s KV poll) are what's supposed to
-  // keep this current without needing a restart, but a long session gives
-  // more surface for either to silently degrade (a dropped WebSocket
-  // connection that never fires its own close event is a known real
-  // possibility over flaky WiFi) — a fresh, one-shot broad sweep like this
-  // never depends on either having stayed alive.
+  // going quiet over a long, never-restarted session, and for making sure
+  // freshly-uploaded videos surface as red-highlighted as soon as
+  // possible rather than only on the next full app restart. The
+  // continuous mechanisms (WebSocket push, the 10-15s KV poll) are what's
+  // supposed to keep this current without needing a restart, but a long
+  // session gives more surface for either to silently degrade (a dropped
+  // WebSocket connection that never fires its own close event is a known
+  // real possibility over flaky WiFi) — a fresh, one-shot broad sweep
+  // like this never depends on either having stayed alive.
   async function _broadSubUploadsSweep() {
     if (window._manualSyncInProgress) return;
     try {
@@ -8541,12 +8478,14 @@ function applyShortPlayerPatch(card, item) {
   }
   await _broadSubUploadsSweep();
   // Safety net for long, never-restarted sessions — re-runs the exact same
-  // broad sweep every 15 minutes for as long as the app stays open, so new
-  // uploads can't stay silently missed for the rest of a session just
-  // because the WebSocket or the faster incremental poll happened to go
-  // quiet at some point. Never runs while the page is hidden/backgrounded,
-  // matching the same guard already used for live-stream checks.
-  setInterval(() => { if (!document.hidden) _broadSubUploadsSweep(); }, 15 * 60 * 1000);
+  // broad sweep every 5 minutes for as long as the app stays open, so a
+  // freshly-uploaded video surfaces as red-highlighted as close to the
+  // moment it's actually posted as this polling-based approach allows,
+  // rather than waiting on the next app restart or the slower rotation in
+  // the regular background poll to happen to reach that channel. Never
+  // runs while the page is hidden/backgrounded, matching the same guard
+  // already used for live-stream checks.
+  setInterval(() => { if (!document.hidden) _broadSubUploadsSweep(); }, 5 * 60 * 1000);
 
   _startPolling();
 
