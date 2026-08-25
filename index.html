@@ -2019,6 +2019,23 @@ function showUIWithMiniPlayer() {
   else if (currentTab === "playlists") playlistPageEl.style.display = "block";
   else feedContainerFor(currentTab).style.display = "grid";
   requestAnimationFrame(() => window.scrollTo({ top: savedScrollY, behavior: "instant" }));
+  // Defensive re-apply, checked at a few increasing delays rather than
+  // just once — on this hardware, closing the player can cause focus to
+  // land on the first focusable element on the page (the Theme button,
+  // top-left) shortly after this function runs, and a native
+  // focus-triggered scroll-into-view can silently override the restore
+  // above. A single re-check shortly after was enough to win that race
+  // when closing via the on-screen X, but the pinch/thumb gesture path
+  // goes through an actual browser back-navigation (popstate) first,
+  // which can settle its own scroll position later than a simple focus
+  // grab does — one 120ms check wasn't always late enough to still be
+  // the last write. Re-checking a few times over a longer window costs
+  // nothing once the position already matches (each check is a no-op the
+  // moment savedScrollY and window.scrollY agree), so this only ever
+  // does real work on the runs that actually need it.
+  [120, 250, 450].forEach(delay => {
+    setTimeout(() => { if (window.scrollY !== savedScrollY) window.scrollTo({ top: savedScrollY, behavior: "instant" }); }, delay);
+  });
 }
 
 /* CHANGE: back button scrolls to the selected video card after exiting fullscreen */
