@@ -2369,6 +2369,31 @@ const QUALITY_LABELS = { auto: "Auto", small: "240p", medium: "360p", large: "48
 let qualityIndex = 0;           // starts at "auto" — like real YouTube ABR
 let currentQuality = "auto";   // no forced quality until user taps the button
 
+// Keeps the quality button's label truthful to what's ACTUALLY playing,
+// not just what was last requested. setPlaybackQuality/
+// setPlaybackQualityRange are advisory — YouTube's own player can still
+// silently step quality down under real bandwidth pressure regardless of
+// what was asked for, and onPlaybackQualityChange (fired by the IFrame
+// API itself whenever the real quality changes, for any reason) is the
+// only reliable way to notice when that happens. Wired identically on
+// every place a player instance gets created below, since a fresh
+// instance has no memory of anything an earlier one detected.
+function _handleActualQualityChange(e) {
+  try {
+    const actual = e.data; // e.g. "hd1080", "large", "medium"
+    if (!actual) return;
+    const rb = document.getElementById("resBtn");
+    if (rb) rb.textContent = QUALITY_LABELS[actual] || actual;
+    // Only worth surfacing to the user when they explicitly chose a tier
+    // (not "auto") and the player just moved away from it on its own —
+    // that's the one case where a stale label would otherwise mislead
+    // them about what's actually on screen right now.
+    if (currentQuality !== "auto" && actual !== currentQuality) {
+      showHUD("Auto-adjusted to " + (QUALITY_LABELS[actual] || actual) + " (network)");
+    }
+  } catch(err) {}
+}
+
 const ytScript = document.createElement("script");
 ytScript.src = "https://www.youtube.com/iframe_api";
 document.head.appendChild(ytScript);
@@ -2437,6 +2462,7 @@ window.onYouTubeIframeAPIReady = function () {
             playNextSuggested();
           }
         },
+        onPlaybackQualityChange: _handleActualQualityChange,
         onError: (e) => {
           if (e.data === 101 || e.data === 150) showEmbedBlockedOverlay(currentVideoId);
           else if (e.data === 100) showHUD('Video not available');
@@ -2581,6 +2607,7 @@ function createYTPlayer(videoId, startSeconds) {
         if (e.data === YT.PlayerState.PAUSED) { playPauseBtn.textContent = "▶"; _watchSegmentEnd(); }
         if (e.data === YT.PlayerState.ENDED && currentVideoId) { clearResumePosition(currentVideoId); _finalizeWatchSession(true); playNextSuggested(); }
         },
+        onPlaybackQualityChange: _handleActualQualityChange,
         onError: (e) => {
           if (e.data === 101 || e.data === 150) showEmbedBlockedOverlay(currentVideoId);
           else if (e.data === 100) showHUD('Video not available');
@@ -3323,6 +3350,7 @@ resBtn.addEventListener("click", () => {
         if (e.data === YT.PlayerState.PAUSED) { playPauseBtn.textContent = "▶"; _watchSegmentEnd(); }
         if (e.data === YT.PlayerState.ENDED && currentVideoId) { clearResumePosition(currentVideoId); _finalizeWatchSession(true); playNextSuggested(); }
         },
+        onPlaybackQualityChange: _handleActualQualityChange,
         onError: (e) => {
           if (e.data === 101 || e.data === 150) showEmbedBlockedOverlay(currentVideoId);
           else if (e.data === 100) showHUD('Video not available');
