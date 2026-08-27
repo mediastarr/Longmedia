@@ -3816,6 +3816,19 @@ function appendFeed(items) {
 }
 
 function setActiveTab(tab) {
+  // Stop any Shorts playback before leaving that tab. This function is
+  // the one place every tab switch goes through — but it only ever
+  // toggles container visibility, so any path away from Shorts other
+  // than tapping its own dedicated back button (which has its own
+  // cleanup) previously left that iframe alive, hidden, and still
+  // playing audio in the background indefinitely. This is what let a
+  // Short's audio keep going long after leaving Shorts entirely — even
+  // through opening and later closing an unrelated medium-player video.
+  if (currentTab === "shorts" && tab !== "shorts") {
+    try { if (typeof _recordShortsWatchTime === "function") _recordShortsWatchTime(); } catch(e) {}
+    const shortsIframeEl = document.getElementById("shortsIframe");
+    if (shortsIframeEl) shortsIframeEl.src = "about:blank";
+  }
   currentTab = tab;
   [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab, subsTab, playlistTab]
     .forEach(btn => btn && btn.classList.remove("active"));
@@ -4350,6 +4363,21 @@ async function openShortsTabSetup() {
   // play/pause, matching the requested cycle order.
   try { document.activeElement?.blur?.(); } catch(e) {}
   setShortsFocus(0);
+  // Reclaim focus if the shorts iframe itself ever grabs it — cross-origin
+  // video embeds can auto-focus themselves once their content becomes
+  // interactive, and since nothing here has any listeners on that iframe
+  // at all, if that happens the generic global *:focus CSS rule draws an
+  // outline around the ENTIRE player box instead of highlighting one of
+  // the actual navigable controls (this is what "the whole short player
+  // opens with a selected border" was). Re-applying the current logical
+  // focus target via setShortsFocus (not a bare .focus() call) keeps the
+  // visual highlight and real focus state consistent with each other.
+  // Self-clearing: stops the moment Shorts is no longer the active tab,
+  // so there's nothing to separately unhook on every exit path.
+  const _shortsFocusReclaimTimer = setInterval(() => {
+    if (currentTab !== "shorts") { clearInterval(_shortsFocusReclaimTimer); return; }
+    if (document.activeElement === shortsIframe) setShortsFocus(shortsFocusIdx);
+  }, 200);
   const shortsFocusKeyHandler = (e) => {
     if (currentTab !== "shorts") return;
     if (e.key === "ArrowLeft") { e.preventDefault(); setShortsFocus(shortsFocusIdx - 1); }
