@@ -2069,6 +2069,18 @@ closeMini.addEventListener("keydown", (e) => {
 });
 
 closeMini.addEventListener("click", () => {
+  // Defensive, independent of any tab-switch path — belt-and-suspenders
+  // alongside the setActiveTab() fix for the same underlying issue. If a
+  // Short is ever still loaded and playing in the background for any
+  // reason not already covered elsewhere, closing the medium/mini/
+  // fullscreen player is a natural, safe moment to also guarantee it's
+  // silenced, since the user is actively leaving video playback behind.
+  try {
+    const shortsIframeEl = document.getElementById("shortsIframe");
+    if (shortsIframeEl && shortsIframeEl.getAttribute("src") && shortsIframeEl.getAttribute("src") !== "about:blank") {
+      shortsIframeEl.src = "about:blank";
+    }
+  } catch(e) {}
   // Save resume position before closing
   if (ytPlayer && currentVideoId) {
     try { const t = ytPlayer.getCurrentTime(); const dur = ytPlayer.getDuration(); if (t > 5 && dur > 0 && t < dur - 10) saveResumePosition(currentVideoId, t); else if (t >= dur - 10) clearResumePosition(currentVideoId); } catch(e) {}
@@ -2352,8 +2364,21 @@ try { history.scrollRestoration = "manual"; } catch(e) {}
 let vtBackHistoryPushed = false;
 function vtPushBackHistory() {
   if (vtBackHistoryPushed) return; // already have an entry to pop — layering multiple states on top of each other (e.g. opening the playlist picker while the player is open) still only ever needs one to go "back" from at a time
-  vtBackHistoryPushed = true;
-  try { history.pushState({ vtBack: true }, "", location.href); } catch(e) {}
+  // Only mark an entry as pushed once pushState genuinely succeeds — this
+  // was previously set to true unconditionally before the call even ran.
+  // A silently-failed pushState (a real possibility right at cold app
+  // start, before a WebView's history API has fully settled) left the
+  // flag lying about a poppable entry existing. Since the guard above
+  // checks this flag first, that one failure would then make EVERY later
+  // vtPushBackHistory() call in the session skip pushing its own entry
+  // too — meaning every subsequent gesture-back for the rest of the
+  // session falls through to real, uncontrolled native back-navigation
+  // (landing on whatever this WebView's actual prior history was) instead
+  // of our own dispatcher, rather than just failing once and recovering.
+  try {
+    history.pushState({ vtBack: true }, "", location.href);
+    vtBackHistoryPushed = true;
+  } catch(e) {}
 }
 window.addEventListener("popstate", () => {
   vtBackHistoryPushed = false; // the entry that was pushed is the one that just got popped
@@ -2624,6 +2649,16 @@ function createYTPlayer(videoId, startSeconds) {
 let _recentlyPlayedIds = [];
 function setPlayerVideo(videoId, snippet, startSeconds) {
   vtPushBackHistory();
+  // Defensive, independent of any tab-switch path — same reasoning as the
+  // closeMini fix: opening a video into the medium player is a natural,
+  // safe moment to also guarantee any lingering Shorts playback is
+  // silenced, regardless of how the user actually got here.
+  try {
+    const shortsIframeEl = document.getElementById("shortsIframe");
+    if (shortsIframeEl && shortsIframeEl.getAttribute("src") && shortsIframeEl.getAttribute("src") !== "about:blank") {
+      shortsIframeEl.src = "about:blank";
+    }
+  } catch(e) {}
   // Track this play — used to exclude recently-watched videos from the
   // suggested-videos pool below, so autoplay can't ping-pong between the
   // same two mutually-related videos forever. Capped small deliberately —
