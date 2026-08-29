@@ -2285,6 +2285,24 @@ document.addEventListener("keydown", (e) => {
 // Returns true if it handled something, so the caller knows not to let
 // the key fall through to anything else.
 function vtHandleBackGesture() {
+  // Catch-all safety check, run unconditionally before any of the ordered
+  // checks below: if the current tab isn't Shorts but the Shorts iframe
+  // still has real (non-blank) content loaded, silence it here too. This
+  // exists specifically because currentTab and "is a Short still audibly
+  // playing" can end up out of sync through paths that don't cleanly go
+  // through the Shorts back button (e.g. a suggested video opened directly
+  // into the medium player) — every other defensive stop added elsewhere
+  // targets one specific transition; this one fires on every single
+  // gesture-triggered action, regardless of which state it ends up
+  // actually closing below.
+  if (currentTab !== "shorts") {
+    try {
+      const _gestureShortsIframe = document.getElementById("shortsIframe");
+      if (_gestureShortsIframe && _gestureShortsIframe.getAttribute("src") && _gestureShortsIframe.getAttribute("src") !== "about:blank") {
+        _gestureShortsIframe.src = "about:blank";
+      }
+    } catch(e) {}
+  }
   // 1. Add to Playlist picker — topmost overlay (z-index 100002)
   if (plOverlay && plOverlay.style.display === "flex") { closePicker(); return true; }
   // 2. Sync from YouTube panel (z-index 100001)
@@ -4201,6 +4219,20 @@ let _currentShortsKeyHandler = null;
 let _currentShortsFocusKeyHandler = null;
 async function openShortsTabSetup() {
   vtPushBackHistory();
+  // Explicitly unload any iframe from a PREVIOUS Shorts session before
+  // wiping shortsPageEl's contents below. Replacing a parent's innerHTML
+  // removes the old <iframe> from the DOM, but that doesn't always
+  // synchronously stop a cross-origin embed's own audio session in every
+  // WebView — the same reason setting src="about:blank" explicitly is
+  // used everywhere else in this file to close a short, rather than just
+  // letting the element get garbage-collected. Doing it here too, right
+  // before the old element is discarded, closes that same gap for the
+  // one remaining path: opening Shorts again while an earlier session's
+  // audio was somehow still going.
+  try {
+    const _oldShortsIframe = document.getElementById("shortsIframe");
+    if (_oldShortsIframe) _oldShortsIframe.src = "about:blank";
+  } catch(e) {}
   // Remove the infinite-scroll sentinel from the DOM entirely while
   // Shorts is open, rather than just disabling scroll via CSS — this
   // element didn't exist in earlier versions that never showed this
@@ -4407,8 +4439,18 @@ async function openShortsTabSetup() {
   // opens with a selected border" was). Re-applying the current logical
   // focus target via setShortsFocus (not a bare .focus() call) keeps the
   // visual highlight and real focus state consistent with each other.
-  // Self-clearing: stops the moment Shorts is no longer the active tab,
-  // so there's nothing to separately unhook on every exit path.
+  //
+  // Primary defense: a genuine "focus" event listener, which fires
+  // synchronously the instant the iframe is focused — zero delay. A
+  // polling interval alone (below) can lose the race if the embedded
+  // player's own content re-steals focus faster than the poll interval,
+  // which would make the border look permanently stuck even though brief
+  // reclaims are technically happening in the background.
+  shortsIframe.addEventListener("focus", () => { setShortsFocus(shortsFocusIdx); });
+  // Backup safety net — covers any case the focus event itself doesn't
+  // fire reliably on this specific WebView. Self-clearing: stops the
+  // moment Shorts is no longer the active tab, so there's nothing to
+  // separately unhook on every exit path.
   const _shortsFocusReclaimTimer = setInterval(() => {
     if (currentTab !== "shorts") { clearInterval(_shortsFocusReclaimTimer); return; }
     if (document.activeElement === shortsIframe) setShortsFocus(shortsFocusIdx);
