@@ -2060,6 +2060,29 @@ backBtn.addEventListener("click", () => {
   showHUD("Mini-player");
 });
 
+// Shared, robust "stop the short" helper — physically removes the iframe
+// element from the DOM rather than just reassigning its src to
+// "about:blank". A same-document src reassignment is NOT a hard guarantee
+// in every WebView engine: if the frame is still mid-navigation (a Short
+// that hasn't finished loading yet) or the reassignment happens too close
+// to a previous one, it can get queued behind the in-flight load rather
+// than applied instantly — which is exactly what let a still-loading
+// Short's audio start playing audibly even after the tab had already
+// moved on, and what made some cases need a second gesture before the
+// audio actually stopped. Removing the DOM node is unconditionally
+// guaranteed by spec to tear down its nested browsing context (and
+// whatever load/decode/playback pipeline it had going) immediately,
+// regardless of what state that navigation was in. Safe to call even if
+// nothing is currently loaded — every call site already guards with
+// "if (iframe)" before touching it, and Shorts always rebuilds a fresh
+// iframe via innerHTML replacement the next time it opens regardless.
+function _hardStopShorts() {
+  try {
+    const iframe = document.getElementById("shortsIframe");
+    if (iframe) iframe.remove();
+  } catch(e) {}
+}
+
 // When focus is on closeMini (X) and user swipes down → go to play button
 closeMini.addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown" || e.key === "Tab") {
@@ -2075,12 +2098,7 @@ closeMini.addEventListener("click", () => {
   // reason not already covered elsewhere, closing the medium/mini/
   // fullscreen player is a natural, safe moment to also guarantee it's
   // silenced, since the user is actively leaving video playback behind.
-  try {
-    const shortsIframeEl = document.getElementById("shortsIframe");
-    if (shortsIframeEl && shortsIframeEl.getAttribute("src") && shortsIframeEl.getAttribute("src") !== "about:blank") {
-      shortsIframeEl.src = "about:blank";
-    }
-  } catch(e) {}
+  _hardStopShorts();
   // Save resume position before closing
   if (ytPlayer && currentVideoId) {
     try { const t = ytPlayer.getCurrentTime(); const dur = ytPlayer.getDuration(); if (t > 5 && dur > 0 && t < dur - 10) saveResumePosition(currentVideoId, t); else if (t >= dur - 10) clearResumePosition(currentVideoId); } catch(e) {}
@@ -2295,14 +2313,7 @@ function vtHandleBackGesture() {
   // targets one specific transition; this one fires on every single
   // gesture-triggered action, regardless of which state it ends up
   // actually closing below.
-  if (currentTab !== "shorts") {
-    try {
-      const _gestureShortsIframe = document.getElementById("shortsIframe");
-      if (_gestureShortsIframe && _gestureShortsIframe.getAttribute("src") && _gestureShortsIframe.getAttribute("src") !== "about:blank") {
-        _gestureShortsIframe.src = "about:blank";
-      }
-    } catch(e) {}
-  }
+  if (currentTab !== "shorts") _hardStopShorts();
   // 1. Add to Playlist picker — topmost overlay (z-index 100002)
   if (plOverlay && plOverlay.style.display === "flex") { closePicker(); return true; }
   // 2. Sync from YouTube panel (z-index 100001)
@@ -2671,12 +2682,7 @@ function setPlayerVideo(videoId, snippet, startSeconds) {
   // closeMini fix: opening a video into the medium player is a natural,
   // safe moment to also guarantee any lingering Shorts playback is
   // silenced, regardless of how the user actually got here.
-  try {
-    const shortsIframeEl = document.getElementById("shortsIframe");
-    if (shortsIframeEl && shortsIframeEl.getAttribute("src") && shortsIframeEl.getAttribute("src") !== "about:blank") {
-      shortsIframeEl.src = "about:blank";
-    }
-  } catch(e) {}
+  _hardStopShorts();
   // Track this play — used to exclude recently-watched videos from the
   // suggested-videos pool below, so autoplay can't ping-pong between the
   // same two mutually-related videos forever. Capped small deliberately —
@@ -3770,8 +3776,7 @@ async function openAsShort(videoId, snippet) {
       backBtn2.parentNode.replaceChild(newBack, backBtn2);
       newBack.addEventListener("click", () => {
         if (typeof _recordShortsWatchTime === "function") _recordShortsWatchTime();
-        const iframe = document.getElementById("shortsIframe");
-        if (iframe) iframe.src = "about:blank";
+        _hardStopShorts();
         if (!document.getElementById("scrollSentinel")) {
           const s = document.createElement("div");
           s.id = "scrollSentinel";
@@ -3879,8 +3884,7 @@ function setActiveTab(tab) {
   // through opening and later closing an unrelated medium-player video.
   if (currentTab === "shorts" && tab !== "shorts") {
     try { if (typeof _recordShortsWatchTime === "function") _recordShortsWatchTime(); } catch(e) {}
-    const shortsIframeEl = document.getElementById("shortsIframe");
-    if (shortsIframeEl) shortsIframeEl.src = "about:blank";
+    _hardStopShorts();
   }
   currentTab = tab;
   [homeTab, shortsTab, moviesTab, historyTab, trendingTab, channelTab, subsTab, playlistTab]
@@ -4220,19 +4224,12 @@ let _currentShortsFocusKeyHandler = null;
 async function openShortsTabSetup() {
   vtPushBackHistory();
   // Explicitly unload any iframe from a PREVIOUS Shorts session before
-  // wiping shortsPageEl's contents below. Replacing a parent's innerHTML
-  // removes the old <iframe> from the DOM, but that doesn't always
-  // synchronously stop a cross-origin embed's own audio session in every
-  // WebView — the same reason setting src="about:blank" explicitly is
-  // used everywhere else in this file to close a short, rather than just
-  // letting the element get garbage-collected. Doing it here too, right
-  // before the old element is discarded, closes that same gap for the
-  // one remaining path: opening Shorts again while an earlier session's
-  // audio was somehow still going.
-  try {
-    const _oldShortsIframe = document.getElementById("shortsIframe");
-    if (_oldShortsIframe) _oldShortsIframe.src = "about:blank";
-  } catch(e) {}
+  // wiping shortsPageEl's contents below — via full removal, not a src
+  // reassignment (see _hardStopShorts for why a same-document src change
+  // isn't a hard guarantee). Doing it here too, right before the old
+  // element is discarded, closes the one remaining path: opening Shorts
+  // again while an earlier session's audio was somehow still going.
+  _hardStopShorts();
   // Remove the infinite-scroll sentinel from the DOM entirely while
   // Shorts is open, rather than just disabling scroll via CSS — this
   // element didn't exist in earlier versions that never showed this
@@ -4321,7 +4318,7 @@ async function openShortsTabSetup() {
   // topbar/tabs hidden above, so leaving Shorts returns the app to normal.
   backBtn2.addEventListener("click", () => {
     _recordShortsWatchTime();
-    shortsIframe.src = "about:blank";
+    _hardStopShorts();
     if (!document.getElementById("scrollSentinel")) {
       const s = document.createElement("div");
       s.id = "scrollSentinel";
