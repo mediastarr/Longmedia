@@ -882,7 +882,7 @@ body.fullscreen-active.ui-hidden .exit-full-btn { opacity: 0 !important; pointer
       <button id="vipSaveBtn" class="vip-action-btn">🔖 Save</button>
     </div>
     <!-- Suggested videos label -->
-    <div style="font-size:12px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:rgba(60,242,255,0.7); padding:10px 2px 6px;">Up Next</div>
+    <div id="vipUpNextLabel" style="font-size:12px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:rgba(60,242,255,0.7); padding:10px 2px 6px;">Up Next</div>
     <!-- Suggested feed -->
     <div id="suggestedFeed" style="touch-action:manipulation;"></div>
   </div>
@@ -2676,8 +2676,21 @@ function createYTPlayer(videoId, startSeconds) {
 }
 
 let _recentlyPlayedIds = [];
-function setPlayerVideo(videoId, snippet, startSeconds) {
+// Playlist "Up Next" context — when set (only ever explicitly, by passing
+// it into setPlayerVideo below), the video info panel shows the REST of
+// the current playlist as Up Next instead of the normal algorithmic
+// suggestions, matching real YouTube's behavior when watching within a
+// playlist. Any call to setPlayerVideo that doesn't pass this argument
+// clears it back to null, which is exactly the right default — opening a
+// video from anywhere else (Home, Search, a channel page, a non-playlist
+// suggestion) should fall back to normal suggested videos, not keep
+// showing a stale playlist queue from an unrelated earlier video.
+let _currentPlaylistQueue = null;
+let _currentPlaylistTitle = null;
+function setPlayerVideo(videoId, snippet, startSeconds, playlistQueue, playlistTitle) {
   vtPushBackHistory();
+  _currentPlaylistQueue = (playlistQueue && playlistQueue.length) ? playlistQueue : null;
+  _currentPlaylistTitle = _currentPlaylistQueue ? (playlistTitle || null) : null;
   // Defensive, independent of any tab-switch path — same reasoning as the
   // closeMini fix: opening a video into the medium player is a natural,
   // safe moment to also guarantee any lingering Shorts playback is
@@ -3152,6 +3165,53 @@ async function loadVideoInfoPanel(videoId, snippet) {
 
   // Suggested videos — show skeletons while loading
   sugFeed.innerHTML = Array(4).fill('<div class="skeleton"><div class="skeleton-thumb"></div><div class="skeleton-info"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div></div>').join("");
+
+  // Playing within a playlist — show the REST of that playlist as Up Next,
+  // matching real YouTube's behavior, instead of running the whole
+  // algorithmic suggested-videos pipeline below. _currentPlaylistQueue is
+  // only ever non-null when setPlayerVideo was explicitly given one (see
+  // openPlaylist's card click handler) — any other way of opening a video
+  // clears it back to null, so this branch only ever fires when it's
+  // actually supposed to.
+  if (_currentPlaylistQueue && _currentPlaylistQueue.length) {
+    const upNextLabelEl = document.getElementById("vipUpNextLabel");
+    if (upNextLabelEl) upNextLabelEl.textContent = _currentPlaylistTitle ? ("Up Next from " + _currentPlaylistTitle) : "Up Next";
+    sugFeed.innerHTML = "";
+    _currentPlaylistQueue.forEach((qItem, qIdx) => {
+      const s = qItem.snippet || {};
+      const vid = qItem.id;
+      if (!vid) return;
+      const thumb = s.thumbnails?.maxres?.url || s.thumbnails?.standard?.url || s.thumbnails?.high?.url || s.thumbnails?.medium?.url || s.thumbnails?.default?.url || "";
+      const card = document.createElement("div");
+      card.className = "video-card parallax focusable";
+      card.dataset.videoid = vid;
+      card.setAttribute("tabindex", "0");
+      card.innerHTML = `<div class="video-thumb"><img src="${thumb}" loading="lazy"></div><div class="video-info"><div class="video-title">${s.title || ""}</div><div class="video-channel">${s.videoOwnerChannelTitle || s.channelTitle || ""}</div><div class="video-meta">Next in playlist</div></div>`;
+      card.onclick = async () => {
+        // Continue the playlist — the queue for the NEXT hop is everything
+        // after this item, so tapping further down the list (not just the
+        // very next one) still correctly drops everything already passed.
+        const remaining = _currentPlaylistQueue.slice(qIdx + 1);
+        try {
+          showHUD("Loading: " + (s.title || "").slice(0,30));
+          const short = await checkIsShort(vid, s);
+          if (short) { openAsShort(vid, s); }
+          else { setPlayerVideo(vid, s, undefined, remaining, _currentPlaylistTitle); }
+        } catch(e) {
+          console.error("Playlist Up Next video failed to open:", e);
+          showHUD("⚠️ Couldn't open — try again");
+        }
+      };
+      sugFeed.appendChild(card);
+    });
+    if (!sugFeed.children.length) {
+      sugFeed.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;opacity:0.6;">End of playlist.</div>';
+    }
+    return;
+  } else {
+    const upNextLabelEl = document.getElementById("vipUpNextLabel");
+    if (upNextLabelEl) upNextLabelEl.textContent = "Up Next";
+  }
 
   // Build queries from multiple signals
   const stopwords = new Set(["the","a","an","and","or","of","to","in","is","on","for","with","how","why","what","i","my","we","you","it","at","be","are","was","were","by","from","as","but","not","||","ft","ep","m/v","official","video","full"]);
@@ -5768,6 +5828,13 @@ async function openPlaylist(playlistId, title) {
     playlistItemsList.innerHTML = "";
     if (!data.items || !data.items.length) { playlistItemsList.innerHTML = `<div style="font-size:12px;opacity:0.6;padding:8px 0;">This playlist is empty.</div>`; return; }
     preCacheShorts(data.items.map(item => ({ id: item.snippet?.resourceId?.videoId || item.contentDetails?.videoId, snippet: item.snippet })).filter(x => x.id)).catch(() => {});
+    // Ordered {id, snippet} list for the whole playlist — passed into
+    // setPlayerVideo so the video info panel's Up Next can show the REST
+    // of this playlist (matching real YouTube), rather than running its
+    // usual algorithmic suggested-videos pipeline.
+    const _playlistOrderedItems = data.items
+      .map(item => ({ id: item.snippet?.resourceId?.videoId || item.contentDetails?.videoId, snippet: item.snippet }))
+      .filter(x => x.id);
     let rendered = 0;
     data.items.forEach((item, i) => {
       const snippet = item.snippet; const videoId = snippet.resourceId?.videoId || item.contentDetails?.videoId; if (!videoId) return;
@@ -5776,7 +5843,8 @@ async function openPlaylist(playlistId, title) {
       card.innerHTML = `<div class="video-thumb"><img src="${thumb}"></div><div class="video-info"><div class="video-title">${snippet.title}</div><div class="video-channel">${snippet.videoOwnerChannelTitle || snippet.channelTitle || ""}</div><div class="video-meta">#${i + 1} in playlist</div></div>`;
       card.onclick = async () => {
         tabsEl.style.display="none"; searchTabEl.style.display="none";
-        const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet); showHUD("Playing: " + snippet.title); }
+        const remaining = _playlistOrderedItems.slice(i + 1);
+        const short = await checkIsShort(videoId, snippet); if (short) openAsShort(videoId, snippet); else { setPlayerVideo(videoId, snippet, undefined, remaining, title); showHUD("Playing: " + snippet.title); }
       };
       playlistItemsList.appendChild(card); rendered++;
     });
